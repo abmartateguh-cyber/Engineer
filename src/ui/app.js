@@ -57,13 +57,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const aiSendBtn = document.getElementById('ai-send-btn');
   const aiChips = document.getElementById('ai-chips');
 
-  // Viewport switch tabs
+  // Viewport switch tabs (Universal 3D & 2D Engineering Viewports)
   const btnView3d = document.getElementById('btn-view-3d');
   const btnViewDiagram = document.getElementById('btn-view-diagram');
   const btnViewEda = document.getElementById('btn-view-eda');
+  const btnViewPcb = document.getElementById('btn-view-pcb');
+  const btnViewPid = document.getElementById('btn-view-pid');
+  const btnViewVle = document.getElementById('btn-view-vle');
+  const btnViewTray = document.getElementById('btn-view-tray');
   const canvas3D = document.getElementById('three-canvas');
   const canvasDiagram = document.getElementById('diagram-canvas');
   const canvasEda = document.getElementById('eda-canvas');
+  const allModeBtns = [btnView3d, btnViewDiagram, btnViewEda, btnViewPcb, btnViewPid, btnViewVle, btnViewTray];
 
   // Load Community Samples from IPC
   try {
@@ -75,32 +80,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('IPC offline, using local fallback samples', err);
   }
 
-  // Bind Viewport Mode Buttons
+  // Bind Viewport Mode Buttons (7 Dedicated Engineering Operational Modes)
   function setViewMode(mode) {
     state.activeViewMode = mode;
-    [btnView3d, btnViewDiagram, btnViewEda].forEach(b => b.classList.remove('active'));
+    allModeBtns.forEach(b => { if (b) b.classList.remove('active'); });
     canvas3D.style.display = 'none';
     canvasDiagram.style.display = 'none';
     canvasEda.style.display = 'none';
 
     if (mode === '3d') {
-      btnView3d.classList.add('active');
+      if (btnView3d) btnView3d.classList.add('active');
       canvas3D.style.display = 'block';
       viewport3D.onResize();
     } else if (mode === 'diagram') {
-      btnViewDiagram.classList.add('active');
+      if (btnViewDiagram) btnViewDiagram.classList.add('active');
       canvasDiagram.style.display = 'block';
       blockDiagramUI.onResize();
-    } else if (mode === 'eda') {
-      btnViewEda.classList.add('active');
+    } else if (mode === 'eda' || mode === 'pcb' || mode === 'pid' || mode === 'vle' || mode === 'tray') {
       canvasEda.style.display = 'block';
+      const activeBtn = mode === 'eda' ? btnViewEda
+                      : mode === 'pcb' ? btnViewPcb
+                      : mode === 'pid' ? btnViewPid
+                      : mode === 'vle' ? btnViewVle
+                      : btnViewTray;
+      if (activeBtn) activeBtn.classList.add('active');
+      const targetSubMode = (mode === 'tray') ? 'tray_profile' : mode;
+      schematicLayoutUI.setMode(targetSubMode);
       schematicLayoutUI.onResize();
     }
   }
 
-  btnView3d.addEventListener('click', () => setViewMode('3d'));
-  btnViewDiagram.addEventListener('click', () => setViewMode('diagram'));
-  btnViewEda.addEventListener('click', () => setViewMode('eda'));
+  if (btnView3d) btnView3d.addEventListener('click', () => setViewMode('3d'));
+  if (btnViewDiagram) btnViewDiagram.addEventListener('click', () => setViewMode('diagram'));
+  if (btnViewEda) btnViewEda.addEventListener('click', () => setViewMode('eda'));
+  if (btnViewPcb) btnViewPcb.addEventListener('click', () => setViewMode('pcb'));
+  if (btnViewPid) btnViewPid.addEventListener('click', () => setViewMode('pid'));
+  if (btnViewVle) btnViewVle.addEventListener('click', () => setViewMode('vle'));
+  if (btnViewTray) btnViewTray.addEventListener('click', () => setViewMode('tray'));
 
   // Studio Switcher Event Binding
   studioButtons.forEach(btn => {
@@ -170,6 +186,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <input type="range" class="slider-input" min="6.5" max="12.0" step="0.1" value="${state.manualParams.cadHeight}" id="slider-cad-h">
         </div>
+        <div class="param-row">
+          <div class="param-label-row">
+            <span>Material (ASTM / ISO Standards):</span>
+          </div>
+          <select class="select-input" id="select-material">
+            <option value="Ti-6Al-4V_Grade5" ${state.manualParams.chassisMaterial === 'Ti-6Al-4V_Grade5' ? 'selected' : ''}>Titanium Grade 5 (Ti-6Al-4V) - 4430 kg/m³</option>
+            <option value="Al_6061-T6" ${state.manualParams.chassisMaterial === 'Al_6061-T6' ? 'selected' : ''}>Aluminum 6061-T6 (Aerospace Grade) - 2700 kg/m³</option>
+            <option value="Al_7075-T6" ${state.manualParams.chassisMaterial === 'Al_7075-T6' ? 'selected' : ''}>Aluminum 7075-T6 (High Strength) - 2810 kg/m³</option>
+            <option value="Stainless_316L" ${state.manualParams.chassisMaterial === 'Stainless_316L' ? 'selected' : ''}>Stainless Steel AISI 316L - 8000 kg/m³</option>
+            <option value="Corning_GorillaGlass_Victus2" ${state.manualParams.chassisMaterial === 'Corning_GorillaGlass_Victus2' ? 'selected' : ''}>Gorilla Glass Victus 2 - 2480 kg/m³</option>
+            <option value="CarbonFiber_Toray_T800" ${state.manualParams.chassisMaterial === 'CarbonFiber_Toray_T800' ? 'selected' : ''}>Toray T800 Carbon Fiber - 1550 kg/m³</option>
+          </select>
+        </div>
+        <div id="material-inertia-telemetry"></div>
       </div>
 
       <div class="param-group">
@@ -232,12 +262,60 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.manualParams.cadWidth = Number(e.target.value);
       document.getElementById('val-cad-w').textContent = `${state.manualParams.cadWidth} mm`;
       viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
+      updateMaterialInertia();
     });
     sliderH.addEventListener('input', (e) => {
       state.manualParams.cadHeight = Number(e.target.value);
       document.getElementById('val-cad-h').textContent = `${state.manualParams.cadHeight} mm`;
       viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
+      updateMaterialInertia();
     });
+
+    // Material Library & Inertia Computation
+    async function updateMaterialInertia() {
+      const matKey = state.manualParams.chassisMaterial || 'Ti-6Al-4V_Grade5';
+      const container = document.getElementById('material-inertia-telemetry');
+      if (!container || !window.omniEngAPI || !window.omniEngAPI.computeInertia) return;
+      try {
+        const inertia = await window.omniEngAPI.computeInertia({
+          matKey,
+          widthM: state.manualParams.cadWidth / 1000,
+          heightM: state.manualParams.cadHeight / 1000,
+          depthM: state.manualParams.cadDepth / 1000
+        });
+        container.innerHTML = `
+          <div class="telemetry-card" style="margin-top: 6px; padding: 6px 8px; font-size: 10px;">
+            <div class="telemetry-row">
+              <span class="telemetry-label">Calculated Mass:</span>
+              <span class="telemetry-value" style="color: var(--accent-cyan); font-weight:700;">${(inertia.massKg * 1000).toFixed(1)} g</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Volume:</span>
+              <span class="telemetry-value">${inertia.volumeCm3} cm³</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Principal Inertia (Izz):</span>
+              <span class="telemetry-value" style="font-family: var(--font-mono);">${inertia.Izz} kg·m²</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Yield Strength (ASTM):</span>
+              <span class="telemetry-value" style="color: var(--accent-green);">${inertia.yieldStrengthMPa} MPa</span>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        console.warn('Inertia compute error', e);
+      }
+    }
+
+    const selectMat = document.getElementById('select-material');
+    if (selectMat) {
+      selectMat.addEventListener('change', (e) => {
+        state.manualParams.chassisMaterial = e.target.value;
+        updateMaterialInertia();
+      });
+      updateMaterialInertia();
+    }
 
     const sliderDropH = document.getElementById('slider-drop-h');
     sliderDropH.addEventListener('input', (e) => {
@@ -262,6 +340,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Switch to FEA stress contour view
       viewport3D.renderFEAStressHeatmap();
+
+      // Also compute 50-step explicit time integration and load dynamic frames into the playback bar
+      try {
+        const transientRes = await window.omniEngAPI.solveTransientDrop({
+          dropHeightM: state.manualParams.dropHeight,
+          impactAngle: state.manualParams.impactAngle,
+          timeStepUs: 100,
+          totalDurationMs: 5.0
+        });
+        viewport3D.loadTransientDropData(transientRes);
+      } catch (err) {
+        console.warn('Transient solver error', err);
+      }
 
       const isPass = res.status.includes('PASS');
       const isWarn = res.status.includes('WARNING');
@@ -424,6 +515,25 @@ endmodule</textarea>
         </div>
       `;
     });
+
+    // Add Direct Layout Mode Switcher (TSMC 3nm IC vs Altium 4-Layer PCB)
+    const layoutModeRow = document.createElement('div');
+    layoutModeRow.style.marginTop = '10px';
+    layoutModeRow.style.display = 'flex';
+    layoutModeRow.style.flexDirection = 'column';
+    layoutModeRow.style.gap = '6px';
+    layoutModeRow.innerHTML = `
+      <button class="btn-primary" id="btn-inspect-ic" style="background: var(--bg-tertiary); border: 1px solid var(--accent-indigo); color: var(--accent-cyan); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        🔬 View TSMC 3nm Custom IC Layout
+      </button>
+      <button class="btn-primary" id="btn-inspect-pcb" style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); color: var(--accent-green); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        📟 View Altium 4-Layer High-Speed PCB Layout
+      </button>
+    `;
+    inspectorContainer.appendChild(layoutModeRow);
+
+    document.getElementById('btn-inspect-ic').addEventListener('click', () => setViewMode('eda'));
+    document.getElementById('btn-inspect-pcb').addEventListener('click', () => setViewMode('pcb'));
   }
 
   function renderAerospaceInspector() {
@@ -639,6 +749,25 @@ endmodule</textarea>
         </div>
       `;
     });
+
+    // Add Direct Chemical Thermodynamics Inspection Buttons
+    const vleBtnRow = document.createElement('div');
+    vleBtnRow.style.marginTop = '10px';
+    vleBtnRow.style.display = 'flex';
+    vleBtnRow.style.flexDirection = 'column';
+    vleBtnRow.style.gap = '6px';
+    vleBtnRow.innerHTML = `
+      <button class="btn-primary" id="btn-inspect-vle" style="background: var(--bg-tertiary); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        📈 View Peng-Robinson P-T Phase Envelope
+      </button>
+      <button class="btn-primary" id="btn-inspect-tray" style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); color: var(--accent-green); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        📊 View 30-Tray Column Thermal & Composition Profile
+      </button>
+    `;
+    inspectorContainer.appendChild(vleBtnRow);
+
+    document.getElementById('btn-inspect-vle').addEventListener('click', () => setViewMode('vle'));
+    document.getElementById('btn-inspect-tray').addEventListener('click', () => setViewMode('tray'));
   }
 
   function renderSimulinkInspector() {
@@ -901,6 +1030,64 @@ endmodule</textarea>
     });
   }
 
+  // Section Cut (Cross-Section Clipping Plane)
+  let isClippingActive = false;
+  const ribbonBtnClip = document.getElementById('ribbon-btn-clip');
+  const ribbonClipAxis = document.getElementById('ribbon-clip-axis');
+  const ribbonClipSlider = document.getElementById('ribbon-clip-slider');
+
+  function updateClipping() {
+    if (!ribbonClipAxis || !ribbonClipSlider) return;
+    const axis = ribbonClipAxis.value;
+    const offset = Number(ribbonClipSlider.value);
+    viewport3D.setClippingPlane(isClippingActive, axis, offset);
+  }
+
+  if (ribbonBtnClip) {
+    ribbonBtnClip.addEventListener('click', () => {
+      isClippingActive = !isClippingActive;
+      ribbonBtnClip.classList.toggle('active', isClippingActive);
+      updateClipping();
+    });
+  }
+  if (ribbonClipAxis) ribbonClipAxis.addEventListener('change', updateClipping);
+  if (ribbonClipSlider) ribbonClipSlider.addEventListener('input', updateClipping);
+
+  // 3D Point-to-Point Caliper Inspection
+  const ribbonBtnMeasure = document.getElementById('ribbon-btn-measure');
+  if (ribbonBtnMeasure) {
+    ribbonBtnMeasure.addEventListener('click', () => {
+      const active = !viewport3D.isMeasuring;
+      viewport3D.toggleMeasureTool(active);
+      ribbonBtnMeasure.classList.toggle('active', active);
+    });
+  }
+
+  // Transient Simulation Dynamic Playback Controls
+  const btnTransPlay = document.getElementById('btn-transient-play');
+  const btnTransPause = document.getElementById('btn-transient-pause');
+  const btnTransReset = document.getElementById('btn-transient-reset');
+  const transSlider = document.getElementById('transient-time-slider');
+
+  if (btnTransPlay) {
+    btnTransPlay.addEventListener('click', () => viewport3D.playTransient());
+  }
+  if (btnTransPause) {
+    btnTransPause.addEventListener('click', () => viewport3D.pauseTransient());
+  }
+  if (btnTransReset) {
+    btnTransReset.addEventListener('click', () => {
+      viewport3D.pauseTransient();
+      viewport3D.renderTransientFrame(0);
+    });
+  }
+  if (transSlider) {
+    transSlider.addEventListener('input', (e) => {
+      viewport3D.pauseTransient();
+      viewport3D.renderTransientFrame(Number(e.target.value));
+    });
+  }
+
   // Camera Presets
   const camIso = document.getElementById('ribbon-cam-iso');
   const camTop = document.getElementById('ribbon-cam-top');
@@ -1094,6 +1281,145 @@ endmodule</textarea>
     btnPrintReport.addEventListener('click', () => {
       reportIframe.contentWindow.print();
     });
+  }
+
+  // --- Frequency Response & Bode Plot Modal (MATLAB Simulink Parity) ---
+  const modalBode = document.getElementById('modal-bode');
+  const btnOpenBode = document.getElementById('ribbon-btn-bode');
+  const btnCloseBode = document.getElementById('btn-close-bode');
+  const btnRecomputeBode = document.getElementById('btn-recompute-bode');
+  const bodePresetSelect = document.getElementById('bode-preset-select');
+  const bodeSvgContainer = document.getElementById('bode-plot-svg-container');
+  const bodeMetricsSummary = document.getElementById('bode-metrics-summary');
+
+  async function runBodeAnalysis() {
+    if (!window.omniEngAPI || !window.omniEngAPI.solveBode) return;
+    const preset = bodePresetSelect ? bodePresetSelect.value : 'drone_pitch';
+
+    let num = [144];
+    let den = [1, 13.2, 144];
+    if (preset === 'consumer_motor') {
+      num = [250];
+      den = [1, 15, 200];
+    } else if (preset === 'plant_temperature') {
+      num = [10];
+      den = [45, 1];
+    }
+
+    try {
+      const res = await window.omniEngAPI.solveBode({
+        numCoeffs: num,
+        denCoeffs: den,
+        omegaMin: 0.1,
+        omegaMax: 1000,
+        points: 80
+      });
+      renderBodeSVG(res);
+    } catch (err) {
+      if (bodeSvgContainer) {
+        bodeSvgContainer.innerHTML = `<div class="status-indicator status-fail">Bode Error: ${err.message}</div>`;
+      }
+    }
+  }
+
+  function renderBodeSVG(data) {
+    if (!bodeSvgContainer || !data || !data.frequencies) return;
+    const { frequencies, magnitudeDB, phaseDeg, stabilityMargins } = data;
+    const W = 820;
+    const H_mag = 160;
+    const H_phase = 160;
+    const padL = 60, padR = 30, padT = 25, padB = 25;
+    const plotW = W - padL - padR;
+
+    const logMin = Math.log10(frequencies[0]);
+    const logMax = Math.log10(frequencies[frequencies.length - 1]);
+    const mapX = (f) => padL + ((Math.log10(f) - logMin) / (logMax - logMin)) * plotW;
+
+    const magMin = -60, magMax = 40;
+    const mapMagY = (db) => padT + (1 - (Math.max(magMin, Math.min(magMax, db)) - magMin) / (magMax - magMin)) * (H_mag - padT - padB);
+
+    const phaseMin = -270, phaseMax = 0;
+    const mapPhaseY = (deg) => (H_mag + 20) + padT + (1 - (Math.max(phaseMin, Math.min(phaseMax, deg)) - phaseMin) / (phaseMax - phaseMin)) * (H_phase - padT - padB);
+
+    const magPoints = frequencies.map((f, i) => `${mapX(f).toFixed(1)},${mapMagY(magnitudeDB[i]).toFixed(1)}`).join(' ');
+    const phasePoints = frequencies.map((f, i) => `${mapX(f).toFixed(1)},${mapPhaseY(phaseDeg[i]).toFixed(1)}`).join(' ');
+
+    const zeroDbY = mapMagY(0);
+    const neg180PhaseY = mapPhaseY(-180);
+
+    bodeSvgContainer.innerHTML = `
+      <svg width="100%" height="370" viewBox="0 0 ${W} 370" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px;">
+        <!-- Magnitude Axes & Zero dB Grid -->
+        <text x="${padL}" y="16" fill="#38bdf8" font-weight="700">Magnitude (dB)</text>
+        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H_mag - padB}" stroke="#475569" stroke-width="1.5" />
+        <line x1="${padL}" y1="${zeroDbY}" x2="${W - padR}" y2="${zeroDbY}" class="bode-axis-line" stroke="#64748b" stroke-dasharray="4,2" />
+        <text x="${padL - 32}" y="${zeroDbY + 3}" fill="#94a3b8">0 dB</text>
+
+        <!-- Magnitude Plot Curve -->
+        <polyline points="${magPoints}" class="bode-curve-mag" />
+
+        <!-- Phase Axes & -180 deg Grid -->
+        <text x="${padL}" y="${H_mag + 32}" fill="#10b981" font-weight="700">Phase (degrees)</text>
+        <line x1="${padL}" y1="${H_mag + 20 + padT}" x2="${padL}" y2="${H_mag + 20 + H_phase - padB}" stroke="#475569" stroke-width="1.5" />
+        <line x1="${padL}" y1="${neg180PhaseY}" x2="${W - padR}" y2="${neg180PhaseY}" class="bode-axis-line" stroke="#ef4444" stroke-dasharray="4,2" />
+        <text x="${padL - 38}" y="${neg180PhaseY + 3}" fill="#ef4444">-180°</text>
+
+        <!-- Phase Plot Curve -->
+        <polyline points="${phasePoints}" class="bode-curve-phase" />
+
+        <!-- Frequency Decade Labels -->
+        <text x="${mapX(0.1)}" y="365" fill="#64748b">10⁻¹ rad/s</text>
+        <text x="${mapX(1.0)}" y="365" fill="#64748b">10⁰ rad/s</text>
+        <text x="${mapX(10.0)}" y="365" fill="#64748b">10¹ rad/s</text>
+        <text x="${mapX(100.0)}" y="365" fill="#64748b">10² rad/s</text>
+        <text x="${mapX(1000.0)}" y="365" fill="#64748b">10³ rad/s</text>
+      </svg>
+    `;
+
+    if (bodeMetricsSummary) {
+      const isStable = stabilityMargins.isClosedLoopStable;
+      bodeMetricsSummary.innerHTML = `
+        <div class="telemetry-card" style="margin-top: 0;">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <div class="telemetry-row" style="flex-direction: column; align-items: flex-start;">
+              <span class="telemetry-label">Gain Margin (GM):</span>
+              <span class="telemetry-value" style="color: var(--accent-cyan); font-size: 13px;">${stabilityMargins.gainMargin_dB} dB</span>
+              <span style="font-size: 9px; color: var(--text-dim);">at ω = ${stabilityMargins.phaseCrossoverFreqRadS} rad/s</span>
+            </div>
+            <div class="telemetry-row" style="flex-direction: column; align-items: flex-start;">
+              <span class="telemetry-label">Phase Margin (PM):</span>
+              <span class="telemetry-value" style="color: var(--accent-green); font-size: 13px;">${stabilityMargins.phaseMargin_deg}°</span>
+              <span style="font-size: 9px; color: var(--text-dim);">at ω = ${stabilityMargins.gainCrossoverFreqRadS} rad/s</span>
+            </div>
+            <div class="telemetry-row" style="flex-direction: column; align-items: flex-start;">
+              <span class="telemetry-label">Closed-Loop Stability:</span>
+              <span class="telemetry-value" style="color: ${isStable ? 'var(--accent-green)' : 'var(--accent-rose)'}; font-size: 13px;">
+                ${isStable ? 'STABLE (Pass)' : 'UNSTABLE'}
+              </span>
+              <span style="font-size: 9px; color: var(--text-dim);">Nyquist Criterion Verified</span>
+            </div>
+            <div class="telemetry-row" style="flex-direction: column; align-items: flex-start;">
+              <span class="telemetry-label">Bandwidth (ω_BW):</span>
+              <span class="telemetry-value" style="color: var(--accent-amber); font-size: 13px;">${stabilityMargins.bandwidthRadS} rad/s</span>
+              <span style="font-size: 9px; color: var(--text-dim);">Control Authority Limit</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (btnOpenBode && modalBode) {
+    btnOpenBode.addEventListener('click', async () => {
+      modalBode.classList.add('active');
+      await runBodeAnalysis();
+    });
+  }
+  if (btnCloseBode && modalBode) {
+    btnCloseBode.addEventListener('click', () => modalBode.classList.remove('active'));
+  }
+  if (btnRecomputeBode) {
+    btnRecomputeBode.addEventListener('click', runBodeAnalysis);
   }
 
   // Wavefront OBJ Export

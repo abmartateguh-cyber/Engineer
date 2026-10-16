@@ -35,6 +35,10 @@ const { PIPING_MATERIALS, ASME_PIPE_SCHEDULES, PipingStressEngine } = require('.
 const { OmniAIEngine, OMNI_TOOLS } = require('../src/core/ai/omni_ai_engine');
 const { CloudHPCEngine } = require('../src/core/hpc/cloud_cluster');
 const { AuditReportGenerator } = require('../src/core/reporting/audit_report');
+const { MaterialManager } = require('../src/core/materials/material_database');
+const { TransientDropAnimator } = require('../src/core/cae/transient_drop_animator');
+const { FrequencyResponseAnalyzer } = require('../src/core/dynamic_simulink/frequency_analysis');
+const { VLEPhaseEnvelopeEngine } = require('../src/core/plant/vle_envelope');
 const { COMMUNITY_SAMPLES } = require('../src/samples/community_samples');
 
 let totalTests = 0;
@@ -539,6 +543,77 @@ test('AuditReportGenerator: Multi-sector regulatory compliance report generation
   assert(report.htmlReport.includes('MIL-STD-810H'));
   assert(report.htmlReport.includes('IEC 62368-1'));
   assert(report.htmlReport.includes('ASME B31.3-2022'));
+});
+
+// ----------------------------------------------------
+// Suite 12: Material Library, Transient Dynamics & Frequency Response
+// ----------------------------------------------------
+console.log('\n12. Testing Material Library, Transient Dynamics & Frequency Analysis:');
+
+test('MaterialManager: ASTM/ISO properties and centroidal inertia tensor calculation', () => {
+  const allMaterials = MaterialManager.listAllMaterials();
+  assert(allMaterials.length >= 10);
+  
+  const ti = MaterialManager.getMaterial('Ti-6Al-4V_Grade5');
+  assert.strictEqual(ti.yieldStrengthMPa, 880.0);
+  assert.strictEqual(ti.densityKgM3, 4430);
+
+  // Compute Mass and Inertia of smartphone enclosure (75mm x 8.2mm x 160mm)
+  const inertia = MaterialManager.computeInertiaCuboid('Ti-6Al-4V_Grade5', 0.075, 0.0082, 0.160);
+  assert(inertia.massKg > 0.4 && inertia.massKg < 0.5, `Expected ~0.435 kg, got ${inertia.massKg}`);
+  assert(inertia.Ixx > 0 && inertia.Iyy > 0 && inertia.Izz > 0);
+  assert.strictEqual(inertia.yieldStrengthMPa, 880.0);
+});
+
+test('TransientDropAnimator: 50-step explicit time integration and energy conservation', () => {
+  const sim = TransientDropAnimator.solveTransientHistory({
+    dropHeightM: 1.5,
+    phoneMassKg: 0.205,
+    impactAngle: 'corner'
+  });
+
+  assert.strictEqual(sim.frames.length, 51);
+  assert(sim.impactVelocity_m_s > 5.0 && sim.impactVelocity_m_s < 6.0);
+  assert(sim.peakDeceleration_G > 50.0);
+  assert(sim.peakChassisStress_MPa > 0.0);
+
+  // Check energy conservation across frames
+  const midFrame = sim.frames[25];
+  assert(midFrame.totalEnergy_J > 0.0);
+  assert(typeof midFrame.kineticEnergy_J === 'number');
+  assert(typeof midFrame.strainEnergy_J === 'number');
+  assert(typeof midFrame.dissipatedEnergy_J === 'number');
+});
+
+test('FrequencyResponseAnalyzer: MATLAB/Simulink Bode magnitude, phase and stability margins', () => {
+  // G(s) = 10 / (s^2 + 2s + 10)
+  const bode = FrequencyResponseAnalyzer.computeBode([10], [1, 2, 10], 0.1, 100, 50);
+
+  assert.strictEqual(bode.bodePoints.length, 50);
+  assert(typeof bode.isStable === 'boolean');
+  assert(bode.stabilityVerdict.includes('STABLE'));
+
+  // DC Gain should be 10/10 = 1.0 (0 dB)
+  const dcPoint = bode.bodePoints[0];
+  assert(Math.abs(dcPoint.magnitudeDb - 0.0) < 1.0);
+  assert(dcPoint.phaseDeg < 5.0 && dcPoint.phaseDeg > -15.0);
+});
+
+test('VLEPhaseEnvelopeEngine: Peng-Robinson P-T Phase Envelope and 30-tray distillation profile', () => {
+  const envelope = VLEPhaseEnvelopeEngine.generatePTEnvelope({ Methane: 0.2, Propane: 0.5, nPentane: 0.3 }, 1.0, 50.0, 20);
+  assert.strictEqual(envelope.points.length, 20);
+  assert(envelope.cricondenbar_Bar >= 50.0);
+  assert(envelope.cricondentherm_C > 0);
+
+  const column = VLEPhaseEnvelopeEngine.generateColumnTrayProfile(30, 22, 50000);
+  assert.strictEqual(column.trays.length, 30);
+  assert.strictEqual(column.trays[0].trayRole, 'Overhead Condenser Collector');
+  assert.strictEqual(column.trays[29].trayRole, 'Bottoms Reboiler Sump');
+
+  // Verify temperature profile monotonically increases down column
+  assert(column.trays[0].temperatureC < column.trays[29].temperatureC);
+  assert.strictEqual(column.trays[0].temperatureC, 110.0);
+  assert.strictEqual(column.trays[29].temperatureC, 360.0);
 });
 
 // ----------------------------------------------------

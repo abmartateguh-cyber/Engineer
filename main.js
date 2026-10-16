@@ -22,6 +22,10 @@ const { PipingStressEngine } = require('./src/core/plant/piping_stress');
 const { OmniAIEngine } = require('./src/core/ai/omni_ai_engine');
 const { CloudHPCEngine } = require('./src/core/hpc/cloud_cluster');
 const { AuditReportGenerator } = require('./src/core/reporting/audit_report');
+const { MaterialManager } = require('./src/core/materials/material_database');
+const { TransientDropAnimator } = require('./src/core/cae/transient_drop_animator');
+const { FrequencyResponseAnalyzer } = require('./src/core/dynamic_simulink/frequency_analysis');
+const { VLEPhaseEnvelopeEngine } = require('./src/core/plant/vle_envelope');
 const { COMMUNITY_SAMPLES } = require('./src/samples/community_samples');
 
 const aiEngine = new OmniAIEngine();
@@ -172,6 +176,33 @@ app.whenReady().then(() => {
   // 9. Comprehensive Engineering Audit & Technical Report
   ipcMain.handle('omni:generate-audit-report', async (event, context) => {
     return AuditReportGenerator.generateComprehensiveReport(context);
+  });
+
+  // 10. Engineering Materials Database
+  ipcMain.handle('omni:get-materials-list', async () => {
+    return MaterialManager.listAllMaterials();
+  });
+
+  ipcMain.handle('omni:compute-inertia', async (event, { matKey, widthM, heightM, depthM }) => {
+    return MaterialManager.computeInertiaCuboid(matKey, widthM, heightM, depthM);
+  });
+
+  // 11. Advanced Transient Dynamics & Frequency Analysis
+  ipcMain.handle('omni:solve-transient-drop', async (event, params) => {
+    return TransientDropAnimator.solveTransientHistory(params);
+  });
+
+  ipcMain.handle('omni:solve-bode', async (event, { numCoeffs, denCoeffs, omegaMin, omegaMax, points }) => {
+    return FrequencyResponseAnalyzer.computeBode(numCoeffs, denCoeffs, omegaMin, omegaMax, points);
+  });
+
+  // 12. Advanced Chemical Process Thermodynamics
+  ipcMain.handle('omni:get-vle-envelope', async (event, { composition, pMinBar, pMaxBar, points }) => {
+    return VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, pMinBar, pMaxBar, points);
+  });
+
+  ipcMain.handle('omni:get-column-profile', async (event, { trayCount, feedTray, feedBPD }) => {
+    return VLEPhaseEnvelopeEngine.generateColumnTrayProfile(trayCount, feedTray, feedBPD);
   });
 
   createWindow();

@@ -70,6 +70,27 @@
     </div>
 
     <div class="ribbon-group">
+      <span class="ribbon-label">Section Cut</span>
+      <div class="ribbon-buttons">
+        <button class="ribbon-btn" id="ribbon-btn-clip" title="Toggle Cross-Section Clipping Plane">✂️ Clip</button>
+        <select class="ribbon-select" id="ribbon-clip-axis" title="Clipping Plane Axis">
+          <option value="y">Y Plane</option>
+          <option value="x">X Plane</option>
+          <option value="z">Z Plane</option>
+        </select>
+        <input type="range" class="ribbon-slider" id="ribbon-clip-slider" min="-100" max="100" value="0" step="1" style="width: 65px;" title="Plane Offset Position">
+      </div>
+    </div>
+
+    <div class="ribbon-group">
+      <span class="ribbon-label">Inspection</span>
+      <div class="ribbon-buttons">
+        <button class="ribbon-btn" id="ribbon-btn-measure" title="3D Point-to-Point Caliper Measurement">📏 Caliper</button>
+        <button class="ribbon-btn" id="ribbon-btn-bode" title="Simulink Frequency Response (Bode Plot)">📊 Bode</button>
+      </div>
+    </div>
+
+    <div class="ribbon-group">
       <span class="ribbon-label">Camera Orientation</span>
       <div class="ribbon-buttons">
         <button class="ribbon-btn" id="ribbon-cam-iso" title="Isometric View">📐 Iso</button>
@@ -127,7 +148,11 @@
         <div class="viewport-mode-tabs">
           <button class="v-mode-btn active" id="btn-view-3d">3D CAD / CAE Mesh</button>
           <button class="v-mode-btn" id="btn-view-diagram">Simulink Block Diagram</button>
-          <button class="v-mode-btn" id="btn-view-eda">EDA / P&ID Schematic</button>
+          <button class="v-mode-btn" id="btn-view-eda">IC Layout (TSMC)</button>
+          <button class="v-mode-btn" id="btn-view-pcb">PCB Layout (Altium)</button>
+          <button class="v-mode-btn" id="btn-view-pid">P&ID Flowsheet</button>
+          <button class="v-mode-btn" id="btn-view-vle">VLE Envelope (HYSYS)</button>
+          <button class="v-mode-btn" id="btn-view-tray">30-Tray Profile</button>
         </div>
         <div style="font-size: 11px; color: var(--text-dim);" id="viewport-stats">
           Triangles: 1,480 | FPS: 60 | Status: Ready
@@ -141,6 +166,28 @@
         <canvas id="diagram-canvas"></canvas>
         <!-- 2D EDA & P&ID Canvas -->
         <canvas id="eda-canvas"></canvas>
+
+        <!-- 3D Caliper Measurement HUD Overlay -->
+        <div id="measurement-hud" class="measurement-hud" style="display: none;"></div>
+
+        <!-- Transient Simulation Dynamic Playback Bar (Ansys Mechanical Parity) -->
+        <div class="transient-playback-bar" id="transient-playback-bar">
+          <div class="playback-controls">
+            <button class="playback-btn" id="btn-transient-reset" title="Reset to t=0">⏮</button>
+            <button class="playback-btn" id="btn-transient-play" title="Play Simulation">▶</button>
+            <button class="playback-btn" id="btn-transient-pause" title="Pause Simulation">⏸</button>
+          </div>
+          <div class="playback-timeline">
+            <span style="font-size: 10px; color: var(--text-dim);">0.0ms</span>
+            <input type="range" id="transient-time-slider" class="transient-slider" min="0" max="49" value="0" step="1">
+            <span style="font-size: 10px; color: var(--text-dim);">5.0ms</span>
+          </div>
+          <div class="playback-telemetry">
+            <div class="playback-stat"><span>Time:</span> <strong id="transient-time-readout">0.00 ms</strong></div>
+            <div class="playback-stat"><span>Peak Stress:</span> <strong id="transient-stress-readout" style="color: var(--accent-cyan);">0.0 MPa</strong></div>
+            <div class="playback-stat"><span>Decel:</span> <strong id="transient-accel-readout" style="color: var(--accent-amber);">0.0 G</strong></div>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -310,6 +357,37 @@ endmodule</textarea>
       </div>
       <div class="modal-body" style="padding: 0;">
         <iframe id="report-iframe" style="width: 100%; height: 100%; border: none; background: #0b0f19;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Frequency Response & Bode Plot (MATLAB Simulink Parity) -->
+  <div class="modal-overlay" id="modal-bode">
+    <div class="modal-card" style="width: 860px; max-height: 90vh;">
+      <div class="modal-header">
+        <div class="modal-title">📊 MATLAB Control System Toolbox Parity — Bode Frequency Response & Margins</div>
+        <button class="modal-close-btn" id="btn-close-bode">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+          <label style="font-size: 11px; color: var(--text-muted);">Transfer Function Preset:</label>
+          <select id="bode-preset-select" class="ribbon-select" style="padding: 4px 8px; font-size: 11px;">
+            <option value="drone_pitch">Drone Pitch Inner Loop (2nd Order: ωn=12, ζ=0.55)</option>
+            <option value="consumer_motor">Haptic Actuator Voice Coil (G(s) = 250 / (s^2 + 15s + 200))</option>
+            <option value="plant_temperature">Distillation Column Temperature Loop (First-Order Lag)</option>
+          </select>
+          <button class="btn-primary" id="btn-recompute-bode" style="margin-top: 0; padding: 4px 12px; font-size: 11px; width: auto;">
+            ⚡ Compute Bode
+          </button>
+        </div>
+
+        <div id="bode-plot-svg-container" style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; min-height: 380px;">
+          <!-- SVG plot rendered by JS -->
+        </div>
+
+        <div id="bode-metrics-summary" style="margin-top: 12px;">
+          <!-- Telemetry rendered by JS -->
+        </div>
       </div>
     </div>
   </div>

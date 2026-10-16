@@ -909,3 +909,144 @@ body {
   border-radius: 2px;
 }
 
+/* Ribbon Select Dropdowns */
+.ribbon-select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-main);
+  font-size: 11px;
+  padding: 3px 6px;
+  outline: none;
+}
+
+.ribbon-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+/* 3D Caliper Measurement HUD */
+.measurement-hud {
+  position: absolute;
+  top: 48px;
+  left: 16px;
+  z-index: 45;
+  background: rgba(15, 23, 42, 0.90);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-glow);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  min-width: 220px;
+}
+
+/* Transient Simulation Playback Scrubber Bar */
+.transient-playback-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 720px;
+  z-index: 45;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75);
+}
+
+.playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.playback-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-main);
+  width: 32px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.playback-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.playback-timeline {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.transient-slider {
+  flex: 1;
+  accent-color: var(--accent-cyan);
+  height: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.playback-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.playback-stat {
+  display: flex;
+  gap: 4px;
+}
+
+.playback-stat span {
+  color: var(--text-dim);
+}
+
+/* Bode Frequency Response SVG Styles */
+.bode-grid-line {
+  stroke: #1e293b;
+  stroke-dasharray: 2, 2;
+  stroke-width: 1;
+}
+
+.bode-axis-line {
+  stroke: #475569;
+  stroke-width: 1.5;
+}
+
+.bode-curve-mag {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 2.2;
+}
+
+.bode-curve-phase {
+  fill: none;
+  stroke: #10b981;
+  stroke-width: 2.2;
+}
+
+.bode-margin-line {
+  stroke: #f59e0b;
+  stroke-dasharray: 4, 3;
+  stroke-width: 1.5;
+}
+
+

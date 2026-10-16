@@ -44,6 +44,18 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   // Engineering Verification & Audit Report
   generateAuditReport: (context) => ipcRenderer.invoke('omni:generate-audit-report', context),
 
+  // Engineering Materials Database
+  getMaterialsList: () => ipcRenderer.invoke('omni:get-materials-list'),
+  computeInertia: (params) => ipcRenderer.invoke('omni:compute-inertia', params),
+
+  // Advanced Transient Dynamics & Frequency Analysis
+  solveTransientDrop: (params) => ipcRenderer.invoke('omni:solve-transient-drop', params),
+  solveBode: (params) => ipcRenderer.invoke('omni:solve-bode', params),
+
+  // Advanced Chemical Process Thermodynamics
+  getVLEEnvelope: (params) => ipcRenderer.invoke('omni:get-vle-envelope', params),
+  getColumnProfile: (params) => ipcRenderer.invoke('omni:get-column-profile', params),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

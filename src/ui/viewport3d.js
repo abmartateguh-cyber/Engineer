@@ -38,6 +38,23 @@ class Viewport3D {
     this.mouse = new THREE.Vector2();
     this.hoveredObject = null;
 
+    // Clipping plane for cross-section analysis
+    this.clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 100);
+    this.isClipping = false;
+    this.clipAxis = 'y';
+    this.clipOffset = 0;
+
+    // 3D Caliper Measurement Tool
+    this.isMeasuring = false;
+    this.measurePoints = [];
+    this.measureLine = null;
+
+    // Transient Drop Dynamic Animation
+    this.transientData = null;
+    this.currentFrameIdx = 0;
+    this.isTransientPlaying = false;
+    this.transientTimer = null;
+
     this.init();
   }
 
@@ -63,6 +80,7 @@ class Viewport3D {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.localClippingEnabled = true;
 
     // 4. Lighting (Studio Key + Fill + Rim + Ground Bounce)
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
@@ -158,6 +176,16 @@ class Viewport3D {
       e.preventDefault();
       this.cameraDistance = Math.max(25, Math.min(1000, this.cameraDistance + e.deltaY * 0.22));
       this.updateCameraPosition();
+    });
+
+    this.canvas.addEventListener('click', () => {
+      if (this.isMeasuring && this.currentMesh && this.camera) {
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.currentMesh.children, true);
+        if (intersects.length > 0) {
+          this.addMeasurePoint(intersects[0].point);
+        }
+      }
     });
   }
 
@@ -281,6 +309,150 @@ class Viewport3D {
       this.target.set(0, 0, 0);
     }
     this.updateCameraPosition();
+  }
+
+  // =========================================================================
+  // Cross-Section Clipping Plane Tool (Creo / NX / SolidWorks)
+  // =========================================================================
+
+  setClippingPlane(enabled, axis = 'y', offset = 0) {
+    this.isClipping = !!enabled;
+    this.clipAxis = axis;
+    this.clipOffset = offset;
+
+    const normal = axis === 'x' ? new THREE.Vector3(-1, 0, 0)
+                 : axis === 'z' ? new THREE.Vector3(0, 0, -1)
+                 : new THREE.Vector3(0, -1, 0);
+
+    this.clipPlane.set(normal, offset);
+
+    if (this.currentMesh) {
+      this.currentMesh.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.clippingPlanes = this.isClipping ? [this.clipPlane] : [];
+          child.material.clipShadows = true;
+          child.material.needsUpdate = true;
+        }
+      });
+    }
+  }
+
+  // =========================================================================
+  // 3D Point-to-Point Caliper Measurement Tool
+  // =========================================================================
+
+  toggleMeasureTool(active) {
+    this.isMeasuring = (active !== undefined) ? active : !this.isMeasuring;
+    this.measurePoints = [];
+    if (this.measureLine) {
+      this.scene.remove(this.measureLine);
+      this.measureLine = null;
+    }
+    const hud = document.getElementById('measurement-hud');
+    if (hud) {
+      hud.style.display = this.isMeasuring ? 'block' : 'none';
+      if (this.isMeasuring) {
+        hud.innerHTML = `
+          <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">📏 3D Caliper Measurement Active</div>
+          <div style="color: var(--text-muted); font-size: 10px;">Click first 3D vertex or component face to anchor...</div>
+        `;
+      }
+    }
+  }
+
+  addMeasurePoint(point3D) {
+    if (!this.isMeasuring) return;
+    this.measurePoints.push(point3D.clone());
+
+    const hud = document.getElementById('measurement-hud');
+    if (this.measurePoints.length === 1 && hud) {
+      hud.innerHTML = `
+        <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">📏 Point 1 Anchored</div>
+        <div style="color: var(--text-muted); font-size: 10px;">P1(${point3D.x.toFixed(1)}, ${point3D.y.toFixed(1)}, ${point3D.z.toFixed(1)}) — Click second point...</div>
+      `;
+    } else if (this.measurePoints.length === 2) {
+      const p1 = this.measurePoints[0];
+      const p2 = this.measurePoints[1];
+      const dx = Math.abs(p2.x - p1.x);
+      const dy = Math.abs(p2.y - p1.y);
+      const dz = Math.abs(p2.z - p1.z);
+      const dist = p1.distanceTo(p2);
+
+      // Render 3D Dimension Line
+      if (this.measureLine) this.scene.remove(this.measureLine);
+
+      const geom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const mat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 3 });
+      this.measureLine = new THREE.Line(geom, mat);
+      this.scene.add(this.measureLine);
+
+      if (hud) {
+        hud.innerHTML = `
+          <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">📏 3D Caliper Result</div>
+          <div style="font-size: 13px; font-weight: 700; color: #fff;">Length: ${dist.toFixed(2)} mm</div>
+          <div style="color: var(--text-dim); font-size: 9px; font-family: var(--font-mono); margin-top: 2px;">
+            ΔX: ${dx.toFixed(2)}mm | ΔY: ${dy.toFixed(2)}mm | ΔZ: ${dz.toFixed(2)}mm
+          </div>
+        `;
+      }
+      this.measurePoints = [];
+    }
+  }
+
+  // =========================================================================
+  // Transient Dynamic Drop Animation Player (Ansys Mechanical Parity)
+  // =========================================================================
+
+  loadTransientDropData(data) {
+    this.transientData = data;
+    this.currentFrameIdx = 0;
+    this.renderTransientFrame(0);
+  }
+
+  renderTransientFrame(frameIdx) {
+    if (!this.transientData || !this.transientData.frames) return;
+    this.currentFrameIdx = Math.max(0, Math.min(this.transientData.frames.length - 1, frameIdx));
+    const frame = this.transientData.frames[this.currentFrameIdx];
+
+    if (this.currentMesh) {
+      // Dynamic vertical motion during drop impact and rebound
+      this.currentMesh.position.y = frame.positionZ_mm;
+
+      // When impact shock hits, update FEA von Mises stress heatmap live
+      if (frame.inContact && frame.chassisStress_MPa > 25) {
+        this.renderFEAStressHeatmap('transient', frame.chassisStress_MPa);
+        this.currentMesh.position.y = frame.positionZ_mm;
+      }
+    }
+
+    // Update transient playback scrubber controls
+    const timeSlider = document.getElementById('transient-time-slider');
+    const timeReadout = document.getElementById('transient-time-readout');
+    const stressReadout = document.getElementById('transient-stress-readout');
+    const accelReadout = document.getElementById('transient-accel-readout');
+
+    if (timeSlider) timeSlider.value = this.currentFrameIdx;
+    if (timeReadout) timeReadout.textContent = `${frame.timeMs.toFixed(2)} ms`;
+    if (stressReadout) stressReadout.textContent = `${frame.chassisStress_MPa.toFixed(1)} MPa`;
+    if (accelReadout) accelReadout.textContent = `${frame.acceleration_G.toFixed(1)} G`;
+  }
+
+  playTransient() {
+    if (this.isTransientPlaying || !this.transientData) return;
+    this.isTransientPlaying = true;
+    const playNext = () => {
+      if (!this.isTransientPlaying) return;
+      let nextIdx = this.currentFrameIdx + 1;
+      if (nextIdx >= this.transientData.frames.length) nextIdx = 0;
+      this.renderTransientFrame(nextIdx);
+      this.transientTimer = setTimeout(playNext, 60);
+    };
+    playNext();
+  }
+
+  pauseTransient() {
+    this.isTransientPlaying = false;
+    if (this.transientTimer) clearTimeout(this.transientTimer);
   }
 
   // =========================================================================
