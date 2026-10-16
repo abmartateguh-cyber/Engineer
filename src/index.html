@@ -49,6 +49,54 @@
     </div>
   </header>
 
+  <!-- Engineering Ribbon Toolbar (Universal CAD/CAE/EDA/HPC Controls) -->
+  <nav class="engineering-ribbon">
+    <div class="ribbon-group">
+      <span class="ribbon-label">Render Style</span>
+      <div class="ribbon-buttons">
+        <button class="ribbon-btn active" id="ribbon-btn-shaded" title="Shaded Solid Geometry">🧊 Solid</button>
+        <button class="ribbon-btn" id="ribbon-btn-wire" title="Wireframe Mesh Overlay">🕸️ Wire</button>
+        <button class="ribbon-btn" id="ribbon-btn-xray" title="Transparent Internal X-Ray">👁️ X-Ray</button>
+        <button class="ribbon-btn" id="ribbon-btn-fea" title="FEA von Mises Stress Colormap">📈 FEA</button>
+      </div>
+    </div>
+
+    <div class="ribbon-group">
+      <span class="ribbon-label">Assembly Explode</span>
+      <div class="ribbon-explode-control">
+        <input type="range" class="ribbon-slider" id="ribbon-explode-slider" min="0" max="100" value="0" step="1">
+        <span class="ribbon-val" id="ribbon-explode-val">0%</span>
+      </div>
+    </div>
+
+    <div class="ribbon-group">
+      <span class="ribbon-label">Camera Orientation</span>
+      <div class="ribbon-buttons">
+        <button class="ribbon-btn" id="ribbon-cam-iso" title="Isometric View">📐 Iso</button>
+        <button class="ribbon-btn" id="ribbon-cam-top" title="Top Plan View">⬆ Top</button>
+        <button class="ribbon-btn" id="ribbon-cam-front" title="Front Elevation View">➡️ Front</button>
+        <button class="ribbon-btn" id="ribbon-cam-reset" title="Reset Camera Framing">🔄 Reset</button>
+      </div>
+    </div>
+
+    <div class="ribbon-group">
+      <span class="ribbon-label">Specialist Tools</span>
+      <div class="ribbon-buttons">
+        <button class="ribbon-btn action-btn" id="ribbon-btn-verilog" title="Open Verilog RTL Synthesis IDE">⚡ Verilog IDE</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-hpc" title="Cloud HPC Cluster Telemetry (Membership)">☁️ Cloud HPC</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-report" title="Generate Comprehensive Audit Report">📄 Audit Report</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-obj" title="Export Wavefront OBJ Mesh">💾 Export OBJ</button>
+      </div>
+    </div>
+
+    <div class="ribbon-status-group">
+      <div class="dual-mode-pill">
+        <span class="pulse-dot"></span>
+        <span>Dual Manual & AI Mode: Synchronized</span>
+      </div>
+    </div>
+  </nav>
+
   <!-- Main Work Area -->
   <div class="app-container">
     <!-- Left Sidebar: Community Samples & Feature Tree -->
@@ -145,6 +193,126 @@
       <button class="ai-send-btn" id="ai-send-btn">Execute AI Action</button>
     </div>
   </footer>
+
+  <!-- Modal: Verilog RTL Synthesis & Static Timing IDE -->
+  <div class="modal-overlay" id="modal-verilog">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">⚡ Verilog RTL Logic Synthesis & Static Timing Analyzer</div>
+        <button class="modal-close-btn" id="btn-close-verilog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+          HDL Source Code (IEEE 1364 Verilog-2001 Standard):
+        </div>
+        <textarea class="code-editor-textarea" id="verilog-source-input">module alu_core (
+  input [3:0] A,
+  input [3:0] B,
+  input [1:0] ALU_Sel,
+  output reg [3:0] ALU_Out,
+  output CarryOut
+);
+  always @(*) begin
+    case (ALU_Sel)
+      2'b00: ALU_Out = A + B;
+      2'b01: ALU_Out = A - B;
+      2'b10: ALU_Out = A & B;
+      2'b11: ALU_Out = A | B;
+      default: ALU_Out = 4'b0000;
+    endcase
+  end
+  assign CarryOut = (ALU_Sel == 2'b00) && ((A + B) > 15);
+endmodule</textarea>
+
+        <div style="display: flex; gap: 10px; margin-top: 12px;">
+          <button class="btn-primary" id="btn-synthesize-modal" style="margin-top: 0; flex: 1;">
+            ⚡ Run RTL Logic Synthesis & Gate Mapping
+          </button>
+        </div>
+
+        <div id="verilog-synthesis-results" style="margin-top: 14px; display: none;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cloud-Native HPC Cluster Telemetry & Membership Tier -->
+  <div class="modal-overlay" id="modal-hpc">
+    <div class="modal-card" style="width: 860px;">
+      <div class="modal-header">
+        <div class="modal-title">☁️ OmniEng Cloud-Native HPC Cluster Management</div>
+        <button class="modal-close-btn" id="btn-close-hpc">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 14px;">
+          <div>
+            <div style="font-weight: 700; color: var(--text-main); font-size: 13px;" id="hpc-tier-status-text">
+              Current Tier: Local Workstation (Air-Gapped)
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Cloud-Native HPC multi-node cluster offload is reserved for Enterprise Members.
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-toggle-membership" style="width: auto; margin-top: 0; padding: 6px 14px; font-size: 11px;">
+            Activate Enterprise Membership
+          </button>
+        </div>
+
+        <div class="param-group-title">Cluster Hardware Architecture (64 Compute Nodes)</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px; margin-bottom: 14px;">
+          <div class="telemetry-card" style="margin-top: 0;">
+            <div class="telemetry-label">Compute Nodes</div>
+            <div class="telemetry-value" style="color: var(--accent-cyan); font-size: 14px;">64 Nodes</div>
+            <div style="color: var(--text-dim); font-size: 9px;">2x AMD EPYC 9654 / Node</div>
+          </div>
+          <div class="telemetry-card" style="margin-top: 0;">
+            <div class="telemetry-label">CPU Cores</div>
+            <div class="telemetry-value" style="color: var(--accent-cyan); font-size: 14px;">8,192 Cores</div>
+            <div style="color: var(--text-dim); font-size: 9px;">16,384 SMT Threads</div>
+          </div>
+          <div class="telemetry-card" style="margin-top: 0;">
+            <div class="telemetry-label">Tensor GPUs</div>
+            <div class="telemetry-value" style="color: var(--accent-cyan); font-size: 14px;">256x H100</div>
+            <div style="color: var(--text-dim); font-size: 9px;">20.48 TB HBM3 VRAM</div>
+          </div>
+          <div class="telemetry-card" style="margin-top: 0;">
+            <div class="telemetry-label">Fabric Throughput</div>
+            <div class="telemetry-value" style="color: var(--accent-cyan); font-size: 14px;">25.6 Tbps</div>
+            <div style="color: var(--text-dim); font-size: 9px;">NDR400 InfiniBand</div>
+          </div>
+        </div>
+
+        <div class="param-group-title">Live Node Telemetry (Nodes 001 - 016)</div>
+        <div class="cluster-grid" id="hpc-nodes-grid">
+          <!-- Populated by JS -->
+        </div>
+
+        <div style="margin-top: 14px; display: flex; gap: 10px;">
+          <button class="btn-primary" id="btn-submit-hpc-job" style="margin-top: 0; flex: 1;">
+            🚀 Dispatch Distributed MPI Simulation to Slurm Queue
+          </button>
+        </div>
+        <div id="hpc-job-results" style="margin-top: 12px; display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Technical Compliance Audit Report -->
+  <div class="modal-overlay" id="modal-report">
+    <div class="modal-card" style="width: 880px; height: 85vh;">
+      <div class="modal-header">
+        <div class="modal-title">📄 OmniEng Engineering Verification & Audit Report</div>
+        <div style="display: flex; gap: 8px;">
+          <button class="ribbon-btn" id="btn-print-report">🖨️ Print / PDF</button>
+          <button class="modal-close-btn" id="btn-close-report">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <iframe id="report-iframe" style="width: 100%; height: 100%; border: none; background: #0b0f19;"></iframe>
+      </div>
+    </div>
+  </div>
 
   <!-- Application Scripts -->
   <script src="ui/viewport3d.js"></script>

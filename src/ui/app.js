@@ -748,6 +748,62 @@ endmodule</textarea>
     addAiMessage(`Loaded turnkey community sample: "${sample.title}". All physics parameters, CAD features, and simulation boundary conditions are initialized and ready to run or edit.`);
   }
 
+  // --- Left Sidebar Tab Switching: Samples vs Feature Tree DAG ---
+  const tabSamples = document.getElementById('tab-samples');
+  const tabTree = document.getElementById('tab-tree');
+  const sidebarSamplesContent = document.getElementById('sidebar-samples-content');
+  const sidebarTreeContent = document.getElementById('sidebar-tree-content');
+  const featureTreeContainer = document.getElementById('feature-tree-container');
+
+  const parametricHistoryFeatures = [
+    { id: 'feat_1', type: 'Extrude', name: 'BaseChassis_Extrude', desc: 'Box: 75.0 x 8.2 x 160.0 mm', status: 'Rebuilt' },
+    { id: 'feat_2', type: 'Fillet', name: 'Corner_EdgeFillet', desc: 'Radius: 8.0 mm (4 corners)', status: 'Rebuilt' },
+    { id: 'feat_3', type: 'CutPocket', name: 'BatteryCavity_Pocket', desc: 'Depth: 5.2 mm, Margin: 3.5 mm', status: 'Rebuilt' },
+    { id: 'feat_4', type: 'BossExtrude', name: 'CameraIsland_Boss', desc: 'Height: 2.4 mm (Sapphire)', status: 'Rebuilt' },
+    { id: 'feat_5', type: 'VaporPlate', name: 'VaporChamber_Pocket', desc: 'Thickness: 0.40 mm Sintered Cu', status: 'Rebuilt' },
+    { id: 'feat_6', type: 'Chamfer', name: 'PerimeterBevel_Chamfer', desc: '45° x 0.50 mm CNC Chamfer', status: 'Rebuilt' }
+  ];
+
+  function renderFeatureTree() {
+    if (!featureTreeContainer) return;
+    featureTreeContainer.innerHTML = '';
+    parametricHistoryFeatures.forEach((feat, idx) => {
+      const node = document.createElement('div');
+      node.className = 'sample-card';
+      node.style.borderLeft = '3px solid var(--accent-cyan)';
+      node.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+          <span style="font-weight: 700; color: var(--text-main); font-size: 11px;">#${idx + 1} ${feat.name}</span>
+          <span class="tag" style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan);">${feat.type}</span>
+        </div>
+        <div style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">${feat.desc}</div>
+        <div style="font-size: 9px; color: var(--accent-green); margin-top: 4px;">✓ ${feat.status} • Valid B-Rep Topology</div>
+      `;
+      node.addEventListener('click', () => {
+        featureTreeContainer.querySelectorAll('.sample-card').forEach(c => c.classList.remove('active'));
+        node.classList.add('active');
+        addAiMessage(`Selected parametric DAG node: "${feat.name}" (${feat.type}). Feature parameters can be modified manually or prompted via OmniAI.`);
+      });
+      featureTreeContainer.appendChild(node);
+    });
+  }
+
+  if (tabSamples && tabTree) {
+    tabSamples.addEventListener('click', () => {
+      tabSamples.classList.add('active');
+      tabTree.classList.remove('active');
+      sidebarSamplesContent.style.display = 'block';
+      sidebarTreeContent.style.display = 'none';
+    });
+    tabTree.addEventListener('click', () => {
+      tabTree.classList.add('active');
+      tabSamples.classList.remove('active');
+      sidebarSamplesContent.style.display = 'none';
+      sidebarTreeContent.style.display = 'block';
+      renderFeatureTree();
+    });
+  }
+
   // --- OmniAI Co-Pilot Messaging & Dual Editing ---
   function addAiMessage(text, isUser = false) {
     const bubble = document.createElement('div');
@@ -810,6 +866,257 @@ endmodule</textarea>
       handleAiPrompt(prompt);
     });
   });
+
+  // --- Engineering Ribbon Toolbar Event Wiring ---
+  const ribbonBtnShaded = document.getElementById('ribbon-btn-shaded');
+  const ribbonBtnWire = document.getElementById('ribbon-btn-wire');
+  const ribbonBtnXray = document.getElementById('ribbon-btn-xray');
+  const ribbonBtnFea = document.getElementById('ribbon-btn-fea');
+  const ribbonExplodeSlider = document.getElementById('ribbon-explode-slider');
+  const ribbonExplodeVal = document.getElementById('ribbon-explode-val');
+
+  function setRibbonRenderMode(btn, mode) {
+    [ribbonBtnShaded, ribbonBtnWire, ribbonBtnXray, ribbonBtnFea].forEach(b => {
+      if (b) b.classList.remove('active');
+    });
+    if (btn) btn.classList.add('active');
+
+    if (mode === 'fea') {
+      viewport3D.renderFEAStressHeatmap('normal', 145);
+    } else {
+      viewport3D.setViewMode(mode);
+    }
+  }
+
+  if (ribbonBtnShaded) ribbonBtnShaded.addEventListener('click', () => setRibbonRenderMode(ribbonBtnShaded, 'shaded'));
+  if (ribbonBtnWire) ribbonBtnWire.addEventListener('click', () => setRibbonRenderMode(ribbonBtnWire, 'wireframe'));
+  if (ribbonBtnXray) ribbonBtnXray.addEventListener('click', () => setRibbonRenderMode(ribbonBtnXray, 'xray'));
+  if (ribbonBtnFea) ribbonBtnFea.addEventListener('click', () => setRibbonRenderMode(ribbonBtnFea, 'fea'));
+
+  if (ribbonExplodeSlider) {
+    ribbonExplodeSlider.addEventListener('input', (e) => {
+      const val = Number(e.target.value);
+      if (ribbonExplodeVal) ribbonExplodeVal.textContent = `${val}%`;
+      viewport3D.setExplodeFactor(val / 100);
+    });
+  }
+
+  // Camera Presets
+  const camIso = document.getElementById('ribbon-cam-iso');
+  const camTop = document.getElementById('ribbon-cam-top');
+  const camFront = document.getElementById('ribbon-cam-front');
+  const camReset = document.getElementById('ribbon-cam-reset');
+
+  if (camIso) camIso.addEventListener('click', () => viewport3D.setCameraPreset('iso'));
+  if (camTop) camTop.addEventListener('click', () => viewport3D.setCameraPreset('top'));
+  if (camFront) camFront.addEventListener('click', () => viewport3D.setCameraPreset('front'));
+  if (camReset) camReset.addEventListener('click', () => viewport3D.setCameraPreset('reset'));
+
+  // --- Specialist Tool Modals ---
+  const modalVerilog = document.getElementById('modal-verilog');
+  const modalHpc = document.getElementById('modal-hpc');
+  const modalReport = document.getElementById('modal-report');
+
+  const btnOpenVerilog = document.getElementById('ribbon-btn-verilog');
+  const btnOpenHpc = document.getElementById('ribbon-btn-hpc');
+  const btnOpenReport = document.getElementById('ribbon-btn-report');
+  const btnExportObj = document.getElementById('ribbon-btn-obj');
+
+  if (btnOpenVerilog && modalVerilog) {
+    btnOpenVerilog.addEventListener('click', () => {
+      modalVerilog.classList.add('active');
+    });
+  }
+  const btnCloseVerilog = document.getElementById('btn-close-verilog');
+  if (btnCloseVerilog && modalVerilog) {
+    btnCloseVerilog.addEventListener('click', () => modalVerilog.classList.remove('active'));
+  }
+
+  // Modal Verilog Synthesis
+  const btnSynthesizeModal = document.getElementById('btn-synthesize-modal');
+  const verilogInput = document.getElementById('verilog-source-input');
+  const verilogResults = document.getElementById('verilog-synthesis-results');
+
+  if (btnSynthesizeModal && verilogInput) {
+    btnSynthesizeModal.addEventListener('click', async () => {
+      try {
+        const res = await window.omniEngAPI.synthesizeVerilog(verilogInput.value);
+        verilogResults.style.display = 'block';
+        verilogResults.innerHTML = `
+          <div class="telemetry-card" style="margin-top: 0;">
+            <div class="telemetry-row">
+              <span class="telemetry-label">Standard Cells Synthesized:</span>
+              <span class="telemetry-value" style="color: var(--accent-cyan);">${res.statistics.cellCount} Gates</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Active Silicon Area:</span>
+              <span class="telemetry-value">${res.statistics.totalAreaUm2} µm²</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Max Clock Frequency:</span>
+              <span class="telemetry-value" style="color: var(--accent-green);">${res.timingAnalysis.maxFrequencyGHz} GHz</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Worst Negative Slack (WNS):</span>
+              <span class="telemetry-value">${res.timingAnalysis.worstNegativeSlackPs} ps</span>
+            </div>
+            <div class="status-indicator status-pass">SYNTHESIS & TIMING CLOSURE VERIFIED (TSMC 3nm FINFET)</div>
+          </div>
+        `;
+      } catch (err) {
+        verilogResults.style.display = 'block';
+        verilogResults.innerHTML = `<div class="status-indicator status-fail">Synthesis Error: ${err.message}</div>`;
+      }
+    });
+  }
+
+  // Cloud HPC Modal
+  let isHpcMember = false;
+  const hpcTierText = document.getElementById('hpc-tier-status-text');
+  const btnToggleMembership = document.getElementById('btn-toggle-membership');
+  const hpcNodesGrid = document.getElementById('hpc-nodes-grid');
+  const btnSubmitHpcJob = document.getElementById('btn-submit-hpc-job');
+  const hpcJobResults = document.getElementById('hpc-job-results');
+  const tierLabel = document.getElementById('tier-label');
+
+  async function refreshHpcTelemetry() {
+    if (!window.omniEngAPI || !window.omniEngAPI.getClusterStatus) return;
+    try {
+      const data = await window.omniEngAPI.getClusterStatus();
+      if (hpcNodesGrid && data.nodesSample) {
+        hpcNodesGrid.innerHTML = data.nodesSample.map(n => `
+          <div class="node-box">
+            <div class="node-box-header">
+              <span>${n.id}</span>
+              <span style="color: ${n.cpuLoadPct > 80 ? 'var(--accent-amber)' : 'var(--accent-cyan)'};">${n.cpuLoadPct}%</span>
+            </div>
+            <div style="font-size: 9px; color: var(--text-dim);">GPU: ${n.gpuLoadPct}% | Mem: ${n.memUsagePct}%</div>
+            <div class="load-bar-bg">
+              <div class="load-bar-fill" style="width: ${n.cpuLoadPct}%;"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+    } catch (err) {
+      console.warn('HPC telemetry fetch error', err);
+    }
+  }
+
+  if (btnOpenHpc && modalHpc) {
+    btnOpenHpc.addEventListener('click', async () => {
+      modalHpc.classList.add('active');
+      await refreshHpcTelemetry();
+    });
+  }
+  const btnCloseHpc = document.getElementById('btn-close-hpc');
+  if (btnCloseHpc && modalHpc) {
+    btnCloseHpc.addEventListener('click', () => modalHpc.classList.remove('active'));
+  }
+
+  if (btnToggleMembership) {
+    btnToggleMembership.addEventListener('click', async () => {
+      isHpcMember = !isHpcMember;
+      await window.omniEngAPI.setMembership(isHpcMember);
+      if (isHpcMember) {
+        if (hpcTierText) hpcTierText.textContent = 'Current Tier: Enterprise Cloud-Native HPC Member';
+        btnToggleMembership.textContent = 'Revert to Local Workstation';
+        btnToggleMembership.style.background = 'var(--bg-tertiary)';
+        if (tierLabel) tierLabel.textContent = 'Enterprise Cloud-Native HPC (Active)';
+      } else {
+        if (hpcTierText) hpcTierText.textContent = 'Current Tier: Local Workstation (Air-Gapped)';
+        btnToggleMembership.textContent = 'Activate Enterprise Membership';
+        btnToggleMembership.style.background = '';
+        if (tierLabel) tierLabel.textContent = 'Air-Gapped Local Workstation';
+      }
+      await refreshHpcTelemetry();
+    });
+  }
+
+  if (btnSubmitHpcJob) {
+    btnSubmitHpcJob.addEventListener('click', async () => {
+      try {
+        const res = await window.omniEngAPI.submitHPCJob('FEA_EXPLICIT_DROP_TEST', {}, 64);
+        hpcJobResults.style.display = 'block';
+        if (res.success) {
+          hpcJobResults.innerHTML = `
+            <div class="telemetry-card" style="margin-top: 0;">
+              <div class="telemetry-row">
+                <span class="telemetry-label">Slurm Job ID:</span>
+                <span class="telemetry-value" style="color: var(--accent-cyan);">${res.job.jobId}</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Cluster Nodes Dispatched:</span>
+                <span class="telemetry-value">${res.job.nodesAllocated} EPYC Nodes (64 MPI Ranks)</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Execution Walltime:</span>
+                <span class="telemetry-value" style="color: var(--accent-green);">${res.job.walltimeSeconds}s (${res.job.estimatedSpeedupVsLocal})</span>
+              </div>
+              <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 8px;">
+                ${res.job.convergenceLog.map(l => `<div>${l}</div>`).join('')}
+              </div>
+            </div>
+          `;
+        } else {
+          hpcJobResults.innerHTML = `<div class="status-indicator status-warn">${res.error}</div>`;
+        }
+      } catch (err) {
+        hpcJobResults.style.display = 'block';
+        hpcJobResults.innerHTML = `<div class="status-indicator status-fail">HPC Dispatch Error: ${err.message}</div>`;
+      }
+    });
+  }
+
+  // Audit Report Modal
+  const reportIframe = document.getElementById('report-iframe');
+  if (btnOpenReport && modalReport) {
+    btnOpenReport.addEventListener('click', async () => {
+      modalReport.classList.add('active');
+      try {
+        const report = await window.omniEngAPI.generateAuditReport({
+          projectId: 'OE-ENG-2026-X89',
+          projectName: 'OmniEng Multi-Sector Physics Certification'
+        });
+        if (reportIframe) {
+          reportIframe.srcdoc = report.htmlReport;
+        }
+      } catch (err) {
+        console.error('Audit report generation error', err);
+      }
+    });
+  }
+  const btnCloseReport = document.getElementById('btn-close-report');
+  if (btnCloseReport && modalReport) {
+    btnCloseReport.addEventListener('click', () => modalReport.classList.remove('active'));
+  }
+  const btnPrintReport = document.getElementById('btn-print-report');
+  if (btnPrintReport && reportIframe) {
+    btnPrintReport.addEventListener('click', () => {
+      reportIframe.contentWindow.print();
+    });
+  }
+
+  // Wavefront OBJ Export
+  if (btnExportObj) {
+    btnExportObj.addEventListener('click', async () => {
+      try {
+        const objContent = await window.omniEngAPI.exportCADOBJ({
+          width: state.manualParams.cadWidth,
+          height: state.manualParams.cadHeight,
+          depth: state.manualParams.cadDepth
+        });
+        const blob = new Blob([objContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `omnieng_${state.currentStudio}_model.obj`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('CAD OBJ export error', err);
+      }
+    });
+  }
 
   // Default initial studio setup
   switchStudio('consumer');

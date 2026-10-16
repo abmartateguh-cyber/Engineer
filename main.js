@@ -20,9 +20,12 @@ const { QuadcopterDynamics } = require('./src/core/dynamic_simulink/drone_flight
 const { ThermodynamicsEngine } = require('./src/core/plant/thermodynamics');
 const { PipingStressEngine } = require('./src/core/plant/piping_stress');
 const { OmniAIEngine } = require('./src/core/ai/omni_ai_engine');
+const { CloudHPCEngine } = require('./src/core/hpc/cloud_cluster');
+const { AuditReportGenerator } = require('./src/core/reporting/audit_report');
 const { COMMUNITY_SAMPLES } = require('./src/samples/community_samples');
 
 const aiEngine = new OmniAIEngine();
+const hpcEngine = new CloudHPCEngine();
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -151,6 +154,24 @@ app.whenReady().then(() => {
       nodeVersion: process.versions.node,
       tier: 'Local Workstation (Air-Gapped)'
     };
+  });
+
+  // 8. Cloud-Native HPC Cluster (Membership Tier)
+  ipcMain.handle('omni:get-cluster-status', async () => {
+    return hpcEngine.getClusterStatus();
+  });
+
+  ipcMain.handle('omni:set-membership', async (event, active) => {
+    return hpcEngine.setMembership(active);
+  });
+
+  ipcMain.handle('omni:submit-hpc-job', async (event, { jobType, params, ranks }) => {
+    return hpcEngine.submitSimulationJob(jobType, params, ranks);
+  });
+
+  // 9. Comprehensive Engineering Audit & Technical Report
+  ipcMain.handle('omni:generate-audit-report', async (event, context) => {
+    return AuditReportGenerator.generateComprehensiveReport(context);
   });
 
   createWindow();

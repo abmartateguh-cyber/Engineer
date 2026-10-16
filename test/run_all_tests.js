@@ -33,6 +33,8 @@ const { PIPING_MATERIALS, ASME_PIPE_SCHEDULES, PipingStressEngine } = require('.
 
 // 7. OmniAI & Community Samples
 const { OmniAIEngine, OMNI_TOOLS } = require('../src/core/ai/omni_ai_engine');
+const { CloudHPCEngine } = require('../src/core/hpc/cloud_cluster');
+const { AuditReportGenerator } = require('../src/core/reporting/audit_report');
 const { COMMUNITY_SAMPLES } = require('../src/samples/community_samples');
 
 let totalTests = 0;
@@ -470,6 +472,73 @@ test('Community Samples: 8 Turnkey Reference Projects Loaded and Valid', () => {
     assert(s.id && s.title && s.studio && s.description);
     assert(Array.isArray(s.tags) && s.tags.length > 0);
   });
+});
+
+// ----------------------------------------------------
+// Suite 11: Cloud-Native HPC Cluster & Engineering Audit
+// ----------------------------------------------------
+console.log('\n11. Testing Cloud-Native HPC Cluster & Technical Audit Engine:');
+
+test('CloudHPCEngine: Membership gating, Slurm MPI workload & Domain Decomposition', () => {
+  const hpc = new CloudHPCEngine();
+
+  // Initial state: Air-gapped workstation
+  const initialStatus = hpc.getClusterStatus();
+  assert.strictEqual(initialStatus.membershipActive, false);
+  assert.strictEqual(initialStatus.specs.nodes, 64);
+  assert.strictEqual(initialStatus.specs.totalCores, 8192);
+  assert.strictEqual(initialStatus.specs.totalGPUs, 256);
+
+  // Attempt distributed dispatch without membership -> Should reject
+  const deniedJob = hpc.submitSimulationJob('FEA_DROP_TEST', {}, 32);
+  assert.strictEqual(deniedJob.success, false);
+  assert(deniedJob.error.includes('Enterprise Membership'));
+
+  // Unlock Enterprise Membership
+  const memberRes = hpc.setMembership(true);
+  assert.strictEqual(memberRes.clusterAccessible, true);
+  assert.strictEqual(hpc.isMembershipActive, true);
+
+  // Domain decomposition (METIS graph partitioner model)
+  const decomp = hpc.computeDomainDecomposition(250000, 32);
+  assert.strictEqual(decomp.success, true);
+  assert.strictEqual(decomp.mpiRanks, 32);
+  assert(decomp.theoreticalSpeedup > 10.0, `Expected speedup > 10x, got ${decomp.theoreticalSpeedup}`);
+  assert(decomp.partitions.length === 8);
+
+  // Submit distributed Slurm MPI job
+  const jobRes = hpc.submitSimulationJob('FEA_EXPLICIT_DROP_TEST', { meshElements: 250000 }, 64);
+  assert.strictEqual(jobRes.success, true);
+  assert(jobRes.job.jobId.startsWith('SLURM-'));
+  assert.strictEqual(jobRes.job.nodesAllocated, 16);
+  assert.strictEqual(jobRes.job.status, 'COMPLETED');
+  assert(jobRes.job.convergenceLog.length >= 5);
+});
+
+test('AuditReportGenerator: Multi-sector regulatory compliance report generation', () => {
+  const report = AuditReportGenerator.generateComprehensiveReport({
+    projectId: 'OE-CERT-2026',
+    projectName: 'Universal Multi-Physics Certification'
+  });
+
+  assert.strictEqual(report.projectId, 'OE-CERT-2026');
+  assert(report.sections.length >= 6);
+
+  // Verify key domains are covered
+  const titles = report.sections.map(s => s.title);
+  assert(titles.some(t => t.includes('Executive Engineering Summary')));
+  assert(titles.some(t => t.includes('Structural Drop Test')));
+  assert(titles.some(t => t.includes('Thermal Conjugate Heat Transfer')));
+  assert(titles.some(t => t.includes('Semiconductor & EDA')));
+  assert(titles.some(t => t.includes('Drone & Aerospace')));
+  assert(titles.some(t => t.includes('Oil & Gas Process')));
+
+  // Verify HTML report output
+  assert(typeof report.htmlReport === 'string');
+  assert(report.htmlReport.includes('OMNIENG MULTI-PHYSICS ENGINEERING AUDIT REPORT'));
+  assert(report.htmlReport.includes('MIL-STD-810H'));
+  assert(report.htmlReport.includes('IEC 62368-1'));
+  assert(report.htmlReport.includes('ASME B31.3-2022'));
 });
 
 // ----------------------------------------------------

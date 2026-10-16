@@ -36,6 +36,14 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   getCommunitySamples: () => ipcRenderer.invoke('omni:get-community-samples'),
   exportCADOBJ: (bodyData) => ipcRenderer.invoke('omni:export-cad-obj', bodyData),
 
+  // Cloud-Native HPC Cluster
+  getClusterStatus: () => ipcRenderer.invoke('omni:get-cluster-status'),
+  setMembership: (active) => ipcRenderer.invoke('omni:set-membership', active),
+  submitHPCJob: (jobType, params, ranks) => ipcRenderer.invoke('omni:submit-hpc-job', { jobType, params, ranks }),
+
+  // Engineering Verification & Audit Report
+  generateAuditReport: (context) => ipcRenderer.invoke('omni:generate-audit-report', context),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });
