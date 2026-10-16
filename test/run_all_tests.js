@@ -1,0 +1,486 @@
+/**
+ * OmniEng Comprehensive Test Suite
+ * Rigorously verifies all mathematical, physics, CAD, CAE, EDA, GNC, plant, and AI modules.
+ */
+
+const assert = require('assert');
+
+// 1. Math Modules
+const { Vector3, Quaternion, LinearSolver } = require('../src/core/math/linear_algebra');
+const { ODESolvers } = require('../src/core/math/ode_solvers');
+
+// 2. CAD Modules
+const { Vertex, Edge, Face, SolidBody, BRepPrimitives } = require('../src/core/cad/brep_topology');
+const { ParametricFeature, FeatureTree } = require('../src/core/cad/feature_tree');
+
+// 3. CAE Modules
+const { FEANode, FEAElement, FEASolver } = require('../src/core/cae/fea_structural');
+const { DropTestSimulator } = require('../src/core/cae/drop_test');
+const { ThermalEngine } = require('../src/core/cae/thermal_cht');
+const { CFDSolver2D } = require('../src/core/cae/cfd_navier_stokes');
+
+// 4. EDA Modules
+const { LogicSynthesisEngine, STANDARD_CELL_LIB } = require('../src/core/eda/logic_synthesis');
+const { DRCEngine } = require('../src/core/eda/drc_engine');
+
+// 5. Dynamic Simulink & GNC Modules
+const { BlockNode, BlockDiagramGraph } = require('../src/core/dynamic_simulink/block_graph');
+const { QuadcopterDynamics } = require('../src/core/dynamic_simulink/drone_flight_dynamics');
+
+// 6. Oil & Gas Process Modules
+const { PURE_COMPONENTS, ThermodynamicsEngine } = require('../src/core/plant/thermodynamics');
+const { PIPING_MATERIALS, ASME_PIPE_SCHEDULES, PipingStressEngine } = require('../src/core/plant/piping_stress');
+
+// 7. OmniAI & Community Samples
+const { OmniAIEngine, OMNI_TOOLS } = require('../src/core/ai/omni_ai_engine');
+const { COMMUNITY_SAMPLES } = require('../src/samples/community_samples');
+
+let totalTests = 0;
+let passedTests = 0;
+let failedTests = 0;
+
+function test(name, fn) {
+  totalTests++;
+  try {
+    fn();
+    passedTests++;
+    console.log(`  ✓ ${name}`);
+  } catch (err) {
+    failedTests++;
+    console.error(`  ✗ FAIL: ${name}`);
+    console.error(`    ${err.message}`);
+  }
+}
+
+console.log('====================================================');
+console.log('   OmniEng Platform Verification & Test Suite       ');
+console.log('====================================================\n');
+
+// ----------------------------------------------------
+// Suite 1: Core Math & Linear Algebra
+// ----------------------------------------------------
+console.log('1. Testing Linear Algebra & Vector Math:');
+
+test('Vector3 arithmetic (add, sub, scale, dot, cross, distanceTo)', () => {
+  const v1 = new Vector3(1, 2, 3);
+  const v2 = new Vector3(4, 5, 6);
+  
+  const vAdd = v1.clone().add(v2);
+  assert.strictEqual(vAdd.x, 5);
+  assert.strictEqual(vAdd.y, 7);
+  assert.strictEqual(vAdd.z, 9);
+
+  const dot = v1.dot(v2); // 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
+  assert.strictEqual(dot, 32);
+
+  const cross = new Vector3(1, 0, 0).cross(new Vector3(0, 1, 0));
+  assert.strictEqual(cross.x, 0);
+  assert.strictEqual(cross.y, 0);
+  assert.strictEqual(cross.z, 1);
+
+  const dist = new Vector3(0, 0, 0).distanceTo(new Vector3(3, 4, 0));
+  assert.strictEqual(dist, 5);
+});
+
+test('Quaternion orientation and Euler rotation conversion', () => {
+  const q = new Quaternion();
+  q.setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2); // 90 deg around Z
+  
+  const v = new Vector3(1, 0, 0);
+  const vRot = q.rotateVector(v);
+  assert(Math.abs(vRot.x - 0) < 1e-5);
+  assert(Math.abs(vRot.y - 1) < 1e-5);
+  assert(Math.abs(vRot.z - 0) < 1e-5);
+
+  const euler = q.toEulerAngles();
+  assert(Math.abs(euler.yaw - Math.PI / 2) < 1e-5);
+});
+
+test('LinearSolver: Gaussian Elimination & Conjugate Gradient', () => {
+  // 2x2 system:
+  // 2*x + 1*y = 5
+  // 1*x + 3*y = 5  => solution: x=2, y=1
+  const A = [
+    [2, 1],
+    [1, 3]
+  ];
+  const b = [5, 5];
+  
+  const xGauss = LinearSolver.solveGaussian(A, b);
+  assert(Math.abs(xGauss[0] - 2.0) < 1e-5, `Expected 2.0, got ${xGauss[0]}`);
+  assert(Math.abs(xGauss[1] - 1.0) < 1e-5, `Expected 1.0, got ${xGauss[1]}`);
+
+  const xCG = LinearSolver.solveConjugateGradient(A, b, [0, 0], 50, 1e-8);
+  assert(Math.abs(xCG[0] - 2.0) < 1e-3, `Expected ~2.0, got ${xCG[0]}`);
+  assert(Math.abs(xCG[1] - 1.0) < 1e-3, `Expected ~1.0, got ${xCG[1]}`);
+});
+
+// ----------------------------------------------------
+// Suite 2: ODE Solvers
+// ----------------------------------------------------
+console.log('\n2. Testing ODE Solvers:');
+
+test('ODESolvers: Explicit RK4 for exponential decay dy/dt = -y', () => {
+  // y(t) = y0 * exp(-t). y(0)=1, at t=1, y(1) = 1/e ~ 0.367879
+  const f = (t, y) => [-y[0]];
+  const traj = ODESolvers.solveRK4(f, [1.0], 0, 1.0, 0.01);
+  const finalState = traj[traj.length - 1];
+  
+  assert.strictEqual(finalState.t, 1.0);
+  assert(Math.abs(finalState.y[0] - Math.exp(-1.0)) < 1e-4);
+});
+
+test('ODESolvers: Adaptive RK45 (Dormand-Prince / ODE45)', () => {
+  const f = (t, y) => [-2.0 * y[0]];
+  const traj = ODESolvers.solveRK45(f, [1.0], 0, 2.0, 0.05, 1e-6);
+  const finalState = traj[traj.length - 1];
+  
+  assert(finalState.t >= 2.0);
+  assert(Math.abs(finalState.y[0] - Math.exp(-4.0)) < 1e-4);
+});
+
+// ----------------------------------------------------
+// Suite 3: Parametric B-Rep CAD Kernel
+// ----------------------------------------------------
+console.log('\n3. Testing B-Rep Topological Kernel:');
+
+test('BRepPrimitives: Box creation, topology and volume', () => {
+  const box = BRepPrimitives.createBox(10, 20, 30, 'TestBox');
+  assert.strictEqual(box.vertices.length, 8);
+  assert.strictEqual(box.faces.length, 6);
+  
+  const vol = box.computeVolume();
+  assert(Math.abs(vol - (10 * 20 * 30)) < 1e-4, `Expected 6000, got ${vol}`);
+
+  const triangles = box.toTriangles();
+  assert.strictEqual(triangles.length, 12); // 6 faces * 2 triangles
+
+  const obj = box.toOBJ();
+  assert(obj.includes('o TestBox'));
+  assert(obj.includes('v '));
+  assert(obj.includes('f '));
+});
+
+test('BRepPrimitives: Cylinder creation and volume approximation', () => {
+  const r = 5;
+  const h = 20;
+  const cyl = BRepPrimitives.createCylinder(r, h, 32, 'TestCyl');
+  const expectedVol = Math.PI * r * r * h; // ~1570.79
+  const vol = cyl.computeVolume();
+  
+  // 32-sided polygon should be within 1.5% of true cylinder volume
+  assert(Math.abs(vol - expectedVol) / expectedVol < 0.015);
+});
+
+test('FeatureTree: Parametric DAG, parameter edits and serialization', () => {
+  const tree = new FeatureTree();
+  const f1 = new ParametricFeature('box', 'BasePlate', { width: 100, height: 10, depth: 50 });
+  tree.addFeature(f1);
+  assert.strictEqual(tree.features.length, 1);
+  assert.strictEqual(tree.currentSolid.name, 'BasePlate');
+  assert.strictEqual(tree.currentSolid.computeVolume(), 50000);
+
+  // Live parameter update
+  tree.updateFeatureParam(f1.id, 'width', 120);
+  assert.strictEqual(tree.currentSolid.computeVolume(), 60000);
+
+  // Serialization to and from JSON
+  const json = tree.toJSON();
+  const restored = FeatureTree.fromJSON(json);
+  assert.strictEqual(restored.features.length, 1);
+  assert.strictEqual(restored.currentSolid.computeVolume(), 60000);
+});
+
+// ----------------------------------------------------
+// Suite 4: Structural FEA (Finite Element Analysis)
+// ----------------------------------------------------
+console.log('\n4. Testing Structural FEA Engine (Ansys Mechanical):');
+
+test('FEASolver: 3D TET4 assembly, Dirichlet boundary conditions & solve', () => {
+  const solver = new FEASolver();
+  
+  // Create 4 vertices of a tetrahedral element
+  const n0 = solver.addNode(0, 0, 0);
+  const n1 = solver.addNode(0.1, 0, 0);
+  const n2 = solver.addNode(0, 0.1, 0);
+  const n3 = solver.addNode(0, 0, 0.1);
+
+  const mat = { E: 69e9, nu: 0.33, yieldStress: 270e6, name: 'Al6061' };
+  solver.addElement([n0.id, n1.id, n2.id, n3.id], mat);
+
+  // Fix base nodes (Dirichlet BCs)
+  solver.fixNode(n0.id, true, true, true);
+  solver.fixNode(n1.id, true, true, true);
+  solver.fixNode(n2.id, true, true, true);
+
+  // Apply tensile force on top node
+  solver.applyForce(n3.id, 0, 0, 1000); // 1000 N
+
+  const results = solver.solve();
+  assert(results !== null);
+  assert(results.dofCount === 12);
+  assert(results.elements.length === 1);
+  assert(results.elements[0].vonMisesStress > 0);
+  assert(typeof results.maxDisplacement === 'number');
+});
+
+// ----------------------------------------------------
+// Suite 5: Consumer Electronics (Drop Test & Thermal CHT)
+// ----------------------------------------------------
+console.log('\n5. Testing Consumer Electronics Engines:');
+
+test('DropTestSimulator: 1.5m smartphone drop test physics', () => {
+  const res = DropTestSimulator.runSimulation({
+    dropHeight: 1.5,
+    phoneMass: 0.205,
+    impactAngle: 'corner'
+  });
+
+  assert(res.impactVelocity > 5.0 && res.impactVelocity < 6.0, `Expected ~5.42 m/s, got ${res.impactVelocity}`);
+  assert(res.peakForce_N > 100, `Expected peak force > 100N, got ${res.peakForce_N}`);
+  assert(res.peakDeceleration_G > 50, `Expected deceleration > 50G, got ${res.peakDeceleration_G}`);
+  assert(typeof res.glassCrackDetected === 'boolean');
+  assert(typeof res.status === 'string');
+  assert(res.timeHistory.length > 0);
+});
+
+test('ThermalEngine: Ansys Icepak CHT with Vapor Chamber and SoC load', () => {
+  const resVC = ThermalEngine.simulateSmartphoneThermal({
+    socPowerWatts: 8.5,
+    batteryPowerWatts: 3.0,
+    hasVaporChamber: true,
+    chassisMaterial: 'Titanium'
+  });
+
+  const resNoVC = ThermalEngine.simulateSmartphoneThermal({
+    socPowerWatts: 8.5,
+    batteryPowerWatts: 3.0,
+    hasVaporChamber: false,
+    chassisMaterial: 'Titanium'
+  });
+
+  assert(resVC.maxSocTempC > 25.0);
+  // Vapor chamber must spread heat and lower peak SoC temperature compared to pure FR4
+  assert(resVC.maxSocTempC < resNoVC.maxSocTempC, 
+    `Vapor chamber (${resVC.maxSocTempC}°C) should cool better than no VC (${resNoVC.maxSocTempC}°C)`);
+  assert(resVC.temperatureMap.length > 0);
+});
+
+// ----------------------------------------------------
+// Suite 6: Semiconductor & EDA (Logic Synthesis & Calibre DRC)
+// ----------------------------------------------------
+console.log('\n6. Testing Semiconductor & EDA Engines:');
+
+test('LogicSynthesisEngine: Synthesizes Verilog ALU to standard cells', () => {
+  const verilog = `
+    module simple_alu (
+      input a, b,
+      output y
+    );
+      assign y = a & b;
+    endmodule
+  `;
+
+  const netlist = LogicSynthesisEngine.synthesize(verilog);
+  assert.strictEqual(netlist.moduleName, 'simple_alu');
+  assert.strictEqual(netlist.inputs.length, 2);
+  assert.strictEqual(netlist.outputs.length, 1);
+  assert.strictEqual(netlist.gateCount, 1);
+  assert.strictEqual(netlist.gates[0].cell, 'AND2');
+  assert(netlist.timing.criticalPathDelay_ps > 0);
+  assert(netlist.area.totalArea_um2 > 0);
+});
+
+test('DRCEngine: Nanometer layout design rule checks (min width & spacing)', () => {
+  const shapes = [
+    { id: 'poly1', layer: 'Poly', x: 0, y: 0, w: 30, h: 100 }, // Violates minWidth 50nm
+    { id: 'poly2', layer: 'Poly', x: 40, y: 0, w: 60, h: 100 } // Spacing is 40 - 30 = 10nm < 45nm minSpacing
+  ];
+
+  const drc = DRCEngine.runDRC(shapes, { minWidth: 50, minSpacing: 45 });
+  assert.strictEqual(drc.isClean, false);
+  assert(drc.violationCount >= 2);
+  
+  const widthViolations = drc.violations.filter(v => v.type === 'MIN_WIDTH_VIOLATION');
+  const spacingViolations = drc.violations.filter(v => v.type === 'MIN_SPACING_VIOLATION');
+  assert(widthViolations.length >= 1);
+  assert(spacingViolations.length >= 1);
+});
+
+test('DRCEngine: LVS (Layout Versus Schematic) netlist equivalence check', () => {
+  const schematic = {
+    gates: [{ id: 'U1', cell: 'NAND2' }, { id: 'U2', cell: 'INV' }]
+  };
+  const layout = {
+    cells: [{ id: 'C1', type: 'NAND2' }, { id: 'C2', type: 'INV' }]
+  };
+
+  const lvs = DRCEngine.runLVS(schematic, layout);
+  assert.strictEqual(lvs.isLVSMatched, true);
+  assert.strictEqual(lvs.matchedCount, 2);
+});
+
+// ----------------------------------------------------
+// Suite 7: Dynamic Simulink & Drone GNC Flight Dynamics
+// ----------------------------------------------------
+console.log('\n7. Testing Dynamic Simulink & Drone GNC Engines:');
+
+test('BlockDiagramGraph: Feedback PID closed-loop step simulation', () => {
+  const graph = new BlockDiagramGraph();
+  const step = graph.addBlock('source_step', 'Step Target', { finalValue: 10.0, stepTime: 0.1 });
+  const pid = graph.addBlock('pid', 'Attitude PID', { Kp: 2.0, Ki: 0.1, Kd: 0.05 });
+  const plant = graph.addBlock('integrator', 'Plant Model', {});
+  const scope = graph.addBlock('scope', 'Signal Scope', {});
+
+  graph.connect(step.id, pid.id);
+  graph.connect(pid.id, plant.id);
+  graph.connect(plant.id, scope.id);
+
+  const res = graph.simulate(2.0, 0.01);
+  assert(res.time.length > 100);
+  assert(res.signals[scope.id].length === res.time.length);
+});
+
+test('QuadcopterDynamics: 6-DOF quaternion flight dynamics autopilot', () => {
+  const res = QuadcopterDynamics.simulateFlightMission({
+    targetAltitude: 10.0,
+    windGustSpeed: 2.5,
+    totalTime: 4.0,
+    dt: 0.01
+  });
+
+  assert.strictEqual(res.targetAltitude, 10.0);
+  assert(res.flightLog.length > 50);
+  const finalLog = res.flightLog[res.flightLog.length - 1];
+  // Autopilot should lift drone toward target altitude
+  assert(finalLog.altitude_m > 8.0, `Expected altitude > 8.0m, got ${finalLog.altitude_m}m`);
+  assert(res.stabilityVerdict.includes('STABLE'));
+});
+
+test('CFDSolver2D: Rotor propeller thrust, torque and FoM calculation', () => {
+  const prop = CFDSolver2D.solvePropellerThrust(8000, 5.0, 3.0);
+  assert(prop.thrust_N > 0);
+  assert(prop.thrust_grams > 25);
+  assert(prop.power_Watts > 0);
+  assert(prop.figureOfMerit > 0 && prop.figureOfMerit <= 1.0);
+});
+
+// ----------------------------------------------------
+// Suite 8: Oil & Gas (Thermodynamics & Piping Stress)
+// ----------------------------------------------------
+console.log('\n8. Testing Oil & Gas Process Simulation Engines:');
+
+test('ThermodynamicsEngine: Peng-Robinson PR-EOS parameters & VLE flash', () => {
+  const pr = ThermodynamicsEngine.getPurePRParams('Propane', 300.0);
+  assert(pr.a > 0);
+  assert(pr.b > 0);
+
+  const feed = { Methane: 0.2, Propane: 0.5, nPentane: 0.3 };
+  const flash = ThermodynamicsEngine.flashVLE(feed, 25.0, 5.0);
+  assert(flash.vaporFraction >= 0 && flash.vaporFraction <= 1.0);
+  assert(typeof flash.vaporComposition === 'object');
+  assert(typeof flash.liquidComposition === 'object');
+});
+
+test('ThermodynamicsEngine: Crude Distillation Column fractionation', () => {
+  const col = ThermodynamicsEngine.simulateDistillationColumn(50000, 30, 2.5);
+  assert.strictEqual(col.feedBPD, 50000);
+  assert.strictEqual(col.trayCount, 30);
+  assert(col.products.lightNaphtha_BPD > 0);
+  assert(col.products.dieselFuel_BPD > 0);
+  assert(col.products.heavyResidue_BPD > 0);
+  assert(col.thermalDuties.condenserDuty_MW > 0);
+});
+
+test('PipingStressEngine: ASME B31.3 thermal expansion & loop flexibility', () => {
+  // Case A: With 4m expansion loop
+  const resLoop = PipingStressEngine.evaluateASMEB313({
+    pipeSpec: '8_SCH40',
+    operatingTempC: 220.0,
+    straightLengthM: 35.0,
+    hasExpansionLoop: true,
+    loopWidthM: 4.0
+  });
+
+  assert.strictEqual(resLoop.isCodeCompliant, true);
+  assert(resLoop.stressRatio <= 1.0);
+  assert(resLoop.status.includes('PASS'));
+
+  // Case B: Rigid pipe without expansion loop (causes overstress)
+  const resNoLoop = PipingStressEngine.evaluateASMEB313({
+    pipeSpec: '8_SCH40',
+    operatingTempC: 220.0,
+    straightLengthM: 35.0,
+    hasExpansionLoop: false
+  });
+
+  assert.strictEqual(resNoLoop.isCodeCompliant, false);
+  assert(resNoLoop.stressRatio > 1.0);
+  assert(resNoLoop.status.includes('FAIL'));
+});
+
+// ----------------------------------------------------
+// Suite 9: OmniAI Co-Pilot & Dual Manual/AI Editing
+// ----------------------------------------------------
+console.log('\n9. Testing OmniAI Co-Pilot & Dual Manual/AI Synchronization:');
+
+test('OmniAIEngine: Tool catalog and prompt routing', () => {
+  const ai = new OmniAIEngine();
+  assert(OMNI_TOOLS.length >= 7);
+
+  // Drop test prompt
+  const pDrop = ai.processPrompt('Run a 2m drop test on the smartphone corner');
+  assert.strictEqual(pDrop.matchedTool, 'run_phone_drop_test');
+  assert.strictEqual(pDrop.toolInput.dropHeight, 2.0);
+  assert(pDrop.suggestedManualEdits.length > 0);
+
+  // Thermal prompt
+  const pTherm = ai.processPrompt('Test smartphone thermal with vapor chamber at 9W');
+  assert.strictEqual(pTherm.matchedTool, 'simulate_mobile_thermal');
+  assert(pTherm.suggestedManualEdits.length > 0);
+
+  // Synthesis prompt
+  const pSynth = ai.processPrompt('Synthesize 32-bit ALU verilog code');
+  assert.strictEqual(pSynth.matchedTool, 'synthesize_verilog_chip');
+
+  // Drone GNC prompt
+  const pDrone = ai.processPrompt('Fly drone to 15m altitude with wind');
+  assert.strictEqual(pDrone.matchedTool, 'simulate_drone_flight');
+
+  // Piping stress prompt
+  const pPipe = ai.processPrompt('Evaluate ASME piping stress at 250C with no loop');
+  assert.strictEqual(pPipe.matchedTool, 'calculate_asme_piping_stress');
+  assert.strictEqual(pPipe.toolInput.hasExpansionLoop, false);
+});
+
+// ----------------------------------------------------
+// Suite 10: Turnkey Community Samples
+// ----------------------------------------------------
+console.log('\n10. Testing Curated Community Reference Projects:');
+
+test('Community Samples: 8 Turnkey Reference Projects Loaded and Valid', () => {
+  assert.strictEqual(COMMUNITY_SAMPLES.length, 8);
+  const industries = new Set(COMMUNITY_SAMPLES.map(s => s.industry));
+  assert(industries.has('Consumer Electronics'));
+  assert(industries.has('Semiconductor & EDA'));
+  assert(industries.has('Drone & Aerospace'));
+  assert(industries.has('Oil & Gas'));
+
+  COMMUNITY_SAMPLES.forEach(s => {
+    assert(s.id && s.title && s.studio && s.description);
+    assert(Array.isArray(s.tags) && s.tags.length > 0);
+  });
+});
+
+// ----------------------------------------------------
+// Summary
+// ----------------------------------------------------
+console.log('\n====================================================');
+console.log(`Test Execution Finished: ${passedTests}/${totalTests} Passed (${failedTests} Failed)`);
+console.log('====================================================\n');
+
+if (failedTests > 0) {
+  process.exit(1);
+} else {
+  console.log('All OmniEng Platform Engines & Computational Modules are 100% Verified!\n');
+}

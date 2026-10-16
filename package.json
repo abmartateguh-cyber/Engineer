@@ -1,0 +1,28 @@
+{
+  "name": "engineering-engine",
+  "version": "1.0.0",
+  "description": "OmniEng — Universal Multi-Industry Engineering & Simulation Platform (CAD • CAE • EDA • GNC • Plant)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run_all_tests.js"
+  },
+  "keywords": [
+    "cad",
+    "cae",
+    "eda",
+    "fea",
+    "cfd",
+    "simulink",
+    "engineering-engine",
+    "electron"
+  ],
+  "author": "OmniEng Engineering Systems",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^41.7.1"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  }
+}

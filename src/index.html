@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniEng — Universal Engineering & Simulation Platform</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <!-- Load Three.js from node_modules for 3D CAD/CAE rendering -->
+  <script src="../node_modules/three/build/three.min.js"></script>
+</head>
+<body>
+  <!-- Header Bar & Studio Switcher -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="logo-badge">OMNIENG</div>
+      <div>
+        <div class="app-title">Universal Engineering Engine</div>
+        <div class="app-subtitle">CAD • CAE • EDA • GNC • Plant Simulation</div>
+      </div>
+    </div>
+
+    <!-- The Studio Switcher (Direct Mode Switching) -->
+    <nav class="studio-switcher">
+      <button class="studio-btn active" data-studio="consumer">
+        📱 Consumer Electronics
+      </button>
+      <button class="studio-btn" data-studio="eda">
+        🔬 Semiconductor & EDA
+      </button>
+      <button class="studio-btn" data-studio="aerospace">
+        🛸 Drone & Aerospace
+      </button>
+      <button class="studio-btn" data-studio="oilgas">
+        🛢️ Oil & Gas Process
+      </button>
+      <button class="studio-btn" data-studio="simulink">
+        🧮 Dynamic Simulink
+      </button>
+      <button class="studio-btn" data-studio="universal_cad">
+        📐 Parametric CAD
+      </button>
+    </nav>
+
+    <div class="header-actions">
+      <div class="tier-badge" id="tier-badge">
+        <span class="tier-dot"></span>
+        <span id="tier-label">Air-Gapped Local Workstation</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Work Area -->
+  <div class="app-container">
+    <!-- Left Sidebar: Community Samples & Feature Tree -->
+    <aside class="left-sidebar">
+      <div class="sidebar-tab-header">
+        <div class="sidebar-tab active" id="tab-samples">Sample Catalog</div>
+        <div class="sidebar-tab" id="tab-tree">Feature Tree</div>
+      </div>
+
+      <div class="sidebar-content" id="sidebar-samples-content">
+        <div class="section-label">Turnkey Community Samples</div>
+        <div id="sample-list-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="sidebar-content" id="sidebar-tree-content" style="display: none;">
+        <div class="section-label">Parametric History DAG</div>
+        <div id="feature-tree-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Viewport Stage -->
+    <main class="center-viewport">
+      <div class="viewport-toolbar">
+        <div class="viewport-mode-tabs">
+          <button class="v-mode-btn active" id="btn-view-3d">3D CAD / CAE Mesh</button>
+          <button class="v-mode-btn" id="btn-view-diagram">Simulink Block Diagram</button>
+          <button class="v-mode-btn" id="btn-view-eda">EDA / P&ID Schematic</button>
+        </div>
+        <div style="font-size: 11px; color: var(--text-dim);" id="viewport-stats">
+          Triangles: 1,480 | FPS: 60 | Status: Ready
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <!-- 3D Viewport Canvas -->
+        <canvas id="three-canvas"></canvas>
+        <!-- 2D Simulink Block Diagram Canvas -->
+        <canvas id="diagram-canvas"></canvas>
+        <!-- 2D EDA & P&ID Canvas -->
+        <canvas id="eda-canvas"></canvas>
+      </div>
+    </main>
+
+    <!-- Right Inspector: Manual Parameter Controls & Telemetry -->
+    <aside class="right-inspector">
+      <div class="inspector-header">
+        <span class="inspector-title" id="inspector-studio-title">Consumer Electronics Studio</span>
+        <span style="font-size: 11px; color: var(--accent-cyan);">Manual Control</span>
+      </div>
+
+      <div class="inspector-body" id="inspector-dynamic-controls">
+        <!-- Dynamic controls injected here based on active studio -->
+      </div>
+    </aside>
+  </div>
+
+  <!-- Bottom OmniAI Co-Pilot Panel -->
+  <footer class="ai-copilot-panel">
+    <div class="ai-header">
+      <div class="ai-title">
+        <span>🤖</span>
+        <span>OmniAI Engineering Co-Pilot & Autonomous Agent</span>
+        <span style="font-size: 10px; color: var(--text-dim); font-weight: normal;">(Code-Gated Tool Execution • Dual Manual/AI Editing)</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-dim);">
+        Model: <span style="color: var(--accent-cyan); font-weight: 600;">Built-in Hybrid Engine (MCP Enabled)</span>
+      </div>
+    </div>
+
+    <div class="ai-chat-history" id="ai-chat-history">
+      <div class="chat-bubble ai">
+        <strong>OmniAI:</strong> Welcome to OmniEng. You can edit parameters manually using the Inspector on the right, or prompt me to model geometries, run explicit drop tests, synthesize Verilog RTL, optimize drone PID controllers, or verify ASME piping stresses.
+      </div>
+    </div>
+
+    <!-- Quick Suggestion Chips -->
+    <div class="ai-suggestion-chips" id="ai-chips">
+      <button class="chip" data-prompt="Simulate 1.5m corner drop test on smartphone">📱 1.5m Corner Drop Test</button>
+      <button class="chip" data-prompt="Run mobile thermal simulation with vapor chamber at 8.5W SoC">🔥 Vapor Chamber Thermal CFD</button>
+      <button class="chip" data-prompt="Synthesize 32-bit RISC-V ALU module and check timing">🔬 Synthesize Verilog ALU</button>
+      <button class="chip" data-prompt="Run Calibre DRC verification on metal layer spacing">📐 Calibre DRC Verification</button>
+      <button class="chip" data-prompt="Simulate 12m quadcopter altitude climb under 3.5 m/s wind">🛸 6-DOF Drone Autopilot</button>
+      <button class="chip" data-prompt="Evaluate ASME B31.3 piping stress at 220°C with expansion loop">🛢️ ASME B31.3 Piping Stress</button>
+      <button class="chip" data-prompt="Run Aspen HYSYS crude distillation column for 50,000 BPD">⚗️ HYSYS Distillation Column</button>
+    </div>
+
+    <!-- Prompt Input Bar -->
+    <div class="ai-input-bar">
+      <input type="text" class="ai-prompt-input" id="ai-input" placeholder="Ask OmniAI or direct simulation action (e.g., 'Increase drop height to 2m and test screen fracture')...">
+      <button class="ai-send-btn" id="ai-send-btn">Execute AI Action</button>
+    </div>
+  </footer>
+
+  <!-- Application Scripts -->
+  <script src="ui/viewport3d.js"></script>
+  <script src="ui/block_diagram_ui.js"></script>
+  <script src="ui/schematic_layout_ui.js"></script>
+  <script src="ui/app.js"></script>
+</body>
+</html>
