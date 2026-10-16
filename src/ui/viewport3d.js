@@ -686,12 +686,25 @@ class Viewport3D {
       side: THREE.DoubleSide
     });
 
+    // Dedicated internal illumination for cutaway inspection
+    const internalTopLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    internalTopLight.position.set(20, 180, 20);
+    group.add(internalTopLight);
+
+    const internalFrontLight = new THREE.DirectionalLight(0xbae6fd, 1.4);
+    internalFrontLight.position.set(-80, 120, -70);
+    group.add(internalFrontLight);
+
+    const internalRearLight = new THREE.DirectionalLight(0xc4b5fd, 1.2);
+    internalRearLight.position.set(60, 100, 90);
+    group.add(internalRearLight);
+
     // -----------------------------------------------------------------------
     // 1. Outer Aluminum Lens Barrel with Cross-Section Cutaway Window
     // -----------------------------------------------------------------------
     const barrelGeom = new THREE.CylinderGeometry(barrelRadius, barrelRadius * 0.96, barrelLength, 48, 1, true, thetaStart, thetaLength);
     const barrelMesh = new THREE.Mesh(barrelGeom, barrelMat);
-    barrelMesh.rotation.x = Math.PI / 2;
+    barrelMesh.rotation.x = -Math.PI / 2;
     barrelMesh.position.z = 10.0;
     barrelMesh.userData = {
       partName: 'Anodized 6061-T6 Aluminum Lens Barrel with Cutaway Section',
@@ -702,9 +715,9 @@ class Viewport3D {
     group.add(barrelMesh);
 
     // Front Filter Ring & Thread (58mm thread)
-    const filterRingGeom = new THREE.CylinderGeometry(barrelRadius + 0.8, barrelRadius, 8.0, 48, 1, false, thetaStart, thetaLength);
+    const filterRingGeom = new THREE.CylinderGeometry(barrelRadius + 0.8, barrelRadius, 8.0, 48, 1, true, thetaStart, thetaLength);
     const filterRing = new THREE.Mesh(filterRingGeom, barrelMat);
-    filterRing.rotation.x = Math.PI / 2;
+    filterRing.rotation.x = -Math.PI / 2;
     filterRing.position.z = -32.0;
     filterRing.userData = {
       partName: 'Front Filter Thread Collar (Ø58mm Standard Thread)',
@@ -716,9 +729,9 @@ class Viewport3D {
     explodedParts.push(filterRing);
 
     // Knurled Rubber Manual Focus Ring (Middle)
-    const focusRingGeom = new THREE.CylinderGeometry(barrelRadius + 1.6, barrelRadius + 1.6, 22.0, 48, 1, false, thetaStart, thetaLength);
+    const focusRingGeom = new THREE.CylinderGeometry(barrelRadius + 1.6, barrelRadius + 1.6, 22.0, 48, 1, true, thetaStart, thetaLength);
     const focusRing = new THREE.Mesh(focusRingGeom, rubberRingMat);
-    focusRing.rotation.x = Math.PI / 2;
+    focusRing.rotation.x = -Math.PI / 2;
     focusRing.position.z = -6.0;
     focusRing.userData = {
       partName: 'Manual Focus Ring with Diamond Knurled Grip Pattern',
@@ -730,9 +743,9 @@ class Viewport3D {
     explodedParts.push(focusRing);
 
     // Aperture Control Ring with f-stop Index Marks
-    const apertureRingGeom = new THREE.CylinderGeometry(barrelRadius + 1.0, barrelRadius + 1.0, 14.0, 48, 1, false, thetaStart, thetaLength);
+    const apertureRingGeom = new THREE.CylinderGeometry(barrelRadius + 1.0, barrelRadius + 1.0, 14.0, 48, 1, true, thetaStart, thetaLength);
     const apertureRing = new THREE.Mesh(apertureRingGeom, barrelMat);
-    apertureRing.rotation.x = Math.PI / 2;
+    apertureRing.rotation.x = -Math.PI / 2;
     apertureRing.position.z = 24.0;
     apertureRing.userData = {
       partName: 'Mechanical Aperture Selector Ring (f/1.4 - f/16 Click Steps)',
@@ -747,7 +760,7 @@ class Viewport3D {
     // 2. Internal Anti-Reflective Stepped Baffles & Lens Group Spacers
     // -----------------------------------------------------------------------
     [-22, -10, 8, 28, 42].forEach((zPos, idx) => {
-      const baffleGeom = new THREE.RingGeometry(barrelRadius * 0.72, barrelRadius * 0.94, 32, 1, thetaStart, thetaLength);
+      const baffleGeom = new THREE.RingGeometry(barrelRadius * 0.72, barrelRadius * 0.94, 32, 1, thetaStart + Math.PI * 0.5, thetaLength);
       const baffle = new THREE.Mesh(baffleGeom, baffleMat);
       baffle.position.z = zPos;
       baffle.userData = {
@@ -760,7 +773,7 @@ class Viewport3D {
     // Internal Brass Dual-Helicoid Cam Barrel (Focus mechanism guide)
     const helicoidGeom = new THREE.CylinderGeometry(barrelRadius * 0.82, barrelRadius * 0.82, 34.0, 32, 1, true, thetaStart, thetaLength);
     const helicoidMesh = new THREE.Mesh(helicoidGeom, brassCamMat);
-    helicoidMesh.rotation.x = Math.PI / 2;
+    helicoidMesh.rotation.x = -Math.PI / 2;
     helicoidMesh.position.z = 4.0;
     helicoidMesh.userData = {
       partName: 'Precision CNC Dual-Helicoid Linear Cam Track (Autofocus Guide)',
@@ -774,7 +787,7 @@ class Viewport3D {
     // Outer Neodymium Magnetic Stator Ring
     const magnetGeom = new THREE.CylinderGeometry(barrelRadius * 0.90, barrelRadius * 0.90, 16.0, 32, 1, true, thetaStart, thetaLength);
     const magnetMesh = new THREE.Mesh(magnetGeom, magnetMat);
-    magnetMesh.rotation.x = Math.PI / 2;
+    magnetMesh.rotation.x = -Math.PI / 2;
     magnetMesh.position.z = 0.0;
     magnetMesh.userData = {
       partName: 'VCM Permanent Magnetic Stator Ring (Sintered NdFeB N52)',
@@ -785,7 +798,7 @@ class Viewport3D {
     // Inner Copper Electromagnetic Voice Coil
     const vcmCoilGeom = new THREE.CylinderGeometry(barrelRadius * 0.86, barrelRadius * 0.86, 12.0, 32, 1, true, thetaStart, thetaLength);
     const vcmCoil = new THREE.Mesh(vcmCoilGeom, copperVcmMat);
-    vcmCoil.rotation.x = Math.PI / 2;
+    vcmCoil.rotation.x = -Math.PI / 2;
     vcmCoil.position.z = 0.0;
     vcmCoil.userData = {
       partName: 'High-Density OFHC Copper Voice Coil Windings (Autofocus Motor)',
@@ -918,9 +931,9 @@ class Viewport3D {
     // -----------------------------------------------------------------------
     // 6. Stainless Steel Bayonet Mount & Gold Contact Pins
     // -----------------------------------------------------------------------
-    const bayonetFlangeGeom = new THREE.CylinderGeometry(barrelRadius * 0.95, barrelRadius * 0.95, 5.0, 48, 1, false, thetaStart, thetaLength);
+    const bayonetFlangeGeom = new THREE.CylinderGeometry(barrelRadius * 0.95, barrelRadius * 0.95, 5.0, 48, 1, true, thetaStart, thetaLength);
     const bayonetFlange = new THREE.Mesh(bayonetFlangeGeom, bayonetMat);
-    bayonetFlange.rotation.x = Math.PI / 2;
+    bayonetFlange.rotation.x = -Math.PI / 2;
     bayonetFlange.position.z = 48.0;
     bayonetFlange.userData = {
       partName: 'Precision CNC Machined Stainless Steel Lens Bayonet Flange',

@@ -6,6 +6,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 
 // Core Engines
 const { BRepPrimitives } = require('./src/core/cad/brep_topology');
@@ -221,7 +222,138 @@ app.whenReady().then(() => {
     return OpticalEngine.get50mmPrescription();
   });
 
-  createWindow();
+  const win = createWindow();
+
+  win.webContents.on('console-message', (e, level, msg, line, src) => {
+    console.log(`[Renderer Console lvl=${level}] ${msg} (${src}:${line})`);
+  });
+
+  if (process.argv.includes('--capture')) {
+    win.webContents.on('did-finish-load', async () => {
+      console.log('[OmniEng Capture] WebContents loaded. Preparing showcase...');
+      const outputDir = process.env.CAPTURE_OUTPUT_DIR || path.join(__dirname, 'screenshots');
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      await sleep(1800);
+
+      // Switch to 50mm Lens Cutaway
+      await win.webContents.executeJavaScript(`
+        (() => {
+          const btn = document.getElementById('subtab-lens');
+          if (btn) btn.click();
+          if (window.viewport3D) {
+            window.viewport3D.target.set(0, 0, 10);
+            window.viewport3D.cameraAngle = { theta: 0.55, phi: 0.75 };
+            window.viewport3D.cameraDistance = 145;
+            window.viewport3D.updateCameraPosition();
+          }
+        })();
+      `);
+      await sleep(2000);
+
+      // Shot 1: Full App UI
+      console.log('[OmniEng Capture] Capturing full application UI...');
+      const fullApp = await win.capturePage();
+      fs.writeFileSync(path.join(outputDir, 'omnieng_camera_lens_app_ui.png'), fullApp.toPNG());
+
+      // Get canvas rect
+      const canvasRect = await win.webContents.executeJavaScript(`
+        (() => {
+          const el = document.getElementById('three-canvas');
+          const r = el.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+        })();
+      `);
+
+      // Shot 2: 3D Viewport Inside Cutaway (Rear / Sensor & Master Group)
+      console.log('[OmniEng Capture] Capturing 3D viewport inside cutaway (Rear / Sensor)...');
+      const cutaway3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'camera_lens_cutaway_inside.png'), cutaway3D.toPNG());
+
+      // Shot 2B: 3D Viewport Front Entrance Pupil Cutaway (Front Aspheric, Crown & Doublet)
+      console.log('[OmniEng Capture] Capturing 3D viewport front entrance cutaway...');
+      await win.webContents.executeJavaScript(`
+        (() => {
+          if (window.viewport3D) {
+            window.viewport3D.target.set(0, 0, -5);
+            window.viewport3D.cameraAngle = { theta: 2.45, phi: 0.85 };
+            window.viewport3D.cameraDistance = 140;
+            window.viewport3D.updateCameraPosition();
+          }
+        })();
+      `);
+      await sleep(1000);
+      const frontCutaway3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'camera_lens_cutaway_front_iso.png'), frontCutaway3D.toPNG());
+
+      // Shot 2C: 3D Cross-Sectional Profile Inspection (Full Optomechanical Optical Train)
+      console.log('[OmniEng Capture] Capturing full optomechanical cross-section profile...');
+      await win.webContents.executeJavaScript(`
+        (() => {
+          if (window.viewport3D) {
+            window.viewport3D.target.set(0, 0, 10);
+            window.viewport3D.cameraAngle = { theta: 1.35, phi: 0.82 };
+            window.viewport3D.cameraDistance = 145;
+            window.viewport3D.updateCameraPosition();
+          }
+        })();
+      `);
+      await sleep(1000);
+      const profile3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'camera_lens_cross_section_profile.png'), profile3D.toPNG());
+
+      // Shot 3: Exploded View
+      console.log('[OmniEng Capture] Setting exploded view 65%...');
+      await win.webContents.executeJavaScript(`
+        (() => {
+          const slider = document.getElementById('lens-explode-slider');
+          if (slider) {
+            slider.value = 65;
+            slider.dispatchEvent(new Event('input'));
+          }
+          if (window.viewport3D) {
+            window.viewport3D.target.set(0, 0, 10);
+            window.viewport3D.cameraAngle = { theta: 0.65, phi: 0.85 };
+            window.viewport3D.cameraDistance = 210;
+            window.viewport3D.updateCameraPosition();
+          }
+        })();
+      `);
+      await sleep(1200);
+      const exploded3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'camera_lens_exploded_view.png'), exploded3D.toPNG());
+
+      // Shot 4: Closed f/16 Aperture
+      console.log('[OmniEng Capture] Setting f/16 aperture...');
+      await win.webContents.executeJavaScript(`
+        (() => {
+          const slider = document.getElementById('lens-explode-slider');
+          if (slider) {
+            slider.value = 0;
+            slider.dispatchEvent(new Event('input'));
+          }
+          const sel = document.getElementById('lens-fstop');
+          if (sel) {
+            sel.value = '16';
+            sel.dispatchEvent(new Event('change'));
+          }
+          if (window.viewport3D) {
+            window.viewport3D.target.set(0, 0, 4);
+            window.viewport3D.cameraAngle = { theta: 0.50, phi: 0.65 };
+            window.viewport3D.cameraDistance = 115;
+            window.viewport3D.updateCameraPosition();
+          }
+        })();
+      `);
+      await sleep(1200);
+      const f16_3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'camera_lens_aperture_f16.png'), f16_3D.toPNG());
+
+      console.log('[OmniEng Capture] All showcase screenshots saved to:', outputDir);
+      app.quit();
+    });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

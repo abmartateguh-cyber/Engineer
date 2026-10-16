@@ -9,6 +9,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const blockDiagramUI = new BlockDiagramUI('diagram-canvas');
   const schematicLayoutUI = new SchematicLayoutUI('eda-canvas');
 
+  // Expose instances for automation and inspection
+  window.viewport3D = viewport3D;
+  window.omniAppState = null;
+
   // Application State
   const state = {
     currentStudio: 'consumer', // 'consumer', 'eda', 'aerospace', 'oilgas', 'simulink', 'universal_cad'
@@ -54,6 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       cadDepth: 160
     }
   };
+  window.omniAppState = state;
 
   // DOM Elements
   const studioButtons = document.querySelectorAll('.studio-btn');
