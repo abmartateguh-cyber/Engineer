@@ -56,6 +56,11 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   getVLEEnvelope: (params) => ipcRenderer.invoke('omni:get-vle-envelope', params),
   getColumnProfile: (params) => ipcRenderer.invoke('omni:get-column-profile', params),
 
+  // Camera Lens Optics & Optomechanics
+  solveOptics: (params) => ipcRenderer.invoke('omni:solve-optics', params),
+  traceRays: (params) => ipcRenderer.invoke('omni:trace-rays', params),
+  getLensPrescription: () => ipcRenderer.invoke('omni:get-lens-prescription'),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

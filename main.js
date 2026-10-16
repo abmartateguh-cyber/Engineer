@@ -26,6 +26,7 @@ const { MaterialManager } = require('./src/core/materials/material_database');
 const { TransientDropAnimator } = require('./src/core/cae/transient_drop_animator');
 const { FrequencyResponseAnalyzer } = require('./src/core/dynamic_simulink/frequency_analysis');
 const { VLEPhaseEnvelopeEngine } = require('./src/core/plant/vle_envelope');
+const { OpticalEngine } = require('./src/core/optics/optical_engine');
 const { COMMUNITY_SAMPLES } = require('./src/samples/community_samples');
 
 const aiEngine = new OmniAIEngine();
@@ -203,6 +204,21 @@ app.whenReady().then(() => {
 
   ipcMain.handle('omni:get-column-profile', async (event, { trayCount, feedTray, feedBPD }) => {
     return VLEPhaseEnvelopeEngine.generateColumnTrayProfile(trayCount, feedTray, feedBPD);
+  });
+
+  // 13. Camera Lens Optics & Optomechanics
+  ipcMain.handle('omni:solve-optics', async (event, params = {}) => {
+    const { focalLengthMm = 50.0, fStop = 1.4, subjectDistM = 2.0 } = params;
+    return OpticalEngine.solveOpticalMetrics(focalLengthMm, fStop, subjectDistM);
+  });
+
+  ipcMain.handle('omni:trace-rays', async (event, params = {}) => {
+    const { fStop = 1.4, rayCount = 9 } = params;
+    return OpticalEngine.traceRays(fStop, rayCount);
+  });
+
+  ipcMain.handle('omni:get-lens-prescription', async () => {
+    return OpticalEngine.get50mmPrescription();
   });
 
   createWindow();

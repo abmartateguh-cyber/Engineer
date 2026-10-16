@@ -90,9 +90,21 @@ const COMMUNITY_SAMPLES = [
     description: '8-inch Class 300 offshore steam & crude manifold pipeline evaluating ASME B31.3 thermal expansion loops and pressure surge.',
     tags: ['Bentley AutoPIPE', 'Caesar II', 'Aveva E3D'],
     pipingParams: { pipeSpec: '8_SCH40', materialKey: 'A106-B', designPressureBar: 30.0, operatingTempC: 240.0, straightLengthM: 40.0, hasExpansionLoop: true }
+  },
+  {
+    id: 'sample_camera_lens_50mm',
+    title: '50mm f/1.4 Aspherical Multi-Element Camera Lens (Creo / NX Optomechanics & Cutaway)',
+    industry: 'Consumer Electronics',
+    studio: 'consumer',
+    description: 'High-precision optomechanical lens assembly showcasing internal 8-element 6-group optics (Schott Crown/Flint & CaF2 Fluorite), 9-blade dynamic iris aperture diaphragm, VCM focus helicoids, matte light baffles, full-frame sensor plane, and paraxial ray tracing.',
+    tags: ['PTC Creo Optomechanics', 'Siemens NX', 'Zemax Optics', '3D Cutaway Inspection', 'Schott Glass'],
+    cadParams: { type: 'camera_lens', focalLengthMm: 50.0, fStop: 1.4, cutawayAngle: 1.5708, showRays: true },
+    opticsParams: { focalLengthMm: 50.0, fStop: 1.4, subjectDistM: 2.0 },
+    pcbLayers: 4
   }
 ];
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { COMMUNITY_SAMPLES };
 }
+

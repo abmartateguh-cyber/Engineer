@@ -583,6 +583,489 @@ class Viewport3D {
   }
 
   // =========================================================================
+  // 1B. Precision Optomechanical Camera Lens Assembly (PTC Creo / Siemens NX)
+  // Shows full internal cross-section: 8 glass elements in 6 groups, 9-blade iris,
+  // copper voice coil motor (VCM), internal light baffles, and ray tracing cone.
+  // =========================================================================
+
+  renderCameraLens3D(cutaway = true, cutawayAngle = Math.PI / 2, explodeFactor = 0, fStop = 1.4, showRays = true) {
+    this.clearMesh();
+    const group = new THREE.Group();
+    const explodedParts = [];
+
+    // Outer barrel dimensions
+    const barrelRadius = 32.0; // mm
+    const barrelLength = 88.0; // mm
+    const thetaStart = cutaway ? cutawayAngle * 0.5 : 0;
+    const thetaLength = cutaway ? Math.PI * 2 - cutawayAngle : Math.PI * 2;
+
+    // Common Materials
+    const barrelMat = new THREE.MeshStandardMaterial({
+      color: 0x111827, // Matte Hard-Anodized Aircraft Aluminum 6061-T6
+      metalness: 0.88,
+      roughness: 0.28,
+      side: THREE.DoubleSide
+    });
+
+    const rubberRingMat = new THREE.MeshStandardMaterial({
+      color: 0x18181b,
+      roughness: 0.92,
+      metalness: 0.05,
+      side: THREE.DoubleSide
+    });
+
+    const baffleMat = new THREE.MeshStandardMaterial({
+      color: 0x050811, // Anti-Reflective Matte Flocked Black
+      roughness: 0.98,
+      metalness: 0.1,
+      side: THREE.DoubleSide
+    });
+
+    const brassCamMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706, // Precision Brass Helical Cam Collar
+      metalness: 0.92,
+      roughness: 0.35,
+      side: THREE.DoubleSide
+    });
+
+    const copperVcmMat = new THREE.MeshStandardMaterial({
+      color: 0xb45309, // Pure Copper Electromagnetic Voice Coil Windings
+      metalness: 0.96,
+      roughness: 0.22,
+      side: THREE.DoubleSide
+    });
+
+    const magnetMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8, // NdFeB Neodymium Stator Magnet
+      metalness: 0.95,
+      roughness: 0.18,
+      side: THREE.DoubleSide
+    });
+
+    const bayonetMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0, // Precision CNC Stainless Steel 316L Bayonet Flange
+      metalness: 0.98,
+      roughness: 0.15,
+      side: THREE.DoubleSide
+    });
+
+    const goldPinMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b, // Hard Gold-Plated CPU Telemetry Contact Pins
+      metalness: 0.98,
+      roughness: 0.1
+    });
+
+    // Optical Glass Materials (Schott Crown N-BK7, Dense Flint N-SF11, CaF2 Fluorite)
+    const glassCrownMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      metalness: 0.15,
+      roughness: 0.03,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: true,
+      side: THREE.DoubleSide
+    });
+
+    const glassFlintMat = new THREE.MeshStandardMaterial({
+      color: 0xc084fc,
+      metalness: 0.20,
+      roughness: 0.02,
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: true,
+      side: THREE.DoubleSide
+    });
+
+    const glassFluoriteMat = new THREE.MeshStandardMaterial({
+      color: 0x2dd4bf,
+      metalness: 0.10,
+      roughness: 0.02,
+      transparent: true,
+      opacity: 0.68,
+      depthWrite: true,
+      side: THREE.DoubleSide
+    });
+
+    // -----------------------------------------------------------------------
+    // 1. Outer Aluminum Lens Barrel with Cross-Section Cutaway Window
+    // -----------------------------------------------------------------------
+    const barrelGeom = new THREE.CylinderGeometry(barrelRadius, barrelRadius * 0.96, barrelLength, 48, 1, true, thetaStart, thetaLength);
+    const barrelMesh = new THREE.Mesh(barrelGeom, barrelMat);
+    barrelMesh.rotation.x = Math.PI / 2;
+    barrelMesh.position.z = 10.0;
+    barrelMesh.userData = {
+      partName: 'Anodized 6061-T6 Aluminum Lens Barrel with Cutaway Section',
+      materialName: 'Aluminum 6061-T6 Hard Anodized',
+      basePosZ: 10.0,
+      explodeZ: 10.0
+    };
+    group.add(barrelMesh);
+
+    // Front Filter Ring & Thread (58mm thread)
+    const filterRingGeom = new THREE.CylinderGeometry(barrelRadius + 0.8, barrelRadius, 8.0, 48, 1, false, thetaStart, thetaLength);
+    const filterRing = new THREE.Mesh(filterRingGeom, barrelMat);
+    filterRing.rotation.x = Math.PI / 2;
+    filterRing.position.z = -32.0;
+    filterRing.userData = {
+      partName: 'Front Filter Thread Collar (Ø58mm Standard Thread)',
+      materialName: 'Aluminum 6061-T6',
+      basePosZ: -32.0,
+      explodeZ: -65.0
+    };
+    group.add(filterRing);
+    explodedParts.push(filterRing);
+
+    // Knurled Rubber Manual Focus Ring (Middle)
+    const focusRingGeom = new THREE.CylinderGeometry(barrelRadius + 1.6, barrelRadius + 1.6, 22.0, 48, 1, false, thetaStart, thetaLength);
+    const focusRing = new THREE.Mesh(focusRingGeom, rubberRingMat);
+    focusRing.rotation.x = Math.PI / 2;
+    focusRing.position.z = -6.0;
+    focusRing.userData = {
+      partName: 'Manual Focus Ring with Diamond Knurled Grip Pattern',
+      materialName: 'High-Friction EPDM Synthetic Rubber',
+      basePosZ: -6.0,
+      explodeZ: -25.0
+    };
+    group.add(focusRing);
+    explodedParts.push(focusRing);
+
+    // Aperture Control Ring with f-stop Index Marks
+    const apertureRingGeom = new THREE.CylinderGeometry(barrelRadius + 1.0, barrelRadius + 1.0, 14.0, 48, 1, false, thetaStart, thetaLength);
+    const apertureRing = new THREE.Mesh(apertureRingGeom, barrelMat);
+    apertureRing.rotation.x = Math.PI / 2;
+    apertureRing.position.z = 24.0;
+    apertureRing.userData = {
+      partName: 'Mechanical Aperture Selector Ring (f/1.4 - f/16 Click Steps)',
+      materialName: 'Aluminum 6061-T6 Engraved',
+      basePosZ: 24.0,
+      explodeZ: 40.0
+    };
+    group.add(apertureRing);
+    explodedParts.push(apertureRing);
+
+    // -----------------------------------------------------------------------
+    // 2. Internal Anti-Reflective Stepped Baffles & Lens Group Spacers
+    // -----------------------------------------------------------------------
+    [-22, -10, 8, 28, 42].forEach((zPos, idx) => {
+      const baffleGeom = new THREE.RingGeometry(barrelRadius * 0.72, barrelRadius * 0.94, 32, 1, thetaStart, thetaLength);
+      const baffle = new THREE.Mesh(baffleGeom, baffleMat);
+      baffle.position.z = zPos;
+      baffle.userData = {
+        partName: `Anti-Glare Serrated Light Baffle Collar #${idx + 1}`,
+        materialName: 'Matte Anti-Reflective Coating'
+      };
+      group.add(baffle);
+    });
+
+    // Internal Brass Dual-Helicoid Cam Barrel (Focus mechanism guide)
+    const helicoidGeom = new THREE.CylinderGeometry(barrelRadius * 0.82, barrelRadius * 0.82, 34.0, 32, 1, true, thetaStart, thetaLength);
+    const helicoidMesh = new THREE.Mesh(helicoidGeom, brassCamMat);
+    helicoidMesh.rotation.x = Math.PI / 2;
+    helicoidMesh.position.z = 4.0;
+    helicoidMesh.userData = {
+      partName: 'Precision CNC Dual-Helicoid Linear Cam Track (Autofocus Guide)',
+      materialName: 'Free-Cutting Brass C36000'
+    };
+    group.add(helicoidMesh);
+
+    // -----------------------------------------------------------------------
+    // 3. Voice Coil Motor (VCM) Electromagnetic Autofocus Linear Actuator
+    // -----------------------------------------------------------------------
+    // Outer Neodymium Magnetic Stator Ring
+    const magnetGeom = new THREE.CylinderGeometry(barrelRadius * 0.90, barrelRadius * 0.90, 16.0, 32, 1, true, thetaStart, thetaLength);
+    const magnetMesh = new THREE.Mesh(magnetGeom, magnetMat);
+    magnetMesh.rotation.x = Math.PI / 2;
+    magnetMesh.position.z = 0.0;
+    magnetMesh.userData = {
+      partName: 'VCM Permanent Magnetic Stator Ring (Sintered NdFeB N52)',
+      materialName: 'Neodymium-Iron-Boron (N52 Magnet)'
+    };
+    group.add(magnetMesh);
+
+    // Inner Copper Electromagnetic Voice Coil
+    const vcmCoilGeom = new THREE.CylinderGeometry(barrelRadius * 0.86, barrelRadius * 0.86, 12.0, 32, 1, true, thetaStart, thetaLength);
+    const vcmCoil = new THREE.Mesh(vcmCoilGeom, copperVcmMat);
+    vcmCoil.rotation.x = Math.PI / 2;
+    vcmCoil.position.z = 0.0;
+    vcmCoil.userData = {
+      partName: 'High-Density OFHC Copper Voice Coil Windings (Autofocus Motor)',
+      materialName: 'Pure Oxygen-Free Copper (99.99%)',
+      basePosZ: 0.0,
+      explodeZ: 12.0
+    };
+    group.add(vcmCoil);
+    explodedParts.push(vcmCoil);
+
+    // -----------------------------------------------------------------------
+    // 4. Optical Lens Elements (8 Elements in 6 Groups)
+    // -----------------------------------------------------------------------
+    // Helper to create spherical meniscus / curved lens element
+    const createLensMesh = (radiusFront, radiusRear, thickness, diameter, zPos, material, partName, matName, explodeDist) => {
+      // Create thick spherical lens using double dome geometries
+      const lensGroup = new THREE.Group();
+      const lensR = diameter / 2;
+
+      // Front convex dome
+      const frontGeom = new THREE.CylinderGeometry(lensR, lensR * 0.94, thickness * 0.5, 36);
+      const frontMesh = new THREE.Mesh(frontGeom, material);
+      frontMesh.rotation.x = Math.PI / 2;
+      lensGroup.add(frontMesh);
+
+      // Spherical convex front cap
+      const capGeom = new THREE.SphereGeometry(lensR * 1.05, 32, 16, 0, Math.PI * 2, 0, Math.PI / 3);
+      const capMesh = new THREE.Mesh(capGeom, material);
+      capMesh.position.z = -thickness * 0.25;
+      lensGroup.add(capMesh);
+
+      // Aluminum mounting retaining cell ring
+      const cellGeom = new THREE.CylinderGeometry(lensR + 1.2, lensR + 1.2, thickness * 0.6, 36, 1, true);
+      const cellMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 });
+      const cellMesh = new THREE.Mesh(cellGeom, cellMat);
+      cellMesh.rotation.x = Math.PI / 2;
+      lensGroup.add(cellMesh);
+
+      lensGroup.position.z = zPos;
+      lensGroup.userData = {
+        partName,
+        materialName: matName,
+        basePosZ: zPos,
+        explodeZ: zPos + explodeDist,
+        defaultTransparent: true,
+        defaultOpacity: 0.72
+      };
+      group.add(lensGroup);
+      explodedParts.push(lensGroup);
+      return lensGroup;
+    };
+
+    // E1: Front Large Aspherical Meniscus (Schott N-BK7 Crown Glass)
+    createLensMesh(42.5, 110.0, 7.8, 48.0, -28.0, glassCrownMat,
+      'Group 1: Front Aspherical Meniscus Element (High AR Coating)', 'Schott N-BK7 Crown Glass (nd=1.5168)', -55.0);
+
+    // E2: Positive Meniscus Crown Element (Schott N-BK7)
+    createLensMesh(28.0, 54.0, 6.2, 42.0, -16.0, glassCrownMat,
+      'Group 2: Positive Meniscus Crown Element', 'Schott N-BK7 Crown Glass', -35.0);
+
+    // E3 + E4: Cemented Achromatic Doublet (Fluorite Crown + Dense Flint N-SF11)
+    createLensMesh(48.0, -24.5, 4.8, 36.0, -6.0, glassFluoriteMat,
+      'Group 3A: Cemented Fluorite Achromat Crown (Ultra-Low Dispersion CaF2)', 'Optical Fluorite (CaF2)', -15.0);
+    createLensMesh(-24.5, 32.0, 3.2, 36.0, -1.8, glassFlintMat,
+      'Group 3B: Cemented Dense Flint Element (Chromatic Correction)', 'Schott N-SF11 Dense Flint Glass (nd=1.7847)', -12.0);
+
+    // -----------------------------------------------------------------------
+    // 5. Variable Iris Diaphragm Aperture Stop (9 Curved Overlapping Blades)
+    // -----------------------------------------------------------------------
+    const irisGroup = new THREE.Group();
+    const irisOuterRadius = 18.0;
+    // Calculate iris opening radius based on f-stop (f/1.4 -> ~14mm, f/16 -> ~2.5mm)
+    const irisInnerRadius = Math.max(2.2, Math.min(14.0, 18.0 / Math.max(1.0, fStop)));
+
+    // Outer aperture mounting collar
+    const irisRingGeom = new THREE.RingGeometry(irisInnerRadius, irisOuterRadius, 36);
+    const irisMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.65,
+      roughness: 0.55,
+      side: THREE.DoubleSide
+    });
+    const irisDisc = new THREE.Mesh(irisRingGeom, irisMat);
+    irisGroup.add(irisDisc);
+
+    // Render 9 radially distributed overlapping iris blades
+    for (let b = 0; b < 9; b++) {
+      const angle = (b / 9) * Math.PI * 2;
+      const bladeGeom = new THREE.PlaneGeometry(irisOuterRadius * 0.8, irisOuterRadius * 0.4);
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        metalness: 0.75,
+        roughness: 0.4,
+        side: THREE.DoubleSide
+      });
+      const bladeMesh = new THREE.Mesh(bladeGeom, bladeMat);
+      bladeMesh.position.set(
+        Math.cos(angle) * (irisInnerRadius + 3.0),
+        Math.sin(angle) * (irisInnerRadius + 3.0),
+        0.05 * b
+      );
+      bladeMesh.rotation.z = angle + 0.45;
+      irisGroup.add(bladeMesh);
+    }
+
+    irisGroup.position.z = 4.0;
+    irisGroup.userData = {
+      partName: `9-Blade Circular Iris Diaphragm Aperture Mechanism (Active: f/${fStop})`,
+      materialName: 'High-Carbon Matte Spring Steel (Anti-Glare)',
+      basePosZ: 4.0,
+      explodeZ: 4.0
+    };
+    group.add(irisGroup);
+    explodedParts.push(irisGroup);
+
+    // E5: Autofocus Variator Biconcave Group (Negative Dispersive)
+    createLensMesh(-35.0, 28.0, 4.2, 32.0, 12.0, glassFlintMat,
+      'Group 4: Autofocus Variator Biconcave Diverging Element', 'Schott N-SF11 Dense Flint Glass', 8.0);
+
+    // E6: Biconvex Rear Master Lens Group
+    createLensMesh(36.0, -42.0, 5.6, 34.0, 22.0, glassCrownMat,
+      'Group 5: Biconvex Rear Master Element (Spherical Aberration Correction)', 'Schott N-BK7 Crown Glass', 22.0);
+
+    // E7 + E8: Rear Field Flattener & Relay Doublet
+    createLensMesh(55.0, -30.0, 4.5, 34.0, 32.0, glassCrownMat,
+      'Group 6A: Rear Field Flattener Crown Element', 'Schott N-BK7 Crown Glass', 38.0);
+    createLensMesh(-30.0, -85.0, 3.2, 34.0, 37.0, glassFluoriteMat,
+      'Group 6B: Rear Aspheric Fluorite Relay Element', 'Optical Fluorite (CaF2 ED)', 44.0);
+
+    // -----------------------------------------------------------------------
+    // 6. Stainless Steel Bayonet Mount & Gold Contact Pins
+    // -----------------------------------------------------------------------
+    const bayonetFlangeGeom = new THREE.CylinderGeometry(barrelRadius * 0.95, barrelRadius * 0.95, 5.0, 48, 1, false, thetaStart, thetaLength);
+    const bayonetFlange = new THREE.Mesh(bayonetFlangeGeom, bayonetMat);
+    bayonetFlange.rotation.x = Math.PI / 2;
+    bayonetFlange.position.z = 48.0;
+    bayonetFlange.userData = {
+      partName: 'Precision CNC Machined Stainless Steel Lens Bayonet Flange',
+      materialName: 'AISI 316L Stainless Steel',
+      basePosZ: 48.0,
+      explodeZ: 70.0
+    };
+    group.add(bayonetFlange);
+    explodedParts.push(bayonetFlange);
+
+    // 3 Bayonet Locking Lugs
+    for (let lug = 0; lug < 3; lug++) {
+      const lugGeom = new THREE.BoxGeometry(4.5, 2.0, 3.5);
+      const lugMesh = new THREE.Mesh(lugGeom, bayonetMat);
+      const lugAngle = (lug / 3) * Math.PI * 2;
+      lugMesh.position.set(Math.cos(lugAngle) * (barrelRadius * 0.78), Math.sin(lugAngle) * (barrelRadius * 0.78), 50.5);
+      lugMesh.rotation.z = lugAngle;
+      group.add(lugMesh);
+    }
+
+    // Gold Electrical CPU Contact Pins (8 Contacts for high-speed autofocus)
+    for (let p = 0; p < 8; p++) {
+      const pinGeom = new THREE.CylinderGeometry(0.7, 0.7, 2.2, 16);
+      const pinMesh = new THREE.Mesh(pinGeom, goldPinMat);
+      pinMesh.rotation.x = Math.PI / 2;
+      const pinAngle = -Math.PI / 2 + (p - 3.5) * 0.12;
+      pinMesh.position.set(Math.cos(pinAngle) * (barrelRadius * 0.65), Math.sin(pinAngle) * (barrelRadius * 0.65), 50.0);
+      pinMesh.userData = { partName: `CPU Telemetry Spring Contact Pin #${p + 1}`, materialName: 'Electroless Nickel / Immersion Gold' };
+      group.add(pinMesh);
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. Full-Frame CMOS Sensor Plane & Optical Low-Pass Filter (OLPF)
+    // -----------------------------------------------------------------------
+    const sensorPackageGeom = new THREE.BoxGeometry(42.0, 30.0, 3.0);
+    const sensorPackageMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85, roughness: 0.3 });
+    const sensorPackage = new THREE.Mesh(sensorPackageGeom, sensorPackageMat);
+    sensorPackage.position.z = 68.0;
+    sensorPackage.userData = {
+      partName: 'Full-Frame 35mm (36x24mm) CMOS Sensor Package',
+      materialName: 'High-Thermal Ceramic Substrate with Gold Bonding Wire',
+      basePosZ: 68.0,
+      explodeZ: 95.0
+    };
+    group.add(sensorPackage);
+    explodedParts.push(sensorPackage);
+
+    // Active Silicon Die with Micro-Lens Array
+    const sensorDieGeom = new THREE.BoxGeometry(36.0, 24.0, 0.8);
+    const sensorDieMat = new THREE.MeshStandardMaterial({
+      color: 0x064e3b, // Iridescent Silicon Green/Blue CFA
+      metalness: 0.95,
+      roughness: 0.1
+    });
+    const sensorDie = new THREE.Mesh(sensorDieGeom, sensorDieMat);
+    sensorDie.position.set(0, 0, -1.2);
+    sensorPackage.add(sensorDie);
+
+    // Optical Low-Pass Filter (OLPF / IR Cut Filter Glass)
+    const olpfGeom = new THREE.BoxGeometry(37.0, 25.0, 0.6);
+    const olpfMat = new THREE.MeshStandardMaterial({
+      color: 0x22d3ee,
+      transparent: true,
+      opacity: 0.65,
+      roughness: 0.05,
+      metalness: 0.3
+    });
+    const olpfMesh = new THREE.Mesh(olpfGeom, olpfMat);
+    olpfMesh.position.set(0, 0, -1.8);
+    olpfMesh.userData = { partName: 'Optical Low-Pass IR-Cut Filter Glass (OLPF)', materialName: 'Niobium Dichroic Coated Glass' };
+    sensorPackage.add(olpfMesh);
+
+    // -----------------------------------------------------------------------
+    // 8. Simulated Optical Light Ray Tracing Cone (Ray Path through Assembly)
+    // -----------------------------------------------------------------------
+    if (showRays) {
+      const rayGroup = new THREE.Group();
+      const rayPointsCount = 9;
+      const rayRadius = Math.min(22.0, 25.0 / Math.max(1.0, fStop));
+
+      for (let r = 0; r < rayPointsCount; r++) {
+        const phi = (r / rayPointsCount) * Math.PI * 2;
+        const curR = (r === 0) ? 0 : rayRadius; // Center ray + peripheral cone rays
+        const cosP = Math.cos(phi);
+        const sinP = Math.sin(phi);
+
+        const curvePoints = [
+          new THREE.Vector3(cosP * curR, sinP * curR, -45.0),  // Entrance pupil
+          new THREE.Vector3(cosP * curR, sinP * curR, -28.0),  // Front element
+          new THREE.Vector3(cosP * curR * 0.88, sinP * curR * 0.88, -16.0), // Crown refraction
+          new THREE.Vector3(cosP * curR * 0.72, sinP * curR * 0.72, -6.0),  // Doublet
+          new THREE.Vector3(cosP * curR * 0.52, sinP * curR * 0.52, 4.0),   // Iris aperture waist
+          new THREE.Vector3(cosP * curR * 0.40, sinP * curR * 0.40, 16.0),  // Variator
+          new THREE.Vector3(cosP * curR * 0.28, sinP * curR * 0.28, 34.0),  // Master
+          new THREE.Vector3(0, 0, 68.0) // Focal convergence point on sensor plane
+        ];
+
+        const rayGeom = new THREE.BufferGeometry().setFromPoints(curvePoints);
+        const rayColor = (r === 0) ? 0xf59e0b : 0x38bdf8; // Golden axial ray + cyan marginal rays
+        const rayMat = new THREE.LineBasicMaterial({
+          color: rayColor,
+          linewidth: (r === 0) ? 2 : 1,
+          transparent: true,
+          opacity: 0.75
+        });
+        const rayLine = new THREE.Line(rayGeom, rayMat);
+        rayGroup.add(rayLine);
+      }
+
+      // Add soft glowing transparent cone envelope
+      const coneGeom = new THREE.ConeGeometry(rayRadius * 0.52, 64.0, 24, 1, true);
+      const coneMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const coneMesh = new THREE.Mesh(coneGeom, coneMat);
+      coneMesh.rotation.x = -Math.PI / 2;
+      coneMesh.position.z = 36.0;
+      rayGroup.add(coneMesh);
+
+      rayGroup.userData = { partName: 'Diffraction-Limited Optical Light Ray Cone', materialName: 'Coherent 550nm Laser Wavefront' };
+      group.add(rayGroup);
+    }
+
+    // Assembly Explode Dispatcher (Smooth separation along optical Z-axis)
+    group.userData.updateExplode = (factor) => {
+      explodedParts.forEach(p => {
+        p.position.z = p.userData.basePosZ + (p.userData.explodeZ - p.userData.basePosZ) * factor;
+      });
+    };
+
+    // Apply initial explode factor if specified
+    if (explodeFactor > 0) {
+      group.userData.updateExplode(explodeFactor);
+    }
+
+    this.currentMesh = group;
+    this.scene.add(group);
+    this.setViewportStats(8920, 'Optomechanical 50mm f/1.4 Lens Assembly (PTC Creo / Siemens NX / Zemax)');
+  }
+
+  // =========================================================================
   // 2. Drone & Aerospace: Carbon Fiber FPV / VTOL Quadcopter (CATIA / Fusion)
   // =========================================================================
 

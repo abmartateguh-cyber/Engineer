@@ -15,12 +15,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeViewMode: '3d',      // '3d', 'diagram', 'eda'
     samples: [],
     manualParams: {
-      // Consumer Electronics
+      // Consumer Electronics (Phone CAD & Drop/Thermal)
       dropHeight: 1.5,
       impactAngle: 'corner',
       socPowerWatts: 8.5,
       hasVaporChamber: true,
       chassisMaterial: 'Titanium',
+
+      // Consumer Electronics (Camera Lens Optomechanics & Ray Tracing)
+      lensSubTab: 'phone', // 'phone' or 'lens'
+      lensFStop: 1.4,
+      lensCutawayDeg: 90,
+      lensShowRays: true,
+      lensSubjectDist: 2.0,
+      lensExplodePercent: 0,
       
       // Semiconductor & EDA
       verilogModule: 'alu_core',
@@ -134,7 +142,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (studio === 'consumer') {
       inspectorTitle.textContent = 'Consumer Electronics Studio';
       setViewMode('3d');
-      viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
+      if (state.manualParams.lensSubTab === 'lens') {
+        const cutawayRad = (state.manualParams.lensCutawayDeg * Math.PI) / 180;
+        viewport3D.renderCameraLens3D(
+          true,
+          cutawayRad,
+          state.manualParams.lensExplodePercent / 100,
+          state.manualParams.lensFStop,
+          state.manualParams.lensShowRays
+        );
+      } else {
+        viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
+      }
       renderConsumerInspector();
     } else if (studio === 'eda') {
       inspectorTitle.textContent = 'Semiconductor & EDA Studio';
@@ -165,254 +184,553 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Dynamic Inspector Panels (Full Manual Editing Support) ---
 
+  // Helper for optical calculations (with IPC + local physics fallback)
+  async function calculateOptics(focalLengthMm, fStop, subjectDistM) {
+    if (window.omniEngAPI && window.omniEngAPI.solveOptics) {
+      try {
+        return await window.omniEngAPI.solveOptics({ focalLengthMm, fStop, subjectDistM });
+      } catch (e) {
+        console.warn('IPC solveOptics fallback', e);
+      }
+    }
+    const fM = focalLengthMm / 1000.0;
+    const pupilD = focalLengthMm / fStop;
+    const NA = 1.0 / (2.0 * fStop);
+    const airyUm = 2.44 * 0.550 * fStop;
+    const cocMm = 0.029;
+    const cocM = cocMm / 1000.0;
+    const H = (fM * fM) / (fStop * cocM) + fM;
+    const s = subjectDistM;
+    let nearM, farM, dofM;
+    if (s >= H) {
+      nearM = H / 2.0;
+      farM = Infinity;
+      dofM = Infinity;
+    } else {
+      nearM = (H * s) / (H + (s - fM));
+      farM = (H * s) / (H - (s - fM));
+      dofM = farM - nearM;
+    }
+    const mtf50 = 1000.0 / (1.22 * 0.550 * fStop);
+    return {
+      focalLengthMm,
+      fStop,
+      subjectDistM,
+      entrancePupilDiameterMm: Number(pupilD.toFixed(2)),
+      numericalAperture: Number(NA.toFixed(4)),
+      diffractionAiryDiskDiameter_um: Number(airyUm.toFixed(2)),
+      circleOfConfusionMm: cocMm,
+      hyperfocalDistance_m: Number(H.toFixed(2)),
+      nearFocusLimit_m: Number(nearM.toFixed(3)),
+      farFocusLimit_m: farM === Infinity ? 'Infinity' : Number(farM.toFixed(3)),
+      depthOfField_m: dofM === Infinity ? 'Infinity' : Number(dofM.toFixed(3)),
+      mtf50ResolutionLimit_lp_per_mm: Number(mtf50.toFixed(1))
+    };
+  }
+
   function renderConsumerInspector() {
-    inspectorContainer.innerHTML = `
-      <div class="param-group">
-        <div class="param-group-title">
-          <span>📱 Phone Packaging CAD</span>
-          <span class="tag">PTC Creo / NX</span>
-        </div>
-        <div class="param-row">
-          <div class="param-label-row">
-            <span>Chassis Width:</span>
-            <span class="param-val" id="val-cad-w">${state.manualParams.cadWidth} mm</span>
-          </div>
-          <input type="range" class="slider-input" min="60" max="90" step="1" value="${state.manualParams.cadWidth}" id="slider-cad-w">
-        </div>
-        <div class="param-row">
-          <div class="param-label-row">
-            <span>Chassis Thickness:</span>
-            <span class="param-val" id="val-cad-h">${state.manualParams.cadHeight} mm</span>
-          </div>
-          <input type="range" class="slider-input" min="6.5" max="12.0" step="0.1" value="${state.manualParams.cadHeight}" id="slider-cad-h">
-        </div>
-        <div class="param-row">
-          <div class="param-label-row">
-            <span>Material (ASTM / ISO Standards):</span>
-          </div>
-          <select class="select-input" id="select-material">
-            <option value="Ti-6Al-4V_Grade5" ${state.manualParams.chassisMaterial === 'Ti-6Al-4V_Grade5' ? 'selected' : ''}>Titanium Grade 5 (Ti-6Al-4V) - 4430 kg/m³</option>
-            <option value="Al_6061-T6" ${state.manualParams.chassisMaterial === 'Al_6061-T6' ? 'selected' : ''}>Aluminum 6061-T6 (Aerospace Grade) - 2700 kg/m³</option>
-            <option value="Al_7075-T6" ${state.manualParams.chassisMaterial === 'Al_7075-T6' ? 'selected' : ''}>Aluminum 7075-T6 (High Strength) - 2810 kg/m³</option>
-            <option value="Stainless_316L" ${state.manualParams.chassisMaterial === 'Stainless_316L' ? 'selected' : ''}>Stainless Steel AISI 316L - 8000 kg/m³</option>
-            <option value="Corning_GorillaGlass_Victus2" ${state.manualParams.chassisMaterial === 'Corning_GorillaGlass_Victus2' ? 'selected' : ''}>Gorilla Glass Victus 2 - 2480 kg/m³</option>
-            <option value="CarbonFiber_Toray_T800" ${state.manualParams.chassisMaterial === 'CarbonFiber_Toray_T800' ? 'selected' : ''}>Toray T800 Carbon Fiber - 1550 kg/m³</option>
-          </select>
-        </div>
-        <div id="material-inertia-telemetry"></div>
-      </div>
+    const isLens = state.manualParams.lensSubTab === 'lens';
 
-      <div class="param-group">
-        <div class="param-group-title">
-          <span>💥 Explicit Drop Test (FEA)</span>
-          <span class="tag">Ansys Mechanical</span>
-        </div>
-        <div class="param-row">
-          <div class="param-label-row">
-            <span>Drop Height:</span>
-            <span class="param-val" id="val-drop-h">${state.manualParams.dropHeight} m</span>
-          </div>
-          <input type="range" class="slider-input" min="0.5" max="2.5" step="0.1" value="${state.manualParams.dropHeight}" id="slider-drop-h">
-        </div>
-        <div class="param-row">
-          <div class="param-label-row">
-            <span>Impact Orientation:</span>
-          </div>
-          <select class="select-input" id="select-drop-angle">
-            <option value="corner" ${state.manualParams.impactAngle === 'corner' ? 'selected' : ''}>Corner Impact (High Shear)</option>
-            <option value="edge" ${state.manualParams.impactAngle === 'edge' ? 'selected' : ''}>Side Edge Impact</option>
-            <option value="face" ${state.manualParams.impactAngle === 'face' ? 'selected' : ''}>Front Screen Flat Impact</option>
-          </select>
-        </div>
-        <button class="btn-primary" id="btn-run-drop">
-          <span>▶ Run Explicit Drop Test</span>
-        </button>
-        <div id="drop-telemetry-container"></div>
-      </div>
-
-      <div class="param-group">
-        <div class="param-group-title">
-          <span>🔥 Thermal CHT & Vapor Chamber</span>
-          <span class="tag">Ansys Icepak</span>
-        </div>
-        <div class="param-row">
-          <div class="param-label-row">
-            <span>SoC Heat Dissipation:</span>
-            <span class="param-val" id="val-soc-pwr">${state.manualParams.socPowerWatts} W</span>
-          </div>
-          <input type="range" class="slider-input" min="2.0" max="15.0" step="0.5" value="${state.manualParams.socPowerWatts}" id="slider-soc-pwr">
-        </div>
-        <div class="param-row">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
-            <input type="checkbox" id="chk-vapor-chamber" ${state.manualParams.hasVaporChamber ? 'checked' : ''}>
-            <span>Enable Sintered Copper Vapor Chamber</span>
-          </label>
-        </div>
-        <button class="btn-primary" id="btn-run-thermal" style="background: linear-gradient(135deg, var(--accent-amber), var(--accent-rose));">
-          <span>▶ Run Thermal CHT Simulation</span>
-        </button>
-        <div id="thermal-telemetry-container"></div>
+    // Sub-tab switcher header
+    let html = `
+      <div style="display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+        <button id="subtab-phone" class="ribbon-btn ${!isLens ? 'active' : ''}" style="flex: 1; padding: 6px 4px; font-size: 11px;">📱 Smartphone CAD</button>
+        <button id="subtab-lens" class="ribbon-btn ${isLens ? 'active' : ''}" style="flex: 1; padding: 6px 4px; font-size: 11px;">📷 50mm Lens Cutaway</button>
       </div>
     `;
 
-    // Bind manual sliders
-    const sliderW = document.getElementById('slider-cad-w');
-    const sliderH = document.getElementById('slider-cad-h');
-    sliderW.addEventListener('input', (e) => {
-      state.manualParams.cadWidth = Number(e.target.value);
-      document.getElementById('val-cad-w').textContent = `${state.manualParams.cadWidth} mm`;
-      viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
-      updateMaterialInertia();
-    });
-    sliderH.addEventListener('input', (e) => {
-      state.manualParams.cadHeight = Number(e.target.value);
-      document.getElementById('val-cad-h').textContent = `${state.manualParams.cadHeight} mm`;
-      viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
-      updateMaterialInertia();
-    });
-
-    // Material Library & Inertia Computation
-    async function updateMaterialInertia() {
-      const matKey = state.manualParams.chassisMaterial || 'Ti-6Al-4V_Grade5';
-      const container = document.getElementById('material-inertia-telemetry');
-      if (!container || !window.omniEngAPI || !window.omniEngAPI.computeInertia) return;
-      try {
-        const inertia = await window.omniEngAPI.computeInertia({
-          matKey,
-          widthM: state.manualParams.cadWidth / 1000,
-          heightM: state.manualParams.cadHeight / 1000,
-          depthM: state.manualParams.cadDepth / 1000
-        });
-        container.innerHTML = `
-          <div class="telemetry-card" style="margin-top: 6px; padding: 6px 8px; font-size: 10px;">
-            <div class="telemetry-row">
-              <span class="telemetry-label">Calculated Mass:</span>
-              <span class="telemetry-value" style="color: var(--accent-cyan); font-weight:700;">${(inertia.massKg * 1000).toFixed(1)} g</span>
-            </div>
-            <div class="telemetry-row">
-              <span class="telemetry-label">Volume:</span>
-              <span class="telemetry-value">${inertia.volumeCm3} cm³</span>
-            </div>
-            <div class="telemetry-row">
-              <span class="telemetry-label">Principal Inertia (Izz):</span>
-              <span class="telemetry-value" style="font-family: var(--font-mono);">${inertia.Izz} kg·m²</span>
-            </div>
-            <div class="telemetry-row">
-              <span class="telemetry-label">Yield Strength (ASTM):</span>
-              <span class="telemetry-value" style="color: var(--accent-green);">${inertia.yieldStrengthMPa} MPa</span>
-            </div>
+    if (isLens) {
+      // --- 50mm f/1.4 Optomechanical Camera Lens Mode ---
+      html += `
+        <div class="param-group">
+          <div class="param-group-title">
+            <span>📷 50mm f/1.4 Optomechanics & 3D Cutaway</span>
+            <span class="tag">PTC Creo / NX / Zemax</span>
           </div>
-        `;
-      } catch (e) {
-        console.warn('Inertia compute error', e);
-      }
+
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Aperture f-Stop (9-Blade Dynamic Iris):</span>
+              <span class="param-val" id="val-lens-fstop" style="color: var(--accent-cyan); font-weight:700;">f/${state.manualParams.lensFStop}</span>
+            </div>
+            <select class="select-input" id="select-lens-fstop">
+              <option value="1.4" ${state.manualParams.lensFStop === 1.4 ? 'selected' : ''}>f/1.4 (Max Aperture / 35.7mm Pupil)</option>
+              <option value="2.0" ${state.manualParams.lensFStop === 2.0 ? 'selected' : ''}>f/2.0 (25.0mm Pupil)</option>
+              <option value="2.8" ${state.manualParams.lensFStop === 2.8 ? 'selected' : ''}>f/2.8 (17.9mm Pupil)</option>
+              <option value="4.0" ${state.manualParams.lensFStop === 4.0 ? 'selected' : ''}>f/4.0 (12.5mm Pupil)</option>
+              <option value="5.6" ${state.manualParams.lensFStop === 5.6 ? 'selected' : ''}>f/5.6 (Sweet Spot Sharpness)</option>
+              <option value="8.0" ${state.manualParams.lensFStop === 8.0 ? 'selected' : ''}>f/8.0 (Deep Landscape Sharpness)</option>
+              <option value="11.0" ${state.manualParams.lensFStop === 11.0 ? 'selected' : ''}>f/11 (Deep Focus)</option>
+              <option value="16.0" ${state.manualParams.lensFStop === 16.0 ? 'selected' : ''}>f/16 (Min Aperture / 3.1mm Pupil)</option>
+            </select>
+          </div>
+
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Barrel 3D Cutaway Angle:</span>
+              <span class="param-val" id="val-lens-cutaway">${state.manualParams.lensCutawayDeg}° (${state.manualParams.lensCutawayDeg === 90 ? 'Quadrant View' : state.manualParams.lensCutawayDeg === 180 ? 'Half-Section' : state.manualParams.lensCutawayDeg === 0 ? 'Sealed' : 'Custom'})</span>
+            </div>
+            <input type="range" class="slider-input" min="0" max="180" step="5" value="${state.manualParams.lensCutawayDeg}" id="slider-lens-cutaway">
+          </div>
+
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Optical Axis Explode:</span>
+              <span class="param-val" id="val-lens-explode">${state.manualParams.lensExplodePercent}%</span>
+            </div>
+            <input type="range" class="slider-input" min="0" max="100" step="1" value="${state.manualParams.lensExplodePercent}" id="slider-lens-explode">
+          </div>
+
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Subject Focus Distance:</span>
+              <span class="param-val" id="val-lens-dist">${state.manualParams.lensSubjectDist} m</span>
+            </div>
+            <input type="range" class="slider-input" min="0.5" max="15.0" step="0.1" value="${state.manualParams.lensSubjectDist}" id="slider-lens-dist">
+          </div>
+
+          <div class="param-row">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
+              <input type="checkbox" id="chk-lens-rays" ${state.manualParams.lensShowRays ? 'checked' : ''}>
+              <span>Trace Paraxial Light Rays (Pupil to Sensor Plane)</span>
+            </label>
+          </div>
+
+          <button class="btn-primary" id="btn-run-optics" style="background: linear-gradient(135deg, var(--accent-cyan), #6366f1);">
+            <span>▶ Recompute Optical Physics & Ray Trace</span>
+          </button>
+        </div>
+
+        <div class="param-group">
+          <div class="param-group-title">
+            <span>🔬 Optical Physics & Depth of Field Telemetry</span>
+            <span class="tag">Airy & MTF</span>
+          </div>
+          <div id="lens-optics-telemetry"></div>
+        </div>
+
+        <div class="param-group">
+          <div class="param-group-title">
+            <span>💎 8-Element Optical Prescription (Schott & CaF2)</span>
+            <span class="tag">Double-Gauss</span>
+          </div>
+          <div style="max-height: 155px; overflow-y: auto; font-size: 10px; font-family: var(--font-mono); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 6px; background: rgba(0,0,0,0.25);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                <tr style="color: var(--text-dim); border-bottom: 1px solid var(--border-subtle);">
+                  <th style="padding: 2px;">Grp</th>
+                  <th style="padding: 2px;">Elem</th>
+                  <th style="padding: 2px;">Glass</th>
+                  <th style="padding: 2px;">nd</th>
+                  <th style="padding: 2px;">Vd</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="color:var(--accent-cyan);">G1</td><td>E1 (Asph)</td><td>Schott N-BK7</td><td>1.517</td><td>64.2</td></tr>
+                <tr><td style="color:var(--accent-cyan);">G2</td><td>E2</td><td>Schott N-SF11</td><td>1.785</td><td>25.8</td></tr>
+                <tr><td style="color:var(--accent-cyan);">G3</td><td>E3</td><td>Schott N-BK7</td><td>1.517</td><td>64.2</td></tr>
+                <tr><td style="color:var(--accent-cyan);">G3</td><td>E4</td><td>Schott N-SF11</td><td>1.785</td><td>25.8</td></tr>
+                <tr style="background: rgba(245, 158, 11, 0.12); color: var(--accent-amber); font-weight:700;"><td colspan="5" style="padding: 2px;">⚙️ 9-Blade Dynamic Iris Diaphragm</td></tr>
+                <tr><td style="color:var(--accent-green);">G4</td><td>E5 (ED)</td><td>Fluorite CaF2</td><td>1.434</td><td>95.3</td></tr>
+                <tr><td style="color:var(--accent-green);">G5</td><td>E6</td><td>Schott N-BK7</td><td>1.517</td><td>64.2</td></tr>
+                <tr><td style="color:var(--accent-green);">G6</td><td>E7</td><td>Schott N-SF11</td><td>1.785</td><td>25.8</td></tr>
+                <tr><td style="color:var(--accent-green);">G6</td><td>E8</td><td>Schott N-BK7</td><td>1.517</td><td>64.2</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } else {
+      // --- Smartphone Packaging CAD, FEA Drop Test, Thermal CHT ---
+      html += `
+        <div class="param-group">
+          <div class="param-group-title">
+            <span>📱 Phone Packaging CAD</span>
+            <span class="tag">PTC Creo / NX</span>
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Chassis Width:</span>
+              <span class="param-val" id="val-cad-w">${state.manualParams.cadWidth} mm</span>
+            </div>
+            <input type="range" class="slider-input" min="60" max="90" step="1" value="${state.manualParams.cadWidth}" id="slider-cad-w">
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Chassis Thickness:</span>
+              <span class="param-val" id="val-cad-h">${state.manualParams.cadHeight} mm</span>
+            </div>
+            <input type="range" class="slider-input" min="6.5" max="12.0" step="0.1" value="${state.manualParams.cadHeight}" id="slider-cad-h">
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Material (ASTM / ISO Standards):</span>
+            </div>
+            <select class="select-input" id="select-material">
+              <option value="Ti-6Al-4V_Grade5" ${state.manualParams.chassisMaterial === 'Ti-6Al-4V_Grade5' ? 'selected' : ''}>Titanium Grade 5 (Ti-6Al-4V) - 4430 kg/m³</option>
+              <option value="Al_6061-T6" ${state.manualParams.chassisMaterial === 'Al_6061-T6' ? 'selected' : ''}>Aluminum 6061-T6 (Aerospace Grade) - 2700 kg/m³</option>
+              <option value="Al_7075-T6" ${state.manualParams.chassisMaterial === 'Al_7075-T6' ? 'selected' : ''}>Aluminum 7075-T6 (High Strength) - 2810 kg/m³</option>
+              <option value="Stainless_316L" ${state.manualParams.chassisMaterial === 'Stainless_316L' ? 'selected' : ''}>Stainless Steel AISI 316L - 8000 kg/m³</option>
+              <option value="Corning_GorillaGlass_Victus2" ${state.manualParams.chassisMaterial === 'Corning_GorillaGlass_Victus2' ? 'selected' : ''}>Gorilla Glass Victus 2 - 2480 kg/m³</option>
+              <option value="CarbonFiber_Toray_T800" ${state.manualParams.chassisMaterial === 'CarbonFiber_Toray_T800' ? 'selected' : ''}>Toray T800 Carbon Fiber - 1550 kg/m³</option>
+            </select>
+          </div>
+          <div id="material-inertia-telemetry"></div>
+        </div>
+
+        <div class="param-group">
+          <div class="param-group-title">
+            <span>💥 Explicit Drop Test (FEA)</span>
+            <span class="tag">Ansys Mechanical</span>
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Drop Height:</span>
+              <span class="param-val" id="val-drop-h">${state.manualParams.dropHeight} m</span>
+            </div>
+            <input type="range" class="slider-input" min="0.5" max="2.5" step="0.1" value="${state.manualParams.dropHeight}" id="slider-drop-h">
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>Impact Orientation:</span>
+            </div>
+            <select class="select-input" id="select-drop-angle">
+              <option value="corner" ${state.manualParams.impactAngle === 'corner' ? 'selected' : ''}>Corner Impact (High Shear)</option>
+              <option value="edge" ${state.manualParams.impactAngle === 'edge' ? 'selected' : ''}>Side Edge Impact</option>
+              <option value="face" ${state.manualParams.impactAngle === 'face' ? 'selected' : ''}>Front Screen Flat Impact</option>
+            </select>
+          </div>
+          <button class="btn-primary" id="btn-run-drop">
+            <span>▶ Run Explicit Drop Test</span>
+          </button>
+          <div id="drop-telemetry-container"></div>
+        </div>
+
+        <div class="param-group">
+          <div class="param-group-title">
+            <span>🔥 Thermal CHT & Vapor Chamber</span>
+            <span class="tag">Ansys Icepak</span>
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span>SoC Heat Dissipation:</span>
+              <span class="param-val" id="val-soc-pwr">${state.manualParams.socPowerWatts} W</span>
+            </div>
+            <input type="range" class="slider-input" min="2.0" max="15.0" step="0.5" value="${state.manualParams.socPowerWatts}" id="slider-soc-pwr">
+          </div>
+          <div class="param-row">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
+              <input type="checkbox" id="chk-vapor-chamber" ${state.manualParams.hasVaporChamber ? 'checked' : ''}>
+              <span>Enable Sintered Copper Vapor Chamber</span>
+            </label>
+          </div>
+          <button class="btn-primary" id="btn-run-thermal" style="background: linear-gradient(135deg, var(--accent-amber), var(--accent-rose));">
+            <span>▶ Run Thermal CHT Simulation</span>
+          </button>
+          <div id="thermal-telemetry-container"></div>
+        </div>
+      `;
     }
 
-    const selectMat = document.getElementById('select-material');
-    if (selectMat) {
-      selectMat.addEventListener('change', (e) => {
-        state.manualParams.chassisMaterial = e.target.value;
+    inspectorContainer.innerHTML = html;
+
+    // Subtab button handlers
+    const btnSubPhone = document.getElementById('subtab-phone');
+    const btnSubLens = document.getElementById('subtab-lens');
+    if (btnSubPhone) {
+      btnSubPhone.addEventListener('click', () => {
+        state.manualParams.lensSubTab = 'phone';
+        viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
+        renderConsumerInspector();
+      });
+    }
+    if (btnSubLens) {
+      btnSubLens.addEventListener('click', () => {
+        state.manualParams.lensSubTab = 'lens';
+        const cutawayRad = (state.manualParams.lensCutawayDeg * Math.PI) / 180;
+        viewport3D.renderCameraLens3D(
+          true,
+          cutawayRad,
+          state.manualParams.lensExplodePercent / 100,
+          state.manualParams.lensFStop,
+          state.manualParams.lensShowRays
+        );
+        renderConsumerInspector();
+      });
+    }
+
+    if (isLens) {
+      // Bind Lens controls
+      async function updateOpticalTelemetry() {
+        const container = document.getElementById('lens-optics-telemetry');
+        if (!container) return;
+        try {
+          const res = await calculateOptics(50.0, state.manualParams.lensFStop, state.manualParams.lensSubjectDist);
+          container.innerHTML = `
+            <div class="telemetry-card" style="margin-top: 4px; padding: 6px 8px; font-size: 10px;">
+              <div class="telemetry-row">
+                <span class="telemetry-label">Entrance Pupil Diameter (D):</span>
+                <span class="telemetry-value" style="color: var(--accent-cyan); font-weight:700;">${res.entrancePupilDiameterMm} mm</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Numerical Aperture (NA):</span>
+                <span class="telemetry-value" style="font-family: var(--font-mono);">${res.numericalAperture}</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Airy Disk Diameter (550nm):</span>
+                <span class="telemetry-value" style="color: var(--accent-amber);">${res.diffractionAiryDiskDiameter_um} µm</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Hyperfocal Distance (H):</span>
+                <span class="telemetry-value">${res.hyperfocalDistance_m} m</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Depth of Field (DoF):</span>
+                <span class="telemetry-value" style="color: var(--accent-green); font-weight:700;">${typeof res.depthOfField_m === 'number' ? res.depthOfField_m + ' m' : res.depthOfField_m}</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Focus Limits (Near / Far):</span>
+                <span class="telemetry-value">${res.nearFocusLimit_m}m — ${res.farFocusLimit_m}m</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Diffraction MTF50 Limit:</span>
+                <span class="telemetry-value" style="color: var(--accent-cyan);">${res.mtf50ResolutionLimit_lp_per_mm} lp/mm</span>
+              </div>
+            </div>
+          `;
+        } catch (err) {
+          console.warn('Optical calculation error', err);
+        }
+      }
+
+      function refreshLens3D() {
+        const cutawayRad = (state.manualParams.lensCutawayDeg * Math.PI) / 180;
+        viewport3D.renderCameraLens3D(
+          true,
+          cutawayRad,
+          state.manualParams.lensExplodePercent / 100,
+          state.manualParams.lensFStop,
+          state.manualParams.lensShowRays
+        );
+      }
+
+      const selectFStop = document.getElementById('select-lens-fstop');
+      if (selectFStop) {
+        selectFStop.addEventListener('change', (e) => {
+          state.manualParams.lensFStop = Number(e.target.value);
+          const valEl = document.getElementById('val-lens-fstop');
+          if (valEl) valEl.textContent = `f/${state.manualParams.lensFStop}`;
+          refreshLens3D();
+          updateOpticalTelemetry();
+        });
+      }
+
+      const sliderCutaway = document.getElementById('slider-lens-cutaway');
+      if (sliderCutaway) {
+        sliderCutaway.addEventListener('input', (e) => {
+          state.manualParams.lensCutawayDeg = Number(e.target.value);
+          const tag = state.manualParams.lensCutawayDeg === 90 ? 'Quadrant View' : state.manualParams.lensCutawayDeg === 180 ? 'Half-Section' : state.manualParams.lensCutawayDeg === 0 ? 'Sealed' : 'Custom';
+          const valEl = document.getElementById('val-lens-cutaway');
+          if (valEl) valEl.textContent = `${state.manualParams.lensCutawayDeg}° (${tag})`;
+          refreshLens3D();
+        });
+      }
+
+      const sliderExplode = document.getElementById('slider-lens-explode');
+      if (sliderExplode) {
+        sliderExplode.addEventListener('input', (e) => {
+          state.manualParams.lensExplodePercent = Number(e.target.value);
+          const valEl = document.getElementById('val-lens-explode');
+          if (valEl) valEl.textContent = `${state.manualParams.lensExplodePercent}%`;
+          viewport3D.setExplodeFactor(state.manualParams.lensExplodePercent / 100);
+          if (ribbonExplodeSlider) ribbonExplodeSlider.value = state.manualParams.lensExplodePercent;
+          if (ribbonExplodeVal) ribbonExplodeVal.textContent = `${state.manualParams.lensExplodePercent}%`;
+        });
+      }
+
+      const sliderDist = document.getElementById('slider-lens-dist');
+      if (sliderDist) {
+        sliderDist.addEventListener('input', (e) => {
+          state.manualParams.lensSubjectDist = Number(e.target.value);
+          const valEl = document.getElementById('val-lens-dist');
+          if (valEl) valEl.textContent = `${state.manualParams.lensSubjectDist} m`;
+          updateOpticalTelemetry();
+        });
+      }
+
+      const chkRays = document.getElementById('chk-lens-rays');
+      if (chkRays) {
+        chkRays.addEventListener('change', (e) => {
+          state.manualParams.lensShowRays = e.target.checked;
+          refreshLens3D();
+        });
+      }
+
+      const btnRunOptics = document.getElementById('btn-run-optics');
+      if (btnRunOptics) {
+        btnRunOptics.addEventListener('click', () => {
+          refreshLens3D();
+          updateOpticalTelemetry();
+        });
+      }
+
+      updateOpticalTelemetry();
+
+    } else {
+      // Bind Phone CAD, Drop FEA, and Thermal CHT controls
+      const sliderW = document.getElementById('slider-cad-w');
+      const sliderH = document.getElementById('slider-cad-h');
+      sliderW.addEventListener('input', (e) => {
+        state.manualParams.cadWidth = Number(e.target.value);
+        document.getElementById('val-cad-w').textContent = `${state.manualParams.cadWidth} mm`;
+        viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
         updateMaterialInertia();
       });
-      updateMaterialInertia();
-    }
-
-    const sliderDropH = document.getElementById('slider-drop-h');
-    sliderDropH.addEventListener('input', (e) => {
-      state.manualParams.dropHeight = Number(e.target.value);
-      document.getElementById('val-drop-h').textContent = `${state.manualParams.dropHeight} m`;
-    });
-
-    const selectDropAngle = document.getElementById('select-drop-angle');
-    selectDropAngle.addEventListener('change', (e) => {
-      state.manualParams.impactAngle = e.target.value;
-    });
-
-    // Run Drop Test Action
-    document.getElementById('btn-run-drop').addEventListener('click', async () => {
-      const dropContainer = document.getElementById('drop-telemetry-container');
-      dropContainer.innerHTML = '<div style="font-size:11px; color:var(--accent-cyan); padding:8px 0;">Solving explicit central difference equations...</div>';
-      
-      const res = await window.omniEngAPI.solveDropTest({
-        dropHeight: state.manualParams.dropHeight,
-        impactAngle: state.manualParams.impactAngle
+      sliderH.addEventListener('input', (e) => {
+        state.manualParams.cadHeight = Number(e.target.value);
+        document.getElementById('val-cad-h').textContent = `${state.manualParams.cadHeight} mm`;
+        viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
+        updateMaterialInertia();
       });
 
-      // Switch to FEA stress contour view
-      viewport3D.renderFEAStressHeatmap();
-
-      // Also compute 50-step explicit time integration and load dynamic frames into the playback bar
-      try {
-        const transientRes = await window.omniEngAPI.solveTransientDrop({
-          dropHeightM: state.manualParams.dropHeight,
-          impactAngle: state.manualParams.impactAngle,
-          timeStepUs: 100,
-          totalDurationMs: 5.0
-        });
-        viewport3D.loadTransientDropData(transientRes);
-      } catch (err) {
-        console.warn('Transient solver error', err);
+      async function updateMaterialInertia() {
+        const matKey = state.manualParams.chassisMaterial || 'Ti-6Al-4V_Grade5';
+        const container = document.getElementById('material-inertia-telemetry');
+        if (!container || !window.omniEngAPI || !window.omniEngAPI.computeInertia) return;
+        try {
+          const inertia = await window.omniEngAPI.computeInertia({
+            matKey,
+            widthM: state.manualParams.cadWidth / 1000,
+            heightM: state.manualParams.cadHeight / 1000,
+            depthM: state.manualParams.cadDepth / 1000
+          });
+          container.innerHTML = `
+            <div class="telemetry-card" style="margin-top: 6px; padding: 6px 8px; font-size: 10px;">
+              <div class="telemetry-row">
+                <span class="telemetry-label">Calculated Mass:</span>
+                <span class="telemetry-value" style="color: var(--accent-cyan); font-weight:700;">${(inertia.massKg * 1000).toFixed(1)} g</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Volume:</span>
+                <span class="telemetry-value">${inertia.volumeCm3} cm³</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Principal Inertia (Izz):</span>
+                <span class="telemetry-value" style="font-family: var(--font-mono);">${inertia.Izz} kg·m²</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="telemetry-label">Yield Strength (ASTM):</span>
+                <span class="telemetry-value" style="color: var(--accent-green);">${inertia.yieldStrengthMPa} MPa</span>
+              </div>
+            </div>
+          `;
+        } catch (e) {
+          console.warn('Inertia compute error', e);
+        }
       }
 
-      const isPass = res.status.includes('PASS');
-      const isWarn = res.status.includes('WARNING');
-      const statusClass = isPass ? 'status-pass' : (isWarn ? 'status-warn' : 'status-fail');
+      const selectMat = document.getElementById('select-material');
+      if (selectMat) {
+        selectMat.addEventListener('change', (e) => {
+          state.manualParams.chassisMaterial = e.target.value;
+          updateMaterialInertia();
+        });
+        updateMaterialInertia();
+      }
 
-      dropContainer.innerHTML = `
-        <div class="telemetry-card">
-          <div class="telemetry-row">
-            <span class="telemetry-label">Impact Velocity:</span>
-            <span class="telemetry-value">${res.impactVelocity} m/s</span>
-          </div>
-          <div class="telemetry-row">
-            <span class="telemetry-label">Peak Deceleration:</span>
-            <span class="telemetry-value">${res.peakDeceleration_G} G</span>
-          </div>
-          <div class="telemetry-row">
-            <span class="telemetry-label">Screen Glass Stress:</span>
-            <span class="telemetry-value">${res.peakScreenStress_MPa} MPa</span>
-          </div>
-          <div class="telemetry-row">
-            <span class="telemetry-label">Chassis Stress:</span>
-            <span class="telemetry-value">${res.peakChassisStress_MPa} MPa</span>
-          </div>
-          <div class="status-indicator ${statusClass}">${res.status}</div>
-        </div>
-      `;
-    });
-
-    // Run Thermal CHT Action
-    document.getElementById('btn-run-thermal').addEventListener('click', async () => {
-      const thermalContainer = document.getElementById('thermal-telemetry-container');
-      thermalContainer.innerHTML = '<div style="font-size:11px; color:var(--accent-amber); padding:8px 0;">Simulating multi-phase conjugate heat transfer...</div>';
-
-      const res = await window.omniEngAPI.solveThermal({
-        socPowerWatts: state.manualParams.socPowerWatts,
-        hasVaporChamber: document.getElementById('chk-vapor-chamber').checked
+      const sliderDropH = document.getElementById('slider-drop-h');
+      sliderDropH.addEventListener('input', (e) => {
+        state.manualParams.dropHeight = Number(e.target.value);
+        document.getElementById('val-drop-h').textContent = `${state.manualParams.dropHeight} m`;
       });
 
-      const isPass = res.verdict.includes('NORMAL');
-      const isWarn = res.verdict.includes('WARNING');
-      const statusClass = isPass ? 'status-pass' : (isWarn ? 'status-warn' : 'status-fail');
+      const selectDropAngle = document.getElementById('select-drop-angle');
+      selectDropAngle.addEventListener('change', (e) => {
+        state.manualParams.impactAngle = e.target.value;
+      });
 
-      thermalContainer.innerHTML = `
-        <div class="telemetry-card">
-          <div class="telemetry-row">
-            <span class="telemetry-label">SoC Junction Temp:</span>
-            <span class="telemetry-value" style="color: ${res.maxSocTempC > 85 ? 'var(--accent-rose)' : 'var(--accent-green)'};">${res.maxSocTempC} °C</span>
+      document.getElementById('btn-run-drop').addEventListener('click', async () => {
+        const dropContainer = document.getElementById('drop-telemetry-container');
+        dropContainer.innerHTML = '<div style="font-size:11px; color:var(--accent-cyan); padding:8px 0;">Solving explicit central difference equations...</div>';
+        
+        const res = await window.omniEngAPI.solveDropTest({
+          dropHeight: state.manualParams.dropHeight,
+          impactAngle: state.manualParams.impactAngle
+        });
+
+        viewport3D.renderFEAStressHeatmap();
+
+        try {
+          const transientRes = await window.omniEngAPI.solveTransientDrop({
+            dropHeightM: state.manualParams.dropHeight,
+            impactAngle: state.manualParams.impactAngle,
+            timeStepUs: 100,
+            totalDurationMs: 5.0
+          });
+          viewport3D.loadTransientDropData(transientRes);
+        } catch (err) {
+          console.warn('Transient solver error', err);
+        }
+
+        const isPass = res.status.includes('PASS');
+        const isWarn = res.status.includes('WARNING');
+        const statusClass = isPass ? 'status-pass' : (isWarn ? 'status-warn' : 'status-fail');
+
+        dropContainer.innerHTML = `
+          <div class="telemetry-card">
+            <div class="telemetry-row">
+              <span class="telemetry-label">Impact Velocity:</span>
+              <span class="telemetry-value">${res.impactVelocity} m/s</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Peak Deceleration:</span>
+              <span class="telemetry-value">${res.peakDeceleration_G} G</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Screen Glass Stress:</span>
+              <span class="telemetry-value">${res.peakScreenStress_MPa} MPa</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Chassis Stress:</span>
+              <span class="telemetry-value">${res.peakChassisStress_MPa} MPa</span>
+            </div>
+            <div class="status-indicator ${statusClass}">${res.status}</div>
           </div>
-          <div class="telemetry-row">
-            <span class="telemetry-label">Battery Surface Temp:</span>
-            <span class="telemetry-value">${res.maxBatteryTempC} °C</span>
+        `;
+      });
+
+      document.getElementById('btn-run-thermal').addEventListener('click', async () => {
+        const thermalContainer = document.getElementById('thermal-telemetry-container');
+        thermalContainer.innerHTML = '<div style="font-size:11px; color:var(--accent-amber); padding:8px 0;">Simulating multi-phase conjugate heat transfer...</div>';
+
+        const res = await window.omniEngAPI.solveThermal({
+          socPowerWatts: state.manualParams.socPowerWatts,
+          hasVaporChamber: document.getElementById('chk-vapor-chamber').checked
+        });
+
+        const isPass = res.verdict.includes('NORMAL');
+        const isWarn = res.verdict.includes('WARNING');
+        const statusClass = isPass ? 'status-pass' : (isWarn ? 'status-warn' : 'status-fail');
+
+        thermalContainer.innerHTML = `
+          <div class="telemetry-card">
+            <div class="telemetry-row">
+              <span class="telemetry-label">SoC Junction Temp:</span>
+              <span class="telemetry-value" style="color: ${res.maxSocTempC > 85 ? 'var(--accent-rose)' : 'var(--accent-green)'};">${res.maxSocTempC} °C</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Battery Surface Temp:</span>
+              <span class="telemetry-value">${res.maxBatteryTempC} °C</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-label">Exterior Skin Temp:</span>
+              <span class="telemetry-value">${res.maxSkinTempC} °C</span>
+            </div>
+            <div class="status-indicator ${statusClass}">${res.verdict}</div>
           </div>
-          <div class="telemetry-row">
-            <span class="telemetry-label">Exterior Skin Temp:</span>
-            <span class="telemetry-value">${res.maxSkinTempC} °C</span>
-          </div>
-          <div class="status-indicator ${statusClass}">${res.verdict}</div>
-        </div>
-      `;
-    });
+        `;
+      });
+    }
   }
 
   function renderEdaInspector() {
@@ -873,6 +1191,21 @@ endmodule</textarea>
   }
 
   function loadSampleProject(sample) {
+    if (sample.id === 'sample_camera_lens_50mm') {
+      state.manualParams.lensSubTab = 'lens';
+      if (sample.cadParams) {
+        state.manualParams.lensFStop = sample.cadParams.fStop || 1.4;
+        state.manualParams.lensCutawayDeg = Math.round((sample.cadParams.cutawayAngle || (Math.PI / 2)) * 180 / Math.PI);
+        state.manualParams.lensShowRays = sample.cadParams.showRays !== false;
+      }
+      if (sample.opticsParams) {
+        state.manualParams.lensSubjectDist = sample.opticsParams.subjectDistM || 2.0;
+      }
+      switchStudio('consumer');
+      addAiMessage(`Loaded turnkey community sample: "${sample.title}". 3D cutaway optomechanical lens loaded showcasing internal 8-element 6-group optics (Schott Crown/Flint & CaF2 Fluorite), dynamic 9-blade iris aperture, focus helicoids, VCM actuator, and paraxial ray tracing.`);
+      return;
+    }
+    state.manualParams.lensSubTab = 'phone';
     switchStudio(sample.studio);
     addAiMessage(`Loaded turnkey community sample: "${sample.title}". All physics parameters, CAD features, and simulation boundary conditions are initialized and ready to run or edit.`);
   }
@@ -956,10 +1289,21 @@ endmodule</textarea>
       addAiMessage(plan.assistantMessage);
 
       // Automatically sync AI results with manual sliders & viewport
-      if (plan.matchedTool === 'run_phone_drop_test') {
+      if (plan.matchedTool === 'design_camera_lens_optics') {
+        state.manualParams.lensSubTab = 'lens';
+        if (plan.toolInput) {
+          state.manualParams.lensFStop = plan.toolInput.fStop || 1.4;
+          state.manualParams.lensCutawayDeg = Math.round((plan.toolInput.cutawayAngle || (Math.PI / 2)) * 180 / Math.PI);
+          state.manualParams.lensSubjectDist = plan.toolInput.subjectDistM || 2.0;
+          state.manualParams.lensShowRays = plan.toolInput.showRays !== false;
+        }
+        switchStudio('consumer');
+      } else if (plan.matchedTool === 'run_phone_drop_test') {
+        state.manualParams.lensSubTab = 'phone';
         switchStudio('consumer');
         viewport3D.renderFEAStressHeatmap();
       } else if (plan.matchedTool === 'simulate_mobile_thermal') {
+        state.manualParams.lensSubTab = 'phone';
         switchStudio('consumer');
       } else if (plan.matchedTool === 'synthesize_verilog_chip' || plan.matchedTool === 'run_calibre_drc_check') {
         switchStudio('eda');
@@ -1027,6 +1371,13 @@ endmodule</textarea>
       const val = Number(e.target.value);
       if (ribbonExplodeVal) ribbonExplodeVal.textContent = `${val}%`;
       viewport3D.setExplodeFactor(val / 100);
+      if (state.manualParams.lensSubTab === 'lens') {
+        state.manualParams.lensExplodePercent = val;
+        const sliderLensExplode = document.getElementById('slider-lens-explode');
+        if (sliderLensExplode) sliderLensExplode.value = val;
+        const valLensExplode = document.getElementById('val-lens-explode');
+        if (valLensExplode) valLensExplode.textContent = `${val}%`;
+      }
     });
   }
 

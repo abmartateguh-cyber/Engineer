@@ -217,6 +217,65 @@ const MATERIAL_DATABASE = {
     relativePermittivity: 1.0,
     electricalResistivityOhmM: 1.29e-6,
     colorHex: 0x6b7280
+  },
+
+  // Precision Optical Glass & Crystal (Schott / Ohara / Corning)
+  'Schott_NBK7': {
+    name: 'Schott N-BK7 Precision Borosilicate Crown Glass',
+    category: 'Optical Crown Glass',
+    densityKgM3: 2510,
+    youngsModulusGPa: 82.0,
+    poissonsRatio: 0.206,
+    yieldStrengthMPa: 65.0,
+    ultimateStrengthMPa: 95.0,
+    refractiveIndex_nd: 1.5168,
+    abbeNumber_Vd: 64.17,
+    thermalConductivityW_mK: 1.114,
+    specificHeatJ_kgK: 858,
+    thermalExpansionPpmK: 7.1,
+    fractureToughnessMPa_m05: 0.85,
+    dampingRatio: 0.002,
+    relativePermittivity: 6.7,
+    electricalResistivityOhmM: 1e11,
+    colorHex: 0x38bdf8
+  },
+  'Schott_NSF11': {
+    name: 'Schott N-SF11 Dense Flint Glass (High Chromatic Dispersion)',
+    category: 'Optical Flint Glass',
+    densityKgM3: 3220,
+    youngsModulusGPa: 65.0,
+    poissonsRatio: 0.23,
+    yieldStrengthMPa: 55.0,
+    ultimateStrengthMPa: 80.0,
+    refractiveIndex_nd: 1.7847,
+    abbeNumber_Vd: 25.76,
+    thermalConductivityW_mK: 0.82,
+    specificHeatJ_kgK: 630,
+    thermalExpansionPpmK: 8.6,
+    fractureToughnessMPa_m05: 0.65,
+    dampingRatio: 0.002,
+    relativePermittivity: 8.2,
+    electricalResistivityOhmM: 1e10,
+    colorHex: 0xa855f7
+  },
+  'OpticalFluorite_CaF2': {
+    name: 'Single-Crystal Calcium Fluoride (CaF2 Fluorite ED Lens)',
+    category: 'Optical Single Crystal',
+    densityKgM3: 3180,
+    youngsModulusGPa: 75.8,
+    poissonsRatio: 0.26,
+    yieldStrengthMPa: 36.0,
+    ultimateStrengthMPa: 50.0,
+    refractiveIndex_nd: 1.4338,
+    abbeNumber_Vd: 95.3,
+    thermalConductivityW_mK: 9.71,
+    specificHeatJ_kgK: 854,
+    thermalExpansionPpmK: 18.8,
+    fractureToughnessMPa_m05: 0.45,
+    dampingRatio: 0.001,
+    relativePermittivity: 6.8,
+    electricalResistivityOhmM: 1e14,
+    colorHex: 0x22d3ee
   }
 };
 

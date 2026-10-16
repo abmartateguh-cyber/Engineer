@@ -14,9 +14,24 @@ const { DRCEngine } = require('../eda/drc_engine');
 const { QuadcopterDynamics } = require('../dynamic_simulink/drone_flight_dynamics');
 const { ThermodynamicsEngine } = require('../plant/thermodynamics');
 const { PipingStressEngine } = require('../plant/piping_stress');
+const { OpticalEngine } = require('../optics/optical_engine');
 
 // Code-Gated Tool Catalog (Model Context Protocol typed schema)
 const OMNI_TOOLS = [
+  {
+    name: 'design_camera_lens_optics',
+    description: 'Design and simulate 50mm f/1.4 multi-element camera lens optics with internal 3D cutaway inspection, Schott glass materials, and paraxial ray tracing',
+    parameters: {
+      type: 'object',
+      properties: {
+        focalLengthMm: { type: 'number', default: 50.0 },
+        fStop: { type: 'number', default: 1.4 },
+        subjectDistM: { type: 'number', default: 2.0 },
+        showRays: { type: 'boolean', default: true },
+        cutawayAngle: { type: 'number', default: 1.5708 }
+      }
+    }
+  },
   {
     name: 'create_cad_geometry',
     description: 'Create a parametric 3D B-Rep CAD geometry (box, cylinder, sphere, or custom feature)',
@@ -135,7 +150,31 @@ class OmniAIEngine {
     };
 
     // Intent routing using code-gated evaluation
-    if (p.includes('drop') || p.includes('impact') || p.includes('fall')) {
+    if (p.includes('lens') || p.includes('optics') || p.includes('camera') || p.includes('aperture') || p.includes('f-stop') || p.includes('cutaway') || p.includes('inside')) {
+      actionPlan.matchedTool = 'design_camera_lens_optics';
+      const fStop = (p.includes('f/1.4') || p.includes('1.4')) ? 1.4
+                  : (p.includes('f/2.8') || p.includes('2.8')) ? 2.8
+                  : (p.includes('f/5.6') || p.includes('5.6')) ? 5.6
+                  : (p.includes('f/4') || /\bf\/?4(\.0)?\b/.test(p)) ? 4.0
+                  : (p.includes('f/2') || /\bf\/?2(\.0)?\b/.test(p)) ? 2.0
+                  : (p.includes('f/8') || /\bf\/?8(\.0)?\b/.test(p)) ? 8.0
+                  : (p.includes('f/11') || p.includes('11')) ? 11.0
+                  : (p.includes('f/16') || p.includes('16')) ? 16.0
+                  : 1.4;
+      const dist = p.includes('5m') ? 5.0 : (p.includes('1m') ? 1.0 : 2.0);
+      const cutAngle = p.includes('half') ? Math.PI : (p.includes('closed') ? 0 : Math.PI / 2);
+      actionPlan.toolInput = { focalLengthMm: 50.0, fStop, subjectDistM: dist, showRays: true, cutawayAngle: cutAngle };
+      actionPlan.result = OpticalEngine.solveOpticalMetrics(50.0, fStop, dist);
+
+      actionPlan.assistantMessage = `Designed 50mm f/${fStop} Aspherical Multi-Element Camera Lens with 8 elements in 6 groups (Schott N-BK7 Crown, N-SF11 Flint & CaF2 Fluorite). Numerical Aperture: ${actionPlan.result.numericalAperture}, Airy Disk: ${actionPlan.result.diffractionAiryDiskDiameter_um} µm, Hyperfocal: ${actionPlan.result.hyperfocalDistance_m} m, DoF: ${actionPlan.result.depthOfField_m} m, MTF50 Limit: ${actionPlan.result.mtf50ResolutionLimit_lp_per_mm} lp/mm. 3D internal cutaway showing mechanical focus helicoids, 9-blade iris diaphragm, VCM actuator, and ray cone loaded.`;
+      actionPlan.suggestedManualEdits = [
+        { label: 'f-Stop Aperture', key: 'lensFStop', value: fStop, unit: 'f/' },
+        { label: 'Cutaway Angle', key: 'lensCutawayDeg', value: Math.round(cutAngle * 180 / Math.PI), unit: '°' },
+        { label: 'Subject Distance', key: 'lensSubjectDist', value: dist, unit: 'm' },
+        { label: 'Light Ray Cone', key: 'lensShowRays', value: true, unit: 'bool' }
+      ];
+
+    } else if (p.includes('drop') || p.includes('impact') || p.includes('fall')) {
       actionPlan.matchedTool = 'run_phone_drop_test';
       const height = p.includes('2m') ? 2.0 : (p.includes('1m') ? 1.0 : 1.5);
       const angle = p.includes('face') ? 'face' : (p.includes('edge') ? 'edge' : 'corner');

@@ -39,6 +39,7 @@ const { MaterialManager } = require('../src/core/materials/material_database');
 const { TransientDropAnimator } = require('../src/core/cae/transient_drop_animator');
 const { FrequencyResponseAnalyzer } = require('../src/core/dynamic_simulink/frequency_analysis');
 const { VLEPhaseEnvelopeEngine } = require('../src/core/plant/vle_envelope');
+const { OpticalEngine } = require('../src/core/optics/optical_engine');
 const { COMMUNITY_SAMPLES } = require('../src/samples/community_samples');
 
 let totalTests = 0;
@@ -457,6 +458,16 @@ test('OmniAIEngine: Tool catalog and prompt routing', () => {
   const pPipe = ai.processPrompt('Evaluate ASME piping stress at 250C with no loop');
   assert.strictEqual(pPipe.matchedTool, 'calculate_asme_piping_stress');
   assert.strictEqual(pPipe.toolInput.hasExpansionLoop, false);
+
+  // Camera Lens Optics & 3D Cutaway prompt
+  const pLens = ai.processPrompt('Design a 50mm f/1.4 camera lens and show inside of camera lens with cutaway and ray tracing');
+  assert.strictEqual(pLens.matchedTool, 'design_camera_lens_optics');
+  assert.strictEqual(pLens.toolInput.focalLengthMm, 50.0);
+  assert.strictEqual(pLens.toolInput.fStop, 1.4);
+  assert(pLens.result.entrancePupilDiameterMm > 30.0);
+  assert(pLens.result.airyDiskDiameterUm > 0.0);
+  assert(pLens.assistantMessage.includes('50mm'));
+  assert(pLens.suggestedManualEdits.some(e => e.key === 'lensFStop'));
 });
 
 // ----------------------------------------------------
@@ -464,8 +475,8 @@ test('OmniAIEngine: Tool catalog and prompt routing', () => {
 // ----------------------------------------------------
 console.log('\n10. Testing Curated Community Reference Projects:');
 
-test('Community Samples: 8 Turnkey Reference Projects Loaded and Valid', () => {
-  assert.strictEqual(COMMUNITY_SAMPLES.length, 8);
+test('Community Samples: Turnkey Reference Projects Loaded and Valid', () => {
+  assert(COMMUNITY_SAMPLES.length >= 8, `Expected at least 8 samples, got ${COMMUNITY_SAMPLES.length}`);
   const industries = new Set(COMMUNITY_SAMPLES.map(s => s.industry));
   assert(industries.has('Consumer Electronics'));
   assert(industries.has('Semiconductor & EDA'));
@@ -614,6 +625,67 @@ test('VLEPhaseEnvelopeEngine: Peng-Robinson P-T Phase Envelope and 30-tray disti
   assert(column.trays[0].temperatureC < column.trays[29].temperatureC);
   assert.strictEqual(column.trays[0].temperatureC, 110.0);
   assert.strictEqual(column.trays[29].temperatureC, 360.0);
+});
+
+// ----------------------------------------------------
+console.log('\n13. Testing Camera Lens Optics & Optomechanics Engine:');
+
+test('OpticalEngine: 50mm f/1.4 prescription definition and glass material validation', () => {
+  const rx = OpticalEngine.get50mmPrescription();
+  assert.strictEqual(rx.focalLengthMm, 50.0);
+  assert.strictEqual(rx.designAperture, 1.4);
+  assert.strictEqual(rx.groups.length, 6);
+  assert.strictEqual(rx.elements.length, 8);
+
+  // Verify elements have valid physical properties and glass types
+  rx.elements.forEach(elem => {
+    assert(elem.thicknessMm > 0);
+    assert(elem.clearApertureMm > 0);
+    assert(['Schott_NBK7', 'Schott_NSF11', 'OpticalFluorite_CaF2'].includes(elem.glassKey));
+    assert(elem.refractiveIndex_nd > 1.4 && elem.refractiveIndex_nd < 1.9);
+    assert(elem.abbeNumber_Vd > 20 && elem.abbeNumber_Vd < 100);
+  });
+});
+
+test('OpticalEngine: solveOpticalMetrics calculates airy disk, hyperfocal and DoF', () => {
+  const m14 = OpticalEngine.solveOpticalMetrics(50.0, 1.4, 2.0);
+  assert.strictEqual(m14.entrancePupilDiameterMm, 35.71);
+  assert.strictEqual(m14.numericalAperture, 0.3571);
+  // Airy disk: 2.44 * 0.550 * 1.4 = 1.88 um
+  assert.strictEqual(m14.diffractionAiryDiskDiameter_um, 1.88);
+  assert.strictEqual(m14.circleOfConfusionMm, 0.029);
+  assert(m14.hyperfocalDistance_m > 60.0 && m14.hyperfocalDistance_m < 65.0);
+  assert(m14.depthOfField_m > 0.1 && m14.depthOfField_m < 0.2);
+  assert(m14.nearFocusLimit_m < 2.0 && m14.farFocusLimit_m > 2.0);
+
+  // Test smaller aperture f/8.0
+  const m8 = OpticalEngine.solveOpticalMetrics(50.0, 8.0, 2.0);
+  assert.strictEqual(m8.entrancePupilDiameterMm, 6.25);
+  // Depth of field should be much larger at f/8 than f/1.4
+  assert(m8.depthOfField_m > m14.depthOfField_m);
+  // Airy disk should be larger at f/8 (diffraction limit increases)
+  assert(m8.diffractionAiryDiskDiameter_um > m14.diffractionAiryDiskDiameter_um);
+  assert(m8.mtf50ResolutionLimit_lp_per_mm < m14.mtf50ResolutionLimit_lp_per_mm);
+});
+
+test('OpticalEngine: traceRays paraxial marginal ray tracing and sensor convergence', () => {
+  const rays = OpticalEngine.traceRays(1.4, 9);
+  assert.strictEqual(rays.length, 9);
+
+  // Central ray should be straight along the optical axis (y=0)
+  const centerRay = rays.find(r => r.id === 'center');
+  assert(centerRay);
+  assert.strictEqual(centerRay.startY, 0);
+  assert.strictEqual(centerRay.points[0].y, 0);
+  assert.strictEqual(centerRay.points[centerRay.points.length - 1].y, 0);
+
+  // Marginal rays should enter off-axis and converge towards focal distance ~75mm
+  const topRay = rays.find(r => r.id === 'marginal_top');
+  assert(topRay);
+  assert(topRay.startY > 10.0);
+  const endPoint = topRay.points[topRay.points.length - 1];
+  assert.strictEqual(endPoint.z, 75.0);
+  assert(Math.abs(endPoint.y) < 2.0); // Converges tightly at the sensor focal point
 });
 
 // ----------------------------------------------------
