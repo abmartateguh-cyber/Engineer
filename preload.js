@@ -86,6 +86,23 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveContinuumPlasticity3D: (params) => ipcRenderer.invoke('omni:solve-continuum-plasticity-3d', params),
   solveFvmCFD3D: (params) => ipcRenderer.invoke('omni:solve-fvm-cfd-3d', params),
 
+  // Phase 4 Semiconductor EDA & High-Order Optics APIs
+  evaluateAsphericOptics: (params) => ipcRenderer.invoke('omni:evaluate-aspheric-optics', params),
+  evaluateThinFilmCoating: (params) => ipcRenderer.invoke('omni:evaluate-thin-film-coating', params),
+  synthesizeSystemVerilog: (params) => ipcRenderer.invoke('omni:synthesize-system-verilog', params),
+  synthesizeClockTree: (params) => ipcRenderer.invoke('omni:synthesize-clock-tree', params),
+  solveBsim4Vtc: (params) => ipcRenderer.invoke('omni:solve-bsim4-vtc', params),
+
+  // Phase 5 GNC Autopilot, Chemical Process & Industrial Parity APIs
+  scheduleMultiRate: (params) => ipcRenderer.invoke('omni:schedule-multi-rate', params),
+  solveAlgebraicLoop: (params) => ipcRenderer.invoke('omni:solve-algebraic-loop', params),
+  synthesizeLQR: (params) => ipcRenderer.invoke('omni:synthesize-lqr', params),
+  autocodeController: (params) => ipcRenderer.invoke('omni:autocode-controller', params),
+  queryDipprDatabase: (query) => ipcRenderer.invoke('omni:query-dippr-database', query),
+  solveVlleFlash: (params) => ipcRenderer.invoke('omni:solve-vlle-flash', params),
+  solveMeshDistillation: (params) => ipcRenderer.invoke('omni:solve-mesh-distillation', params),
+  solveWaterHammerMOC: (params) => ipcRenderer.invoke('omni:solve-water-hammer-moc', params),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

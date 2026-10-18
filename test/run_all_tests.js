@@ -725,6 +725,24 @@ passedTests += p3Stats.testsPassed;
 failedTests += p3Stats.testsFailed;
 
 // ----------------------------------------------------
+// Suite 18: Phase 4 Upgrade Master Plan Engines (EDA & High-Order Optics)
+// ----------------------------------------------------
+const { runPhase4Tests } = require('./test_phase4_upgrade');
+const p4Stats = runPhase4Tests();
+totalTests += p4Stats.testsPassed + p4Stats.testsFailed;
+passedTests += p4Stats.testsPassed;
+failedTests += p4Stats.testsFailed;
+
+// ----------------------------------------------------
+// Suite 19: Phase 5 Upgrade Master Plan Engines (GNC, Plant & Gold Certification)
+// ----------------------------------------------------
+const { runPhase5Tests } = require('./test_phase5_upgrade');
+const p5Stats = runPhase5Tests();
+totalTests += p5Stats.testsPassed + p5Stats.testsFailed;
+passedTests += p5Stats.testsPassed;
+failedTests += p5Stats.testsFailed;
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

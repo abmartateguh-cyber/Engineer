@@ -52,6 +52,19 @@ const { Point3D, Tetrahedron, DelaunayMesher3D } = require('./src/core/cae/delau
 const { QuadraticTet10Element, MortarContactPair3D, LanczosModalEigensolver } = require('./src/core/cae/continuum_plasticity_3d');
 const { FVMNavierStokes3D } = require('./src/core/cae/fvm_navier_stokes_3d');
 
+// Phase 4 Semiconductor EDA & High-Order Optics Engines
+const { AsphericSurface, DielectricThinFilm, OffAxisRayFan, MonteCarloTolerancing } = require('./src/core/optics/aspheric_freeform_optics');
+const { SystemVerilogSynthesizer, SystemVerilogElaborator, AIGGraph, TechnologyMapper, SKY130_STANDARD_CELLS } = require('./src/core/eda/system_verilog_synth');
+const { ClockTreeSynthesis, PathFinderRouter, BSIM4CompactModel } = require('./src/core/eda/clock_tree_synthesis');
+
+// Phase 5 GNC Autopilot, Chemical Process & Industrial Parity Engines
+const { MultiRateScheduler, AlgebraicLoopSolver, ModernControlSynthesis } = require('./src/core/dynamic_simulink/multi_rate_scheduler');
+const { AutocoderCRust } = require('./src/core/dynamic_simulink/autocoder_c_rust');
+const { DIPPRDatabase } = require('./src/core/plant/dippr_database');
+const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('./src/core/plant/naphtali_sandholm_mesh');
+
+const dipprDatabase = new DIPPRDatabase();
+
 const aiEngine = new OmniAIEngine();
 const hpcEngine = new CloudHPCEngine();
 const symbolicReasoner = new SymbolicReasoner();
@@ -457,6 +470,180 @@ app.whenReady().then(() => {
     return { success: true, domain, result };
   });
 
+  // Phase 4 Semiconductor EDA & High-Order Optics IPC Handlers
+  ipcMain.handle('omni:evaluate-aspheric-optics', async (event, params = {}) => {
+    const asphere = new AsphericSurface(params);
+    const sag = asphere.evaluateSag(params.r || 5.0);
+    const normal = asphere.evaluateNormal(params.x || 3.0, params.y || 4.0);
+    const ray = { origin: new Vector3(0, params.y || 4.0, -10.0), dir: new Vector3(0, 0, 1) };
+    const hit = asphere.intersectRay(ray);
+    return { success: true, sag, normal: normal.toArray(), hit: (hit && hit.hit && hit.point) ? { point: hit.point.toArray(), normal: hit.normal.toArray() } : null };
+  });
+
+  ipcMain.handle('omni:evaluate-thin-film-coating', async (event, params = {}) => {
+    const coating = new DielectricThinFilm(params.substrateIndex || 1.5168);
+    if (params.layers && params.layers.length > 0) {
+      params.layers.forEach(l => coating.addLayer(l.n, l.thicknessNm));
+    } else {
+      coating.addLayer(1.38, 99.64);
+      coating.addLayer(2.10, 65.48);
+    }
+    const res = coating.evaluate(params.wavelengthNm || 550.0, params.thetaDeg || 0.0);
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:synthesize-system-verilog', async (event, params = {}) => {
+    const code = params.code || `
+      module Counter #(parameter WIDTH=8) (input clk, input rst, output [WIDTH-1:0] q);
+        always_ff @(posedge clk) q <= q + 1;
+      endmodule
+    `;
+    const synth = new SystemVerilogSynthesizer();
+    const synthResult = synth.synthesize(code);
+    return {
+      success: true,
+      elaborated: {
+        moduleName: synthResult.moduleName,
+        parameters: synthResult.parameters,
+        ports: synthResult.ports
+      },
+      mapped: {
+        gateCount: synthResult.technologyMapping.cellCount,
+        cellCount: synthResult.technologyMapping.cellCount,
+        ...synthResult.technologyMapping
+      }
+    };
+  });
+
+  ipcMain.handle('omni:synthesize-clock-tree', async (event, params = {}) => {
+    const sinks = params.sinks || [
+      { id: 'ff0', x: 10, y: 10, capFf: 1.5 },
+      { id: 'ff1', x: 90, y: 10, capFf: 1.5 },
+      { id: 'ff2', x: 10, y: 90, capFf: 1.5 },
+      { id: 'ff3', x: 90, y: 90, capFf: 1.5 }
+    ];
+    const tree = ClockTreeSynthesis.synthesizeHTree(sinks, { x: 50, y: 50 });
+    const router = new PathFinderRouter({ width: 20, height: 20, layers: 3 });
+    const route = router.routeNet({ x: 2, y: 2, layer: 0 }, { x: 12, y: 12, layer: 2 });
+    return { success: true, tree, route };
+  });
+
+  ipcMain.handle('omni:solve-bsim4-vtc', async (event, params = {}) => {
+    const nmos = new BSIM4CompactModel({ type: 'nmos', Vth0: 0.40, mu0: 0.05 });
+    const pmos = new BSIM4CompactModel({ type: 'pmos', Vth0: -0.42, mu0: 0.02 });
+    const idSat = nmos.computeCurrent(1.2, 1.2, 0.0, 0.0);
+    const vtc = BSIM4CompactModel.solveInverterVTC(nmos, pmos, 1.2, 13);
+    return { success: true, idSat, vtc };
+  });
+
+  // Phase 5 GNC Autopilot, Chemical Process & Industrial Parity IPC Handlers
+  ipcMain.handle('omni:schedule-multi-rate', async (event, params = {}) => {
+    const scheduler = new MultiRateScheduler({ baseRateHz: params.baseRateHz || 1000 });
+    scheduler.addTask({
+      id: 'task_fast',
+      name: 'Inner Fast Loop',
+      sampleRateHz: 1000,
+      priority: 1,
+      stepFn: (t, dt, inps) => ({ count: (inps.count || 0) + 1 })
+    });
+    scheduler.addTask({
+      id: 'task_slow',
+      name: 'Outer Slow Loop',
+      sampleRateHz: 100,
+      priority: 2,
+      stepFn: (t, dt, inps) => ({ target: 10.0 })
+    });
+    scheduler.connectTasks('task_fast', 'task_slow');
+    const res = scheduler.run(params.durationSec || 0.05);
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:solve-algebraic-loop', async (event, params = {}) => {
+    const f = x => [Math.sqrt(Math.max(0, x[1]) + 2.0), 0.5 * x[0] + 1.0];
+    const res = AlgebraicLoopSolver.solveBroyden(f, params.x0 || [1.0, 1.0]);
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:synthesize-lqr', async (event, params = {}) => {
+    const A = params.A || [[0, 1], [0, 0]];
+    const B = params.B || [[0], [1]];
+    const Q = params.Q || [[10, 0], [0, 1]];
+    const R = params.R || [[1]];
+    const cLqr = ModernControlSynthesis.solveContinuousLQR(A, B, Q, R);
+    return { success: true, continuous: cLqr };
+  });
+
+  ipcMain.handle('omni:autocode-controller', async (event, params = {}) => {
+    const spec = params.modelSpec || {
+      name: 'flight_attitude',
+      A: [[0.98, 0.01], [-0.02, 0.97]],
+      B: [[0.001], [0.08]],
+      C: [[1.0, 0.0]],
+      K: [[2.8, 1.0]],
+      sampleRateHz: 1000
+    };
+    const cCode = AutocoderCRust.generateMisraC(spec);
+    const rustCode = AutocoderCRust.generateNoStdRust(spec);
+    return { success: true, cCode, rustCode };
+  });
+
+  ipcMain.handle('omni:query-dippr-database', async (event, query) => {
+    const comp = dipprDatabase.get(query);
+    if (!comp) return { success: false, error: 'Component not found' };
+    return {
+      success: true,
+      component: {
+        id: comp.id,
+        name: comp.name,
+        formula: comp.formula,
+        family: comp.family,
+        mw: comp.mw,
+        Tc: comp.Tc,
+        Pc: comp.Pc,
+        Tb: comp.Tb,
+        Pvap298Pa: comp.getVaporPressure(298.15),
+        rhoL298KgM3: comp.getLiquidDensity(298.15),
+        Cp0300: comp.getIdealGasCp(300.0)
+      }
+    };
+  });
+
+  ipcMain.handle('omni:solve-vlle-flash', async (event, params = {}) => {
+    const res = dipprDatabase.solveVLLEFlash(params.spec || {
+      components: ['Water', 'n-Hexane', 'Nitrogen'],
+      feedFractions: [0.45, 0.45, 0.10],
+      temperatureK: 340.0,
+      pressurePa: 1.2e5
+    });
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:solve-mesh-distillation', async (event, params = {}) => {
+    const res = NaphtaliSandholmColumnSolver.solve(params.spec || {
+      stages: 15,
+      feedStage: 8,
+      components: ['Propane', 'n-Butane', 'n-Pentane'],
+      feedFlows: [15.0, 20.0, 15.0],
+      feedTemperatureK: 330.0,
+      pressurePa: 1.01325e5,
+      refluxRatio: 2.5,
+      distillateRate: 25.0
+    });
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:solve-water-hammer-moc', async (event, params = {}) => {
+    const res = WaterHammerMOC.simulateMOC(params.options || {
+      pipeLengthM: 400.0,
+      initialVelocityMs: 2.5,
+      initialPressurePa: 4.0e5,
+      closureTimeSec: 0.15,
+      frictionFactor: 0.02,
+      totalTimeSec: 1.5
+    });
+    return { success: true, result: res };
+  });
+
   const win = createWindow();
 
   win.webContents.on('console-message', (e, level, msg, line, src) => {
@@ -584,6 +771,44 @@ app.whenReady().then(() => {
 
             const cfdRes = await window.omniEngAPI.solveFvmCFD3D({ inletVelocity: 20.0, steps: 3 });
             assert(cfdRes && cfdRes.success && cfdRes.result.maxVelocity > 0, 'IPC solveFvmCFD3D executes 3D polyhedral FVM step');
+
+            // 10. Test Phase 4 Semiconductor EDA & High-Order Optics
+            const asphericRes = await window.omniEngAPI.evaluateAsphericOptics({ r: 5.0 });
+            assert(asphericRes && asphericRes.success && asphericRes.sag > 0, 'IPC evaluateAsphericOptics evaluates non-spherical sag');
+
+            const thinFilmRes = await window.omniEngAPI.evaluateThinFilmCoating({ wavelengthNm: 550.0 });
+            assert(thinFilmRes && thinFilmRes.success && thinFilmRes.result.reflectance < 0.05, 'IPC evaluateThinFilmCoating computes BBAR reflectance');
+
+            const svRes = await window.omniEngAPI.synthesizeSystemVerilog({});
+            assert(svRes && svRes.success && svRes.mapped.gateCount > 0, 'IPC synthesizeSystemVerilog elaborates IEEE 1800 AST and maps gates');
+
+            const ctsRes = await window.omniEngAPI.synthesizeClockTree({});
+            assert(ctsRes && ctsRes.success && ctsRes.route.wirelength > 0, 'IPC synthesizeClockTree synthesizes H-tree and routes metal layers');
+
+            const bsim4Res = await window.omniEngAPI.solveBsim4Vtc({});
+            assert(bsim4Res && bsim4Res.success && bsim4Res.vtc.switchingThresholdVm > 0.4, 'IPC solveBsim4Vtc evaluates CMOS inverter switching threshold');
+
+            // 11. Test Phase 5 GNC Autopilot, Chemical Process & Industrial Parity
+            const schedRes = await window.omniEngAPI.scheduleMultiRate({ durationSec: 0.05 });
+            assert(schedRes && schedRes.success && schedRes.result.totalTicks === 50, 'IPC scheduleMultiRate executes multi-rate tasks deterministically');
+
+            const lqrRes = await window.omniEngAPI.synthesizeLQR({});
+            assert(lqrRes && lqrRes.success && lqrRes.continuous.K[0][0] > 0, 'IPC synthesizeLQR solves Riccati equation for optimal feedback gain');
+
+            const autocodeRes = await window.omniEngAPI.autocodeController({});
+            assert(autocodeRes && autocodeRes.success && autocodeRes.rustCode.includes('#![no_std]'), 'IPC autocodeController generates zero-alloc #![no_std] Rust code');
+
+            const dipprRes = await window.omniEngAPI.queryDipprDatabase('Water');
+            assert(dipprRes && dipprRes.success && dipprRes.component.mw === 18.015, 'IPC queryDipprDatabase retrieves thermophysical parameters');
+
+            const vlleRes = await window.omniEngAPI.solveVlleFlash({});
+            assert(vlleRes && vlleRes.success && vlleRes.result.converged, 'IPC solveVlleFlash executes 3-phase VLLE liquid-liquid-vapor flash');
+
+            const meshColRes = await window.omniEngAPI.solveMeshDistillation({});
+            assert(meshColRes && meshColRes.success && meshColRes.result.stages.length === 15, 'IPC solveMeshDistillation solves simultaneous MESH column');
+
+            const hammerRes = await window.omniEngAPI.solveWaterHammerMOC({});
+            assert(hammerRes && hammerRes.success && hammerRes.result.passedAsmeB31_3, 'IPC solveWaterHammerMOC simulates transient wave damping and ASME B31.3 stress');
 
             return results;
           })();
