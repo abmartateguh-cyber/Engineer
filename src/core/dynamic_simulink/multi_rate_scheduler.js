@@ -690,10 +690,14 @@ class ModernControlSynthesis {
   }
 }
 
+const { GoldfarbIdnaniQPSolver, ModelPredictiveController } = require('./model_predictive_control');
+
 module.exports = {
   RateTransitionBuffer,
   ScheduledTask,
   MultiRateScheduler,
   AlgebraicLoopSolver,
-  ModernControlSynthesis
+  ModernControlSynthesis,
+  GoldfarbIdnaniQPSolver,
+  ModelPredictiveController
 };

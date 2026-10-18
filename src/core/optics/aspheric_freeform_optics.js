@@ -419,6 +419,8 @@ class MonteCarloOpticalTolerancing {
   }
 }
 
+const { OpticalThermalSoakEngine, SCHOTT_THERMAL_GLASS_CATALOG, HOUSING_CTE } = require('./thermal_soak');
+
 module.exports = {
   AsphericSurface,
   ThinFilmMultilayerCoating,
@@ -426,5 +428,8 @@ module.exports = {
   MultiFieldRayFanAnalyzer,
   OffAxisRayFan: MultiFieldRayFanAnalyzer,
   MonteCarloOpticalTolerancing,
-  MonteCarloTolerancing: MonteCarloOpticalTolerancing
+  MonteCarloTolerancing: MonteCarloOpticalTolerancing,
+  OpticalThermalSoakEngine,
+  SCHOTT_THERMAL_GLASS_CATALOG,
+  HOUSING_CTE
 };

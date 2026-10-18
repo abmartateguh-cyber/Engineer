@@ -54,11 +54,14 @@ const { FVMNavierStokes3D } = require('./src/core/cae/fvm_navier_stokes_3d');
 
 // Phase 4 Semiconductor EDA & High-Order Optics Engines
 const { AsphericSurface, DielectricThinFilm, OffAxisRayFan, MonteCarloTolerancing } = require('./src/core/optics/aspheric_freeform_optics');
+const { OpticalThermalSoakEngine } = require('./src/core/optics/thermal_soak');
 const { SystemVerilogSynthesizer, SystemVerilogElaborator, AIGGraph, TechnologyMapper, SKY130_STANDARD_CELLS } = require('./src/core/eda/system_verilog_synth');
 const { ClockTreeSynthesis, PathFinderRouter, BSIM4CompactModel } = require('./src/core/eda/clock_tree_synthesis');
+const { GdsiiStreamEngine, GdsLibrary } = require('./src/core/eda/gdsii_stream');
 
 // Phase 5 GNC Autopilot, Chemical Process & Industrial Parity Engines
 const { MultiRateScheduler, AlgebraicLoopSolver, ModernControlSynthesis } = require('./src/core/dynamic_simulink/multi_rate_scheduler');
+const { ModelPredictiveController, GoldfarbIdnaniQPSolver } = require('./src/core/dynamic_simulink/model_predictive_control');
 const { AutocoderCRust } = require('./src/core/dynamic_simulink/autocoder_c_rust');
 const { DIPPRDatabase } = require('./src/core/plant/dippr_database');
 const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('./src/core/plant/naphtali_sandholm_mesh');
@@ -644,6 +647,47 @@ app.whenReady().then(() => {
     return { success: true, result: res };
   });
 
+  ipcMain.handle('omni:export-gdsii', async (event, params = {}) => {
+    const lib = new GdsLibrary(params.libName || 'OMNI_CHIP', params.userUnits || 1e-3, params.dbUnits || 1e-9);
+    const top = lib.createStructure(params.topCell || 'TOP_MACRO');
+    const polys = params.polygons || [
+      { layer: 1, datatype: 0, points: [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }, { x: 0, y: 1000 }] }
+    ];
+    for (const p of polys) {
+      top.addPolygon(p.layer, p.datatype, p.points);
+    }
+    const buf = GdsiiStreamEngine.writeGdsii(lib);
+    return { success: true, sizeBytes: buf.length, base64: buf.toString('base64') };
+  });
+
+  ipcMain.handle('omni:import-gdsii', async (event, bufferBase64) => {
+    const buf = Buffer.isBuffer(bufferBase64) ? bufferBase64 : Buffer.from(bufferBase64, 'base64');
+    const lib = GdsiiStreamEngine.readGdsii(buf);
+    return {
+      success: true,
+      libraryName: lib.name,
+      structureCount: lib.structures.size,
+      structures: Array.from(lib.structures.keys())
+    };
+  });
+
+  ipcMain.handle('omni:evaluate-optical-thermal-soak', async (event, params = {}) => {
+    const spec = params.lensSpec || {
+      housingMaterial: 'ALUMINUM_6061',
+      elements: [
+        { radius1: 50.0, radius2: -100.0, thicknessMm: 8.0, glass: 'N-BK7', airGapMm: 2.0, refractiveIndex: 1.5168 }
+      ]
+    };
+    const res = OpticalThermalSoakEngine.evaluateThermalSoak(spec, params.targetTempC || 60.0, params.refTempC || 20.0);
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:solve-mpc', async (event, params = {}) => {
+    const mpc = new ModelPredictiveController(params.options || {});
+    const res = mpc.computeControlAction(params.x0 || [0.0, 0.0], params.yRef !== undefined ? params.yRef : 1.0);
+    return { success: true, result: res };
+  });
+
   const win = createWindow();
 
   win.webContents.on('console-message', (e, level, msg, line, src) => {
@@ -809,6 +853,19 @@ app.whenReady().then(() => {
 
             const hammerRes = await window.omniEngAPI.solveWaterHammerMOC({});
             assert(hammerRes && hammerRes.success && hammerRes.result.passedAsmeB31_3, 'IPC solveWaterHammerMOC simulates transient wave damping and ASME B31.3 stress');
+
+            // 12. Test Binary GDSII Stream, Optical Thermal Soak, and Constrained MPC
+            const gdsExportRes = await window.omniEngAPI.exportGdsii({});
+            assert(gdsExportRes && gdsExportRes.success && gdsExportRes.sizeBytes > 50, 'IPC exportGdsii serializes binary GDSII Stream format');
+
+            const gdsImportRes = await window.omniEngAPI.importGdsii(gdsExportRes.base64);
+            assert(gdsImportRes && gdsImportRes.success && gdsImportRes.structureCount === 1, 'IPC importGdsii deserializes binary GDSII records');
+
+            const thermalSoakRes = await window.omniEngAPI.evaluateOpticalThermalSoak({ targetTempC: 60.0 });
+            assert(thermalSoakRes && thermalSoakRes.success && thermalSoakRes.result.focalShiftMm !== 0, 'IPC evaluateOpticalThermalSoak computes dn/dT and CTE expansion');
+
+            const mpcRes = await window.omniEngAPI.solveMPC({ x0: [0.5, 0.0], yRef: 1.0 });
+            assert(mpcRes && mpcRes.success && mpcRes.result.qpConverged, 'IPC solveMPC executes constrained Goldfarb-Idnani dual QP');
 
             return results;
           })();

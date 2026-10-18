@@ -743,6 +743,15 @@ passedTests += p5Stats.testsPassed;
 failedTests += p5Stats.testsFailed;
 
 // ----------------------------------------------------
+// Suite 20: Section 6 Master Regulatory Certification & Validation Suite
+// ----------------------------------------------------
+const { runGoldBenchmarks } = require('./test_gold_benchmarks');
+const goldStats = runGoldBenchmarks();
+totalTests += goldStats.passedCount + goldStats.failedCount;
+passedTests += goldStats.passedCount;
+failedTests += goldStats.failedCount;
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

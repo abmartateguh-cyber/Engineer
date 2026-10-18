@@ -102,6 +102,10 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveVlleFlash: (params) => ipcRenderer.invoke('omni:solve-vlle-flash', params),
   solveMeshDistillation: (params) => ipcRenderer.invoke('omni:solve-mesh-distillation', params),
   solveWaterHammerMOC: (params) => ipcRenderer.invoke('omni:solve-water-hammer-moc', params),
+  exportGdsii: (params) => ipcRenderer.invoke('omni:export-gdsii', params),
+  importGdsii: (buffer) => ipcRenderer.invoke('omni:import-gdsii', buffer),
+  evaluateOpticalThermalSoak: (params) => ipcRenderer.invoke('omni:evaluate-optical-thermal-soak', params),
+  solveMPC: (params) => ipcRenderer.invoke('omni:solve-mpc', params),
 
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')

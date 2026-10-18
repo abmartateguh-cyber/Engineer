@@ -435,6 +435,28 @@ class DIPPRDatabase {
       beta_L2 = Math.max(0.0, Math.min(1.0 - beta_V, nextL2));
     }
 
+    // Subcooled Liquid-Liquid Equilibrium (LLE) resolution if no vapor phase forms
+    if (!converged && beta_V < 0.05) {
+      beta_V = 0.0;
+      let beta = 0.5;
+      for (let it = 0; it < 30; it++) {
+        let f = 0.0, df = 0.0;
+        for (let i = 0; i < C; i++) {
+          const d = 1.0 + beta * (KL2[i] - 1.0);
+          f += z[i] * (KL2[i] - 1.0) / d;
+          df -= z[i] * (KL2[i] - 1.0) * (KL2[i] - 1.0) / (d * d);
+        }
+        if (Math.abs(f) < 1e-7) {
+          converged = true;
+          break;
+        }
+        if (Math.abs(df) > 1e-12) {
+          beta = Math.max(0.001, Math.min(0.999, beta - f / df));
+        }
+      }
+      beta_L2 = beta;
+    }
+
     const beta_L1 = Math.max(0.0, 1.0 - beta_V - beta_L2);
 
     // Compute mole fractions in all three phases
