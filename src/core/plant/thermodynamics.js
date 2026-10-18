@@ -143,6 +143,22 @@ class ThermodynamicsEngine {
   }
 }
 
+const { ProcessStream, ProcessFlowsheetSolver } = require('./process_flowsheet_solver');
+const { HeatExchangerTEMA } = require('./heat_exchanger_tema');
+const { PipingNetwork3D } = require('./piping_network_3d');
+
+ThermodynamicsEngine.Flowsheet = ProcessFlowsheetSolver;
+ThermodynamicsEngine.ProcessStream = ProcessStream;
+ThermodynamicsEngine.TEMA = HeatExchangerTEMA;
+ThermodynamicsEngine.PipingNetwork = PipingNetwork3D;
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { PURE_COMPONENTS, ThermodynamicsEngine };
+  module.exports = { 
+    PURE_COMPONENTS, 
+    ThermodynamicsEngine,
+    ProcessStream,
+    ProcessFlowsheetSolver,
+    HeatExchangerTEMA,
+    PipingNetwork3D
+  };
 }

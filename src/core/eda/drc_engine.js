@@ -144,6 +144,19 @@ class DRCEngine {
   }
 }
 
+const { SpiceEngine } = require('./spice_engine');
+const { GerberExporter } = require('./gerber_exporter');
+const { StaticTimingAnalysis } = require('./static_timing_analysis');
+
+DRCEngine.Spice = SpiceEngine;
+DRCEngine.Gerber = GerberExporter;
+DRCEngine.STA = StaticTimingAnalysis;
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DRCEngine };
+  module.exports = { 
+    DRCEngine,
+    SpiceEngine,
+    GerberExporter,
+    StaticTimingAnalysis
+  };
 }

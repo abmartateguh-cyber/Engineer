@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self';">
   <title>OmniEng — Universal Engineering & Simulation Platform</title>
   <link rel="stylesheet" href="styles/main.css">
   <!-- Load Three.js for 3D CAD/CAE rendering -->
@@ -87,6 +88,9 @@
       <div class="ribbon-buttons">
         <button class="ribbon-btn" id="ribbon-btn-measure" title="3D Point-to-Point Caliper Measurement">📏 Caliper</button>
         <button class="ribbon-btn" id="ribbon-btn-bode" title="Simulink Frequency Response (Bode Plot)">📊 Bode</button>
+        <button class="ribbon-btn" id="ribbon-btn-optics" title="Zemax / Code V Optical Spot & MTF Inspector">🔬 Optics</button>
+        <button class="ribbon-btn" id="ribbon-btn-scope" title="Cadence SPICE Waveform Oscilloscope">📈 Scope</button>
+        <button class="ribbon-btn" id="ribbon-btn-pfd" title="Aspen HYSYS Process Flowsheet (PFD) Streams">🛢️ PFD</button>
       </div>
     </div>
 
@@ -104,9 +108,29 @@
       <span class="ribbon-label">Specialist Tools</span>
       <div class="ribbon-buttons">
         <button class="ribbon-btn action-btn" id="ribbon-btn-verilog" title="Open Verilog RTL Synthesis IDE">⚡ Verilog IDE</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-drafting" title="Generate ISO 1101 / ASME Y14.5 2D Engineering Drafting Sheet">📐 2D Drawing</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-blend" title="Apply Edge Fillet / Chamfer to Active Geometry">🗜️ Fillet/Chamfer</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-assembly" title="Solve 3D Kinematic Assembly Mates">🔗 Assembly Mates</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-step" title="Export ISO 10303-21 STEP AP214 B-Rep Solid">📐 STEP</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-gerber" title="Export RS-274X PCB Gerber Package">💾 Gerber</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-hpc" title="Cloud HPC Cluster Telemetry (Membership)">☁️ Cloud HPC</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-report" title="Generate Comprehensive Audit Report">📄 Audit Report</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-obj" title="Export Wavefront OBJ Mesh">💾 Export OBJ</button>
+      </div>
+    </div>
+
+    <div class="ribbon-group">
+      <span class="ribbon-label">Universal Usability</span>
+      <div class="ribbon-buttons">
+        <select class="ribbon-select" id="ribbon-user-level" title="Adaptive User Experience Level">
+          <option value="apprentice">🐣 Apprentice</option>
+          <option value="practitioner" selected>🛠️ Practitioner</option>
+          <option value="master">🎓 Chief Lead</option>
+        </select>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-wizards" title="Launch Guided Engineering Design Wizards">✨ Wizards</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-omni-archive" title="Save / Export Single-File .omni Container">📦 .omni</button>
+        <button class="ribbon-btn" id="ribbon-btn-undo" title="Undo Action (Ctrl/Cmd+Z)">↩️</button>
+        <button class="ribbon-btn" id="ribbon-btn-redo" title="Redo Action (Ctrl/Cmd+Y)">↪️</button>
       </div>
     </div>
 
@@ -393,10 +417,78 @@ endmodule</textarea>
     </div>
   </div>
 
+  <!-- Modal: Zemax / Code V Optical Spot Diagram & MTF Curves -->
+  <div class="modal-overlay" id="modal-optical-inspector">
+    <div class="modal-card" style="width: 900px; max-height: 90vh;">
+      <div class="modal-header">
+        <div class="modal-title">🔬 Zemax OpticStudio / Code V Parity — Optical Surface Prescription, Spot Diagram & MTF</div>
+        <button class="modal-close-btn" id="btn-close-optical-inspector">&times;</button>
+      </div>
+      <div class="modal-body" id="optical-inspector-body">
+        <!-- Rendered by OpticalInspectorUI -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cadence SPICE Waveform Oscilloscope -->
+  <div class="modal-overlay" id="modal-spice-oscilloscope">
+    <div class="modal-card" style="width: 860px; max-height: 90vh;">
+      <div class="modal-header">
+        <div class="modal-title">📈 Cadence Virtuoso ViVA / SPICE Mixed-Signal Virtual Oscilloscope</div>
+        <button class="modal-close-btn" id="btn-close-spice-oscilloscope">&times;</button>
+      </div>
+      <div class="modal-body" id="spice-oscilloscope-body">
+        <!-- Rendered by SpiceOscilloscopeUI -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Aspen HYSYS Flowsheet PFD Stream Summary -->
+  <div class="modal-overlay" id="modal-flowsheet-pfd">
+    <div class="modal-card" style="width: 900px; max-height: 90vh;">
+      <div class="modal-header">
+        <div class="modal-title">🛢️ Aspen HYSYS Parity — Cyclic Process Flowsheet (PFD) Streams & Recycle Tearing</div>
+        <button class="modal-close-btn" id="btn-close-flowsheet-pfd">&times;</button>
+      </div>
+      <div class="modal-body" id="flowsheet-pfd-body">
+        <!-- Rendered by FlowsheetPfdUI -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Universal Guided Design Wizards -->
+  <div class="modal-overlay" id="modal-design-wizards">
+    <div class="modal-card" style="width: 860px; max-height: 90vh;">
+      <div class="modal-header">
+        <div class="modal-title">✨ Universal Guided Design Wizards (Apprentice to Master)</div>
+        <button class="modal-close-btn" id="btn-close-design-wizards">&times;</button>
+      </div>
+      <div class="modal-body" id="design-wizards-body">
+        <!-- Rendered dynamically by App -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 2D Engineering Drafting & GD&T Sheet -->
+  <div class="modal-overlay" id="modal-drafting-sheet">
+    <div class="modal-card" style="width: 1040px; max-height: 92vh;">
+      <div class="modal-header">
+        <div class="modal-title">📐 ISO 1101 / ASME Y14.5 2D Engineering Drafting & GD&T Sheet</div>
+        <button class="modal-close-btn" id="btn-close-drafting-sheet">&times;</button>
+      </div>
+      <div class="modal-body" id="drafting-sheet-body" style="padding: 15px; overflow-y: auto; text-align: center; background: #020617;">
+        <!-- Rendered dynamically by App -->
+      </div>
+    </div>
+  </div>
+
   <!-- Application Scripts -->
   <script src="ui/viewport3d.js"></script>
   <script src="ui/block_diagram_ui.js"></script>
   <script src="ui/schematic_layout_ui.js"></script>
+  <script src="ui/optical_inspector_ui.js"></script>
+  <script src="ui/spice_oscilloscope_ui.js"></script>
+  <script src="ui/flowsheet_pfd_ui.js"></script>
   <script src="ui/app.js"></script>
 </body>
 </html>

@@ -135,6 +135,27 @@ class SolidBody {
     }
     return out;
   }
+
+  buildEdges() {
+    const edgeMap = new Map();
+    this.edges = [];
+    for (const face of this.faces) {
+      const len = face.vertices.length;
+      for (let i = 0; i < len; i++) {
+        const v1 = face.vertices[i];
+        const v2 = face.vertices[(i + 1) % len];
+        const k1 = `${v1.point.x.toFixed(4)},${v1.point.y.toFixed(4)},${v1.point.z.toFixed(4)}`;
+        const k2 = `${v2.point.x.toFixed(4)},${v2.point.y.toFixed(4)},${v2.point.z.toFixed(4)}`;
+        const key = k1 < k2 ? `${k1}_${k2}` : `${k2}_${k1}`;
+        if (!edgeMap.has(key)) {
+          const edge = new Edge(v1, v2);
+          edgeMap.set(key, edge);
+          this.edges.push(edge);
+        }
+      }
+    }
+    return this.edges;
+  }
 }
 
 /**
@@ -172,6 +193,7 @@ class BRepPrimitives {
       new Face([v[1], v[2], v[6], v[5]], new Vector3(1, 0, 0))   // Right +X
     ];
 
+    body.buildEdges();
     return body;
   }
 
@@ -216,6 +238,7 @@ class BRepPrimitives {
       body.faces.push(new Face([v0, v1, v2, v3], normal));
     }
 
+    body.buildEdges();
     return body;
   }
 
@@ -261,6 +284,7 @@ class BRepPrimitives {
       }
     }
 
+    body.buildEdges();
     return body;
   }
 }

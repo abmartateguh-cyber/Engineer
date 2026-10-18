@@ -125,8 +125,11 @@ class FEASolver {
     let u;
     try {
       u = LinearSolver.solveGaussian(A, b);
-    } catch {
+    } catch (err) {
       u = LinearSolver.solveConjugateGradient(A, b, 2000, 1e-6);
+    }
+    if (!u || u.length < totalDOF) {
+      throw new Error(`FEA system solve failed: displacement vector could not be resolved for ${totalDOF} degrees of freedom.`);
     }
 
     // Distribute displacements to nodes

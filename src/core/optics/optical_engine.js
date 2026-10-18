@@ -5,12 +5,14 @@
  * aperture stop geometry, depth of field (DoF), and diffraction-limited Airy disks.
  */
 
+const { OpticalMaterials } = require('./optical_materials');
+const { SkewRayTracer } = require('./skew_ray_tracer');
+const { SeidelAberrations } = require('./seidel_aberrations');
+
 class OpticalEngine {
-  /**
-   * Standard 50mm f/1.4 Double-Gauss / Modern Aspherical Camera Lens Formula
-   * 8 elements in 6 groups with front aspheric, cemented achromatic doublet,
-   * iris aperture stop, and rear relay group.
-   */
+  static Materials = OpticalMaterials;
+  static SkewTracer = SkewRayTracer;
+  static Seidel = SeidelAberrations;
   static get50mmPrescription() {
     return {
       focalLengthMm: 50.0,
@@ -301,6 +303,128 @@ class OpticalEngine {
     }
 
     return rays;
+  }
+
+  /**
+   * Converts the 50mm lens prescription into an array of sequential optical surfaces
+   * for exact 3D vector skew ray tracing and Seidel sums.
+   */
+  static getOpticalSurfaces() {
+    const rx = this.get50mmPrescription();
+    const surfaces = [];
+    let skipFront = false;
+
+    for (let i = 0; i < rx.elements.length; i++) {
+      const el = rx.elements[i];
+      const glass = el.glassKey || 'Schott_NBK7';
+      const props = OpticalMaterials.getFraunhoferProperties(glass);
+
+      // Front surface of element (unless cemented to previous)
+      if (!skipFront) {
+        surfaces.push({
+          id: `${el.id}_Front`,
+          elementName: el.name,
+          radius: el.radiusFrontMm,
+          zVertex: el.zPosMm,
+          thickness: el.centerThicknessMm,
+          clearRadius: (el.diameterMm || 40.0) / 2.0,
+          glassKey: glass,
+          nIncident: 1.0,
+          nTransmitted: props.nd,
+          conic: (i === 0) ? -0.45 : 0.0, // Front element is aspheric
+          asphericCoeffs: (i === 0) ? [1.2e-6, -3.5e-10, 0, 0] : [0, 0, 0, 0],
+          asphericA4: (i === 0) ? 1.2e-6 : 0.0
+        });
+      }
+
+      const isCementedToNext = (i < rx.elements.length - 1) && 
+        (Math.abs((el.zPosMm + el.centerThicknessMm) - rx.elements[i + 1].zPosMm) < 0.05);
+
+      if (isCementedToNext) {
+        const nextEl = rx.elements[i + 1];
+        const nextProps = OpticalMaterials.getFraunhoferProperties(nextEl.glassKey);
+        // Cemented contact interface
+        surfaces.push({
+          id: `${el.id}_${nextEl.id}_Cemented`,
+          elementName: `Cemented Interface (${el.name} / ${nextEl.name})`,
+          radius: el.radiusRearMm,
+          zVertex: el.zPosMm + el.centerThicknessMm,
+          thickness: nextEl.centerThicknessMm,
+          clearRadius: Math.min((el.diameterMm || 40.0) / 2.0, (nextEl.diameterMm || 40.0) / 2.0),
+          glassKey: nextEl.glassKey,
+          nIncident: props.nd,
+          nTransmitted: nextProps.nd,
+          conic: 0.0,
+          asphericCoeffs: [0, 0, 0, 0],
+          asphericA4: 0.0
+        });
+        skipFront = true;
+      } else {
+        // Rear surface into Air
+        surfaces.push({
+          id: `${el.id}_Rear`,
+          elementName: el.name,
+          radius: el.radiusRearMm,
+          zVertex: el.zPosMm + el.centerThicknessMm,
+          thickness: (i < rx.elements.length - 1) ? Math.max(0.1, rx.elements[i + 1].zPosMm - (el.zPosMm + el.centerThicknessMm)) : 22.0,
+          clearRadius: (el.diameterMm || 40.0) / 2.0,
+          glassKey: 'Air',
+          nIncident: props.nd,
+          nTransmitted: 1.0,
+          conic: 0.0,
+          asphericCoeffs: [0, 0, 0, 0],
+          asphericA4: 0.0
+        });
+        skipFront = false;
+      }
+    }
+
+    return surfaces;
+  }
+
+  /**
+   * Runs exact 3D vector skew ray tracing through the entire optical system,
+   * calculating the 2D spot diagram, RMS spot radius, and MTF curves.
+   */
+  static traceExactSkewRays(fStop = 1.4, fieldAngleDeg = 0.0, numRings = 4, raysPerRing = 10, wavelengthUm = 0.5875618) {
+    const rx = this.get50mmPrescription();
+    const entrancePupilRadius = (rx.focalLengthMm / fStop) / 2.0;
+    const surfaces = this.getOpticalSurfaces();
+    const sensorZ = 75.0; // Sensor image plane
+
+    const pupilRays = SkewRayTracer.generatePupilRayGrid(
+      entrancePupilRadius,
+      numRings,
+      raysPerRing,
+      fieldAngleDeg,
+      wavelengthUm
+    );
+
+    const tracedRays = SkewRayTracer.traceOpticalSystem(surfaces, pupilRays, sensorZ);
+    const spotDiagram = SkewRayTracer.computeSpotDiagram(tracedRays);
+    const mtf = SkewRayTracer.computeMTFCurve(spotDiagram.rmsSpotRadiusMm || 0.015, fStop, 120);
+
+    return {
+      fStop,
+      fieldAngleDeg,
+      wavelengthUm,
+      entrancePupilRadiusMm: Number(entrancePupilRadius.toFixed(2)),
+      rayCount: tracedRays.length,
+      spotDiagram,
+      mtf,
+      tracedRays
+    };
+  }
+
+  /**
+   * Computes 3rd-order Seidel primary aberration coefficients for the 50mm system.
+   */
+  static computeSeidelAberrations(fStop = 1.4, fieldAngleDeg = 23.4) {
+    const rx = this.get50mmPrescription();
+    const entrancePupilRadius = (rx.focalLengthMm / fStop) / 2.0;
+    const surfaces = this.getOpticalSurfaces();
+
+    return SeidelAberrations.computeSeidelCoefficients(surfaces, entrancePupilRadius, fieldAngleDeg);
   }
 }
 

@@ -151,6 +151,11 @@ class FeatureTree {
     }
   }
 
+  toSTEP(modelName = 'OmniEng_Parametric_Part') {
+    const { StepTranslator } = require('./step_translator');
+    return StepTranslator.exportSTEP(this.currentSolid, modelName);
+  }
+
   toJSON() {
     return {
       features: this.features.map(f => ({
@@ -179,6 +184,16 @@ class FeatureTree {
   }
 }
 
+const { StepTranslator } = require('./step_translator');
+const { ConstraintSolver2D } = require('./constraint_solver_2d');
+const { CSGSolid } = require('./csg_mesh_booleans');
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ParametricFeature, FeatureTree };
+  module.exports = { 
+    ParametricFeature, 
+    FeatureTree,
+    StepTranslator,
+    ConstraintSolver2D,
+    CSGSolid
+  };
 }

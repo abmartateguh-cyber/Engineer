@@ -210,6 +210,20 @@ class BlockDiagramGraph {
   }
 }
 
+const { StateSpaceEngine } = require('./state_space_engine');
+const { ExtendedKalmanFilter } = require('./extended_kalman_filter');
+const { AerodynamicCoefficients } = require('./aerodynamic_coefficients');
+
+BlockDiagramGraph.StateSpace = StateSpaceEngine;
+BlockDiagramGraph.EKF = ExtendedKalmanFilter;
+BlockDiagramGraph.Aero = AerodynamicCoefficients;
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { BlockNode, BlockDiagramGraph };
+  module.exports = { 
+    BlockNode, 
+    BlockDiagramGraph,
+    StateSpaceEngine,
+    ExtendedKalmanFilter,
+    AerodynamicCoefficients
+  };
 }

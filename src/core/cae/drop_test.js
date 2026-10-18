@@ -122,6 +122,19 @@ class DropTestSimulator {
   }
 }
 
+const { J2Plasticity } = require('./nonlinear_plasticity');
+const { JohnsonCookFracture } = require('./johnson_cook_fracture');
+const { PenaltyContact } = require('./penalty_contact');
+
+DropTestSimulator.J2Plasticity = J2Plasticity;
+DropTestSimulator.JohnsonCook = JohnsonCookFracture;
+DropTestSimulator.PenaltyContact = PenaltyContact;
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DropTestSimulator };
+  module.exports = { 
+    DropTestSimulator,
+    J2Plasticity,
+    JohnsonCookFracture,
+    PenaltyContact
+  };
 }

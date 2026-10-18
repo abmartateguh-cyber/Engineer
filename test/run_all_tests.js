@@ -689,6 +689,33 @@ test('OpticalEngine: traceRays paraxial marginal ray tracing and sensor converge
 });
 
 // ----------------------------------------------------
+// Suite 14: Industrial Parity Gap Closure Engines
+// ----------------------------------------------------
+const { runIndustrialTests } = require('./test_industrial_gap_closure');
+const indStats = runIndustrialTests();
+totalTests += indStats.total;
+passedTests += indStats.passed;
+failedTests += indStats.failed;
+
+// ----------------------------------------------------
+// Suite 15: Phase 1 Upgrade Master Plan Engines
+// ----------------------------------------------------
+const { runPhase1Tests } = require('./test_phase1_upgrade');
+const p1Stats = runPhase1Tests();
+totalTests += p1Stats.total;
+passedTests += p1Stats.passed;
+failedTests += p1Stats.failed;
+
+// ----------------------------------------------------
+// Suite 16: Phase 2 Upgrade Master Plan Engines (CAD Kernel)
+// ----------------------------------------------------
+const { runPhase2Tests } = require('./test_phase2_upgrade');
+const p2Stats = runPhase2Tests();
+totalTests += p2Stats.total;
+passedTests += p2Stats.passed;
+failedTests += p2Stats.failed;
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

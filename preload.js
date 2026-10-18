@@ -60,6 +60,26 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveOptics: (params) => ipcRenderer.invoke('omni:solve-optics', params),
   traceRays: (params) => ipcRenderer.invoke('omni:trace-rays', params),
   getLensPrescription: () => ipcRenderer.invoke('omni:get-lens-prescription'),
+  solveSkewOptics: (params) => ipcRenderer.invoke('omni:solve-skew-optics', params),
+
+  // Industrial Parity CAD & EDA Exporters
+  exportSTEP: (bodyData) => ipcRenderer.invoke('omni:export-step', bodyData),
+  exportGerber: (pcbData) => ipcRenderer.invoke('omni:export-gerber', pcbData),
+  solveSpiceCircuit: (netlist) => ipcRenderer.invoke('omni:solve-spice-circuit', netlist),
+  solveFlowsheet: (config) => ipcRenderer.invoke('omni:solve-flowsheet', config),
+
+  // Universal Usability & Phase 1 Archive & Wizard APIs
+  packageOmniArchive: (params) => ipcRenderer.invoke('omni:package-omni-archive', params),
+  loadOmniArchive: (filePath) => ipcRenderer.invoke('omni:load-omni-archive', filePath),
+  runDesignWizard: (wizardType, inputs) => ipcRenderer.invoke('omni:run-design-wizard', { wizardType, inputs }),
+  selfHealDesign: (currentDesign, safetyFactor) => ipcRenderer.invoke('omni:self-heal-design', { currentDesign, safetyFactor }),
+
+  // Phase 2 CAD Kernel & Modeling Parity APIs
+  evaluateNurbs: (params) => ipcRenderer.invoke('omni:evaluate-nurbs', params),
+  intersectNurbsSSI: (params) => ipcRenderer.invoke('omni:intersect-nurbs-ssi', params),
+  applyEdgeBlend: (params) => ipcRenderer.invoke('omni:apply-edge-blend', params),
+  solveAssemblyMates: (params) => ipcRenderer.invoke('omni:solve-assembly-mates', params),
+  generateDraftingSheet: (params) => ipcRenderer.invoke('omni:generate-drafting-sheet', params),
 
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
