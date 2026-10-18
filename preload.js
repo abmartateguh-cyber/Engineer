@@ -81,6 +81,11 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveAssemblyMates: (params) => ipcRenderer.invoke('omni:solve-assembly-mates', params),
   generateDraftingSheet: (params) => ipcRenderer.invoke('omni:generate-drafting-sheet', params),
 
+  // Phase 3 Structural Mechanics & Fluid Multiphysics APIs
+  meshDelaunay3D: (params) => ipcRenderer.invoke('omni:mesh-delaunay-3d', params),
+  solveContinuumPlasticity3D: (params) => ipcRenderer.invoke('omni:solve-continuum-plasticity-3d', params),
+  solveFvmCFD3D: (params) => ipcRenderer.invoke('omni:solve-fvm-cfd-3d', params),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

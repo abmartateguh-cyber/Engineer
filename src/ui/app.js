@@ -2225,6 +2225,49 @@ endmodule</textarea>
     });
   }
 
+  // --- Phase 3: 3D Delaunay & Advancing-Front TET10 Mesher ---
+  const btnMesher = document.getElementById('ribbon-btn-mesher');
+  if (btnMesher) {
+    btnMesher.addEventListener('click', async () => {
+      try {
+        if (window.omniEngAPI?.meshDelaunay3D) {
+          const boxVerts = [
+            { x: 0, y: 0, z: 0 }, { x: 0.1, y: 0, z: 0 }, { x: 0.1, y: 0.1, z: 0 }, { x: 0, y: 0.1, z: 0 },
+            { x: 0, y: 0, z: 0.1 }, { x: 0.1, y: 0, z: 0.1 }, { x: 0.1, y: 0.1, z: 0.1 }, { x: 0, y: 0.1, z: 0.1 }
+          ];
+          const boxFaces = [
+            [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6],
+            [0, 5, 1], [0, 4, 5], [2, 7, 3], [2, 6, 7],
+            [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]
+          ];
+          const res = await window.omniEngAPI.meshDelaunay3D({ vertices: boxVerts, faces: boxFaces, quadratic: true });
+          if (res?.success && res.mesh) {
+            addAiMessage(`🕸️ 3D Delaunay Mesher: Generated ${res.mesh.type} volume mesh with ${res.mesh.nodeCount} nodes and ${res.mesh.elementCount} elements (Avg Quality: ${res.mesh.metrics?.averageQuality?.toFixed(3)}, Valid: ${res.mesh.metrics?.validElementPercentage?.toFixed(1)}%).`);
+          }
+        }
+      } catch (err) {
+        console.error('3D mesher error:', err);
+      }
+    });
+  }
+
+  // --- Phase 3: 3D Polyhedral FVM Navier-Stokes with k-omega SST ---
+  const btnFvmCfd = document.getElementById('ribbon-btn-fvm-cfd');
+  if (btnFvmCfd) {
+    btnFvmCfd.addEventListener('click', async () => {
+      try {
+        if (window.omniEngAPI?.solveFvmCFD3D) {
+          const res = await window.omniEngAPI.solveFvmCFD3D({ inletVelocity: 25.0, steps: 5 });
+          if (res?.success && res.result) {
+            addAiMessage(`🌪️ 3D Polyhedral FVM CFD: Solved 5 pseudo-transient steps with Menter k-omega SST turbulence (Max Velocity: ${res.result.maxVelocity?.toFixed(2)} m/s, Max Eddy Viscosity: ${res.result.maxTurbulentViscosity?.toExponential(3)} m²/s).`);
+          }
+        }
+      } catch (err) {
+        console.error('3D CFD error:', err);
+      }
+    });
+  }
+
   // Default initial studio setup
   switchStudio('consumer');
 });

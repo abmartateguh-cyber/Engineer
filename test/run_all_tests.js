@@ -716,6 +716,15 @@ passedTests += p2Stats.passed;
 failedTests += p2Stats.failed;
 
 // ----------------------------------------------------
+// Suite 17: Phase 3 Upgrade Master Plan Engines (Structural & Fluid Mechanics)
+// ----------------------------------------------------
+const { runPhase3Tests } = require('./test_phase3_upgrade');
+const p3Stats = runPhase3Tests();
+totalTests += p3Stats.testsPassed + p3Stats.testsFailed;
+passedTests += p3Stats.testsPassed;
+failedTests += p3Stats.testsFailed;
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

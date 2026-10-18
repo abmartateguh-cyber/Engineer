@@ -47,6 +47,11 @@ const { EdgeBlender } = require('./src/core/cad/edge_blender');
 const { AssemblyComponent, AssemblyMateSolver } = require('./src/core/cad/assembly_mates');
 const { FeatureControlFrame, DraftingEngine2D } = require('./src/core/cad/drafting_2d');
 
+// Phase 3 Structural Mechanics & Fluid Multiphysics Engines
+const { Point3D, Tetrahedron, DelaunayMesher3D } = require('./src/core/cae/delaunay_mesher_3d');
+const { QuadraticTet10Element, MortarContactPair3D, LanczosModalEigensolver } = require('./src/core/cae/continuum_plasticity_3d');
+const { FVMNavierStokes3D } = require('./src/core/cae/fvm_navier_stokes_3d');
+
 const aiEngine = new OmniAIEngine();
 const hpcEngine = new CloudHPCEngine();
 const symbolicReasoner = new SymbolicReasoner();
@@ -428,6 +433,30 @@ app.whenReady().then(() => {
     return { success: true, svg: sheet.svg, sheetWidth: sheet.sheetWidth, sheetHeight: sheet.sheetHeight };
   });
 
+  // Phase 3 Structural Mechanics & Fluid Multiphysics IPC Handlers
+  ipcMain.handle('omni:mesh-delaunay-3d', async (event, params = {}) => {
+    const mesher = new DelaunayMesher3D({ targetEdgeLength: params.targetEdgeLength || 0.1 });
+    const vertices = (params.vertices || []).map((v, i) => new Point3D(v.x, v.y, v.z, i));
+    const faces = params.faces || [];
+    const mesh = mesher.meshClosedSurface(vertices, faces, { quadratic: params.quadratic === true });
+    return { success: true, mesh };
+  });
+
+  ipcMain.handle('omni:solve-continuum-plasticity-3d', async (event, params = {}) => {
+    const tet = new QuadraticTet10Element(0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], params.material || {});
+    const gp = tet.gaussPoints[0];
+    const strainInc = new Float64Array(params.strainIncrement || [0.01, -0.003, -0.003, 0, 0, 0]);
+    const result = tet.radialReturnMapping(gp, strainInc, params.strainRate || 1.0, params.temperature || 293.15);
+    return { success: true, result, gaussPoint: { vonMises: result.vonMises, isPlastic: result.isPlastic, ep: gp.equivalentPlasticStrain } };
+  });
+
+  ipcMain.handle('omni:solve-fvm-cfd-3d', async (event, params = {}) => {
+    const fvm = new FVMNavierStokes3D({ omegaMRF: params.omegaMRF || { x: 0, y: 0, z: 0 } });
+    const domain = fvm.createBoxDomain(params.nx || 6, params.ny || 6, params.nz || 4, params.lx || 1.0, params.ly || 0.8, params.lz || 0.6);
+    const result = fvm.step(params.inletVelocity || 15.0, params.steps || 5);
+    return { success: true, domain, result };
+  });
+
   const win = createWindow();
 
   win.webContents.on('console-message', (e, level, msg, line, src) => {
@@ -534,6 +563,27 @@ app.whenReady().then(() => {
 
             const mateRes = await window.omniEngAPI.solveAssemblyMates({ targetZ: 10.0 });
             assert(mateRes && mateRes.success && mateRes.result.rank > 0, 'IPC solveAssemblyMates resolves 6-DOF constraints');
+
+            // 9. Test Phase 3 Structural & Fluid Mechanics
+            assert(!!document.getElementById('ribbon-btn-mesher'), 'Ribbon button: 3D Mesher exists');
+            assert(!!document.getElementById('ribbon-btn-fvm-cfd'), 'Ribbon button: 3D CFD exists');
+
+            const meshRes = await window.omniEngAPI.meshDelaunay3D({
+              vertices: [
+                { x: 0, y: 0, z: 0 }, { x: 0.1, y: 0, z: 0 }, { x: 0.1, y: 0.1, z: 0 }, { x: 0, y: 0.1, z: 0 },
+                { x: 0, y: 0, z: 0.1 }, { x: 0.1, y: 0, z: 0.1 }, { x: 0.1, y: 0.1, z: 0.1 }, { x: 0, y: 0.1, z: 0.1 }
+              ],
+              faces: [
+                [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6],
+                [0, 5, 1], [0, 4, 5], [2, 7, 3], [2, 6, 7],
+                [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]
+              ],
+              quadratic: true
+            });
+            assert(meshRes && meshRes.success && meshRes.mesh.type === 'TET10', 'IPC meshDelaunay3D generates TET10 quadratic mesh');
+
+            const cfdRes = await window.omniEngAPI.solveFvmCFD3D({ inletVelocity: 20.0, steps: 3 });
+            assert(cfdRes && cfdRes.success && cfdRes.result.maxVelocity > 0, 'IPC solveFvmCFD3D executes 3D polyhedral FVM step');
 
             return results;
           })();
