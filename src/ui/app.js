@@ -2268,6 +2268,65 @@ endmodule</textarea>
     });
   }
 
+  // --- Phase 6: DIN 6935 K-Factor Sheet Metal Unfolding ---
+  const btnSheetMetal = document.getElementById('ribbon-btn-sheet-metal');
+  if (btnSheetMetal) {
+    btnSheetMetal.addEventListener('click', async () => {
+      try {
+        if (window.omniEngAPI?.unfoldSheetMetal) {
+          const res = await window.omniEngAPI.unfoldSheetMetal({
+            bend: { angleDeg: 90.0, innerRadiusMm: 2.0, thicknessMm: 2.0, kFactor: 0.44 },
+            flanges: [{ name: 'Base', lengthMm: 60, widthMm: 40 }, { name: 'Flange', lengthMm: 40, widthMm: 40 }]
+          });
+          if (res?.success && res.flat) {
+            addAiMessage(`📦 DIN 6935 Sheet Metal Unfolder: Generated 2D flat blank pattern (Developed Length: ${res.flat.totalDevelopedLengthMm?.toFixed(2)} mm, Bend Allowance: ${res.bendAllowanceMm?.toFixed(2)} mm, Bend Deduction: ${res.bendDeductionMm?.toFixed(2)} mm).`);
+          }
+        }
+      } catch (err) {
+        console.error('Sheet metal error:', err);
+      }
+    });
+  }
+
+  // --- Phase 6: ASME Y14.5-2018 GD&T Inspection ---
+  const btnGDT = document.getElementById('ribbon-btn-gdt');
+  if (btnGDT) {
+    btnGDT.addEventListener('click', async () => {
+      try {
+        if (window.omniEngAPI?.evaluateGDT) {
+          const res = await window.omniEngAPI.evaluateGDT({
+            fcf: { specifiedTolerance: 0.25, materialCondition: 'MMC' }
+          });
+          if (res?.success && res.result) {
+            const statusStr = res.result.passed ? 'CONFORMS (PASSED)' : 'NON-CONFORMANCE';
+            addAiMessage(`📏 ASME Y14.5 GD&T Engine: True Position at MMC ${statusStr} (Position Error Dia: ${res.result.positionErrorDiameter?.toFixed(3)} mm, Bonus Tol: +${res.result.bonusTolerance?.toFixed(3)} mm, Total Allowable: ${res.result.totalAllowableTolerance?.toFixed(3)} mm).`);
+          }
+        }
+      } catch (err) {
+        console.error('GD&T error:', err);
+      }
+    });
+  }
+
+  // --- Phase 13: FMI 3.0 Multiphysics Co-Simulation Master ---
+  const btnFmi = document.getElementById('ribbon-btn-fmi');
+  if (btnFmi) {
+    btnFmi.addEventListener('click', async () => {
+      try {
+        if (window.omniEngAPI?.runFmiCoSimulation) {
+          const res = await window.omniEngAPI.runFmiCoSimulation({
+            config: { startTime: 0, stopTime: 0.1, defaultStepSize: 0.001 }
+          });
+          if (res?.success && res.result) {
+            addAiMessage(`🔄 FMI 3.0 Co-Simulation Master: Executed synchronized cross-domain co-simulation across ${res.result.slaveCount} FMU slaves (${res.result.totalSteps} communication points, Global Time: ${res.result.finalTime?.toFixed(3)}s, Status: ${res.result.converged ? 'Converged' : 'Failed'}).`);
+          }
+        }
+      } catch (err) {
+        console.error('FMI Co-Sim error:', err);
+      }
+    });
+  }
+
   // Default initial studio setup
   switchStudio('consumer');
 });

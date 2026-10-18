@@ -76,7 +76,7 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
 
   // Phase 2 CAD Kernel & Modeling Parity APIs
   evaluateNurbs: (params) => ipcRenderer.invoke('omni:evaluate-nurbs', params),
-  intersectNurbsSSI: (params) => ipcRenderer.invoke('omni:intersect-nurbs-ssi', params),
+  intersectBasicNurbs: (params) => ipcRenderer.invoke('omni:intersect-basic-nurbs-ssi', params),
   applyEdgeBlend: (params) => ipcRenderer.invoke('omni:apply-edge-blend', params),
   solveAssemblyMates: (params) => ipcRenderer.invoke('omni:solve-assembly-mates', params),
   generateDraftingSheet: (params) => ipcRenderer.invoke('omni:generate-drafting-sheet', params),
@@ -106,6 +106,25 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   importGdsii: (buffer) => ipcRenderer.invoke('omni:import-gdsii', buffer),
   evaluateOpticalThermalSoak: (params) => ipcRenderer.invoke('omni:evaluate-optical-thermal-soak', params),
   solveMPC: (params) => ipcRenderer.invoke('omni:solve-mpc', params),
+
+  // Phase 6-13 Master Implementation Plan 2.0 APIs
+  intersectNurbsSSI: (params) => ipcRenderer.invoke('omni:intersect-nurbs-ssi', params),
+  unfoldSheetMetal: (params) => ipcRenderer.invoke('omni:unfold-sheet-metal', params),
+  evaluateGDT: (params) => ipcRenderer.invoke('omni:evaluate-gdt', params),
+  solveSparseCholesky: (params) => ipcRenderer.invoke('omni:solve-sparse-cholesky', params),
+  computeShellMITC4: (params) => ipcRenderer.invoke('omni:compute-shell-mitc4', params),
+  computeBeamTimoshenko: (params) => ipcRenderer.invoke('omni:compute-beam-timoshenko', params),
+  evaluateCompositeCLPT: (params) => ipcRenderer.invoke('omni:evaluate-composite-clpt', params),
+  stepSimpleCFD: (params) => ipcRenderer.invoke('omni:step-simple-cfd', params),
+  runMcmmSTA: (params) => ipcRenderer.invoke('omni:run-mcmm-sta', params),
+  extractPex3D: (params) => ipcRenderer.invoke('omni:extract-pex-3d', params),
+  evaluateWavefrontPSF: (params) => ipcRenderer.invoke('omni:evaluate-wavefront-psf', params),
+  simulateSimscapeDAE: (params) => ipcRenderer.invoke('omni:simulate-simscape-dae', params),
+  evaluateMcdcCoverage: (params) => ipcRenderer.invoke('omni:evaluate-mcdc-coverage', params),
+  flashPengRobinson: (params) => ipcRenderer.invoke('omni:flash-peng-robinson', params),
+  rateTemaHeatExchanger: (params) => ipcRenderer.invoke('omni:rate-tema-heat-exchanger', params),
+  sizeApi520PRV: (params) => ipcRenderer.invoke('omni:size-api520-prv', params),
+  runFmiCoSimulation: (params) => ipcRenderer.invoke('omni:run-fmi-cosimulation', params),
 
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')

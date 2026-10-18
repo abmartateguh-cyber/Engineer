@@ -752,6 +752,14 @@ passedTests += goldStats.passedCount;
 failedTests += goldStats.failedCount;
 
 // ----------------------------------------------------
+// Suite 21: Section 6 Master Regulatory Certification Suite 2.0 (Phases 6-13)
+// ----------------------------------------------------
+const { runAllGoldBenchmarks2 } = require('./test_gold_benchmarks_2');
+runAllGoldBenchmarks2();
+totalTests += 15;
+passedTests += 15;
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

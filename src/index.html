@@ -6,6 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self';">
   <title>OmniEng — Universal Engineering & Simulation Platform</title>
   <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/glassmorphic_theme.css">
   <!-- Load Three.js for 3D CAD/CAE rendering -->
   <script src="vendor/three.min.js"></script>
 </head>
@@ -113,6 +114,9 @@
         <button class="ribbon-btn action-btn" id="ribbon-btn-assembly" title="Solve 3D Kinematic Assembly Mates">🔗 Assembly Mates</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-mesher" title="Generate 3D Delaunay TET10 Volume Mesh">🕸️ 3D Mesher</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-fvm-cfd" title="Run 3D Polyhedral k-omega SST CFD">🌪️ 3D CFD</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-sheet-metal" title="DIN 6935 K-Factor Sheet Metal Unfolding">📦 Sheet Metal</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-gdt" title="ASME Y14.5-2018 GD&T Inspection">📏 GD&T</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-fmi" title="FMI 3.0 Multiphysics Co-Simulation Master">🔄 FMI Co-Sim</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-step" title="Export ISO 10303-21 STEP AP214 B-Rep Solid">📐 STEP</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-gerber" title="Export RS-274X PCB Gerber Package">💾 Gerber</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-hpc" title="Cloud HPC Cluster Telemetry (Membership)">☁️ Cloud HPC</button>
@@ -486,7 +490,9 @@ endmodule</textarea>
 
   <!-- Application Scripts -->
   <script src="ui/viewport3d.js"></script>
+  <script src="ui/viewport3d_webgpu.js"></script>
   <script src="ui/block_diagram_ui.js"></script>
+  <script src="ui/interactive_block_canvas.js"></script>
   <script src="ui/schematic_layout_ui.js"></script>
   <script src="ui/optical_inspector_ui.js"></script>
   <script src="ui/spice_oscilloscope_ui.js"></script>

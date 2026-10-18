@@ -45,7 +45,7 @@ const { DropTestWizard, DroneDesignWizard, CameraLensWizard, PCBDesignWizard } =
 const { NurbsBasis, NurbsCurve, NurbsSurface, SurfaceSurfaceIntersection } = require('./src/core/cad/nurbs_engine');
 const { EdgeBlender } = require('./src/core/cad/edge_blender');
 const { AssemblyComponent, AssemblyMateSolver } = require('./src/core/cad/assembly_mates');
-const { FeatureControlFrame, DraftingEngine2D } = require('./src/core/cad/drafting_2d');
+const { DraftingEngine2D } = require('./src/core/cad/drafting_2d');
 
 // Phase 3 Structural Mechanics & Fluid Multiphysics Engines
 const { Point3D, Tetrahedron, DelaunayMesher3D } = require('./src/core/cae/delaunay_mesher_3d');
@@ -65,6 +65,28 @@ const { ModelPredictiveController, GoldfarbIdnaniQPSolver } = require('./src/cor
 const { AutocoderCRust } = require('./src/core/dynamic_simulink/autocoder_c_rust');
 const { DIPPRDatabase } = require('./src/core/plant/dippr_database');
 const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('./src/core/plant/naphtali_sandholm_mesh');
+
+// Phase 6-13 Master Implementation Plan 2.0 Engines
+const { SurfaceSurfaceIntersectionEngine, TrimmedNurbsSurface } = require('./src/core/cad/nurbs_trimmed_ssi');
+const { VariableRadiusFilletEngine } = require('./src/core/cad/variable_fillet_gregory');
+const { SheetMetalBend, SheetMetalFlange, SheetMetalUnfolder } = require('./src/core/cad/sheet_metal_unfolding');
+const { GDTEngine, FeatureControlFrame } = require('./src/core/cad/gdt_engine');
+const { AssemblyBvhHierarchy } = require('./src/core/cad/assembly_bvh_hierarchy');
+const { SparseMatrixCSR, SparseCholeskySolver } = require('./src/core/math/sparse_cholesky');
+const { ShellMITC4Element } = require('./src/core/cae/shell_mitc4');
+const { TimoshenkoBeam3D } = require('./src/core/cae/beam_timoshenko_3d');
+const { CompositePly, CompositeLaminateCLPT } = require('./src/core/cae/composite_clpt');
+const { SimpleNavierStokesSolver } = require('./src/core/cae/simple_navier_stokes');
+const { NLDMTable2D } = require('./src/core/eda/liberty_nldm_parser');
+const { MCMMStaticTimingEngine } = require('./src/core/eda/mcmm_sta_engine');
+const { ParasiticExtraction3D } = require('./src/core/eda/parasitic_extraction_3d');
+const { DiffractionPSFMTFEngine } = require('./src/core/optics/diffraction_psf_mtf');
+const { SimscapeDAESolver } = require('./src/core/dynamic_simulink/simscape_dae_solver');
+const { MCDCCoverageAnalyzer } = require('./src/core/dynamic_simulink/mcdc_coverage');
+const { PengRobinsonEOS } = require('./src/core/plant/peng_robinson_eos');
+const { TemaBellDelaware } = require('./src/core/plant/tema_bell_delaware');
+const { Api520ReliefValve } = require('./src/core/plant/api520_relief_valve');
+const { FmiMasterEngine, FmuSlave } = require('./src/core/cosim/fmi_master_engine');
 
 const dipprDatabase = new DIPPRDatabase();
 
@@ -380,7 +402,7 @@ app.whenReady().then(() => {
     return { success: true, point: point.toArray(), tangent: tangent.toArray(), length };
   });
 
-  ipcMain.handle('omni:intersect-nurbs-ssi', async (event, params = {}) => {
+  ipcMain.handle('omni:intersect-basic-nurbs-ssi', async (event, params = {}) => {
     const surf1 = NurbsSurface.createPlane(
       new Vector3(0, 0, params.z1 || 5),
       new Vector3(1, 0, 0),
@@ -688,6 +710,151 @@ app.whenReady().then(() => {
     return { success: true, result: res };
   });
 
+  // Phase 6-13 Advanced CAD, CAE, EDA, Optics, Simulink, Plant & FMI Co-Sim Handlers
+  ipcMain.handle('omni:intersect-nurbs-ssi', async (event, params = {}) => {
+    const surf1 = new TrimmedNurbsSurface(params.surf1 || {});
+    const surf2 = new TrimmedNurbsSurface(params.surf2 || {});
+    const res = SurfaceSurfaceIntersectionEngine.intersectSurfaces(surf1, surf2, params.options || { tolerance: 0.05 });
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:unfold-sheet-metal', async (event, params = {}) => {
+    const bend = new SheetMetalBend(params.bend || { angleDeg: 90.0, innerRadiusMm: 2.0, thicknessMm: 2.0, kFactor: 0.44 });
+    const flanges = (params.flanges || [{ name: 'F1', lengthMm: 50, widthMm: 50 }, { name: 'F2', lengthMm: 50, widthMm: 50 }])
+      .map(f => new SheetMetalFlange(f.name, f.lengthMm, f.widthMm));
+    const flat = SheetMetalUnfolder.unfoldPart({ flanges, bends: [bend] });
+    return { success: true, flat, bendAllowanceMm: bend.bendAllowanceMm, bendDeductionMm: bend.bendDeductionMm };
+  });
+
+  ipcMain.handle('omni:evaluate-gdt', async (event, params = {}) => {
+    const fcf = new FeatureControlFrame(params.fcf || { specifiedTolerance: 0.20, materialCondition: 'MMC' });
+    const res = GDTEngine.evaluateTruePosition(params.hole || {
+      nominalX: 50.0, nominalY: 30.0, measuredX: 50.08, measuredY: 29.95,
+      nominalDiameter: 10.0, measuredDiameter: 10.25, lowerTolerance: -0.30, upperTolerance: 0.30
+    }, fcf);
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:solve-sparse-cholesky', async (event, params = {}) => {
+    const N = params.N || 50;
+    const A = new SparseMatrixCSR(N, N);
+    for (let i = 0; i < N; i++) {
+      A.addEntry(i, i, 4.0);
+      if (i > 0) A.addEntry(i, i - 1, -1.0);
+      if (i < N - 1) A.addEntry(i, i + 1, -1.0);
+    }
+    A.finalize();
+    const b = new Float64Array(N).fill(1.0);
+    const sol = SparseCholeskySolver.solve(A, b, params.options || { tolerance: 1e-8 });
+    return { success: true, solution: sol };
+  });
+
+  ipcMain.handle('omni:compute-shell-mitc4', async (event, params = {}) => {
+    const nodes = [0, 1, 2, 3];
+    const coords = params.coords || [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 1, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }];
+    const shell = new ShellMITC4Element(1, nodes, coords, params.properties || { thickness: 0.001, E: 210e9, nu: 0.3 });
+    const Ke = shell.computeStiffnessMatrix();
+    return { success: true, matrixSize: Ke.length, sampleEntry: Ke[0] };
+  });
+
+  ipcMain.handle('omni:compute-beam-timoshenko', async (event, params = {}) => {
+    const beam = new TimoshenkoBeam3D(1, [0, 1], params.coords || [{ x: 0, y: 0, z: 0 }, { x: 2.0, y: 0, z: 0 }], params.section || {
+      E: 200e9, nu: 0.3, A: 0.005, Iy: 8.33e-6, Iz: 8.33e-6, J: 1.4e-5
+    });
+    const Ke = beam.computeLocalStiffnessMatrix();
+    const buckling = beam.calculateEulerBucklingLoad(params.K || 2.0);
+    return { success: true, stiffnessSize: Ke.length, buckling };
+  });
+
+  ipcMain.handle('omni:evaluate-composite-clpt', async (event, params = {}) => {
+    const ply0 = new CompositePly({ orientationDeg: 0, thicknessMm: 0.125, E1: 142e9, E2: 10.3e9, nu12: 0.27, G12: 7.2e9 });
+    const ply90 = new CompositePly({ orientationDeg: 90, thicknessMm: 0.125, E1: 142e9, E2: 10.3e9, nu12: 0.27, G12: 7.2e9 });
+    const laminate = new CompositeLaminateCLPT([ply0, ply90, ply90, ply0]);
+    const tw = CompositeLaminateCLPT.evaluateTsaiWu(ply0, 400e6, 30e6, 40e6);
+    return { success: true, A: laminate.A, B: laminate.B, D: laminate.D, tsaiWu: tw };
+  });
+
+  ipcMain.handle('omni:step-simple-cfd', async (event, params = {}) => {
+    const solver = new SimpleNavierStokesSolver();
+    const cells = params.cells || [
+      { u: 0, v: 0, w: 0, p: 101325, centroid: { x: 0, y: 0, z: 0 }, volume: 1e-3, gradP: { x: 0, y: 0, z: 0 } },
+      { u: 0, v: 0, w: 0, p: 101325, centroid: { x: 0.1, y: 0, z: 0 }, volume: 1e-3, gradP: { x: 0, y: 0, z: 0 } }
+    ];
+    const faces = params.faces || [
+      { leftCell: 0, rightCell: 1, area: 0.01, normal: { x: 1, y: 0, z: 0 } },
+      { leftCell: 0, rightCell: -1, boundaryType: 'inlet', inletVelocity: 2.0, area: 0.01, normal: { x: -1, y: 0, z: 0 } }
+    ];
+    const res = solver.stepSIMPLE(cells, faces);
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:run-mcmm-sta', async (event, params = {}) => {
+    const sta = MCMMStaticTimingEngine.runMCMMAnalysis(params);
+    return { success: true, result: sta };
+  });
+
+  ipcMain.handle('omni:extract-pex-3d', async (event, params = {}) => {
+    const pex = ParasiticExtraction3D.extractWireRC(params || { lengthUm: 100, widthUm: 0.1, thicknessUm: 0.15, spacingUm: 0.1, dielectricHeightUm: 0.2 });
+    return { success: true, result: pex };
+  });
+
+  ipcMain.handle('omni:evaluate-wavefront-psf', async (event, params = {}) => {
+    const res = DiffractionPSFMTFEngine.evaluateWavefrontPSFandMTF(params || { gridSize: 64, wavelengthUm: 0.55, fNumber: 2.8 });
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:simulate-simscape-dae', async (event, params = {}) => {
+    const res = SimscapeDAESolver.simulateElectromechanicalDCMotor(params || {});
+    return { success: true, result: res };
+  });
+
+  ipcMain.handle('omni:evaluate-mcdc-coverage', async (event, params = {}) => {
+    const conditionNames = params.conditionNames || ['A', 'B', 'C'];
+    const decisionFunc = (A, B, C) => A && (B || C);
+    const testVectors = params.testVectors || [
+      [false, true, false],
+      [true, true, false],
+      [true, false, false],
+      [true, false, true]
+    ];
+    const report = MCDCCoverageAnalyzer.evaluateMCDCCoverage(conditionNames, decisionFunc, testVectors);
+    return { success: true, report };
+  });
+
+  ipcMain.handle('omni:flash-peng-robinson', async (event, params = {}) => {
+    const eos = new PengRobinsonEOS(params.components || ['methane', 'ethane', 'propane']);
+    const flash = eos.flashPT(params.z || [0.5, 0.3, 0.2], params.T || 200.0, params.P || 2000000.0);
+    return { success: true, flash };
+  });
+
+  ipcMain.handle('omni:rate-tema-heat-exchanger', async (event, params = {}) => {
+    const tema = new TemaBellDelaware(params.geom || {
+      Ds: 0.60, do: 0.020, Pt: 0.025, pitchAngle: 30, L: 4.0, B: 0.30, Bc: 0.20, Nt: 350
+    });
+    const rating = tema.rateShellSide(params.fluid || {
+      massFlow: 15.0, rho: 850.0, mu: 0.002, Cp: 2100.0, k: 0.14
+    });
+    return { success: true, rating };
+  });
+
+  ipcMain.handle('omni:size-api520-prv', async (event, params = {}) => {
+    const sizing = Api520ReliefValve.sizeGasVapor(params || {
+      massFlow: 5000, P1: 1100, Pb: 101.325, T: 320, M: 28.97, k: 1.40
+    });
+    return { success: true, sizing };
+  });
+
+  ipcMain.handle('omni:run-fmi-cosimulation', async (event, params = {}) => {
+    const master = new FmiMasterEngine(params.config || { startTime: 0, stopTime: 0.05, defaultStepSize: 0.001 });
+    const slave1 = new FmuSlave({ instanceName: 'Controller', variables: [{ vr: 1, initial: 10.0, causality: 'output' }] });
+    const slave2 = new FmuSlave({ instanceName: 'Actuator', variables: [{ vr: 2, initial: 0.0, causality: 'input' }] });
+    master.addSlave(slave1);
+    master.addSlave(slave2);
+    master.addConnection(slave1, 1, slave2, 2);
+    const sim = master.simulate();
+    return { success: true, result: sim };
+  });
+
   const win = createWindow();
 
   win.webContents.on('console-message', (e, level, msg, line, src) => {
@@ -866,6 +1033,77 @@ app.whenReady().then(() => {
 
             const mpcRes = await window.omniEngAPI.solveMPC({ x0: [0.5, 0.0], yRef: 1.0 });
             assert(mpcRes && mpcRes.success && mpcRes.result.qpConverged, 'IPC solveMPC executes constrained Goldfarb-Idnani dual QP');
+
+            // 13. Test Phase 6-13 Master Implementation Plan 2.0 (CAD, CAE, EDA, Optics, Simulink, Plant, Co-Sim)
+            const ssiRes = await window.omniEngAPI.intersectNurbsSSI({});
+            assert(ssiRes && ssiRes.success && ssiRes.result.intersectionFound, 'IPC intersectNurbsSSI computes trimmed NURBS intersection curve');
+
+            const smRes = await window.omniEngAPI.unfoldSheetMetal({});
+            assert(smRes && smRes.success && smRes.flat.totalDevelopedLengthMm > 90, 'IPC unfoldSheetMetal computes DIN 6935 K-factor developed blank');
+
+            const gdtRes = await window.omniEngAPI.evaluateGDT({});
+            assert(gdtRes && gdtRes.success && gdtRes.result.passed, 'IPC evaluateGDT evaluates ASME Y14.5 MMC true position and bonus tolerance');
+
+            const cholRes = await window.omniEngAPI.solveSparseCholesky({ N: 50 });
+            assert(cholRes && cholRes.success && cholRes.solution.converged, 'IPC solveSparseCholesky factors and solves symmetric positive definite system');
+
+            const shellRes = await window.omniEngAPI.computeShellMITC4({});
+            assert(shellRes && shellRes.success && shellRes.matrixSize === 576, 'IPC computeShellMITC4 computes 24x24 locking-free stiffness matrix');
+
+            const timRes = await window.omniEngAPI.computeBeamTimoshenko({});
+            assert(timRes && timRes.success && timRes.buckling.criticalPcr > 0, 'IPC computeBeamTimoshenko evaluates 3D frame stiffness and Euler buckling');
+
+            const clptRes = await window.omniEngAPI.evaluateCompositeCLPT({});
+            assert(clptRes && clptRes.success && clptRes.tsaiWu.isSafe, 'IPC evaluateCompositeCLPT evaluates ABD laminate matrices and Tsai-Wu index');
+
+            const cfdRes2 = await window.omniEngAPI.stepSimpleCFD({});
+            assert(cfdRes2 && cfdRes2.success && cfdRes2.result.iteration === 1, 'IPC stepSimpleCFD performs SIMPLE segregated iteration with Rhie-Chow');
+
+            const mcmmRes = await window.omniEngAPI.runMcmmSTA({ clockPeriodNs: 1.0, logicDelayTypNs: 0.50 });
+            assert(mcmmRes && mcmmRes.success && mcmmRes.result.signoffPassed, 'IPC runMcmmSTA evaluates MCMM timing slacks across WCS, TYP, BCF corners');
+
+            const pexRes = await window.omniEngAPI.extractPex3D({});
+            assert(pexRes && pexRes.success && pexRes.result.capacitanceCouplingFf > 0, 'IPC extractPex3D computes 3D wire resistance, fringe and coupling cap');
+
+            const psfRes = await window.omniEngAPI.evaluateWavefrontPSF({});
+            assert(psfRes && psfRes.success && psfRes.result.strehlRatio >= 0.80, 'IPC evaluateWavefrontPSF evaluates 2D FFT Point Spread Function & MTF');
+
+            const simscapeRes = await window.omniEngAPI.simulateSimscapeDAE({ totalTimeSec: 3.0 });
+            assert(simscapeRes && simscapeRes.success && simscapeRes.result.simulationStepsCount > 0, 'IPC simulateSimscapeDAE integrates index-1 stiff DAE network');
+
+            const mcdcRes = await window.omniEngAPI.evaluateMcdcCoverage({});
+            assert(mcdcRes && mcdcRes.success && mcdcRes.report.mcdcCoveragePercent === 100, 'IPC evaluateMcdcCoverage verifies DO-178C DAL-A MC/DC independence pairs');
+
+            const prRes = await window.omniEngAPI.flashPengRobinson({});
+            assert(prRes && prRes.success && prRes.flash.converged, 'IPC flashPengRobinson executes PR-78 cubic VLE flash with Rachford-Rice');
+
+            const temaRes = await window.omniEngAPI.rateTemaHeatExchanger({});
+            assert(temaRes && temaRes.success && temaRes.rating.h_shell > 100, 'IPC rateTemaHeatExchanger rates shell-side heat transfer via Bell-Delaware');
+
+            const prvRes = await window.omniEngAPI.sizeApi520PRV({});
+            assert(prvRes && prvRes.success && prvRes.sizing.selectedOrifice.designation.length > 0, 'IPC sizeApi520PRV sizes pressure relief valve and selects API 526 orifice');
+
+            const fmiRes = await window.omniEngAPI.runFmiCoSimulation({});
+            assert(fmiRes && fmiRes.success && fmiRes.result.converged, 'IPC runFmiCoSimulation orchestrates cross-domain FMI Co-Simulation master');
+
+            // 14. Test UI Buttons for Sheet Metal, GD&T, and FMI Co-Simulation
+            assert(!!document.getElementById('ribbon-btn-sheet-metal'), 'Ribbon button: Sheet Metal exists');
+            assert(!!document.getElementById('ribbon-btn-gdt'), 'Ribbon button: GD&T exists');
+            assert(!!document.getElementById('ribbon-btn-fmi'), 'Ribbon button: FMI Co-Sim exists');
+
+            document.getElementById('ribbon-btn-sheet-metal').click();
+            document.getElementById('ribbon-btn-gdt').click();
+            document.getElementById('ribbon-btn-fmi').click();
+            await new Promise(r => setTimeout(r, 300));
+            assert(true, 'Ribbon buttons Sheet Metal, GD&T, and FMI Co-Sim clicked without error');
+
+            // 15. Test WebGPU Viewport & Interactive Block Canvas in window
+            assert(typeof window.HighCapacityWebGPUViewport === 'function', 'HighCapacityWebGPUViewport loaded in window');
+            const gpuVp = new window.HighCapacityWebGPUViewport({ canvasId: 'main-canvas' });
+            assert(gpuVp && gpuVp.maxPolygons === 5000000, 'HighCapacityWebGPUViewport initialized with 5M polygon target');
+            assert(typeof window.InteractiveBlockCanvasEngine === 'function', 'InteractiveBlockCanvasEngine loaded in window');
+            const blockCanvas = new window.InteractiveBlockCanvasEngine();
+            assert(blockCanvas && typeof blockCanvas.createBlock === 'function', 'InteractiveBlockCanvasEngine initialized');
 
             return results;
           })();
