@@ -510,3 +510,182 @@ body.theme-high-contrast .modal-card {
   border: 1px solid rgba(56, 189, 248, 0.5) !important;
   box-shadow: 0 0 25px rgba(56, 189, 248, 0.25) !important;
 }
+
+/* =========================================================================
+   OmniIcons Vector Iconography System & Component Slots
+   ========================================================================= */
+.icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.icon-svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: inline-block;
+  vertical-align: middle;
+  transition: stroke 0.15s ease, transform 0.15s ease;
+}
+
+.studio-btn .icon-svg {
+  width: 15px;
+  height: 15px;
+  margin-right: 4px;
+}
+
+.ribbon-btn .icon-svg {
+  width: 13px;
+  height: 13px;
+  margin-right: 3px;
+}
+
+.doc-icon.icon-slot .icon-svg {
+  width: 13px;
+  height: 13px;
+}
+
+.modal-title .icon-svg {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  color: var(--accent-cyan);
+}
+
+.chip .icon-svg {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+}
+
+/* =========================================================================
+   Floating In-Viewport HUD Toolbar
+   ========================================================================= */
+.viewport-hud-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(16px) saturate(190%);
+  -webkit-backdrop-filter: blur(16px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.25) inset;
+  pointer-events: auto;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.viewport-hud-toolbar:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.35) inset;
+}
+
+.hud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-btn .icon-svg {
+  width: 13px;
+  height: 13px;
+}
+
+.hud-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.hud-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+  font-weight: 600;
+}
+
+.hud-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
+}
+
+.hud-label {
+  font-size: 10.5px;
+  letter-spacing: 0.2px;
+}
+
+/* =========================================================================
+   Collapsible Bottom OmniAI Dock Panel
+   ========================================================================= */
+.ai-copilot-panel {
+  transition: height 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.ai-copilot-panel.collapsed {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.ai-copilot-panel.collapsed .ai-chat-history,
+.ai-copilot-panel.collapsed .ai-suggestion-chips,
+.ai-copilot-panel.collapsed .ai-input-bar {
+  display: none !important;
+}
+
+.dock-toggle-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #94a3b8;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.dock-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.dock-toggle-btn .icon-svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s ease;
+}
+
+.ai-copilot-panel.collapsed .dock-toggle-btn .icon-svg {
+  transform: rotate(180deg);
+}

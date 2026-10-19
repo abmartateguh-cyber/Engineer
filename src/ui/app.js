@@ -4,6 +4,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Hydrate all static vector SVG icons across headers, ribbon, tabs, modals
+  if (window.OmniIcons) {
+    window.OmniIcons.hydrateAll(document);
+  }
+
   // Initialize Viewports
   const viewport3D = new Viewport3D('three-canvas');
   const blockDiagramUI = new BlockDiagramUI('diagram-canvas');
@@ -184,6 +189,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       setViewMode('3d');
       viewport3D.renderSmartphoneCad(state.manualParams.cadWidth, state.manualParams.cadHeight, state.manualParams.cadDepth);
       renderCadInspector();
+    }
+
+    if (window.OmniIcons && inspectorContainer) {
+      window.OmniIcons.hydrateAll(inspectorContainer);
     }
   }
 
@@ -3253,7 +3262,9 @@ endmodule</textarea>
   if (btnToggleTheme) {
     btnToggleTheme.addEventListener('click', () => {
       const isHighContrast = document.body.classList.toggle('theme-high-contrast');
-      if (themeIcon) {
+      if (themeIcon && window.OmniIcons) {
+        themeIcon.innerHTML = isHighContrast ? window.OmniIcons.get('themeLight') : window.OmniIcons.get('themeDark');
+      } else if (themeIcon) {
         themeIcon.textContent = isHighContrast ? '☀️' : '🌙';
       }
       addAiMessage(`🎨 Display Theme: Switched to ${isHighContrast ? 'Technical High-Contrast' : 'Default Glassmorphic Night'} workstation mode.`);
@@ -3312,12 +3323,13 @@ endmodule</textarea>
       tabEl.className = 'workspace-tab active';
       tabEl.setAttribute('data-doc-id', docId);
       tabEl.innerHTML = `
-        <span class="doc-icon">📄</span>
+        <span class="doc-icon icon-slot" data-omni-icon="fileDoc"></span>
         <span class="doc-title">Untitled_${newTabCounter}.omni</span>
         <span class="doc-badge">${state.currentStudio.toUpperCase()}</span>
         <span class="doc-close-btn">&times;</span>
       `;
       workspaceTabsList.appendChild(tabEl);
+      if (window.OmniIcons) window.OmniIcons.hydrateAll(tabEl);
       activateDocumentTab(docId);
     });
   }
@@ -3333,34 +3345,38 @@ endmodule</textarea>
   let currentPaletteFilter = 'all';
   let selectedPaletteIndex = 0;
 
+  function getPaletteIcon(iconKey) {
+    return (window.OmniIcons && window.OmniIcons.get(iconKey)) || '⚡';
+  }
+
   const COMMAND_CATALOG = [
     // Studios
-    { id: 'studio-consumer', title: 'Consumer Electronics Studio', desc: 'Mobile drop-test FEA, vapor chamber CFD, camera lens optics', category: 'studios', icon: '📱', action: () => switchStudio('consumer') },
-    { id: 'studio-eda', title: 'Semiconductor & EDA Studio', desc: 'Verilog RTL synthesis, static timing (STA), Calibre DRC & LVS', category: 'studios', icon: '🔬', action: () => switchStudio('eda') },
-    { id: 'studio-aerospace', title: 'Drone & Aerospace Studio', desc: '6-DOF flight dynamics, propeller BEM aerodynamics, CFD', category: 'studios', icon: '🛸', action: () => switchStudio('aerospace') },
-    { id: 'studio-oilgas', title: 'Oil & Gas Process Studio', desc: 'Aspen HYSYS distillation, ASME B31.3 piping, flash thermodynamics', category: 'studios', icon: '🛢️', action: () => switchStudio('oilgas') },
-    { id: 'studio-simulink', title: 'Dynamic Simulink Studio', desc: 'Block diagram modeling, frequency response Bode plots, state-space', category: 'studios', icon: '🧮', action: () => switchStudio('simulink') },
-    { id: 'studio-cad', title: 'Parametric CAD Studio', desc: 'Constructive solid geometry, NURBS surfaces, feature DAG history', category: 'studios', icon: '📐', action: () => switchStudio('universal_cad') },
+    { id: 'studio-consumer', title: 'Consumer Electronics Studio', desc: 'Mobile drop-test FEA, vapor chamber CFD, camera lens optics', category: 'studios', icon: getPaletteIcon('studioConsumer'), action: () => switchStudio('consumer') },
+    { id: 'studio-eda', title: 'Semiconductor & EDA Studio', desc: 'Verilog RTL synthesis, static timing (STA), Calibre DRC & LVS', category: 'studios', icon: getPaletteIcon('studioEda'), action: () => switchStudio('eda') },
+    { id: 'studio-aerospace', title: 'Drone & Aerospace Studio', desc: '6-DOF flight dynamics, propeller BEM aerodynamics, CFD', category: 'studios', icon: getPaletteIcon('studioAerospace'), action: () => switchStudio('aerospace') },
+    { id: 'studio-oilgas', title: 'Oil & Gas Process Studio', desc: 'Aspen HYSYS distillation, ASME B31.3 piping, flash thermodynamics', category: 'studios', icon: getPaletteIcon('studioPlant'), action: () => switchStudio('oilgas') },
+    { id: 'studio-simulink', title: 'Dynamic Simulink Studio', desc: 'Block diagram modeling, frequency response Bode plots, state-space', category: 'studios', icon: getPaletteIcon('studioSimulink'), action: () => switchStudio('simulink') },
+    { id: 'studio-cad', title: 'Parametric CAD Studio', desc: 'Constructive solid geometry, NURBS surfaces, feature DAG history', category: 'studios', icon: getPaletteIcon('studioCad'), action: () => switchStudio('universal_cad') },
 
     // CAD / Geometry
-    { id: 'tool-sketcher', title: '2D Variational Constraint Sketcher', desc: 'Newton-Raphson SVD parametric 2D constraint solving (D-Cubed parity)', category: 'cad', icon: '📐', action: () => { modalSketcher?.classList.add('active'); renderSketcherCanvas(); solveSketcher(); } },
-    { id: 'tool-healer', title: 'Topological Healing (Auto-Heal)', desc: 'Stitch dirty STEP micro-gaps and collapse slivers to watertight B-Rep', category: 'cad', icon: '🩹', action: () => { modalHealer?.classList.add('active'); } },
-    { id: 'tool-cad-diff', title: '3D CAD Git Visual B-Rep Diff', desc: 'Color-coded visual comparison of 3D CAD revisions with volume metrics', category: 'cad', icon: '🔀', action: () => { modalCADDiff?.classList.add('active'); executeVisualDiff(); } },
-    { id: 'tool-sheet-metal', title: 'Sheet Metal Unfolding (DIN 6935)', desc: 'Calculate neutral axis bend deduction and flatten sheet metal blanks', category: 'cad', icon: '📦', action: () => document.getElementById('ribbon-btn-sheet-metal')?.click() },
-    { id: 'tool-gdt', title: 'ASME Y14.5 GD&T Verification', desc: 'True position at MMC with datum reference frame bonus tolerances', category: 'cad', icon: '📏', action: () => document.getElementById('ribbon-btn-gdt')?.click() },
-    { id: 'tool-drafting', title: '2D Engineering Drawing Sheet', desc: 'Generate multi-view ISO 1101 drafting sheet with title block & dimensions', category: 'cad', icon: '📐', action: () => document.getElementById('ribbon-btn-drafting')?.click() },
-    { id: 'tool-export-step', title: 'Export ISO 10303 STEP AP214', desc: 'Serialize active solid geometry into standardized B-Rep STEP file', category: 'cad', icon: '💾', action: () => document.getElementById('ribbon-btn-step')?.click() },
+    { id: 'tool-sketcher', title: '2D Variational Constraint Sketcher', desc: 'Newton-Raphson SVD parametric 2D constraint solving (D-Cubed parity)', category: 'cad', icon: getPaletteIcon('sketcher'), action: () => { modalSketcher?.classList.add('active'); renderSketcherCanvas(); solveSketcher(); } },
+    { id: 'tool-healer', title: 'Topological Healing (Auto-Heal)', desc: 'Stitch dirty STEP micro-gaps and collapse slivers to watertight B-Rep', category: 'cad', icon: getPaletteIcon('autoHeal'), action: () => { modalHealer?.classList.add('active'); } },
+    { id: 'tool-cad-diff', title: '3D CAD Git Visual B-Rep Diff', desc: 'Color-coded visual comparison of 3D CAD revisions with volume metrics', category: 'cad', icon: getPaletteIcon('cadDiff'), action: () => { modalCADDiff?.classList.add('active'); executeVisualDiff(); } },
+    { id: 'tool-sheet-metal', title: 'Sheet Metal Unfolding (DIN 6935)', desc: 'Calculate neutral axis bend deduction and flatten sheet metal blanks', category: 'cad', icon: getPaletteIcon('sheetMetal'), action: () => document.getElementById('ribbon-btn-sheet-metal')?.click() },
+    { id: 'tool-gdt', title: 'ASME Y14.5 GD&T Verification', desc: 'True position at MMC with datum reference frame bonus tolerances', category: 'cad', icon: getPaletteIcon('gdt'), action: () => document.getElementById('ribbon-btn-gdt')?.click() },
+    { id: 'tool-drafting', title: '2D Engineering Drawing Sheet', desc: 'Generate multi-view ISO 1101 drafting sheet with title block & dimensions', category: 'cad', icon: getPaletteIcon('drawing2d'), action: () => document.getElementById('ribbon-btn-drafting')?.click() },
+    { id: 'tool-export-step', title: 'Export ISO 10303 STEP AP214', desc: 'Serialize active solid geometry into standardized B-Rep STEP file', category: 'cad', icon: getPaletteIcon('step'), action: () => document.getElementById('ribbon-btn-step')?.click() },
 
     // CAE / FEA / CFD
-    { id: 'tool-mesher', title: '3D Delaunay TET10 Volume Mesher', desc: 'Generate 10-node quadratic tetrahedral solid FEA mesh', category: 'cae', icon: '🕸️', action: () => document.getElementById('ribbon-btn-mesher')?.click() },
-    { id: 'tool-fvm-cfd', title: '3D Polyhedral k-omega SST CFD', desc: 'Solve incompressible Navier-Stokes with turbulence transport', category: 'cae', icon: '🌪️', action: () => document.getElementById('ribbon-btn-fvm-cfd')?.click() },
-    { id: 'tool-sparse-cholesky', title: 'High-Performance Sparse Direct Solver', desc: 'Multifrontal sparse matrix factorization with AMD reordering', category: 'cae', icon: '⚡', action: async () => {
+    { id: 'tool-mesher', title: '3D Delaunay TET10 Volume Mesher', desc: 'Generate 10-node quadratic tetrahedral solid FEA mesh', category: 'cae', icon: getPaletteIcon('mesher'), action: () => document.getElementById('ribbon-btn-mesher')?.click() },
+    { id: 'tool-fvm-cfd', title: '3D Polyhedral k-omega SST CFD', desc: 'Solve incompressible Navier-Stokes with turbulence transport', category: 'cae', icon: getPaletteIcon('cfd'), action: () => document.getElementById('ribbon-btn-fvm-cfd')?.click() },
+    { id: 'tool-sparse-cholesky', title: 'High-Performance Sparse Direct Solver', desc: 'Multifrontal sparse matrix factorization with AMD reordering', category: 'cae', icon: getPaletteIcon('bolt'), action: async () => {
       window.omniSetSolverProgress('Multifrontal Sparse Solver: Factorizing N=50,000...', 45);
       await window.omniEngAPI?.solveWasmSparseMultifrontal?.({ N: 40 });
       window.omniSetSolverProgress('Multifrontal Factorization Complete: Residual 3.9e-12', 100, true);
       addAiMessage('⚡ High-Performance Sparse Solver: Factorization converged in 12ms (AMD fill-reducing reordering verified).');
     }},
-    { id: 'tool-gpu-pcg', title: 'GPU Parallel PCG Solver', desc: 'Preconditioned Conjugate Gradient with Jacobi preconditioner', category: 'cae', icon: '🎮', action: async () => {
+    { id: 'tool-gpu-pcg', title: 'GPU Parallel PCG Solver', desc: 'Preconditioned Conjugate Gradient with Jacobi preconditioner', category: 'cae', icon: getPaletteIcon('gear'), action: async () => {
       window.omniSetSolverProgress('GPU PCG Solver: Iterating linear system...', 60);
       await window.omniEngAPI?.solveGpuParallelPCG?.({ N: 30 });
       window.omniSetSolverProgress('GPU PCG Converged (Tol: 1e-6)', 100, true);
@@ -3368,22 +3384,22 @@ endmodule</textarea>
     }},
 
     // Optics
-    { id: 'tool-dls-opt', title: 'DLS Optical Merit Function Optimizer', desc: 'Levenberg-Marquardt global curvature and thickness optimization (Zemax parity)', category: 'optics', icon: '🎯', action: () => { modalDLS?.classList.add('active'); plotDLSConvergence(); } },
-    { id: 'tool-optical-inspector', title: 'Optical Spot Diagram & MTF Inspector', desc: 'Evaluate ray trace aberrations, spot diagram RMS radius, and MTF curves', category: 'optics', icon: '🔬', action: () => { modalOpticalInspector?.classList.add('active'); runOpticalInspection(); } },
+    { id: 'tool-dls-opt', title: 'DLS Optical Merit Function Optimizer', desc: 'Levenberg-Marquardt global curvature and thickness optimization (Zemax parity)', category: 'optics', icon: getPaletteIcon('dlsOpt'), action: () => { modalDLS?.classList.add('active'); plotDLSConvergence(); } },
+    { id: 'tool-optical-inspector', title: 'Optical Spot Diagram & MTF Inspector', desc: 'Evaluate ray trace aberrations, spot diagram RMS radius, and MTF curves', category: 'optics', icon: getPaletteIcon('optics'), action: () => { modalOpticalInspector?.classList.add('active'); runOpticalInspection(); } },
 
     // EDA / Silicon
-    { id: 'tool-verilog', title: 'Verilog RTL Synthesis IDE', desc: 'Elaborate HDL register transfer level AST and evaluate timing paths', category: 'eda', icon: '⚡', action: () => document.getElementById('ribbon-btn-verilog')?.click() },
-    { id: 'tool-spice-scope', title: 'SPICE Mixed-Signal Oscilloscope', desc: 'Simulate transient analog voltage waveforms and clock slew', category: 'eda', icon: '📈', action: () => { modalSpiceOscilloscope?.classList.add('active'); runSpiceOscilloscope(); } },
-    { id: 'tool-export-gerber', title: 'Export RS-274X Gerber Package', desc: 'Generate multi-layer PCB Gerber manufacturing files and drill report', category: 'eda', icon: '💾', action: () => document.getElementById('ribbon-btn-gerber')?.click() },
-    { id: 'tool-pdn-ir', title: 'Power Grid IR-Drop Analysis', desc: 'Evaluate on-chip power distribution network voltage drop and electromigration', category: 'eda', icon: '⚡', action: () => {
+    { id: 'tool-verilog', title: 'Verilog RTL Synthesis IDE', desc: 'Elaborate HDL register transfer level AST and evaluate timing paths', category: 'eda', icon: getPaletteIcon('verilog'), action: () => document.getElementById('ribbon-btn-verilog')?.click() },
+    { id: 'tool-spice-scope', title: 'SPICE Mixed-Signal Oscilloscope', desc: 'Simulate transient analog voltage waveforms and clock slew', category: 'eda', icon: getPaletteIcon('oscilloscope'), action: () => { modalSpiceOscilloscope?.classList.add('active'); runSpiceOscilloscope(); } },
+    { id: 'tool-export-gerber', title: 'Export RS-274X Gerber Package', desc: 'Generate multi-layer PCB Gerber manufacturing files and drill report', category: 'eda', icon: getPaletteIcon('gerber'), action: () => document.getElementById('ribbon-btn-gerber')?.click() },
+    { id: 'tool-pdn-ir', title: 'Power Grid IR-Drop Analysis', desc: 'Evaluate on-chip power distribution network voltage drop and electromigration', category: 'eda', icon: getPaletteIcon('bolt'), action: () => {
       handleAiPrompt('Run Power Grid PDN IR-Drop analysis on 1.2V core mesh');
     }},
 
     // Compliance & Lifecycle
-    { id: 'tool-asme-viii', title: 'ASME Section VIII Div 2 Certificate', desc: 'Design-by-Analysis stress linearization (Pm, Pb, Q) and limit load check', category: 'compliance', icon: '🛡️', action: () => { modalASME?.classList.add('active'); evaluateAndRenderASME(); } },
-    { id: 'tool-ebom', title: 'Hierarchical Engineering BOM Manager', desc: 'Siemens Teamcenter parity multi-level parts roll-up & cost consolidation', category: 'compliance', icon: '📋', action: () => { modalEBOM?.classList.add('active'); updateEBOMData(); } },
-    { id: 'tool-fmi', title: 'FMI 3.0 Co-Simulation Master', desc: 'Step cross-domain Functional Mock-up Units with adaptive communication step', category: 'compliance', icon: '🔄', action: () => document.getElementById('ribbon-btn-fmi')?.click() },
-    { id: 'tool-audit-report', title: 'Engineering Audit & Qualification Report', desc: 'Generate comprehensive DO-178C / ASME / ISO verification document', category: 'compliance', icon: '📄', action: () => document.getElementById('ribbon-btn-report')?.click() }
+    { id: 'tool-asme-viii', title: 'ASME Section VIII Div 2 Certificate', desc: 'Design-by-Analysis stress linearization (Pm, Pb, Q) and limit load check', category: 'compliance', icon: getPaletteIcon('asme'), action: () => { modalASME?.classList.add('active'); evaluateAndRenderASME(); } },
+    { id: 'tool-ebom', title: 'Hierarchical Engineering BOM Manager', desc: 'Siemens Teamcenter parity multi-level parts roll-up & cost consolidation', category: 'compliance', icon: getPaletteIcon('ebom'), action: () => { modalEBOM?.classList.add('active'); updateEBOMData(); } },
+    { id: 'tool-fmi', title: 'FMI 3.0 Co-Simulation Master', desc: 'Step cross-domain Functional Mock-up Units with adaptive communication step', category: 'compliance', icon: getPaletteIcon('fmi'), action: () => document.getElementById('ribbon-btn-fmi')?.click() },
+    { id: 'tool-audit-report', title: 'Engineering Audit & Qualification Report', desc: 'Generate comprehensive DO-178C / ASME / ISO verification document', category: 'compliance', icon: getPaletteIcon('auditReport'), action: () => document.getElementById('ribbon-btn-report')?.click() }
   ];
 
   function openCommandPalette() {
@@ -3517,6 +3533,57 @@ endmodule</textarea>
       }
     } else if (e.key === 'Escape' && commandPaletteModal?.classList.contains('active')) {
       closeCommandPalette();
+    }
+  });
+
+  // --- 5. Floating In-Viewport HUD Toolbar Interaction ---
+  const hudToolbar = document.getElementById('viewport-hud-toolbar');
+  if (hudToolbar) {
+    hudToolbar.querySelectorAll('.hud-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-ribbon-target');
+        if (targetId) {
+          const ribbonBtn = document.getElementById(targetId);
+          if (ribbonBtn) ribbonBtn.click();
+        }
+        // Synchronize active highlight across the HUD render style buttons
+        if (btn.id.startsWith('hud-btn-shaded') || btn.id.startsWith('hud-btn-wire') || btn.id.startsWith('hud-btn-xray') || btn.id.startsWith('hud-btn-fea')) {
+          hudToolbar.querySelectorAll('[id^="hud-btn-shaded"], [id^="hud-btn-wire"], [id^="hud-btn-xray"], [id^="hud-btn-fea"]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        }
+      });
+    });
+  }
+
+  // --- 6. Collapsible Bottom OmniAI Dock Panel Interaction ---
+  const aiCopilotDock = document.getElementById('ai-copilot-dock');
+  const btnToggleAiDock = document.getElementById('btn-toggle-ai-dock');
+
+  function toggleAiDock() {
+    if (!aiCopilotDock) return;
+    const isCollapsed = aiCopilotDock.classList.toggle('collapsed');
+    if (btnToggleAiDock && window.OmniIcons) {
+      const slot = btnToggleAiDock.querySelector('.icon-slot');
+      if (slot) {
+        slot.setAttribute('data-omni-icon', isCollapsed ? 'chevronUp' : 'chevronDown');
+        window.OmniIcons.hydrateAll(btnToggleAiDock);
+      }
+    }
+    // Dispatch window resize event so 3D Viewport expands smoothly to fill full canvas
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 240);
+  }
+
+  if (btnToggleAiDock) {
+    btnToggleAiDock.addEventListener('click', toggleAiDock);
+  }
+
+  // Global Keyboard Shortcut: Ctrl+J or Cmd+J to toggle OmniAI Dock
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+      e.preventDefault();
+      toggleAiDock();
     }
   });
 

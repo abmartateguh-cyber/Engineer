@@ -135,13 +135,20 @@ class ToolQualificationKit {
     const total = this.testCases.length;
     const passRate = total > 0 ? (passedCount / total) * 100.0 : 100.0;
     const isCertified = (passedCount === total && total > 0);
-    const sha256Digest = ToolQualificationKit.computeSha256(JSON.stringify(this.testResults));
+    const deterministicResults = this.testResults.map(r => ({
+      id: r.id,
+      description: r.description,
+      passes: r.passes,
+      actual: String(r.actual),
+      expected: String(r.expected)
+    }));
+    const sha256Digest = ToolQualificationKit.computeSha256(JSON.stringify(deterministicResults));
 
-    return {
+    this.lastSummary = {
       toolName: this.toolName,
       toolVersion: this.toolVersion,
       targetSafetyStandard: this.targetSafetyStandard,
-      timestamp: new Date().toISOString(),
+      timestamp: this.lastSummary?.timestamp || new Date().toISOString(),
       totalTests: total,
       passedCount,
       failedCount: total - passedCount,
@@ -150,6 +157,8 @@ class ToolQualificationKit {
       sha256Digest,
       results: this.testResults
     };
+
+    return this.lastSummary;
   }
 
   static computeSha256(text) {
@@ -179,7 +188,7 @@ class ToolQualificationKit {
    * @returns {string} Formatted regulatory report
    */
   generateComplianceReport() {
-    const summary = this.executeQualificationSuite();
+    const summary = this.lastSummary || this.executeQualificationSuite();
     const do330 = ToolQualificationKit.evaluateDO330TQL('A', 2);
     const iso = ToolQualificationKit.evaluateISO26262TCL('TI2', 'TD1');
 
