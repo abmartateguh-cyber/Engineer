@@ -197,18 +197,21 @@ class OmniArchive {
     let offset = 12;
 
     for (let i = 0; i < sectionCount; i++) {
-      if (offset + 2 > buffer.length) throw new Error('Malformed archive: unexpected EOF');
+      if (offset + 2 > buffer.length) throw new Error('Malformed archive: unexpected EOF in section header');
       const nameLen = buffer.readUInt16BE(offset);
       offset += 2;
 
+      if (offset + nameLen > buffer.length) throw new Error('Malformed archive: unexpected EOF in section name');
       const name = buffer.subarray(offset, offset + nameLen).toString('utf8');
       offset += nameLen;
 
+      if (offset + 12 > buffer.length) throw new Error('Malformed archive: unexpected EOF in section metadata');
       const rawLength = buffer.readUInt32BE(offset);
       const compLength = buffer.readUInt32BE(offset + 4);
       const crc = buffer.readUInt32BE(offset + 8);
       offset += 12;
 
+      if (offset + compLength > buffer.length) throw new Error('Malformed archive: unexpected EOF in section payload');
       const compressed = buffer.subarray(offset, offset + compLength);
       offset += compLength;
 

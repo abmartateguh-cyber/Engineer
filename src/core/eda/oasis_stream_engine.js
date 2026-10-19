@@ -76,6 +76,9 @@ class OasisStreamEngine {
     let bytesRead = 0;
 
     while (offset + bytesRead < buffer.length) {
+      if (bytesRead >= 10) {
+        throw new Error('Vint overflow: variable length integer exceeds 10 bytes');
+      }
       const b = buffer[offset + bytesRead++];
       result += (b & 0x7F) * Math.pow(2, shift);
       shift += 7;
@@ -115,7 +118,7 @@ class OasisStreamEngine {
     this.resetModalState();
     const bytes = [];
 
-    // 1. Magic OASIS Header (12 bytes: %SEMI-OASIS\r\n)
+    // 1. Magic OASIS Header (13 bytes: %SEMI-OASIS\r\n)
     const magic = [0x25, 0x53, 0x45, 0x4D, 0x49, 0x2D, 0x4F, 0x41, 0x53, 0x49, 0x53, 0x0D, 0x0A];
     bytes.push(...magic);
 
@@ -214,17 +217,20 @@ class OasisStreamEngine {
    * @returns {Object} Layout object with parsed cells and geometry
    */
   deserialize(buffer) {
+    if (!buffer || buffer.length < 13) {
+      throw new Error('Invalid or truncated OASIS stream buffer');
+    }
     this.resetModalState();
     let offset = 0;
 
-    // 1. Verify Magic Header (12 bytes)
+    // 1. Verify Magic Header (13 bytes: %SEMI-OASIS\r\n)
     const magic = [0x25, 0x53, 0x45, 0x4D, 0x49, 0x2D, 0x4F, 0x41, 0x53, 0x49, 0x53, 0x0D, 0x0A];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < magic.length; i++) {
       if (buffer[offset + i] !== magic[i]) {
         throw new Error(`Invalid OASIS magic header at byte ${i}`);
       }
     }
-    offset += 12;
+    offset += magic.length;
 
     const layout = {
       format: 'SEMI-P39-OASIS',
@@ -330,6 +336,8 @@ class OasisStreamEngine {
       } else if (recordType === 2) {
         // END Record
         break;
+      } else {
+        throw new Error(`Unknown or corrupted OASIS record type: ${recordType} at offset ${offset - 1}`);
       }
     }
 

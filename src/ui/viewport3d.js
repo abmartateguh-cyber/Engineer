@@ -135,6 +135,26 @@ class Viewport3D {
       const rotY = -this.cameraAngle.theta * (180 / Math.PI);
       navCube.style.transform = `rotateX(${rotX.toFixed(1)}deg) rotateY(${rotY.toFixed(1)}deg)`;
     }
+
+    // Evaluate Out-of-Core Spatial Octree LOD based on camera position
+    if (window.omniEngAPI?.getOutOfCoreLOD) {
+      clearTimeout(this._lodDebounce);
+      this._lodDebounce = setTimeout(async () => {
+        try {
+          const lodRes = await window.omniEngAPI.getOutOfCoreLOD({
+            cameraPosition: [x, y, z],
+            frustumBounds: [-500, -500, -500, 500, 500, 500]
+          });
+          if (lodRes && lodRes.success) {
+            this.activeOctreeLOD = lodRes;
+            const stats = document.getElementById('viewport-stats');
+            if (stats && lodRes.visibleCount !== undefined) {
+              stats.title = `Octree LOD: ${lodRes.visibleCount} visible items across spatial hierarchy`;
+            }
+          }
+        } catch (_) {}
+      }, 150);
+    }
   }
 
   setupInteractions() {

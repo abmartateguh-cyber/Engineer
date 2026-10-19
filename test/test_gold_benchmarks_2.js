@@ -552,6 +552,8 @@ function runAllGoldBenchmarks2() {
   if (passed !== total) {
     throw new Error(`Only ${passed} of ${total} Gold Benchmarks passed!`);
   }
+
+  return { passed, total };
 }
 
 if (require.main === module) {

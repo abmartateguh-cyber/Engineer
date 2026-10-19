@@ -755,9 +755,10 @@ failedTests += goldStats.failedCount;
 // Suite 21: Section 6 Master Regulatory Certification Suite 2.0 (Phases 6-13)
 // ----------------------------------------------------
 const { runAllGoldBenchmarks2 } = require('./test_gold_benchmarks_2');
-runAllGoldBenchmarks2();
-totalTests += 15;
-passedTests += 15;
+const gold2Stats = runAllGoldBenchmarks2();
+totalTests += gold2Stats.total;
+passedTests += gold2Stats.passed;
+failedTests += (gold2Stats.total - gold2Stats.passed);
 
 // ----------------------------------------------------
 // Suite 22: Tier-1 Commercial Production Certification Suite 3.0 (Pillars 1-4)
@@ -785,6 +786,15 @@ const tenOutOfTenStats = runTier1TenOutOfTenTests();
 totalTests += tenOutOfTenStats.total;
 passedTests += tenOutOfTenStats.passed;
 failedTests += (tenOutOfTenStats.total - tenOutOfTenStats.passed);
+
+// ----------------------------------------------------
+// Suite 25: Tier-1 Parser Fuzzing & Input Robustness Gate (CWE-20 / CWE-400)
+// ----------------------------------------------------
+const { runParserFuzzTests } = require('./fuzz/test_parsers_fuzz');
+const fuzzStats = runParserFuzzTests();
+totalTests += fuzzStats.total;
+passedTests += fuzzStats.passed;
+failedTests += (fuzzStats.total - fuzzStats.passed);
 
 // ----------------------------------------------------
 // Summary
