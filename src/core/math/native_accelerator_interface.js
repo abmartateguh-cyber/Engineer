@@ -9,11 +9,14 @@
 
 'use strict';
 
+const { buildOmniEngWasmBinary, WasmKernelEngine } = require('./wasm_kernel_engine');
+
 class NativeAcceleratorInterface {
   constructor() {
     this.activeTier = 'js_typedarrays';
     this.nativeModule = null;
     this.wasmInstance = null;
+    this.wasmEngine = null;
     this._initializeBackend();
   }
 
@@ -27,11 +30,18 @@ class NativeAcceleratorInterface {
       // Native addon not compiled; gracefully continue to Tier 2
     }
 
-    // Attempt Tier 2: WASM SIMD128
-    // Requires a compiled WASM module to be loaded; if none loaded, truthful fallback is optimized JS
-    if (this.wasmInstance) {
+    // Attempt Tier 2: Real Bare-Metal WebAssembly Kernels
+    try {
+      const bytes = buildOmniEngWasmBinary();
+      const mod = new WebAssembly.Module(bytes);
+      const instance = new WebAssembly.Instance(mod);
+      this.wasmInstance = instance;
+      this.wasmEngine = new WasmKernelEngine();
+      this.wasmEngine.instance = instance;
+      this.wasmEngine.memory = instance.exports.memory;
+      this.wasmEngine.isReady = true;
       this.activeTier = 'wasm_simd128';
-    } else {
+    } catch (e) {
       this.activeTier = 'js_typedarrays_optimized';
     }
 
@@ -147,6 +157,12 @@ class NativeAcceleratorInterface {
   spmv(csr, x, y = null) {
     const rows = csr.rows;
     if (!y) y = new Float64Array(rows);
+
+    if (this.wasmEngine && this.wasmEngine.isReady) {
+      this.wasmEngine.spmv(csr.rowPtr, csr.colInd, csr.values, x, y, rows);
+      return y;
+    }
+
     const rowPtr = csr.rowPtr;
     const colInd = csr.colInd;
     const values = csr.values;
@@ -164,12 +180,16 @@ class NativeAcceleratorInterface {
   }
 
   /**
-   * Vector dot product with 4x loop unrolling
+   * Vector dot product with WebAssembly acceleration & loop unrolling fallback
    * @param {Float64Array} a 
    * @param {Float64Array} b 
    * @returns {number}
    */
   dot(a, b) {
+    if (this.wasmEngine && this.wasmEngine.isReady) {
+      return this.wasmEngine.dotProduct(a, b);
+    }
+
     const n = Math.min(a.length, b.length);
     let sum = 0.0;
     let i = 0;
@@ -183,12 +203,17 @@ class NativeAcceleratorInterface {
   }
 
   /**
-   * Vector AXPY: y = alpha * x + y
+   * Vector AXPY: y = alpha * x + y with WebAssembly acceleration
    * @param {number} alpha 
    * @param {Float64Array} x 
    * @param {Float64Array} y 
    */
   axpy(alpha, x, y) {
+    if (this.wasmEngine && this.wasmEngine.isReady) {
+      this.wasmEngine.daxpy(x, y, alpha);
+      return y;
+    }
+
     const n = Math.min(x.length, y.length);
     let i = 0;
     for (; i <= n - 4; i += 4) {

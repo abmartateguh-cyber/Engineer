@@ -5,7 +5,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/run_all_tests.js"
+    "test": "node test/run_all_tests.js",
+    "test:ui": "electron . --test-ui",
+    "test:vv": "node test/vv/run_vv.js",
+    "check:ipc": "node scripts/check_ipc.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "keywords": [
     "cad",

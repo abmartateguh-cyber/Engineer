@@ -24,6 +24,8 @@ const { NativeAcceleratorInterface, accelerator } = require('../src/core/math/na
 const { OctreeNode, OutOfCoreAssemblyManager } = require('../src/core/cad/out_of_core_octree');
 const { StandardPartsLibrary } = require('../src/core/cad/standard_parts_library');
 const { KeymapManager, KEYMAP_PROFILES } = require('../src/ui/keymap_manager');
+const { WasmKernelEngine, buildOmniEngWasmBinary } = require('../src/core/math/wasm_kernel_engine');
+const { GeometryKernelAdapter } = require('../src/core/cad/kernel_adapter');
 
 function runTier1TenOutOfTenTests() {
   console.log('\n================================================================');
@@ -223,6 +225,74 @@ function runTier1TenOutOfTenTests() {
     });
     km.dispatchAction('ACTION_VIEW_TOP');
     assert.strictEqual(actionTriggered, true);
+  });
+
+  // [T10-8] Bare-Metal WebAssembly Kernel Engine
+  runTest('[T10-8] Native WebAssembly Kernel Engine (Bytecode Compiler, SIMD128, SpMV, DAXPY)...', () => {
+    const engine = new WasmKernelEngine();
+    const initialized = engine.init();
+    assert.strictEqual(initialized, true);
+    assert.strictEqual(engine.isReady, true);
+
+    // Test addF64
+    const sum = engine.addF64(12.5, 37.5);
+    assert.strictEqual(sum, 50.0);
+
+    // Test vector dot product
+    const a = new Float64Array([1, 2, 3, 4]);
+    const b = new Float64Array([5, 6, 7, 8]);
+    const dot = engine.dotProduct(a, b);
+    assert.strictEqual(dot, 70.0);
+
+    // Test DAXPY: y = 2.5 * x + y
+    const x = new Float64Array([1, 2, 3]);
+    const y = new Float64Array([10, 20, 30]);
+    engine.daxpy(x, y, 2.5);
+    assert.strictEqual(y[0], 12.5);
+    assert.strictEqual(y[1], 25.0);
+    assert.strictEqual(y[2], 37.5);
+
+    // Test Vector Norm
+    const norm = engine.vectorNorm(new Float64Array([3, 4]));
+    assert.strictEqual(norm, 5.0);
+
+    // Test SpMV
+    const rowPtr = new Int32Array([0, 2, 3]);
+    const colInd = new Int32Array([0, 1, 1]);
+    const values = new Float64Array([10, 20, 30]);
+    const vx = new Float64Array([1, 2]);
+    const vy = new Float64Array(2);
+    engine.spmv(rowPtr, colInd, values, vx, vy, 2);
+    assert.strictEqual(vy[0], 50.0); // 10*1 + 20*2 = 50
+    assert.strictEqual(vy[1], 60.0); // 30*2 = 60
+  });
+
+  // [T10-9] Unified CAD Geometry Kernel Adapter & NIST Validation Properties
+  runTest('[T10-9] Unified CAD Geometry Kernel Adapter & NIST AP242 Validation Properties...', () => {
+    const adapter = new GeometryKernelAdapter();
+    const box = adapter.makeBox(10, 20, 30, 'TestBox');
+    assert.strictEqual(box.faces.length, 6);
+    assert.strictEqual(box.faces[0].tag.startsWith('TestBox:FACE'), true);
+    const resolved = adapter.namingManager.resolveTag(box.faces[0].tag);
+    assert.strictEqual(resolved.entity.featureId, 'TestBox');
+
+    const cylinder = adapter.makeCylinder(5, 20, 'TestCyl');
+    assert(cylinder.faces.length > 0);
+
+    // NIST Recommended Practice Validation Properties (Volume, Area, Centroid, BBox)
+    const props = adapter.computeValidationProperties(box);
+    assert.strictEqual(props.volume, 6000.0); // 10 * 20 * 30
+    assert.strictEqual(props.surfaceArea, 2200.0); // 2*(10*20 + 20*30 + 10*30)
+    assert.strictEqual(props.centroid.x, 0.0);
+    assert.strictEqual(props.centroid.y, 0.0);
+    assert.strictEqual(props.centroid.z, 0.0);
+    assert.strictEqual(props.boundingBox.dx, 10);
+    assert.strictEqual(props.boundingBox.dy, 20);
+    assert.strictEqual(props.boundingBox.dz, 30);
+
+    const info = adapter.getKernelInfo();
+    assert.strictEqual(info.ap242Compliance, true);
+    assert.strictEqual(info.nistValidationPropsSupported, true);
   });
 
   console.log(`\n================================================================`);
