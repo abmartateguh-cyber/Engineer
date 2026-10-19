@@ -778,6 +778,15 @@ passedTests += tier1Stats.passed;
 failedTests += (tier1Stats.total - tier1Stats.passed);
 
 // ----------------------------------------------------
+// Suite 24: Tier-1 10/10 Industrial Commercial Production Architecture (Pillars 1-5)
+// ----------------------------------------------------
+const { runTier1TenOutOfTenTests } = require('./test_tier1_10_out_of_10');
+const tenOutOfTenStats = runTier1TenOutOfTenTests();
+totalTests += tenOutOfTenStats.total;
+passedTests += tenOutOfTenStats.passed;
+failedTests += (tenOutOfTenStats.total - tenOutOfTenStats.passed);
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

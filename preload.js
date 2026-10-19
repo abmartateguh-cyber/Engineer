@@ -139,6 +139,16 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveGpuParallelPCG: (params) => ipcRenderer.invoke('omni:solve-gpu-parallel-pcg', params),
   solveWebGPUCFDPoisson: (params) => ipcRenderer.invoke('omni:solve-webgpu-cfd-poisson', params),
 
+  // Tier-1 10/10 Industrial Commercial Production APIs
+  securityValidateInput: (params) => ipcRenderer.invoke('omni:security-validate-input', params),
+  vaultEncryptProject: (params) => ipcRenderer.invoke('omni:vault-encrypt-project', params),
+  vaultDecryptProject: (params) => ipcRenderer.invoke('omni:vault-decrypt-project', params),
+  getStandardFastener: (params) => ipcRenderer.invoke('omni:get-standard-fastener', params),
+  getOutOfCoreLOD: (params) => ipcRenderer.invoke('omni:get-out-of-core-lod', params),
+  auditRecordAction: (params) => ipcRenderer.invoke('omni:audit-record-action', params),
+  getKeymapProfiles: (params) => ipcRenderer.invoke('omni:get-keymap-profiles', params),
+  getAcceleratorInfo: () => ipcRenderer.invoke('omni:get-accelerator-info'),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

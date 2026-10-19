@@ -11,9 +11,16 @@
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const MAGIC_BYTES = Buffer.from('OMNIENG\x01', 'binary'); // 8-byte magic header
+const VAULT_MAGIC_BYTES = Buffer.from('OMNIVAUL', 'utf8'); // 8-byte encrypted vault header
 const CURRENT_SCHEMA_VERSION = 1;
+
+// Tier-1 Industrial Security Controls (CWE-400 Decompression Bomb & DoS Defense)
+const MAX_UNCOMPRESSED_SECTION_SIZE = 500 * 1024 * 1024; // 500 MB ceiling
+const MAX_EXPANSION_RATIO = 50; // 50:1 maximum compression expansion ratio
+
 
 /**
  * Simple standard 32-bit CRC implementation for archive data integrity
@@ -95,7 +102,22 @@ class OmniArchive {
       throw new Error(`CRC32 mismatch on section '${name}': data corruption detected!`);
     }
 
-    const decompressed = zlib.inflateSync(entry.compressed);
+    // Security Gate: Decompression Bomb Guard (CWE-400)
+    if (entry.rawLength > MAX_UNCOMPRESSED_SECTION_SIZE) {
+      throw new Error(`Security Violation: Section '${name}' uncompressed size (${entry.rawLength} bytes) exceeds maximum ceiling (${MAX_UNCOMPRESSED_SECTION_SIZE} bytes)`);
+    }
+    const compLen = Math.max(1, entry.compressed.length);
+    if (entry.rawLength / compLen > MAX_EXPANSION_RATIO && entry.rawLength > 1024 * 1024) {
+      throw new Error(`Security Violation: Decompression bomb detected on section '${name}' (expansion ratio ${(entry.rawLength / compLen).toFixed(1)}:1 exceeds ${MAX_EXPANSION_RATIO}:1)`);
+    }
+
+    const decompressed = zlib.inflateSync(entry.compressed, {
+      maxOutputLength: Math.min(entry.rawLength + 1024, MAX_UNCOMPRESSED_SECTION_SIZE)
+    });
+    if (decompressed.length !== entry.rawLength) {
+      throw new Error(`Security Error: Decompressed byte length (${decompressed.length}) does not match manifest header (${entry.rawLength})`);
+    }
+
     if (asJson) {
       try {
         const parsed = JSON.parse(decompressed.toString('utf8'));
@@ -230,6 +252,86 @@ class OmniArchive {
     const buf = fs.readFileSync(filePath);
     return OmniArchive.loadFromBuffer(buf);
   }
+
+  /**
+   * Encrypts the entire archive using AES-256-GCM with PBKDF2 key derivation.
+   * Directly protects confidential CAD IP from disk extraction (CWE-311).
+   * @param {string} password 
+   * @returns {Buffer} Encrypted binary container
+   */
+  saveToEncryptedBuffer(password) {
+    if (!password || typeof password !== 'string' || password.length < 4) {
+      throw new Error('Encryption Error: Password must be at least 4 characters long');
+    }
+    const plaintext = this.saveToBuffer();
+    return OmniVaultAES256.encrypt(plaintext, password);
+  }
+
+  /**
+   * Decrypts and restores an OmniArchive from an AES-256-GCM encrypted buffer.
+   * @param {Buffer} encryptedBuffer 
+   * @param {string} password 
+   * @returns {OmniArchive}
+   */
+  static loadFromEncryptedBuffer(encryptedBuffer, password) {
+    if (!password || typeof password !== 'string') {
+      throw new Error('Decryption Error: Password must be provided');
+    }
+    const decrypted = OmniVaultAES256.decrypt(encryptedBuffer, password);
+    return OmniArchive.loadFromBuffer(decrypted);
+  }
+}
+
+/**
+ * OmniVaultAES256: Industrial Encrypted Engineering Container
+ * Implements authenticated symmetric encryption (AES-256-GCM) with random salt,
+ * 100,000 PBKDF2 iterations, 96-bit IV, and 128-bit authentication tag.
+ */
+class OmniVaultAES256 {
+  static encrypt(plaintextBuffer, password) {
+    const salt = crypto.randomBytes(16);
+    const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+    const iv = crypto.randomBytes(12);
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const ciphertext = Buffer.concat([cipher.update(plaintextBuffer), cipher.final()]);
+    const tag = cipher.getAuthTag();
+
+    // Format: [8B VAULT_MAGIC] [16B salt] [12B iv] [16B tag] [N bytes ciphertext]
+    const header = Buffer.alloc(8 + 16 + 12 + 16);
+    VAULT_MAGIC_BYTES.copy(header, 0);
+    salt.copy(header, 8);
+    iv.copy(header, 24);
+    tag.copy(header, 36);
+
+    return Buffer.concat([header, ciphertext]);
+  }
+
+  static decrypt(encryptedBuffer, password) {
+    if (encryptedBuffer.length < 52) {
+      throw new Error('Corrupt encrypted vault: payload shorter than cryptographic header');
+    }
+
+    const magic = encryptedBuffer.subarray(0, 8);
+    if (!magic.equals(VAULT_MAGIC_BYTES)) {
+      throw new Error('Invalid vault header: not an OmniEng AES-256 encrypted container');
+    }
+
+    const salt = encryptedBuffer.subarray(8, 24);
+    const iv = encryptedBuffer.subarray(24, 36);
+    const tag = encryptedBuffer.subarray(36, 52);
+    const ciphertext = encryptedBuffer.subarray(52);
+
+    const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+
+    try {
+      return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    } catch (err) {
+      throw new Error('Decryption Failed: Invalid password or corrupted authentication tag (HMAC mismatch)');
+    }
+  }
 }
 
 /**
@@ -327,6 +429,10 @@ class CommandJournal {
 module.exports = {
   OmniArchive,
   CommandJournal,
+  OmniVaultAES256,
   calculateCRC32,
-  MAGIC_BYTES
+  MAGIC_BYTES,
+  VAULT_MAGIC_BYTES,
+  MAX_UNCOMPRESSED_SECTION_SIZE,
+  MAX_EXPANSION_RATIO
 };
