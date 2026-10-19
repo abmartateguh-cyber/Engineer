@@ -1,0 +1,79 @@
+appId: com.omnieng.workstation
+productName: OmniEng
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+copyright: Copyright © 2026 OmniEng Engineering Systems
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - "**/*"
+  - "!native/target/**"
+  - "!test/**"
+  - "!scripts/**"
+  - "!dist/**"
+  - "!**/*.map"
+  - "!.git/**"
+
+asar: true
+
+protocols:
+  - name: OmniEng Project File
+    schemes:
+      - omnieng
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  darkModeSupport: true
+  minimumSystemVersion: "12.0.0"
+
+dmg:
+  sign: false
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  verifyUpdateCodeSignature: true
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  category: Development
+  synopsis: Universal Multi-Industry Engineering & Simulation Platform (CAD • CAE • EDA • GNC • Plant)
