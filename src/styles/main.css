@@ -1049,4 +1049,60 @@ body {
   stroke-width: 1.5;
 }
 
+/* =========================================================================
+   Industrial Workstation Status Bar (CARD-104 & CARD-105)
+   ========================================================================= */
 
+.workstation-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+  background: var(--bg-surface-elevated, #0d1117);
+  border-top: 1px solid var(--border-color, #21262d);
+  font-size: 11px;
+  color: var(--text-dim, #8b949e);
+  z-index: 100;
+  user-select: none;
+  min-height: 26px;
+}
+
+.status-bar-left,
+.status-bar-center,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.status-badge-simd {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.status-select {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid var(--border-color, #30363d);
+  color: var(--text-main, #c9d1d9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  outline: none;
+  cursor: pointer;
+}
+
+.status-select:focus {
+  border-color: var(--accent-cyan, #58a6ff);
+}

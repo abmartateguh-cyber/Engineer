@@ -47,7 +47,7 @@ The platform employs a **defense-in-depth, zero-trust boundary model**:
 +-----------------------------------------------------------------------------------+
 |                      TRUSTED MAIN PROCESS IPC SECURITY GATEWAY                    |
 |  - defineHandler(channel, schema, handler)                                        |
-|  - 100% Schema Validation (104 / 104 Channels Verified)                            |
+|  - 100% Schema Validation (105 / 105 Channels Verified)                            |
 |  - Prototype Pollution Stripper (CWE-1321 Mitigation)                             |
 |  - Path Traversal & Canonicalization Sanitizer (CWE-22 Mitigation)                |
 |  - CI Enforced Gate: scripts/check_ipc.js (Zero raw ipcMain.handle violations)    |

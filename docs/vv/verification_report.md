@@ -1,7 +1,7 @@
 # OmniEng — Verification & Validation (V&V) Certification Report
 
 > **Standard Compliance:** ASME V&V 10-2019 / NAFEMS / NASA TMR / NIST Sparse Matrix Collection  
-> **Generated:** 2026-10-19T14:49:00.944Z  
+> **Generated:** 2026-10-19T15:57:12.625Z  
 > **Environment:** `darwin x64 | Node v20.20.2 | CPUs: 4`  
 > **Status:** **CERTIFIED PASS (100%)**
 
@@ -13,7 +13,7 @@ This formal Verification & Validation dossier provides empirical proof of numeri
 
 | Total Benchmarks | Passed | Failed | Pass Rate |
 | :---: | :---: | :---: | :---: |
-| **7** | **7** | **0** | **100.0%** |
+| **9** | **9** | **0** | **100.0%** |
 
 ---
 
@@ -28,6 +28,8 @@ This formal Verification & Validation dossier provides empirical proof of numeri
 | `NASA_TMR_FLAT_PLATE` | NASA TMR Zero Pressure Gradient Flat Plate (Cf at Re_x = 5M) | 0.00269 | 0.00276 | dimensionless | 2.602% | ±3% | **✓ PASS** |
 | `NIST_SPARSE_ROBUSTNESS` | NIST SuiteSparse Extreme Condition Number (kappa=1e6 SPD residual) | 0.000001 | 9.961e-11 | relative residual | 0% | < 0.000001 | **✓ PASS** |
 | `HERTZ_CONTACT_3D` | Hertz 3D Sphere-on-Flat Contact Pressure | 615.94 | 615.94 | MPa | 0% | ±3% | **✓ PASS** |
+| `NAFEMS_LE11` | Thick Cylinder Plane Strain (Inner bore hoop stress sigma_theta) | 166.67 | 166.67 | MPa | 0% | ±1% | **✓ PASS** |
+| `ISO_10110_OPTICS_TOLERANCE` | ISO 10110 Wavefront Tolerance & Diffraction Strehl Ratio (Rayleigh Limit) | 0.82 | 0.82 | ratio | 0% | ±1% | **✓ PASS** |
 
 ---
 

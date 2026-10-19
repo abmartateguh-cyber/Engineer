@@ -13,10 +13,12 @@ const os = require('os');
 
 const { runNafemsLE1 } = require('./nafems/test_nafems_le1');
 const { runNafemsLE10 } = require('./nafems/test_nafems_le10');
+const { runNafemsLE11 } = require('./nafems/test_nafems_le11');
 const { runNafemsFV32 } = require('./nafems/test_nafems_fv32');
 const { runNafemsT1 } = require('./nafems/test_nafems_t1');
 const { runNasaTmrFlatPlate } = require('./nasa_tmr/test_nasa_tmr_flat_plate');
 const { runNistSparseRobustness } = require('./nist_matrix/test_nist_sparse_robustness');
+const { runIso10110OpticsTolerance } = require('./optics/test_iso10110_tolerance');
 const { ContactMechanics3D } = require('../../src/core/cae/contact_mechanics_3d');
 
 function runVVVerificationBenchmarks() {
@@ -80,6 +82,16 @@ function runVVVerificationBenchmarks() {
   };
   results.push(hertzItem);
   console.log(`  ${hertzPassed ? '✓' : '✗'} [HERTZ CONTACT] ${hertzItem.name}: calc = ${hertzItem.calculatedValue} MPa, target = ${hertzItem.targetValue} MPa (err: ${hertzItem.errorPercent}%, tol: +/-3.0%)`);
+
+  // 8. NAFEMS LE11 Thick Cylinder (Plane Strain)
+  const le11 = runNafemsLE11();
+  results.push(le11);
+  console.log(`  ${le11.passed ? '✓' : '✗'} [NAFEMS LE11] ${le11.name}: calc = ${le11.calculatedValue} ${le11.units}, target = ${le11.targetValue} (err: ${le11.errorPercent}%, tol: +/-${le11.tolerancePercent}%)`);
+
+  // 9. ISO 10110 Optics Wavefront Tolerance
+  const isoOptics = runIso10110OpticsTolerance();
+  results.push(isoOptics);
+  console.log(`  ${isoOptics.passed ? '✓' : '✗'} [ISO 10110 OPTICS] ${isoOptics.name}: calc = ${isoOptics.calculatedValue}, target = ${isoOptics.targetValue} (err: ${isoOptics.errorPercent}%, tol: +/-${isoOptics.tolerancePercent}%)`);
 
   const total = results.length;
   const passed = results.filter(r => r.passed).length;

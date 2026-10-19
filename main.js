@@ -516,6 +516,27 @@ app.whenReady().then(() => {
             document.getElementById('btn-cancel-solver').click();
             assert(document.getElementById('global-solver-progress').style.display === 'none', 'Solver progress cancels on button click');
 
+            // 20. Test Industrial Production Features (Quad-View, NIST Props, Workstation Status Bar)
+            assert(!!document.getElementById('ribbon-btn-quad-view'), 'Ribbon button: Quad-View exists');
+            assert(!!document.getElementById('ribbon-btn-nist-props'), 'Ribbon button: NIST Props exists');
+            assert(!!document.getElementById('modal-nist-validation'), 'Modal: NIST STEP Validation exists');
+            assert(!!document.getElementById('workstation-status-bar'), 'Workstation Status Bar exists');
+            assert(!!document.getElementById('status-hardware-accel'), 'Status Bar: Hardware accelerator badge exists');
+            assert(!!document.getElementById('status-keymap-selector'), 'Status Bar: Keymap selector exists');
+
+            // Test Quad-View toggle
+            document.getElementById('ribbon-btn-quad-view').click();
+            assert(window.viewport3D && window.viewport3D.isQuadView, 'Quad-View toggles active');
+            document.getElementById('ribbon-btn-quad-view').click();
+            assert(window.viewport3D && !window.viewport3D.isQuadView, 'Quad-View toggles off back to single perspective');
+
+            // Test NIST Props modal
+            document.getElementById('ribbon-btn-nist-props').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-nist-validation').classList.contains('active'), 'Modal: NIST Validation opens active');
+            document.getElementById('btn-close-nist-validation').click();
+            assert(!document.getElementById('modal-nist-validation').classList.contains('active'), 'Modal: NIST Validation closes');
+
             return results;
           })();
         `);

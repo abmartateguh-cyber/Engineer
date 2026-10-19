@@ -20,6 +20,7 @@ const { TopologicalHealingEngine } = require('../../core/cad/topological_healing
 const { GitCADVisualDiffEngine } = require('../../core/pdm/git_cad_visual_diff');
 const { EngineeringBOMManager } = require('../../core/pdm/engineering_bom_manager');
 const { StandardPartsLibrary } = require('../../core/cad/standard_parts_library');
+const { defaultGeometryKernel } = require('../../core/cad/kernel_adapter');
 const { Vector3 } = require('../../core/math/linear_algebra');
 
 function registerCadIpc(deps = {}) {
@@ -296,6 +297,32 @@ function registerCadIpc(deps = {}) {
     const res = outOfCoreOctree.evaluateVisibleLODs(cameraPosition, frustumBounds);
     return { success: true, ...res };
   }, { domain: 'cad', description: 'Evaluate visible LOD levels from spatial octree' });
+
+  // 18. NIST Recommended Practice Validation Properties (AP242 / CAx-IF)
+  defineHandler('omni:compute-cad-validation-properties', {
+    type: 'object',
+    properties: {
+      dx: { type: 'number', optional: true },
+      dy: { type: 'number', optional: true },
+      dz: { type: 'number', optional: true },
+      shapeType: { type: 'string', optional: true }
+    },
+    optional: true
+  }, async (event, params = {}) => {
+    const dx = params.dx || 50;
+    const dy = params.dy || 30;
+    const dz = params.dz || 80;
+    let body;
+    if (params.shapeType === 'cylinder') {
+      body = defaultGeometryKernel.makeCylinder(params.radius || 15, dz, 'CylComponent');
+    } else {
+      body = defaultGeometryKernel.makeBox(dx, dy, dz, 'BoxComponent');
+    }
+    const props = defaultGeometryKernel.computeValidationProperties(body);
+    const kernelInfo = defaultGeometryKernel.getKernelInfo();
+    return { success: true, props, kernelInfo };
+  }, { domain: 'cad', description: 'Compute NIST AP242 analytical validation properties (Volume, Area, Centroid, BBox)' });
 }
 
 module.exports = { registerCadIpc };
+

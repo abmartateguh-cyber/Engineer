@@ -111,6 +111,7 @@
         <button class="ribbon-btn" id="ribbon-cam-top" data-studio-cat="common" title="Top Plan View"><span class="icon-slot" data-omni-icon="camTop"></span> Top</button>
         <button class="ribbon-btn" id="ribbon-cam-front" data-studio-cat="common" title="Front Elevation View"><span class="icon-slot" data-omni-icon="camFront"></span> Front</button>
         <button class="ribbon-btn" id="ribbon-cam-reset" data-studio-cat="common" title="Reset Camera Framing"><span class="icon-slot" data-omni-icon="camReset"></span> Reset</button>
+        <button class="ribbon-btn" id="ribbon-btn-quad-view" data-studio-cat="common" title="Toggle 4-View Engineering Quad Layout (Top, Front, Right, Iso)"><span class="icon-slot" data-omni-icon="assembly"></span> Quad-View</button>
       </div>
     </div>
 
@@ -139,6 +140,7 @@
       <div class="ribbon-buttons">
         <button class="ribbon-btn action-btn" id="ribbon-btn-sketcher" data-studio-cat="consumer universal_cad" title="2D Variational Geometric Constraint Sketcher (D-Cubed Parity)"><span class="icon-slot" data-omni-icon="sketcher"></span> Sketcher</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-heal" data-studio-cat="consumer universal_cad" title="Auto-Heal Non-Manifold Dirty STEP Solid Geometry"><span class="icon-slot" data-omni-icon="autoHeal"></span> Auto-Heal</button>
+        <button class="ribbon-btn action-btn" id="ribbon-btn-nist-props" data-studio-cat="consumer universal_cad" title="NIST STEP Validation Properties (ISO 10303-59 B-Rep Verification)"><span class="icon-slot" data-omni-icon="gdt"></span> NIST Props</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-opt-dls" data-studio-cat="consumer" title="DLS Global Optical Merit Function Optimizer (Zemax Parity)"><span class="icon-slot" data-omni-icon="dlsOpt"></span> DLS Opt</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-asme" data-studio-cat="oilgas" title="ASME Section VIII Div 2 Compliance Report (Design-by-Analysis)"><span class="icon-slot" data-omni-icon="asme"></span> ASME VIII</button>
         <button class="ribbon-btn action-btn" id="ribbon-btn-cad-diff" data-studio-cat="common" title="3D CAD Git Visual B-Rep Diffing"><span class="icon-slot" data-omni-icon="cadDiff"></span> CAD Diff</button>
@@ -407,6 +409,34 @@
       <button class="ai-send-btn" id="ai-send-btn">Execute AI Action</button>
     </div>
   </footer>
+
+  <!-- Industrial Workstation Status Bar (CARD-104 & CARD-105) -->
+  <div class="workstation-status-bar" id="workstation-status-bar">
+    <div class="status-bar-left">
+      <span class="status-badge status-badge-simd" id="status-hardware-accel">
+        <span class="pulse-dot"></span>
+        <span id="hardware-accel-label">WASM SIMD128 • Multithreaded Host Active</span>
+      </span>
+      <span style="font-size: 10px; color: var(--text-dim);">FPS: <span id="status-fps-val" style="color: #4ade80; font-family: var(--font-mono);">60.0</span></span>
+      <span style="font-size: 10px; color: var(--text-dim);">Precision: <span style="color: var(--accent-cyan); font-family: var(--font-mono);">IEEE 754 Float64</span></span>
+    </div>
+    <div class="status-bar-center">
+      <span style="font-size: 10px; color: var(--text-dim);">Coordinate System: <strong style="color: var(--text-main);">Right-Handed Z-Up (ISO 10303)</strong></span>
+    </div>
+    <div class="status-bar-right">
+      <label for="status-keymap-selector" style="font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 4px;">
+        Keymap Profile:
+      </label>
+      <select class="status-select" id="status-keymap-selector" title="Switch CAD/CAE Ergonomic Keymap">
+        <option value="OMNIENG_DEFAULT" selected>OmniEng Standard</option>
+        <option value="CATIA_V5">Dassault CATIA V5</option>
+        <option value="SIEMENS_NX">Siemens NX / UG</option>
+        <option value="SOLIDWORKS">Dassault SolidWorks</option>
+        <option value="BLENDER">Blender 4.x</option>
+      </select>
+      <span style="font-size: 10px; color: var(--text-dim); padding-left: 6px; border-left: 1px solid var(--border-color);">OmniEng v1.0.0 Tier-1</span>
+    </div>
+  </div>
 
   <!-- Modal: Verilog RTL Synthesis & Static Timing IDE -->
   <div class="modal-overlay" id="modal-verilog">
@@ -962,6 +992,48 @@ endmodule</textarea>
         </div>
       </div>
     </div>
+
+  <!-- Modal: NIST STEP Validation Properties (ISO 10303-59 Parity) -->
+  <div class="modal-overlay" id="modal-nist-validation">
+    <div class="modal-card" style="width: 580px; max-width: 90vw;">
+      <div class="modal-header">
+        <div class="modal-title"><span class="icon-slot" data-omni-icon="gdt"></span> NIST STEP Validation Properties (B-Rep Quality)</div>
+        <button class="modal-close-btn" id="btn-close-nist-validation">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 12px;">
+          Certified geometric verification in accordance with <strong>ISO 10303-59</strong> and NIST Recommended Practices for CAD translation verification.
+        </p>
+        <div style="background: var(--bg-surface-elevated, #161b22); border: 1px solid var(--border-color, #30363d); border-radius: 6px; padding: 12px; margin-bottom: 14px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
+            <div>
+              <span style="color: var(--text-muted); display: block;">Volume (mm³):</span>
+              <span id="nist-val-volume" style="font-family: monospace; font-size: 14px; color: var(--accent-cyan, #58a6ff); font-weight: 600;">--</span>
+            </div>
+            <div>
+              <span style="color: var(--text-muted); display: block;">Total Surface Area (mm²):</span>
+              <span id="nist-val-area" style="font-family: monospace; font-size: 14px; color: var(--accent-green, #3fb950); font-weight: 600;">--</span>
+            </div>
+            <div style="grid-column: span 2;">
+              <span style="color: var(--text-muted); display: block;">Centroid Coordinates [X, Y, Z] (mm):</span>
+              <span id="nist-val-centroid" style="font-family: monospace; font-size: 13px; color: #f0883e;">--</span>
+            </div>
+            <div style="grid-column: span 2;">
+              <span style="color: var(--text-muted); display: block;">Bounding Box [Min - Max] (mm):</span>
+              <span id="nist-val-bbox" style="font-family: monospace; font-size: 12px; color: var(--text-main, #c9d1d9);">--</span>
+            </div>
+          </div>
+        </div>
+        <div id="nist-val-status" style="font-size: 11px; padding: 6px 10px; border-radius: 4px; background: rgba(56, 139, 253, 0.1); border: 1px solid rgba(56, 139, 253, 0.3); color: #58a6ff;">
+          Ready for validation inspection.
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button class="ribbon-btn" id="btn-recompute-nist">Recompute</button>
+        <button class="btn-primary" id="btn-export-nist-report" style="width: auto; padding: 5px 14px;">Export NIST Report</button>
+      </div>
+    </div>
+  </div>
   <!-- Modal: Global Command Palette (Ctrl+K) -->
   <div class="modal-overlay" id="command-palette-modal">
     <div class="modal-card command-palette-card" style="width: 760px; max-height: 80vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">

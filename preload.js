@@ -133,6 +133,7 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   evaluateASMEVIIIDiv2: (params) => ipcRenderer.invoke('omni:evaluate-asme-viii-div2', params),
   visualDiffCAD: (params) => ipcRenderer.invoke('omni:visual-diff-cad', params),
   rollupEBOM: (params) => ipcRenderer.invoke('omni:rollup-ebom', params),
+  computeCadValidationProperties: (params) => ipcRenderer.invoke('omni:compute-cad-validation-properties', params),
 
   // High-Performance Solvers & Multiphysics Kernels (Pillars 1-2)
   solveWasmSparseMultifrontal: (params) => ipcRenderer.invoke('omni:solve-wasm-sparse-multifrontal', params),

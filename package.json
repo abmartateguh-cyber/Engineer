@@ -25,9 +25,13 @@
   "author": "OmniEng Engineering Systems",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^41.7.1"
+    "electron": "^41.7.1",
+    "electron-builder": "^26.5.0"
   },
   "dependencies": {
     "three": "^0.186.1"
+  },
+  "overrides": {
+    "sprintf-js": "^1.1.3"
   }
 }
