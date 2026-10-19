@@ -126,6 +126,14 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   sizeApi520PRV: (params) => ipcRenderer.invoke('omni:size-api520-prv', params),
   runFmiCoSimulation: (params) => ipcRenderer.invoke('omni:run-fmi-cosimulation', params),
 
+  // Tier-1 Commercial Production Master Plan 3.0 APIs (Pillars 1-4)
+  solveVariationalSketch: (params) => ipcRenderer.invoke('omni:solve-variational-sketch', params),
+  healCadGeometry: (params) => ipcRenderer.invoke('omni:heal-cad-geometry', params),
+  optimizeOpticalDLS: (params) => ipcRenderer.invoke('omni:optimize-optical-dls', params),
+  evaluateASMEVIIIDiv2: (params) => ipcRenderer.invoke('omni:evaluate-asme-viii-div2', params),
+  visualDiffCAD: (params) => ipcRenderer.invoke('omni:visual-diff-cad', params),
+  rollupEBOM: (params) => ipcRenderer.invoke('omni:rollup-ebom', params),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

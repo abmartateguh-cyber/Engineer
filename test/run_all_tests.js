@@ -760,6 +760,15 @@ totalTests += 15;
 passedTests += 15;
 
 // ----------------------------------------------------
+// Suite 22: Tier-1 Commercial Production Certification Suite 3.0 (Pillars 1-4)
+// ----------------------------------------------------
+const { runGoldRegulatoryBenchmarks3 } = require('./test_gold_benchmarks_3');
+const gold3Stats = runGoldRegulatoryBenchmarks3();
+totalTests += gold3Stats.total;
+passedTests += gold3Stats.passed;
+failedTests += (gold3Stats.total - gold3Stats.passed);
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

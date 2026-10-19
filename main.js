@@ -88,6 +88,14 @@ const { TemaBellDelaware } = require('./src/core/plant/tema_bell_delaware');
 const { Api520ReliefValve } = require('./src/core/plant/api520_relief_valve');
 const { FmiMasterEngine, FmuSlave } = require('./src/core/cosim/fmi_master_engine');
 
+// Tier-1 Commercial Production Master Plan 3.0 Engines (Pillars 1-4)
+const { VariationalConstraintSolver } = require('./src/core/cad/variational_constraint_solver');
+const { TopologicalHealingEngine } = require('./src/core/cad/topological_healing_engine');
+const { DampedLeastSquaresOptimizer } = require('./src/core/optics/damped_least_squares_optimizer');
+const { ASMESectionVIIIDiv2Analyzer } = require('./src/core/compliance/asme_section_viii_div2');
+const { GitCADVisualDiffEngine } = require('./src/core/pdm/git_cad_visual_diff');
+const { EngineeringBOMManager } = require('./src/core/pdm/engineering_bom_manager');
+
 const dipprDatabase = new DIPPRDatabase();
 
 const aiEngine = new OmniAIEngine();
@@ -855,6 +863,86 @@ app.whenReady().then(() => {
     return { success: true, result: sim };
   });
 
+  // Tier-1 Commercial Production Master Plan 3.0 Handlers (Pillars 1-4)
+  ipcMain.handle('omni:solve-variational-sketch', async (event, params = {}) => {
+    const solver = new VariationalConstraintSolver();
+    if (params.points) {
+      for (const p of params.points) {
+        solver.addPoint(p.id, p.x, p.y, p.fixed);
+      }
+    }
+    if (params.constraints) {
+      for (const c of params.constraints) {
+        solver.addConstraint(c);
+      }
+    }
+    const res = solver.solve();
+    return { success: res.converged, ...res };
+  });
+
+  ipcMain.handle('omni:heal-cad-geometry', async (event, params = {}) => {
+    const healer = new TopologicalHealingEngine(params.options || { tolerance: 0.05 });
+    const res = healer.healSolid(params.dirtyModel || { vertices: [], faces: [] }, params.options);
+    return { success: res.healed, ...res };
+  });
+
+  ipcMain.handle('omni:optimize-optical-dls', async (event, params = {}) => {
+    const optimizer = new DampedLeastSquaresOptimizer(params.options || {});
+    const system = params.system || {
+      entrancePupilRadius: 10.0,
+      targetEfl: 50.0,
+      surfaces: [
+        { radius: 50.0, thickness: 5.0, refractiveIndex: 1.5168 },
+        { radius: -80.0, thickness: 48.0, refractiveIndex: 1.0 },
+        { radius: 0.0, thickness: 0.0, refractiveIndex: 1.0 }
+      ]
+    };
+    const variables = params.variables || [
+      { surfaceIndex: 0, param: 'radius', min: 20.0, max: 100.0 }
+    ];
+    const operands = params.operands || [];
+    const res = optimizer.optimize(system, variables, operands);
+    return { success: true, ...res };
+  });
+
+  ipcMain.handle('omni:evaluate-asme-viii-div2', async (event, params = {}) => {
+    const analyzer = new ASMESectionVIIIDiv2Analyzer({
+      designPressureMpa: params.designPressureMpa || 10.0,
+      designTemperatureC: params.designTemperatureC || 150.0,
+      material: params.material || 'SA-516 Grade 70',
+      allowableStressS: params.allowableStressS || 138.0,
+      yieldStrengthSy: params.yieldStrengthSy || 260.0
+    });
+    const sclPoints = params.sclPoints || [
+      { x: -12.5, stressMpa: 110.0 },
+      { x: 0.0, stressMpa: 90.0 },
+      { x: 12.5, stressMpa: 80.0 }
+    ];
+    const wallThicknessMm = params.wallThicknessMm || 25.0;
+    const res = analyzer.linearizeStressClassificationLine(sclPoints, wallThicknessMm, params.isSecondaryThermal);
+    return { success: true, ...res };
+  });
+
+  ipcMain.handle('omni:visual-diff-cad', async (event, params = {}) => {
+    const engine = new GitCADVisualDiffEngine(params.options || {});
+    const res = engine.compareRevisions(params.modelA || params.revA || {}, params.modelB || params.revB || {});
+    return { success: true, ...res };
+  });
+
+  ipcMain.handle('omni:rollup-ebom', async (event, params = {}) => {
+    const bom = new EngineeringBOMManager();
+    const root = params.rootAssembly || {
+      partNumber: params.partNumber || 'ASM-01',
+      name: params.name || 'Main Assembly',
+      children: params.items || []
+    };
+    bom.setRootAssembly(root);
+    const rolledUp = bom.computeRollUp();
+    const indented = bom.generateIndentedBOM();
+    const flattened = bom.generateFlattenedBOM();
+    return { success: true, rolledUp, indented, flattened };
+  });
+
   const win = createWindow();
 
   win.webContents.on('console-message', (e, level, msg, line, src) => {
@@ -1104,6 +1192,67 @@ app.whenReady().then(() => {
             assert(typeof window.InteractiveBlockCanvasEngine === 'function', 'InteractiveBlockCanvasEngine loaded in window');
             const blockCanvas = new window.InteractiveBlockCanvasEngine();
             assert(blockCanvas && typeof blockCanvas.createBlock === 'function', 'InteractiveBlockCanvasEngine initialized');
+
+            // 16. Test Tier-1 Commercial Production Master Plan 3.0 APIs
+            const varRes = await window.omniEngAPI.solveVariationalSketch({
+              points: [
+                { id: 'P1', x: 0, y: 0, fixed: true },
+                { id: 'P2', x: 38, y: 2, fixed: false },
+                { id: 'P3', x: 2, y: 28, fixed: false }
+              ],
+              constraints: [
+                { type: 'HORIZONTAL', point1: 'P1', point2: 'P2' },
+                { type: 'VERTICAL', point1: 'P1', point2: 'P3' },
+                { type: 'DISTANCE', point1: 'P1', point2: 'P2', value: 40.0 },
+                { type: 'DISTANCE', point1: 'P1', point2: 'P3', value: 30.0 }
+              ]
+            });
+            assert(varRes && varRes.success && Math.abs(varRes.points.P2.x - 40.0) < 1e-4, 'IPC solveVariationalSketch solves 2D geometric constraints');
+
+            const healRes = await window.omniEngAPI.healCadGeometry({
+              dirtyModel: {
+                vertices: [
+                  { id: 'v1', x: 0, y: 0, z: 0 },
+                  { id: 'v2', x: 0.02, y: 0.01, z: 0 },
+                  { id: 'v3', x: 10, y: 0, z: 0 },
+                  { id: 'v4', x: 10, y: 10, z: 0 },
+                  { id: 'v5', x: 0, y: 10, z: 0 }
+                ],
+                faces: [
+                  { id: 'f1', vertexIds: ['v1', 'v3', 'v4', 'v5'] },
+                  { id: 'f_sliver', vertexIds: ['v1', 'v2', 'v3'] }
+                ]
+              }
+            });
+            assert(healRes && healRes.success && healRes.stitchedVerticesCount === 1, 'IPC healCadGeometry stitches micro-gaps and collapses slivers');
+
+            const dlsRes = await window.omniEngAPI.optimizeOpticalDLS({
+              variables: [{ surfaceIndex: 0, param: 'radius', min: 20.0, max: 100.0 }]
+            });
+            assert(dlsRes && dlsRes.success && dlsRes.finalMerit !== undefined, 'IPC optimizeOpticalDLS performs Levenberg-Marquardt optimization');
+
+            const asmeRes = await window.omniEngAPI.evaluateASMEVIIIDiv2({
+              sclPoints: [
+                { x: -12.5, stressMpa: 110.0 },
+                { x: 0.0, stressMpa: 90.0 },
+                { x: 12.5, stressMpa: 80.0 }
+              ],
+              wallThicknessMm: 25.0
+            });
+            assert(asmeRes && asmeRes.success && asmeRes.evaluation && asmeRes.evaluation.overallConforms, 'IPC evaluateASMEVIIIDiv2 performs stress linearization Pm, Pb, Q');
+
+            const diffRes = await window.omniEngAPI.visualDiffCAD({
+              modelA: { faces: [{ id: 'f1', area: 10, normal: [0, 0, 1] }] },
+              modelB: { faces: [{ id: 'f1', area: 10, normal: [0, 0, 1] }] }
+            });
+            assert(diffRes && diffRes.success && diffRes.colorMap !== undefined, 'IPC visualDiffCAD diffs 3D CAD B-Rep models');
+
+            const bomRes = await window.omniEngAPI.rollupEBOM({
+              items: [
+                { partNumber: 'PRT-01', name: 'Bracket', quantity: 2, unitCostUsd: 5, unitMassKg: 0.5 }
+              ]
+            });
+            assert(bomRes && bomRes.success && bomRes.flattened.length > 0, 'IPC rollupEBOM rolls up hierarchical eBOM');
 
             return results;
           })();
