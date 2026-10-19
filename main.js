@@ -95,6 +95,9 @@ const { DampedLeastSquaresOptimizer } = require('./src/core/optics/damped_least_
 const { ASMESectionVIIIDiv2Analyzer } = require('./src/core/compliance/asme_section_viii_div2');
 const { GitCADVisualDiffEngine } = require('./src/core/pdm/git_cad_visual_diff');
 const { EngineeringBOMManager } = require('./src/core/pdm/engineering_bom_manager');
+const { WasmSparseMultifrontalSolver } = require('./src/core/math/wasm_sparse_multifrontal');
+const { GPUParallelPCGSolver } = require('./src/core/math/gpu_parallel_pcg_solver');
+const { WebGPUCFDKernel } = require('./src/core/cae/webgpu_cfd_kernel');
 
 const dipprDatabase = new DIPPRDatabase();
 
@@ -920,7 +923,11 @@ app.whenReady().then(() => {
     ];
     const wallThicknessMm = params.wallThicknessMm || 25.0;
     const res = analyzer.linearizeStressClassificationLine(sclPoints, wallThicknessMm, params.isSecondaryThermal);
-    return { success: true, ...res };
+    const certDoc = analyzer.generateFormalCertificationDocument({
+      vesselTag: params.vesselTag || 'V-101 Production Separator Vessel',
+      sclAnalysis: res
+    });
+    return { success: true, ...res, certDoc };
   });
 
   ipcMain.handle('omni:visual-diff-cad', async (event, params = {}) => {
@@ -940,7 +947,86 @@ app.whenReady().then(() => {
     const rolledUp = bom.computeRollUp();
     const indented = bom.generateIndentedBOM();
     const flattened = bom.generateFlattenedBOM();
-    return { success: true, rolledUp, indented, flattened };
+    const csv = bom.exportToCSV();
+    return { success: true, rolledUp, indented, flattened, csv };
+  });
+
+  // High-Performance Core Linear Solvers & Multiphysics Kernels
+  ipcMain.handle('omni:solve-wasm-sparse-multifrontal', async (event, params = {}) => {
+    const { N = 100, triplets, b, leafCutoff = 32 } = params;
+    const solver = new WasmSparseMultifrontalSolver(N, { leafCutoff });
+    if (triplets && triplets.length > 0) {
+      for (const t of triplets) {
+        solver.addEntry(t[0], t[1], t[2]);
+      }
+    } else {
+      // Default 1D Poisson tridiagonal if none provided
+      for (let i = 0; i < N; i++) {
+        solver.addEntry(i, i, 2.0);
+        if (i + 1 < N) {
+          solver.addEntry(i, i + 1, -1.0);
+          solver.addEntry(i + 1, i, -1.0);
+        }
+      }
+    }
+    const t0 = performance.now();
+    const fact = solver.factorize();
+    const rhs = b ? new Float64Array(b) : new Float64Array(N).fill(1.0);
+    const solveRes = solver.solve(rhs);
+    const x = solveRes.solution;
+    const totalTimeMs = performance.now() - t0;
+    let norm = 0;
+    for (let i = 0; i < x.length; i++) norm += x[i] * x[i];
+    return {
+      success: true,
+      N,
+      nnzL: fact.nnzL,
+      fillRatio: fact.fillRatio,
+      factorizationTimeMs: fact.factorizationTimeMs,
+      totalTimeMs,
+      solutionNorm: Math.sqrt(norm),
+      relativeResidual: solveRes.relativeResidual,
+      sampleSolution: Array.from(x.slice(0, 5))
+    };
+  });
+
+  ipcMain.handle('omni:solve-gpu-parallel-pcg', async (event, params = {}) => {
+    const { N = 100, maxIter = 500, tol = 1e-6 } = params;
+    const solver = new GPUParallelPCGSolver({ maxIterations: maxIter, tolerance: tol });
+    let csr = params.csr;
+    let b = params.b ? new Float64Array(params.b) : null;
+    if (!csr) {
+      const rowPtr = new Int32Array(N + 1);
+      const colIndices = [];
+      const values = [];
+      for (let i = 0; i < N; i++) {
+        rowPtr[i] = colIndices.length;
+        if (i > 0) { colIndices.push(i - 1); values.push(-1.0); }
+        colIndices.push(i); values.push(2.0);
+        if (i < N - 1) { colIndices.push(i + 1); values.push(-1.0); }
+      }
+      rowPtr[N] = colIndices.length;
+      csr = {
+        N,
+        nnz: values.length,
+        rowPtr,
+        colIndices: new Int32Array(colIndices),
+        values: new Float64Array(values)
+      };
+      b = new Float64Array(N).fill(1.0);
+    }
+    const res = solver.solve(csr, b);
+    const sol = res.solution || res.x || new Float64Array(0);
+    return { success: res.converged, ...res, sampleSolution: Array.from(sol.slice(0, 5)) };
+  });
+
+  ipcMain.handle('omni:solve-webgpu-cfd-poisson', async (event, params = {}) => {
+    const { nx = 32, ny = 32, maxIter = 100 } = params;
+    const kernel = new WebGPUCFDKernel({ nx, ny, maxIterations: maxIter });
+    const b = params.b ? new Float32Array(params.b) : new Float32Array(nx * ny).fill(1.0);
+    const p = new Float32Array(nx * ny);
+    const res = kernel.solvePressurePoisson(p, b);
+    return { success: res.converged, ...res };
   });
 
   const win = createWindow();
@@ -1254,7 +1340,17 @@ app.whenReady().then(() => {
             });
             assert(bomRes && bomRes.success && bomRes.flattened.length > 0, 'IPC rollupEBOM rolls up hierarchical eBOM');
 
-            // 17. Test Tier-1 Commercial Production Modals & Ribbon Buttons
+            // 17. Test High-Performance Solvers & Multiphysics Kernels
+            const wasmSparseRes = await window.omniEngAPI.solveWasmSparseMultifrontal({ N: 40 });
+            assert(wasmSparseRes && wasmSparseRes.success && wasmSparseRes.nnzL > 0, 'IPC solveWasmSparseMultifrontal factorizes sparse system');
+
+            const pcgRes = await window.omniEngAPI.solveGpuParallelPCG({ N: 30 });
+            assert(pcgRes && pcgRes.success && pcgRes.iterations > 0, 'IPC solveGpuParallelPCG converges on linear system');
+
+            const cfdPoissonRes = await window.omniEngAPI.solveWebGPUCFDPoisson({ nx: 16, ny: 16, maxIter: 50 });
+            assert(cfdPoissonRes && cfdPoissonRes.success, 'IPC solveWebGPUCFDPoisson solves pressure Poisson equation');
+
+            // 18. Test Tier-1 Commercial Production Modals & Ribbon Buttons
             assert(!!document.getElementById('ribbon-btn-sketcher'), 'Ribbon button: Variational Sketcher exists');
             assert(!!document.getElementById('ribbon-btn-heal'), 'Ribbon button: Auto-Heal exists');
             assert(!!document.getElementById('ribbon-btn-opt-dls'), 'Ribbon button: DLS Optimizer exists');

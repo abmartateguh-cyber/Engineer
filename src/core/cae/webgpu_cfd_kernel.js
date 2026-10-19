@@ -112,7 +112,7 @@ class WebGPUCFDKernel {
     const nz = this.nz;
     const slice = nx * ny;
 
-    const tStart = Date.now();
+    const tStart = performance.now();
 
     for (iter = 0; iter < this.maxIterations; iter++) {
       let maxDiff = 0.0;
@@ -169,17 +169,19 @@ class WebGPUCFDKernel {
       }
     }
 
-    const tDurationMs = Math.max(1, Date.now() - tStart);
-    const estimatedGpuTimeMs = Math.max(0.1, tDurationMs / 18.5); // WebGPU parallel speedup estimate
+    const tDurationMs = Math.max(0.001, performance.now() - tStart);
 
     return {
-      converged: finalRes < this.tolerance || iter >= 20,
+      converged: finalRes < this.tolerance,
       iterations: iter,
       residualNorm: finalRes,
       pressureField: p0,
       totalCells,
       durationCpuMs: tDurationMs,
-      estimatedGpuSpeedup: (tDurationMs / estimatedGpuTimeMs).toFixed(1) + 'x',
+      // No GPU dispatch is performed by this method; the WGSL shader source is provided
+      // for a WebGPU backend but its speedup has not been measured, so none is claimed.
+      gpuSpeedupVerified: false,
+      backend: 'CPU (JavaScript Float32Array Jacobi)',
       shaderAvailable: true,
       dimensions: { nx, ny, nz }
     };

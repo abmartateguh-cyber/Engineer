@@ -175,7 +175,31 @@ function runGoldRegulatoryBenchmarks3() {
       assert(Math.abs(x[i] - 1.0) < 1e-8, `Solution x[${i}] should be 1.0, got ${x[i]}`);
     }
 
-    console.log(`  ✓ PASSED: Sparse Cholesky solved 5x5 tridiagonal system with max error < 1e-8`);
+    // Production-scale check: 2D Poisson (5-point stencil) with ~100,000 unknowns
+    const G = 316;
+    const NN = G * G;
+    const big = new WasmSparseMultifrontalSolver(NN, NN);
+    for (let yy = 0; yy < G; yy++) {
+      for (let xx = 0; xx < G; xx++) {
+        const i = yy * G + xx;
+        big.addEntry(i, i, 4);
+        if (xx > 0) big.addEntry(i, i - 1, -1);
+        if (xx < G - 1) big.addEntry(i, i + 1, -1);
+        if (yy > 0) big.addEntry(i, i - G, -1);
+        if (yy < G - 1) big.addEntry(i, i + G, -1);
+      }
+    }
+    const tBig = performance.now();
+    big.finalizeCSR();
+    const fac = big.factorize();
+    const sol = big.solve(new Float64Array(NN).fill(1.0));
+    const bigMs = performance.now() - tBig;
+    assert(sol.relativeResidual < 1e-8, `100k-unknown relative residual ${sol.relativeResidual} must be < 1e-8`);
+    assert(fac.nnzL < NN * 40, `Fill (nnz(L)=${fac.nnzL}) must stay O(n log n), not dense`);
+    // Sanity ceiling only (the plan's <2.0 s target is NOT met in pure JS; measured time is reported below)
+    assert(bigMs < 60000, `100k-unknown direct solve took ${bigMs.toFixed(0)} ms`);
+
+    console.log(`  ✓ PASSED: 5x5 exact; ${NN.toLocaleString()}-unknown 2D Poisson Cholesky: relRes=${sol.relativeResidual.toExponential(2)}, nnz(L)=${fac.nnzL.toLocaleString()} (fill ${fac.fillInRatio.toFixed(1)}x), ${(bigMs / 1000).toFixed(2)} s measured (plan target <2.0 s not met)`);
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 4: ${err.message}`);
@@ -201,7 +225,39 @@ function runGoldRegulatoryBenchmarks3() {
     assert.strictEqual(res.converged, true, 'PCG must converge');
     assert(res.residualNorm < 1e-7, 'Residual norm must be < 1e-7');
 
-    console.log(`  ✓ PASSED: PCG converged in ${res.iterations} iterations, residual = ${res.residualNorm.toExponential(4)}`);
+    // Scale check: 2D Poisson 100x100 (10,000 unknowns) in CSR, cross-checked against the direct solver
+    const G2 = 100;
+    const N2 = G2 * G2;
+    const direct = new WasmSparseMultifrontalSolver(N2, N2);
+    const rowPtr = new Int32Array(N2 + 1);
+    const cols = [];
+    const vals = [];
+    for (let yy = 0; yy < G2; yy++) {
+      for (let xx = 0; xx < G2; xx++) {
+        const i = yy * G2 + xx;
+        const push = (j, v) => { cols.push(j); vals.push(v); direct.addEntry(i, j, v); };
+        if (yy > 0) push(i - G2, -1);
+        if (xx > 0) push(i - 1, -1);
+        push(i, 4);
+        if (xx < G2 - 1) push(i + 1, -1);
+        if (yy < G2 - 1) push(i + G2, -1);
+        rowPtr[i + 1] = cols.length;
+      }
+    }
+    const csr2 = { n: N2, nnz: cols.length, rowPtr, colIdx: Int32Array.from(cols), values: Float64Array.from(vals) };
+    const b2 = new Float64Array(N2);
+    for (let i = 0; i < N2; i++) b2[i] = Math.sin(i * 0.01) + 1.0;
+    const pcgBig = new GPUParallelPCGSolver({ maxIterations: 5000, tolerance: 1e-10 });
+    const rBig = pcgBig.solve(csr2, b2);
+    assert.strictEqual(rBig.converged, true, `10k-unknown PCG must converge (rel res ${rBig.relativeResidual})`);
+    direct.finalizeCSR();
+    const dSol = direct.solve(b2).solution;
+    let maxDiff = 0;
+    for (let i = 0; i < N2; i++) maxDiff = Math.max(maxDiff, Math.abs(dSol[i] - rBig.solution[i]));
+    assert(maxDiff < 1e-6, `PCG vs direct solution mismatch ${maxDiff}`);
+    assert.strictEqual(rBig.gpuSpeedupVerified, false, 'No unmeasured GPU speedup may be claimed');
+
+    console.log(`  ✓ PASSED: PCG 20x20 in ${res.iterations} it; ${N2.toLocaleString()}-unknown CSR in ${rBig.iterations} it (${rBig.elapsedMs.toFixed(0)} ms, CPU-JS, ${rBig.throughputGFlops} GFlop/s), max|PCG-direct| = ${maxDiff.toExponential(2)}; GPU speedup NOT verified`);
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 5: ${err.message}`);

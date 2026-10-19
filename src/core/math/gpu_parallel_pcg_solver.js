@@ -66,6 +66,7 @@ class GPUParallelPCGSolver {
       csr = { n, nnz: totalNnz, rowPtr, colIdx, values };
     }
 
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const n = csr.n;
     const x = new Float64Array(n);
     if (x0) {
@@ -163,6 +164,7 @@ class GPUParallelPCGSolver {
       rzOld = rzNew;
     }
 
+    const elapsedMs = Math.max(1e-3, (typeof performance !== 'undefined' ? performance.now() : Date.now()) - tStart);
     return {
       solution: x,
       iterations,
@@ -171,8 +173,12 @@ class GPUParallelPCGSolver {
       finalResidualNorm,
       residualNorm: finalResidualNorm,
       relativeResidual: finalResidualNorm / bNorm,
-      hardwareAcceleration: this.useWebGPU ? 'WebGPU Compute (Emulated Parallel SpMV)' : 'CPU Parallel SIMD',
-      throughputGFlops: Number(((iterations * csr.nnz * 2 * 1e-9) / 0.01).toFixed(2))
+      // Honest backend label: this implementation executes on the CPU (JS, Float64Array).
+      // A WGSL SpMV path is not dispatched here, so no GPU speedup is claimed.
+      hardwareAcceleration: 'CPU (JavaScript Float64Array CSR SpMV)',
+      gpuSpeedupVerified: false,
+      elapsedMs,
+      throughputGFlops: Number(((iterations * (csr.nnz || val.length) * 2 * 1e-9) / (elapsedMs / 1000)).toFixed(4))
     };
   }
 }

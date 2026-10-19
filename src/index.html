@@ -549,11 +549,11 @@ endmodule</textarea>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
           <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
             <div style="font-size: 12px; font-weight: 600; color: #f87171; margin-bottom: 8px;">⚠️ Dirty Model Topology Inspection</div>
-            <table style="width: 100%; font-size: 11px; color: var(--text-muted); border-collapse: collapse;">
-              <tr><td style="padding: 4px 0;">Non-Manifold Edges:</td><td style="text-align: right; color: #f87171; font-weight: 600;">3 detected</td></tr>
-              <tr><td style="padding: 4px 0;">Sliver Faces (Aspect &gt; 50:1):</td><td style="text-align: right; color: #f87171; font-weight: 600;">1 face (Area 0.002 mm²)</td></tr>
-              <tr><td style="padding: 4px 0;">Micro-Gap Vertex Tolerance:</td><td style="text-align: right; color: #fbbf24; font-weight: 600;">0.022 mm gap</td></tr>
-              <tr><td style="padding: 4px 0;">Initial Watertight Status:</td><td style="text-align: right; color: #f87171; font-weight: 700;">BROKEN / OPEN SHELL</td></tr>
+            <table id="healer-inspection-table" style="width: 100%; font-size: 11px; color: var(--text-muted); border-collapse: collapse;">
+              <tr><td style="padding: 4px 0;">Non-Manifold Edges:</td><td id="healer-nonmanifold-count" style="text-align: right; color: #f87171; font-weight: 600;">3 detected</td></tr>
+              <tr><td style="padding: 4px 0;">Sliver Faces (Aspect &gt; 50:1):</td><td id="healer-sliver-count" style="text-align: right; color: #f87171; font-weight: 600;">1 face (Area 0.002 mm²)</td></tr>
+              <tr><td style="padding: 4px 0;">Micro-Gap Vertex Tolerance:</td><td id="healer-gap-val" style="text-align: right; color: #fbbf24; font-weight: 600;">0.022 mm gap</td></tr>
+              <tr><td style="padding: 4px 0;">Initial Watertight Status:</td><td id="healer-watertight-status" style="text-align: right; color: #f87171; font-weight: 700;">BROKEN / OPEN SHELL</td></tr>
             </table>
           </div>
           <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
@@ -630,7 +630,7 @@ endmodule</textarea>
               <span style="font-weight: 700; color: #fff; font-size: 13px;">ASME BPVC SECTION VIII DIVISION 2 COMPLIANCE DOSSIER</span>
               <div style="font-size: 11px; color: var(--text-muted);">Equipment Tag: V-101 Production Separator Vessel | Material: SA-516 Gr 70</div>
             </div>
-            <div style="background: rgba(74,222,128,0.15); border: 1px solid #4ade80; color: #4ade80; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
+            <div id="asme-compliance-badge" style="background: rgba(74,222,128,0.15); border: 1px solid #4ade80; color: #4ade80; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
               ✓ 100% CODE COMPLIANT
             </div>
           </div>
@@ -645,7 +645,7 @@ endmodule</textarea>
                 <th style="text-align: center; padding: 6px 4px;">Status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="asme-report-tbody">
               <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 6px 4px;">General Primary Membrane</td>
                 <td style="padding: 6px 4px; color: #94a3b8;">Pm</td>
@@ -701,13 +701,15 @@ endmodule</textarea>
             <div>
               <label style="font-size: 10px; color: var(--text-muted); display: block;">Base Revision A:</label>
               <select id="diff-rev-a" class="ribbon-select" style="font-size: 11px; padding: 4px 8px;">
-                <option value="v2.4.0-revA">v2.4.0-revA (Solid Casting Baseline)</option>
+                <option value="revA">v2.4.0-revA (Solid Casting Baseline)</option>
+                <option value="revB">v2.5.0-revB (Lightweight Pocketing &amp; Thin Wall)</option>
               </select>
             </div>
             <div>
               <label style="font-size: 10px; color: var(--text-muted); display: block;">Compare Revision B:</label>
               <select id="diff-rev-b" class="ribbon-select" style="font-size: 11px; padding: 4px 8px;">
-                <option value="v2.5.0-revB">v2.5.0-revB (Lightweight Pocketing &amp; Thin Wall)</option>
+                <option value="revB">v2.5.0-revB (Lightweight Pocketing &amp; Thin Wall)</option>
+                <option value="revC">v2.6.0-revC (Aero-Contoured Stiffener Ribs)</option>
               </select>
             </div>
           </div>
@@ -717,19 +719,19 @@ endmodule</textarea>
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; font-size: 11px;">
           <div style="background: rgba(34,197,94,0.15); border: 1px solid #22c55e; border-radius: 6px; padding: 10px; text-align: center;">
             <div style="color: #4ade80; font-weight: 700;">🟢 Added Material</div>
-            <div style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">+124.5 cm³</div>
+            <div id="diff-added-vol" style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">+124.5 cm³</div>
           </div>
           <div style="background: rgba(239,68,68,0.15); border: 1px solid #ef4444; border-radius: 6px; padding: 10px; text-align: center;">
             <div style="color: #f87171; font-weight: 700;">🔴 Removed Material</div>
-            <div style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">-42.1 cm³</div>
+            <div id="diff-removed-vol" style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">-42.1 cm³</div>
           </div>
           <div style="background: rgba(234,179,8,0.15); border: 1px solid #eab308; border-radius: 6px; padding: 10px; text-align: center;">
             <div style="color: #fde047; font-weight: 700;">🟡 Modified Surfaces</div>
-            <div style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">-1.5 mm Wall Thk</div>
+            <div id="diff-modified-faces" style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">-1.5 mm Wall Thk</div>
           </div>
           <div style="background: rgba(100,116,139,0.15); border: 1px solid #64748b; border-radius: 6px; padding: 10px; text-align: center;">
             <div style="color: #cbd5e1; font-weight: 700;">⚪ Unchanged Core</div>
-            <div style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">94.2% Surface</div>
+            <div id="diff-unchanged-pct" style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 2px;">94.2% Surface</div>
           </div>
         </div>
 
@@ -752,19 +754,19 @@ endmodule</textarea>
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; font-size: 11px;">
           <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="color: var(--text-muted);">Total Components:</div>
-            <div style="font-size: 14px; font-weight: 700; color: #38bdf8; font-family: monospace;">524 Parts</div>
+            <div id="ebom-total-parts" style="font-size: 14px; font-weight: 700; color: #38bdf8; font-family: monospace;">524 Parts</div>
           </div>
           <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="color: var(--text-muted);">Total Weight:</div>
-            <div style="font-size: 14px; font-weight: 700; color: #4ade80; font-family: monospace;">2.150 kg</div>
+            <div id="ebom-total-weight" style="font-size: 14px; font-weight: 700; color: #4ade80; font-family: monospace;">2.150 kg</div>
           </div>
           <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="color: var(--text-muted);">Procurement Cost:</div>
-            <div style="font-size: 14px; font-weight: 700; color: #fbbf24; font-family: monospace;">$312.00 USD</div>
+            <div id="ebom-total-cost" style="font-size: 14px; font-weight: 700; color: #fbbf24; font-family: monospace;">$312.00 USD</div>
           </div>
           <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="color: var(--text-muted);">Consolidated Screws:</div>
-            <div style="font-size: 14px; font-weight: 700; color: #a78bfa; font-family: monospace;">24 x M3x8 Titanium</div>
+            <div id="ebom-hardware-count" style="font-size: 14px; font-weight: 700; color: #a78bfa; font-family: monospace;">24 x M3x8 Titanium</div>
           </div>
         </div>
 
@@ -781,7 +783,7 @@ endmodule</textarea>
                 <th style="text-align: right; padding: 6px 10px;">Ext Cost</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="ebom-table-tbody">
               <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 6px 10px; color: #38bdf8;">.1</td>
                 <td style="padding: 6px 10px; font-weight: 600;">ASM-DRONE-01</td>
@@ -817,7 +819,6 @@ endmodule</textarea>
                 <td style="text-align: right; padding: 6px 10px;">1</td>
                 <td style="text-align: right; padding: 6px 10px;">$65.00</td>
                 <td style="text-align: right; padding: 6px 10px;">$65.00</td>
-              </tr>
               <tr>
                 <td style="padding: 6px 10px; color: #38bdf8;">..2</td>
                 <td style="padding: 6px 10px;">FST-M3-08</td>

@@ -38,6 +38,19 @@ class PowerGridIRDropAnalyzer {
   }
 
   /**
+   * Resolves the in-house sparse Cholesky class (Node require or browser global).
+   */
+  static _sparseSolverClass() {
+    if (typeof require !== 'undefined') {
+      return require('../math/wasm_sparse_multifrontal').WasmSparseMultifrontalSolver;
+    }
+    if (typeof window !== 'undefined' && window.WasmSparseMultifrontalSolver) {
+      return window.WasmSparseMultifrontalSolver;
+    }
+    throw new Error('Sparse solver (wasm_sparse_multifrontal.js) is not loaded');
+  }
+
+  /**
    * Create an N x M rectangular multi-layer power distribution grid mesh.
    * 
    * @param {number} rows - Number of grid rows
@@ -125,53 +138,51 @@ class PowerGridIRDropAnalyzer {
       }
     });
 
-    // Formulate G * V = I
-    // For pad nodes: V_pad = Vdd (Dirichlet)
-    // For non-pad nodes: sum_j G_ij (V_i - V_j) = -I_sink_i
-    // Diagonal G_ii = sum G_ij; RHS b_i = -I_sink_i + sum (G_i,pad * Vdd)
-    const G = new Float64Array(N * N);
-    const b = new Float64Array(N);
-
-    // Accumulate conductance
-    for (const res of mesh.resistors) {
-      const u = res.nodeA;
-      const v = res.nodeB;
-      const g = res.conductance;
-
-      G[u * N + u] += g;
-      G[v * N + v] += g;
-      G[u * N + v] -= g;
-      G[v * N + u] -= g;
-    }
-
+    // Formulate G * V = I on the reduced (non-pad) unknowns:
+    // pads are Dirichlet V = Vdd and are eliminated from the system; each resistor
+    // between a free node and a pad contributes g to the diagonal and g*Vdd to the RHS.
+    // The reduced matrix is symmetric positive definite and is solved with the
+    // in-house sparse Cholesky (O(nnz(L)) memory instead of a dense N x N matrix).
+    const freeIdx = new Int32Array(N).fill(-1);
+    let nFree = 0;
     for (let i = 0; i < N; i++) {
-      if (padSet.has(i)) {
-        // Enforce V_i = Vdd
-        for (let j = 0; j < N; j++) {
-          G[i * N + j] = (i === j) ? 1.0 : 0.0;
-        }
-        b[i] = this.vdd;
-      } else {
-        // Logic sink: current drawn out of node
-        b[i] = -mesh.nodes[i].currentLoad;
-      }
+      if (!padSet.has(i)) freeIdx[i] = nFree++;
+    }
+    if (nFree > 0 && padSet.size === 0) {
+      throw new Error('PDN has no supply pads: conductance matrix is singular');
     }
 
-    // Adjust RHS for pads in non-pad equations to preserve symmetry / direct solve
-    for (const padId of padNodeIds) {
+    const V = new Float64Array(N);
+    for (let i = 0; i < N; i++) V[i] = padSet.has(i) ? this.vdd : 0.0;
+
+    if (nFree > 0) {
+      const SparseSolver = PowerGridIRDropAnalyzer._sparseSolverClass();
+      const solver = new SparseSolver(nFree, nFree);
+      const b = new Float64Array(nFree);
       for (let i = 0; i < N; i++) {
-        if (!padSet.has(i)) {
-          const g_i_pad = G[i * N + padId];
-          if (g_i_pad !== 0.0) {
-            b[i] -= g_i_pad * this.vdd;
-            G[i * N + padId] = 0.0;
-          }
+        if (freeIdx[i] >= 0) b[freeIdx[i]] = -mesh.nodes[i].currentLoad;
+      }
+      for (const res of mesh.resistors) {
+        const fu = freeIdx[res.nodeA];
+        const fv = freeIdx[res.nodeB];
+        const g = res.conductance;
+        if (fu >= 0) solver.addEntry(fu, fu, g);
+        if (fv >= 0) solver.addEntry(fv, fv, g);
+        if (fu >= 0 && fv >= 0) {
+          solver.addEntry(fu, fv, -g);
+          solver.addEntry(fv, fu, -g);
+        } else if (fu >= 0) {
+          b[fu] += g * this.vdd;
+        } else if (fv >= 0) {
+          b[fv] += g * this.vdd;
         }
       }
+      solver.finalizeCSR();
+      const sol = solver.solve(b);
+      for (let i = 0; i < N; i++) {
+        if (freeIdx[i] >= 0) V[i] = sol.solution[freeIdx[i]];
+      }
     }
-
-    // Solve system via LU or Gauss elimination with partial pivoting
-    const V = this._solveLinearSystem(G, b, N);
 
     let minVoltage = Infinity;
     let maxDrop = 0.0;

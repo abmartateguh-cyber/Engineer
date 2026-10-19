@@ -134,6 +134,11 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   visualDiffCAD: (params) => ipcRenderer.invoke('omni:visual-diff-cad', params),
   rollupEBOM: (params) => ipcRenderer.invoke('omni:rollup-ebom', params),
 
+  // High-Performance Solvers & Multiphysics Kernels (Pillars 1-2)
+  solveWasmSparseMultifrontal: (params) => ipcRenderer.invoke('omni:solve-wasm-sparse-multifrontal', params),
+  solveGpuParallelPCG: (params) => ipcRenderer.invoke('omni:solve-gpu-parallel-pcg', params),
+  solveWebGPUCFDPoisson: (params) => ipcRenderer.invoke('omni:solve-webgpu-cfd-poisson', params),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });
