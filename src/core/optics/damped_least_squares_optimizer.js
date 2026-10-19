@@ -300,8 +300,11 @@ class DampedLeastSquaresOptimizer {
         }
       }
 
-      const pivot = M[i * (n + 1) + i];
-      if (Math.abs(pivot) < 1e-15) continue;
+      let pivot = M[i * (n + 1) + i];
+      if (Math.abs(pivot) < 1e-15) {
+        pivot = (pivot >= 0 ? 1e-15 : -1e-15);
+        M[i * (n + 1) + i] = pivot;
+      }
 
       for (let j = i; j <= n; j++) {
         M[i * (n + 1) + j] /= pivot;

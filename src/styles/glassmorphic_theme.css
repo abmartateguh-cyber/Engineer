@@ -149,3 +149,364 @@
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.75; }
 }
+
+/* =========================================================================
+   Pillar 1: Multi-Document Workspace Tab Bar
+   ========================================================================= */
+.workspace-tab-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(10, 15, 29, 0.90);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 3px 8px 0 8px;
+  gap: 4px;
+  overflow-x: auto;
+  user-select: none;
+  scrollbar-width: thin;
+}
+
+.workspace-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+}
+
+.workspace-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  background: rgba(25, 33, 52, 0.65);
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  color: var(--glass-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+}
+
+.workspace-tab:hover {
+  background: rgba(40, 53, 83, 0.85);
+  color: var(--glass-text-bright);
+}
+
+.workspace-tab.active {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(56, 189, 248, 0.45);
+  border-top: 2px solid var(--glass-accent-cyan);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.15);
+}
+
+.workspace-tab .doc-badge {
+  font-size: 9px;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--glass-accent-cyan);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.workspace-tab .doc-close-btn {
+  margin-left: 4px;
+  font-size: 13px;
+  opacity: 0.6;
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 1;
+  transition: opacity 0.1s, background 0.1s;
+}
+
+.workspace-tab .doc-close-btn:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.workspace-new-tab-btn {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--glass-text-dim);
+  font-size: 14px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.workspace-new-tab-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--glass-accent-cyan);
+  color: var(--glass-accent-cyan);
+}
+
+/* =========================================================================
+   Global Solver Asynchronous Progress Bar
+   ========================================================================= */
+.global-solver-progress-bar {
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.solver-progress-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+
+.solver-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #4ade80);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+  transition: width 0.15s ease-out;
+}
+
+.solver-progress-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.solver-progress-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--glass-text-bright);
+}
+
+.solver-progress-spinner {
+  display: inline-block;
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+.solver-progress-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.solver-progress-pct {
+  color: var(--glass-accent-cyan);
+  font-weight: 700;
+}
+
+.solver-progress-cancel {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.solver-progress-cancel:hover {
+  color: #f87171;
+}
+
+/* =========================================================================
+   Pillar 1: Global Command Palette (Ctrl+K)
+   ========================================================================= */
+.command-palette-card {
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.18) !important;
+  background: rgba(10, 15, 28, 0.94) !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+}
+
+.command-palette-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.command-palette-search-icon {
+  font-size: 18px;
+  opacity: 0.85;
+}
+
+.command-palette-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 15px;
+  outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.command-palette-input::placeholder {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.command-palette-badge {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.command-palette-filter-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.35);
+  overflow-x: auto;
+}
+
+.palette-filter-chip {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.palette-filter-chip:hover {
+  background: rgba(51, 65, 85, 0.7);
+  color: #e2e8f0;
+}
+
+.palette-filter-chip.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.command-palette-results {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.05s;
+  border: 1px solid transparent;
+}
+
+.command-item:hover, .command-item.selected {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.command-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.command-item-icon {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+}
+
+.command-item-title {
+  font-size: 13px;
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+.command-item-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.command-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.command-item-category {
+  font-size: 10px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.command-palette-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.65);
+  border-top: 1px solid var(--glass-border);
+  font-size: 11px;
+  color: #64748b;
+}
+
+.palette-footer-hint kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: monospace;
+  color: #cbd5e1;
+}
+
+/* =========================================================================
+   Pillar 1: High-Contrast Technical Theme (Theme Toggle)
+   ========================================================================= */
+body.theme-high-contrast {
+  --glass-bg-primary: #0a0f1d;
+  --glass-bg-secondary: #131b2e;
+  --glass-bg-card: #0d1527;
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --glass-border-highlight: rgba(255, 255, 255, 0.45);
+  --glass-text-bright: #ffffff;
+  --glass-text-main: #f1f5f9;
+  --glass-text-dim: #cbd5e1;
+  background-color: #030712 !important;
+}
+
+body.theme-high-contrast .ribbon-btn {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+body.theme-high-contrast .modal-card {
+  border: 1px solid rgba(56, 189, 248, 0.5) !important;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.25) !important;
+}

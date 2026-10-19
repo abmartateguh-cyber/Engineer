@@ -1413,6 +1413,47 @@ app.whenReady().then(() => {
             document.getElementById('btn-close-ebom-manager').click();
             assert(!document.getElementById('modal-ebom-manager').classList.contains('active'), 'Modal: eBOM Manager closes');
 
+            // 19. Test Command Palette (Ctrl+K), Workspace Tabs, Theme Toggle, and Solver Progress
+            assert(!!document.getElementById('command-palette-modal'), 'Modal: Command Palette exists');
+            assert(!!document.getElementById('btn-open-palette'), 'Button: Quick Find (Ctrl+K) exists');
+            assert(!!document.getElementById('btn-toggle-theme'), 'Button: Theme Toggle exists');
+            assert(!!document.getElementById('workspace-tab-bar'), 'Workspace Tab Bar exists');
+            assert(!!document.getElementById('global-solver-progress'), 'Global Solver Progress bar exists');
+
+            // Open and test Command Palette
+            document.getElementById('btn-open-palette').click();
+            await new Promise(r => setTimeout(r, 100));
+            assert(document.getElementById('command-palette-modal').classList.contains('active'), 'Command Palette opens active');
+            const palInput = document.getElementById('command-palette-input');
+            palInput.value = 'sketcher';
+            palInput.dispatchEvent(new Event('input'));
+            await new Promise(r => setTimeout(r, 100));
+            const palItems = document.querySelectorAll('.command-item');
+            assert(palItems.length > 0, 'Command Palette filters commands dynamically');
+            document.getElementById('btn-close-command-palette').click();
+            assert(!document.getElementById('command-palette-modal').classList.contains('active'), 'Command Palette closes');
+
+            // Test Theme Toggle
+            const themeBtn = document.getElementById('btn-toggle-theme');
+            themeBtn.click();
+            assert(document.body.classList.contains('theme-high-contrast'), 'Theme switches to high-contrast workstation');
+            themeBtn.click();
+            assert(!document.body.classList.contains('theme-high-contrast'), 'Theme toggles back to default dark mode');
+
+            // Test Workspace Tab switching
+            const tabs = document.querySelectorAll('.workspace-tab');
+            assert(tabs.length >= 4, 'Multi-document workspace has at least 4 project tabs');
+            tabs[1].click();
+            await new Promise(r => setTimeout(r, 100));
+            assert(tabs[1].classList.contains('active'), 'Second workspace tab activates on click');
+
+            // Test Global Solver Progress
+            window.omniSetSolverProgress('Asynchronous Sparse Cholesky Factorization...', 65);
+            assert(document.getElementById('global-solver-progress').style.display === 'block', 'Global solver progress displays');
+            assert(document.getElementById('solver-progress-pct').textContent === '65%', 'Solver percentage updates');
+            document.getElementById('btn-cancel-solver').click();
+            assert(document.getElementById('global-solver-progress').style.display === 'none', 'Solver progress cancels on button click');
+
             return results;
           })();
         `);

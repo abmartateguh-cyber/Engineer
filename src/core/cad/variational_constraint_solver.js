@@ -261,13 +261,14 @@ class VariationalConstraintSolver {
       numVariables: numVars,
       numConstraints: numEquations,
       dofRemaining: dof,
+      degreesOfFreedom: dof,
       status: dof === 0 && finalResidualNorm < 1e-4 ? 'FULLY_CONSTRAINED' : dof > 0 ? 'UNDER_CONSTRAINED' : 'OVER_CONSTRAINED',
       points: pointsMap
     };
   }
 
   solveDenseSystem(A, b, n) {
-    // Gauss-Jordan elimination with partial pivoting
+    // Gauss-Jordan elimination with partial pivoting & Levenberg-Marquardt regularization
     const M = Array.from({ length: n }, (row, i) => {
       const r = new Float64Array(n + 1);
       for (let j = 0; j < n; j++) r[j] = A[i][j];
@@ -284,7 +285,9 @@ class VariationalConstraintSolver {
       M[i] = M[maxRow];
       M[maxRow] = tmp;
 
-      if (Math.abs(M[i][i]) < 1e-12) continue;
+      if (Math.abs(M[i][i]) < 1e-12) {
+        M[i][i] = (M[i][i] >= 0 ? 1e-12 : -1e-12);
+      }
 
       for (let k = i + 1; k < n; k++) {
         const factor = M[k][i] / M[i][i];

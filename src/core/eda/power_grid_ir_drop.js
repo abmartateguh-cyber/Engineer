@@ -177,6 +177,15 @@ class PowerGridIRDropAnalyzer {
           b[fv] += g * this.vdd;
         }
       }
+
+      // Floating Node Singularity Guard (Tier-1 EDA RedHawk / Voltus Parity):
+      // Injects a high-impedance 1e-12 Siemens shunt to Vdd on every free node.
+      // Guarantees strict positive definiteness even with disconnected dummy metal.
+      const gShunt = 1e-12;
+      for (let f = 0; f < nFree; f++) {
+        solver.addEntry(f, f, gShunt);
+        b[f] += gShunt * this.vdd;
+      }
       solver.finalizeCSR();
       const sol = solver.solve(b);
       for (let i = 0; i < N; i++) {

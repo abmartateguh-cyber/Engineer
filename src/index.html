@@ -44,6 +44,12 @@
     </nav>
 
     <div class="header-actions">
+      <button class="ribbon-btn palette-trigger-btn" id="btn-open-palette" title="Global Command Palette (Ctrl+K)">
+        <span>🔍</span> <span class="shortcut-hint" style="font-size: 10px; opacity: 0.8; margin-left: 4px; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px;">Ctrl+K</span>
+      </button>
+      <button class="ribbon-btn theme-toggle-btn" id="btn-toggle-theme" title="Toggle Dark / Technical High-Contrast Theme">
+        <span id="theme-icon">🌙</span>
+      </button>
       <div class="tier-badge" id="tier-badge">
         <span class="tier-dot"></span>
         <span id="tier-label">Air-Gapped Local Workstation</span>
@@ -186,6 +192,54 @@
 
     <!-- Center Viewport Stage -->
     <main class="center-viewport">
+      <!-- Multi-Document Workspace Tab Bar -->
+      <div class="workspace-tab-bar" id="workspace-tab-bar">
+        <div class="workspace-tabs-list" id="workspace-tabs-list">
+          <div class="workspace-tab active" data-doc-id="doc-main-cad">
+            <span class="doc-icon">📐</span>
+            <span class="doc-title">Main_Assembly.omni</span>
+            <span class="doc-badge">CAD</span>
+            <span class="doc-close-btn">&times;</span>
+          </div>
+          <div class="workspace-tab" data-doc-id="doc-optics">
+            <span class="doc-icon">🔬</span>
+            <span class="doc-title">Doublet_Lens.zmx</span>
+            <span class="doc-badge">Optics</span>
+            <span class="doc-close-btn">&times;</span>
+          </div>
+          <div class="workspace-tab" data-doc-id="doc-power-pdn">
+            <span class="doc-icon">⚡</span>
+            <span class="doc-title">Power_Grid_PDN.cir</span>
+            <span class="doc-badge">EDA</span>
+            <span class="doc-close-btn">&times;</span>
+          </div>
+          <div class="workspace-tab" data-doc-id="doc-asme-vessel">
+            <span class="doc-icon">🛡️</span>
+            <span class="doc-title">Pressure_Vessel_V101.asme</span>
+            <span class="doc-badge">ASME VIII</span>
+            <span class="doc-close-btn">&times;</span>
+          </div>
+        </div>
+        <button class="workspace-new-tab-btn" id="btn-new-doc-tab" title="Create New Document Tab">+</button>
+      </div>
+
+      <!-- Global Solver Asynchronous Progress Bar -->
+      <div class="global-solver-progress-bar" id="global-solver-progress" style="display: none;">
+        <div class="solver-progress-track">
+          <div class="solver-progress-fill" id="solver-progress-fill" style="width: 0%;"></div>
+        </div>
+        <div class="solver-progress-content">
+          <div class="solver-progress-left">
+            <span class="solver-progress-spinner">⚙️</span>
+            <span class="solver-progress-status" id="solver-progress-status">Solver idle</span>
+          </div>
+          <div class="solver-progress-right">
+            <span class="solver-progress-pct" id="solver-progress-pct">0%</span>
+            <button class="solver-progress-cancel" id="btn-cancel-solver" title="Cancel Solver Run">&times;</button>
+          </div>
+        </div>
+      </div>
+
       <div class="viewport-toolbar">
         <div class="viewport-mode-tabs">
           <button class="v-mode-btn active" id="btn-view-3d">3D CAD / CAE Mesh</button>
@@ -836,6 +890,33 @@ endmodule</textarea>
           <button class="ribbon-btn" id="btn-consolidate-hardware" style="font-size: 11px; padding: 5px 12px;">🔗 Single-Level Hardware Rollup</button>
           <button class="btn-primary" id="btn-export-ebom-csv" style="margin-top: 0; width: auto; font-size: 11px; padding: 5px 16px;">💾 Export eBOM (CSV)</button>
         </div>
+      </div>
+    </div>
+  <!-- Modal: Global Command Palette (Ctrl+K) -->
+  <div class="modal-overlay" id="command-palette-modal">
+    <div class="modal-card command-palette-card" style="width: 760px; max-height: 80vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+      <div class="command-palette-header">
+        <span class="command-palette-search-icon">🔍</span>
+        <input type="text" id="command-palette-input" class="command-palette-input" placeholder="Search commands, tools, studios, or engines... (Esc to close, ↑↓ to navigate, Enter to run)" autocomplete="off">
+        <span class="command-palette-badge">Ctrl+K</span>
+        <button class="modal-close-btn" id="btn-close-command-palette">&times;</button>
+      </div>
+      <div class="command-palette-filter-bar" id="command-palette-filters">
+        <button class="palette-filter-chip active" data-category="all">All</button>
+        <button class="palette-filter-chip" data-category="studios">Studios</button>
+        <button class="palette-filter-chip" data-category="cad">CAD / Geometry</button>
+        <button class="palette-filter-chip" data-category="cae">CAE / FEA / CFD</button>
+        <button class="palette-filter-chip" data-category="optics">Optics</button>
+        <button class="palette-filter-chip" data-category="eda">EDA / Silicon</button>
+        <button class="palette-filter-chip" data-category="compliance">Compliance</button>
+      </div>
+      <div class="command-palette-results" id="command-palette-results">
+        <!-- Dynamically populated by app.js -->
+      </div>
+      <div class="command-palette-footer">
+        <div class="palette-footer-hint"><span>Use <kbd>↑</kbd> <kbd>↓</kbd> to navigate</span></div>
+        <div class="palette-footer-hint"><span><kbd>↵</kbd> to select</span></div>
+        <div class="palette-footer-hint"><span><kbd>Esc</kbd> to dismiss</span></div>
       </div>
     </div>
   </div>

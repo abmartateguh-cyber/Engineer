@@ -769,6 +769,15 @@ passedTests += gold3Stats.passed;
 failedTests += (gold3Stats.total - gold3Stats.passed);
 
 // ----------------------------------------------------
+// Suite 23: Tier-1 Commercial Production Quality Gate (Pillars 1-5 Final Sign-Off)
+// ----------------------------------------------------
+const { runTier1CommercialProductionTests } = require('./test_tier1_commercial_production');
+const tier1Stats = runTier1CommercialProductionTests();
+totalTests += tier1Stats.total;
+passedTests += tier1Stats.passed;
+failedTests += (tier1Stats.total - tier1Stats.passed);
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');
