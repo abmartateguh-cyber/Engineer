@@ -39,6 +39,9 @@ const { StateflowFSMEngine } = require('../src/core/dynamic_simulink/stateflow_f
 const { SimscapeDomainLibrary } = require('../src/core/dynamic_simulink/simscape_domain_library');
 const { DynamicFlowsheetSolver } = require('../src/core/plant/dynamic_flowsheet_solver');
 const { ElectrolyteNRTLModel } = require('../src/core/plant/enrtl_electrolyte_thermo');
+const { WebGPUCFDKernel } = require('../src/core/cae/webgpu_cfd_kernel');
+const { SFunctionPluginHost } = require('../src/core/dynamic_simulink/s_function_plugin_host');
+const { PetroleumAssayCharacterizer } = require('../src/core/plant/petroleum_assay_characterizer');
 
 // Import Pillar 4 Modules
 const { GitCADVisualDiffEngine } = require('../src/core/pdm/git_cad_visual_diff');
@@ -842,12 +845,39 @@ function runGoldRegulatoryBenchmarks3() {
     assert(typeof SimscapeDomainLibrary === 'function');
     assert(typeof DynamicFlowsheetSolver === 'function');
     assert(typeof ElectrolyteNRTLModel === 'function');
+    assert(typeof WebGPUCFDKernel === 'function');
+    assert(typeof SFunctionPluginHost === 'function');
+    assert(typeof PetroleumAssayCharacterizer === 'function');
     assert(typeof GitCADVisualDiffEngine === 'function');
     assert(typeof EngineeringBOMManager === 'function');
     assert(typeof ToolQualificationKit === 'function');
     assert(typeof ASMESectionVIIIDiv2Analyzer === 'function');
 
-    console.log(`  ✓ PASSED: All 25 Tier-1 commercial engineering engines validated with 0 errors`);
+    // Functional sanity tests for the 3 new gap matrix engines
+    const cfd = new WebGPUCFDKernel({ nx: 16, ny: 16, nz: 8 });
+    const div = new Float32Array(16 * 16 * 8);
+    div[8 + 8 * 16 + 4 * 256] = 10.0;
+    const cfdRes = cfd.solvePoissonCPU(div, 0.001);
+    assert(cfdRes.iterations > 0, 'CFD Kernel must perform Poisson relaxation');
+
+    const sfunc = new SFunctionPluginHost({ name: 'IntegratorBlock' });
+    sfunc.registerDefinition({
+      mdlInitializeSizes: (ss) => { ss.numContStates = 1; ss.numInputs = 1; ss.numOutputs = 1; },
+      mdlDerivatives: (ss, t, u) => { u.derivatives[0] = u.inputs[0]; },
+      mdlOutputs: (ss, t, u) => { u.outputs[0] = u.continuousStates[0]; }
+    });
+    sfunc.initialize();
+    sfunc.setInputs([5.0]);
+    sfunc.stepContinuousRK4(0.0, 0.1);
+    const sOut = sfunc.evaluateOutputs(0.1);
+    assert(Math.abs(sOut[0] - 0.5) < 1e-6, `S-Function RK4 integration error: ${sOut[0]}`);
+
+    const assay = new PetroleumAssayCharacterizer({ apiGravity: 34.0 });
+    const assayRes = assay.characterize();
+    assert(assayRes.pseudoComponents.length >= 4, 'Petroleum assay must split into cuts');
+    assert(assayRes.watsonKw > 10.0, 'Watson Kw must be physical');
+
+    console.log(`  ✓ PASSED: All 28 Tier-1 commercial engineering engines validated with 0 errors`);
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 30: ${err.message}`);

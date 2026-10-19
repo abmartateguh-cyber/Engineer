@@ -1254,6 +1254,69 @@ app.whenReady().then(() => {
             });
             assert(bomRes && bomRes.success && bomRes.flattened.length > 0, 'IPC rollupEBOM rolls up hierarchical eBOM');
 
+            // 17. Test Tier-1 Commercial Production Modals & Ribbon Buttons
+            assert(!!document.getElementById('ribbon-btn-sketcher'), 'Ribbon button: Variational Sketcher exists');
+            assert(!!document.getElementById('ribbon-btn-heal'), 'Ribbon button: Auto-Heal exists');
+            assert(!!document.getElementById('ribbon-btn-opt-dls'), 'Ribbon button: DLS Optimizer exists');
+            assert(!!document.getElementById('ribbon-btn-asme'), 'Ribbon button: ASME VIII Div 2 exists');
+            assert(!!document.getElementById('ribbon-btn-cad-diff'), 'Ribbon button: CAD Diff exists');
+            assert(!!document.getElementById('ribbon-btn-ebom'), 'Ribbon button: eBOM Manager exists');
+
+            // Test Variational Sketcher UI
+            document.getElementById('ribbon-btn-sketcher').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-variational-sketcher').classList.contains('active'), 'Modal: Variational Sketcher opens active');
+            assert(!!document.getElementById('canvas-variational-sketcher'), 'Variational Sketcher 2D canvas rendered');
+            document.getElementById('btn-solve-sketcher').click();
+            await new Promise(r => setTimeout(r, 100));
+            document.getElementById('btn-close-variational-sketcher').click();
+            assert(!document.getElementById('modal-variational-sketcher').classList.contains('active'), 'Modal: Variational Sketcher closes');
+
+            // Test Topological Healer UI
+            document.getElementById('ribbon-btn-heal').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-topological-healer').classList.contains('active'), 'Modal: Topological Healer opens active');
+            document.getElementById('btn-run-auto-heal').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('healing-log-output').textContent.includes('HEALING COMPLETE'), 'Auto-Heal executes and logs watertight status');
+            document.getElementById('btn-close-topological-healer').click();
+            assert(!document.getElementById('modal-topological-healer').classList.contains('active'), 'Modal: Topological Healer closes');
+
+            // Test DLS Optimizer UI
+            document.getElementById('ribbon-btn-opt-dls').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-dls-optimizer').classList.contains('active'), 'Modal: DLS Optimizer opens active');
+            assert(!!document.getElementById('canvas-dls-convergence'), 'DLS Convergence canvas rendered');
+            document.getElementById('btn-run-dls-opt').click();
+            await new Promise(r => setTimeout(r, 200));
+            document.getElementById('btn-close-dls-optimizer').click();
+            assert(!document.getElementById('modal-dls-optimizer').classList.contains('active'), 'Modal: DLS Optimizer closes');
+
+            // Test ASME Section VIII Div 2 Report UI
+            document.getElementById('ribbon-btn-asme').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-asme-report').classList.contains('active'), 'Modal: ASME VIII Div 2 Report opens active');
+            document.getElementById('btn-close-asme-report').click();
+            assert(!document.getElementById('modal-asme-report').classList.contains('active'), 'Modal: ASME VIII Div 2 Report closes');
+
+            // Test 3D CAD Visual Diff UI
+            document.getElementById('ribbon-btn-cad-diff').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-cad-diff').classList.contains('active'), 'Modal: 3D CAD Diff opens active');
+            document.getElementById('btn-run-cad-diff').click();
+            await new Promise(r => setTimeout(r, 200));
+            document.getElementById('btn-close-cad-diff').click();
+            assert(!document.getElementById('modal-cad-diff').classList.contains('active'), 'Modal: 3D CAD Diff closes');
+
+            // Test Hierarchical eBOM Manager UI
+            document.getElementById('ribbon-btn-ebom').click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(document.getElementById('modal-ebom-manager').classList.contains('active'), 'Modal: eBOM Manager opens active');
+            document.getElementById('btn-consolidate-hardware').click();
+            await new Promise(r => setTimeout(r, 200));
+            document.getElementById('btn-close-ebom-manager').click();
+            assert(!document.getElementById('modal-ebom-manager').classList.contains('active'), 'Modal: eBOM Manager closes');
+
             return results;
           })();
         `);
