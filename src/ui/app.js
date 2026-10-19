@@ -4,6 +4,27 @@
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Enterprise Error Boundary & Audit Logger
+  window.addEventListener('error', (event) => {
+    console.error('[OmniEng Workstation Error Boundary]', event.error || event.message);
+    if (window.omniEngAPI?.auditRecordAction) {
+      window.omniEngAPI.auditRecordAction({
+        eventType: 'RENDERER_RUNTIME_ERROR',
+        details: { message: event.message, filename: event.filename, lineno: event.lineno }
+      }).catch(() => {});
+    }
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    console.warn('[OmniEng Workstation Unhandled Rejection]', event.reason);
+    if (window.omniEngAPI?.auditRecordAction) {
+      window.omniEngAPI.auditRecordAction({
+        eventType: 'RENDERER_UNHANDLED_PROMISE',
+        details: { reason: String(event.reason) }
+      }).catch(() => {});
+    }
+  });
+
   // Hydrate all static vector SVG icons across headers, ribbon, tabs, modals
   if (window.OmniIcons) {
     window.OmniIcons.hydrateAll(document);

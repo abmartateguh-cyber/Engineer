@@ -203,5 +203,29 @@ try {
   console.warn('[Icon Generator] Note: macOS iconutil conversion skipped or not supported:', e.message);
 }
 
+// Generate Windows .ico container natively from PNG
+try {
+  const icoHeader = Buffer.alloc(6);
+  icoHeader.writeUInt16LE(0, 0); // reserved
+  icoHeader.writeUInt16LE(1, 2); // type 1 = icon
+  icoHeader.writeUInt16LE(1, 4); // 1 image
+
+  const icoDirEntry = Buffer.alloc(16);
+  icoDirEntry.writeUInt8(0, 0); // width: 0 = 256px
+  icoDirEntry.writeUInt8(0, 1); // height: 0 = 256px
+  icoDirEntry.writeUInt8(0, 2); // color count
+  icoDirEntry.writeUInt8(0, 3); // reserved
+  icoDirEntry.writeUInt16LE(1, 4); // color planes
+  icoDirEntry.writeUInt16LE(32, 6); // bits per pixel
+  icoDirEntry.writeUInt32LE(icon512.length, 8); // image size
+  icoDirEntry.writeUInt32LE(6 + 16, 12); // image offset
+
+  const icoBuffer = Buffer.concat([icoHeader, icoDirEntry, icon512]);
+  fs.writeFileSync(path.join(buildDir, 'icon.ico'), icoBuffer);
+  console.log(`[Icon Generator] Successfully created Windows icon: ${path.join(buildDir, 'icon.ico')}`);
+} catch (e) {
+  console.warn('[Icon Generator] Note: Windows .ico generation failed:', e.message);
+}
+
 module.exports = { generateOmniEngIcon };
 

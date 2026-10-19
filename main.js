@@ -78,7 +78,42 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Register All 98 Schema-Validated Domain IPC Handlers
+  // Enterprise Headless CLI Mode Handling
+  if (process.argv.includes('--version') || process.argv.includes('-v')) {
+    const pkg = require('./package.json');
+    console.log(`${pkg.productName || 'OmniEng'} v${pkg.version} [Tier-1 Industrial Full Production Release]`);
+    app.exit(0);
+    return;
+  }
+
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(`
+OmniEng — Universal Multi-Industry Engineering & Simulation Platform
+Version: 1.0.0 (Tier-1 Industrial Full Production Release)
+
+Usage:
+  omnieng [options] [project.omni]
+
+Options:
+  --version, -v          Display platform release version and build info
+  --help, -h             Display this enterprise CLI usage manual
+  --benchmark            Run all 9 gold-standard regulatory V&V benchmarks headlessly
+  --test-ui              Run automated headless Electron integration test suite
+  --capture              Run automated visual showcase and screenshot capture
+  --no-devtools          Launch without developer inspection tools
+`);
+    app.exit(0);
+    return;
+  }
+
+  if (process.argv.includes('--benchmark')) {
+    const { runVVVerificationBenchmarks } = require('./test/vv/run_vv');
+    const stats = runVVVerificationBenchmarks();
+    app.exit(stats.failed === 0 ? 0 : 1);
+    return;
+  }
+
+  // Register All 105 Schema-Validated Domain IPC Handlers
   registerAllIpcHandlers({
     auditLedger,
     outOfCoreOctree,
