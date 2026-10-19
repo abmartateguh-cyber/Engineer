@@ -127,6 +127,14 @@ class Viewport3D {
     const z = this.target.z + this.cameraDistance * Math.sin(this.cameraAngle.phi) * Math.cos(this.cameraAngle.theta);
     this.camera.position.set(x, y, z);
     this.camera.lookAt(this.target);
+
+    // Synchronize 3D in-viewport ViewCube gizmo
+    const navCube = document.getElementById('nav-cube');
+    if (navCube) {
+      const rotX = (this.cameraAngle.phi - Math.PI / 2) * (180 / Math.PI);
+      const rotY = -this.cameraAngle.theta * (180 / Math.PI);
+      navCube.style.transform = `rotateX(${rotX.toFixed(1)}deg) rotateY(${rotY.toFixed(1)}deg)`;
+    }
   }
 
   setupInteractions() {
@@ -291,7 +299,7 @@ class Viewport3D {
   }
 
   setCameraPreset(preset) {
-    if (preset === 'iso') {
+    if (preset === 'iso' || preset === 'reset') {
       this.cameraAngle = { theta: 0.65, phi: 0.85 };
       this.cameraDistance = 220;
       this.target.set(0, 0, 0);
@@ -299,12 +307,24 @@ class Viewport3D {
       this.cameraAngle = { theta: 0.0, phi: 0.05 };
       this.cameraDistance = 240;
       this.target.set(0, 0, 0);
+    } else if (preset === 'bottom') {
+      this.cameraAngle = { theta: 0.0, phi: Math.PI - 0.05 };
+      this.cameraDistance = 240;
+      this.target.set(0, 0, 0);
     } else if (preset === 'front') {
       this.cameraAngle = { theta: 0.0, phi: Math.PI / 2 };
       this.cameraDistance = 220;
       this.target.set(0, 0, 0);
-    } else if (preset === 'reset') {
-      this.cameraAngle = { theta: 0.65, phi: 0.85 };
+    } else if (preset === 'back') {
+      this.cameraAngle = { theta: Math.PI, phi: Math.PI / 2 };
+      this.cameraDistance = 220;
+      this.target.set(0, 0, 0);
+    } else if (preset === 'right') {
+      this.cameraAngle = { theta: Math.PI / 2, phi: Math.PI / 2 };
+      this.cameraDistance = 220;
+      this.target.set(0, 0, 0);
+    } else if (preset === 'left') {
+      this.cameraAngle = { theta: -Math.PI / 2, phi: Math.PI / 2 };
       this.cameraDistance = 220;
       this.target.set(0, 0, 0);
     }
@@ -353,9 +373,10 @@ class Viewport3D {
       hud.style.display = this.isMeasuring ? 'block' : 'none';
       if (this.isMeasuring) {
         hud.innerHTML = `
-          <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">📏 3D Caliper Measurement Active</div>
+          <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="caliper"></span> 3D Caliper Measurement Active</div>
           <div style="color: var(--text-muted); font-size: 10px;">Click first 3D vertex or component face to anchor...</div>
         `;
+        if (typeof window !== 'undefined' && window.OmniIcons) window.OmniIcons.hydrateAll(hud);
       }
     }
   }
@@ -367,9 +388,10 @@ class Viewport3D {
     const hud = document.getElementById('measurement-hud');
     if (this.measurePoints.length === 1 && hud) {
       hud.innerHTML = `
-        <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">📏 Point 1 Anchored</div>
+        <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="caliper"></span> Point 1 Anchored</div>
         <div style="color: var(--text-muted); font-size: 10px;">P1(${point3D.x.toFixed(1)}, ${point3D.y.toFixed(1)}, ${point3D.z.toFixed(1)}) — Click second point...</div>
       `;
+      if (typeof window !== 'undefined' && window.OmniIcons) window.OmniIcons.hydrateAll(hud);
     } else if (this.measurePoints.length === 2) {
       const p1 = this.measurePoints[0];
       const p2 = this.measurePoints[1];
@@ -388,12 +410,13 @@ class Viewport3D {
 
       if (hud) {
         hud.innerHTML = `
-          <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">📏 3D Caliper Result</div>
+          <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="caliper"></span> 3D Caliper Result</div>
           <div style="font-size: 13px; font-weight: 700; color: #fff;">Length: ${dist.toFixed(2)} mm</div>
           <div style="color: var(--text-dim); font-size: 9px; font-family: var(--font-mono); margin-top: 2px;">
             ΔX: ${dx.toFixed(2)}mm | ΔY: ${dy.toFixed(2)}mm | ΔZ: ${dz.toFixed(2)}mm
           </div>
         `;
+        if (typeof window !== 'undefined' && window.OmniIcons) window.OmniIcons.hydrateAll(hud);
       }
       this.measurePoints = [];
     }

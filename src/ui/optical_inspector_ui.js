@@ -64,7 +64,7 @@ class OpticalInspectorUI {
           <!-- Spot Diagram Pane -->
           <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--accent-cyan);">🎯 2D Focal Spot Diagram (Image Plane)</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="spotDiagram"></span> 2D Focal Spot Diagram (Image Plane)</span>
               <span style="font-size: 10px; color: var(--text-dim);">Scale: ±50 µm</span>
             </div>
             <canvas id="canvas-spot-diagram" width="380" height="260" style="width: 100%; height: 260px; background: #03050a; border-radius: 4px; display: block;"></canvas>
@@ -78,7 +78,7 @@ class OpticalInspectorUI {
           <!-- MTF Curve Pane -->
           <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 12px; font-weight: 600; color: #a78bfa;">📊 Modulation Transfer Function (MTF)</span>
+              <span style="font-size: 12px; font-weight: 600; color: #a78bfa; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="mtfCurve"></span> Modulation Transfer Function (MTF)</span>
               <span style="font-size: 10px; color: var(--text-dim);">Spatial Freq: 0 - 120 lp/mm</span>
             </div>
             <canvas id="canvas-mtf-curve" width="380" height="260" style="width: 100%; height: 260px; background: #03050a; border-radius: 4px; display: block;"></canvas>
@@ -92,8 +92,8 @@ class OpticalInspectorUI {
 
         <!-- Bottom row: ISO 10110 Sequential Prescription Table -->
         <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
-          <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--accent-cyan);">
-            📋 Optical Surface Prescription (Zemax Lens Data Editor Parity)
+          <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px;">
+            <span class="icon-slot" data-omni-icon="lensElement"></span> Optical Surface Prescription (Zemax Lens Data Editor Parity)
           </div>
           <div style="max-height: 180px; overflow-y: auto;">
             <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
@@ -117,6 +117,10 @@ class OpticalInspectorUI {
         </div>
       </div>
     `;
+
+    if (typeof window !== 'undefined' && window.OmniIcons) {
+      window.OmniIcons.hydrateAll(this.container);
+    }
 
     // Render Canvas Charts
     this._drawSpotDiagram();

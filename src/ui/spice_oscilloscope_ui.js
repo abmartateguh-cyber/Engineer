@@ -35,12 +35,12 @@ class SpiceOscilloscopeUI {
         <!-- Oscilloscope Top Bar -->
         <div style="display: flex; justify-content: space-between; align-items: center; background: #0c1220; padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border-color);">
           <div>
-            <div style="font-weight: 700; color: var(--accent-cyan); font-size: 13px;">📈 ${circuitName}</div>
+            <div style="font-weight: 700; color: var(--accent-cyan); font-size: 13px; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="oscilloscope"></span> ${circuitName}</div>
             <div style="font-size: 10px; color: var(--text-muted);">MNA Engine Companion Matrix • Backward Euler Integration (dt = 50 µs)</div>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="ribbon-btn active" id="btn-scope-autoscale" style="padding: 4px 10px; font-size: 11px;">🔍 Auto-Scale</button>
-            <button class="ribbon-btn" id="btn-scope-trigger" style="padding: 4px 10px; font-size: 11px;">⚡ Single Trig</button>
+            <button class="ribbon-btn active" id="btn-scope-autoscale" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><span class="icon-slot" data-omni-icon="search"></span> Auto-Scale</button>
+            <button class="ribbon-btn" id="btn-scope-trigger" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><span class="icon-slot" data-omni-icon="bolt"></span> Single Trig</button>
           </div>
         </div>
 
@@ -90,6 +90,10 @@ class SpiceOscilloscopeUI {
         </div>
       </div>
     `;
+
+    if (typeof window !== 'undefined' && window.OmniIcons) {
+      window.OmniIcons.hydrateAll(this.container);
+    }
 
     this._setupCanvas();
     this._drawGraticuleAndTraces();

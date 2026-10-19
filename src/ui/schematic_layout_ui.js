@@ -355,7 +355,7 @@ class SchematicLayoutUI {
         ctx.setLineDash([]);
         ctx.fillStyle = '#f43f5e';
         ctx.font = 'bold 10px monospace';
-        ctx.fillText(`⚠ DRC: ${v.type}`, v.location.x, v.location.y - 6);
+        ctx.fillText(`[DRC] ${v.type}`, v.location.x, v.location.y - 6);
       }
     }
   }
@@ -720,7 +720,7 @@ class SchematicLayoutUI {
         const d = active.data;
         ctx.fillStyle = '#f43f5e';
         ctx.font = 'bold 12px monospace';
-        ctx.fillText(`⚠ DRC Violation: ${d.type}`, cardX + 12, cardY + 22);
+        ctx.fillText(`[DRC Violation] ${d.type}`, cardX + 12, cardY + 22);
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px monospace';
         ctx.fillText(`Measured: ${d.measured}nm < Limit: ${d.rule}nm`, cardX + 12, cardY + 42);

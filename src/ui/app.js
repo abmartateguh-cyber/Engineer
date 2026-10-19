@@ -194,6 +194,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.OmniIcons && inspectorContainer) {
       window.OmniIcons.hydrateAll(inspectorContainer);
     }
+
+    // Update Contextual Studio Ribbon Filter
+    const ribbon = document.querySelector('.engineering-ribbon');
+    if (ribbon) {
+      ribbon.classList.remove('filter-consumer', 'filter-eda', 'filter-aerospace', 'filter-oilgas', 'filter-simulink', 'filter-universal_cad');
+      ribbon.classList.add(`filter-${studio}`);
+    }
   }
 
   // --- Dynamic Inspector Panels (Full Manual Editing Support) ---
@@ -248,8 +255,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Sub-tab switcher header
     let html = `
       <div style="display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
-        <button id="subtab-phone" class="ribbon-btn ${!isLens ? 'active' : ''}" style="flex: 1; padding: 6px 4px; font-size: 11px;">📱 Smartphone CAD</button>
-        <button id="subtab-lens" class="ribbon-btn ${isLens ? 'active' : ''}" style="flex: 1; padding: 6px 4px; font-size: 11px;">📷 50mm Lens Cutaway</button>
+        <button id="subtab-phone" class="ribbon-btn ${!isLens ? 'active' : ''}" style="flex: 1; padding: 6px 4px; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;"><span class="icon-slot" data-omni-icon="smartphone"></span> Smartphone CAD</button>
+        <button id="subtab-lens" class="ribbon-btn ${isLens ? 'active' : ''}" style="flex: 1; padding: 6px 4px; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;"><span class="icon-slot" data-omni-icon="cameraLens"></span> 50mm Lens Cutaway</button>
       </div>
     `;
 
@@ -258,7 +265,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `
         <div class="param-group">
           <div class="param-group-title">
-            <span>📷 50mm f/1.4 Optomechanics & 3D Cutaway</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="cameraLens"></span> 50mm f/1.4 Optomechanics & 3D Cutaway</span>
             <span class="tag">PTC Creo / NX / Zemax</span>
           </div>
 
@@ -317,7 +324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         <div class="param-group">
           <div class="param-group-title">
-            <span>🔬 Optical Physics & Depth of Field Telemetry</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="optics"></span> Optical Physics & Depth of Field Telemetry</span>
             <span class="tag">Airy & MTF</span>
           </div>
           <div id="lens-optics-telemetry"></div>
@@ -325,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         <div class="param-group">
           <div class="param-group-title">
-            <span>💎 8-Element Optical Prescription (Schott & CaF2)</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="lensElement"></span> 8-Element Optical Prescription (Schott & CaF2)</span>
             <span class="tag">Double-Gauss</span>
           </div>
           <div style="max-height: 155px; overflow-y: auto; font-size: 10px; font-family: var(--font-mono); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 6px; background: rgba(0,0,0,0.25);">
@@ -344,7 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <tr><td style="color:var(--accent-cyan);">G2</td><td>E2</td><td>Schott N-SF11</td><td>1.785</td><td>25.8</td></tr>
                 <tr><td style="color:var(--accent-cyan);">G3</td><td>E3</td><td>Schott N-BK7</td><td>1.517</td><td>64.2</td></tr>
                 <tr><td style="color:var(--accent-cyan);">G3</td><td>E4</td><td>Schott N-SF11</td><td>1.785</td><td>25.8</td></tr>
-                <tr style="background: rgba(245, 158, 11, 0.12); color: var(--accent-amber); font-weight:700;"><td colspan="5" style="padding: 2px;">⚙️ 9-Blade Dynamic Iris Diaphragm</td></tr>
+                <tr style="background: rgba(245, 158, 11, 0.12); color: var(--accent-amber); font-weight:700;"><td colspan="5" style="padding: 2px;"><span class="icon-slot" data-omni-icon="aperture"></span> 9-Blade Dynamic Iris Diaphragm</td></tr>
                 <tr><td style="color:var(--accent-green);">G4</td><td>E5 (ED)</td><td>Fluorite CaF2</td><td>1.434</td><td>95.3</td></tr>
                 <tr><td style="color:var(--accent-green);">G5</td><td>E6</td><td>Schott N-BK7</td><td>1.517</td><td>64.2</td></tr>
                 <tr><td style="color:var(--accent-green);">G6</td><td>E7</td><td>Schott N-SF11</td><td>1.785</td><td>25.8</td></tr>
@@ -359,7 +366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `
         <div class="param-group">
           <div class="param-group-title">
-            <span>📱 Phone Packaging CAD</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="smartphone"></span> Phone Packaging CAD</span>
             <span class="tag">PTC Creo / NX</span>
           </div>
           <div class="param-row">
@@ -394,7 +401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         <div class="param-group">
           <div class="param-group-title">
-            <span>💥 Explicit Drop Test (FEA)</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="dropTest"></span> Explicit Drop Test (FEA)</span>
             <span class="tag">Ansys Mechanical</span>
           </div>
           <div class="param-row">
@@ -414,15 +421,15 @@ document.addEventListener('DOMContentLoaded', async () => {
               <option value="face" ${state.manualParams.impactAngle === 'face' ? 'selected' : ''}>Front Screen Flat Impact</option>
             </select>
           </div>
-          <button class="btn-primary" id="btn-run-drop">
-            <span>▶ Run Explicit Drop Test</span>
+          <button class="btn-primary" id="btn-run-drop" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span class="icon-slot" data-omni-icon="play"></span> <span>Run Explicit Drop Test</span>
           </button>
           <div id="drop-telemetry-container"></div>
         </div>
 
         <div class="param-group">
           <div class="param-group-title">
-            <span>🔥 Thermal CHT & Vapor Chamber</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="thermalCht"></span> Thermal CHT & Vapor Chamber</span>
             <span class="tag">Ansys Icepak</span>
           </div>
           <div class="param-row">
@@ -751,7 +758,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     inspectorContainer.innerHTML = `
       <div class="param-group">
         <div class="param-group-title">
-          <span>🔬 RTL Logic Synthesis</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="circuit"></span> RTL Logic Synthesis</span>
           <span class="tag">Design Compiler</span>
         </div>
         <div class="param-row">
@@ -768,14 +775,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 endmodule</textarea>
         </div>
         <button class="btn-primary" id="btn-run-synth">
-          <span>▶ Synthesize to Standard Cells</span>
+          <span>Synthesize to Standard Cells</span>
         </button>
         <div id="synth-telemetry-container"></div>
       </div>
 
       <div class="param-group">
         <div class="param-group-title">
-          <span>📐 Physical DRC Verification</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="drcCheck"></span> Physical DRC Verification</span>
           <span class="tag">Siemens Calibre</span>
         </div>
         <div class="param-row">
@@ -793,7 +800,7 @@ endmodule</textarea>
           <input type="range" class="slider-input" min="30" max="80" value="45" id="slider-drc-s">
         </div>
         <button class="btn-primary" id="btn-run-drc" style="background: linear-gradient(135deg, var(--accent-indigo), var(--accent-cyan));">
-          <span>▶ Run Calibre DRC Verification</span>
+          <span>Run Calibre DRC Verification</span>
         </button>
         <div id="drc-telemetry-container"></div>
       </div>
@@ -855,24 +862,26 @@ endmodule</textarea>
     layoutModeRow.style.flexDirection = 'column';
     layoutModeRow.style.gap = '6px';
     layoutModeRow.innerHTML = `
-      <button class="btn-primary" id="btn-inspect-ic" style="background: var(--bg-tertiary); border: 1px solid var(--accent-indigo); color: var(--accent-cyan); margin-top: 0; padding: 6px 10px; font-size: 11px;">
-        🔬 View TSMC 3nm Custom IC Layout
+      <button class="btn-primary" id="btn-inspect-ic" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;background: var(--bg-tertiary); border: 1px solid var(--accent-indigo); color: var(--accent-cyan); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        <span class="icon-slot" data-omni-icon="circuit"></span> View TSMC 3nm Custom IC Layout
       </button>
-      <button class="btn-primary" id="btn-inspect-pcb" style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); color: var(--accent-green); margin-top: 0; padding: 6px 10px; font-size: 11px;">
-        📟 View Altium 4-Layer High-Speed PCB Layout
+      <button class="btn-primary" id="btn-inspect-pcb" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;background: var(--bg-tertiary); border: 1px solid var(--accent-green); color: var(--accent-green); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        <span class="icon-slot" data-omni-icon="pcbStack"></span> View Altium 4-Layer High-Speed PCB Layout
       </button>
     `;
     inspectorContainer.appendChild(layoutModeRow);
 
     document.getElementById('btn-inspect-ic').addEventListener('click', () => setViewMode('eda'));
     document.getElementById('btn-inspect-pcb').addEventListener('click', () => setViewMode('pcb'));
+
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(inspectorContainer);
   }
 
   function renderAerospaceInspector() {
     inspectorContainer.innerHTML = `
       <div class="param-group">
         <div class="param-group-title">
-          <span>🛸 6-DOF Autonomous Drone GNC</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="drone"></span> 6-DOF Autonomous Drone GNC</span>
           <span class="tag">Simulink Autopilot</span>
         </div>
         <div class="param-row">
@@ -890,14 +899,14 @@ endmodule</textarea>
           <input type="range" class="slider-input" min="0" max="10" step="0.5" value="${state.manualParams.windGustSpeed}" id="slider-wind-gust">
         </div>
         <button class="btn-primary" id="btn-run-drone">
-          <span>▶ Simulate 6-DOF Flight Control</span>
+          <span>Simulate 6-DOF Flight Control</span>
         </button>
         <div id="drone-telemetry-container"></div>
       </div>
 
       <div class="param-group">
         <div class="param-group-title">
-          <span>🌀 Rotor Propeller CFD (MRF)</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="cfdStreamlines"></span> Rotor Propeller CFD (MRF)</span>
           <span class="tag">Ansys Fluent</span>
         </div>
         <div class="param-row">
@@ -908,7 +917,7 @@ endmodule</textarea>
           <input type="range" class="slider-input" min="3000" max="15000" step="500" value="${state.manualParams.rotorRPM}" id="slider-rotor-rpm">
         </div>
         <button class="btn-primary" id="btn-run-propeller" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));">
-          <span>▶ Compute Rotor Thrust & Torque</span>
+          <span>Compute Rotor Thrust & Torque</span>
         </button>
         <div id="propeller-telemetry-container"></div>
       </div>
@@ -969,13 +978,15 @@ endmodule</textarea>
         </div>
       `;
     });
+
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(inspectorContainer);
   }
 
   function renderOilGasInspector() {
     inspectorContainer.innerHTML = `
       <div class="param-group">
         <div class="param-group-title">
-          <span>🛢️ ASME B31.3 Piping Stress</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="piping"></span> ASME B31.3 Piping Stress</span>
           <span class="tag">Caesar II / AutoPIPE</span>
         </div>
         <div class="param-row">
@@ -992,14 +1003,14 @@ endmodule</textarea>
           </label>
         </div>
         <button class="btn-primary" id="btn-run-pipe">
-          <span>▶ Check ASME Code Compliance</span>
+          <span>Check ASME Code Compliance</span>
         </button>
         <div id="pipe-telemetry-container"></div>
       </div>
 
       <div class="param-group">
         <div class="param-group-title">
-          <span>⚗️ Crude Distillation Column</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="distillation"></span> Crude Distillation Column</span>
           <span class="tag">Aspen HYSYS</span>
         </div>
         <div class="param-row">
@@ -1010,7 +1021,7 @@ endmodule</textarea>
           <input type="range" class="slider-input" min="10000" max="100000" step="5000" value="${state.manualParams.crudeFeedBPD}" id="slider-crude-bpd">
         </div>
         <button class="btn-primary" id="btn-run-hysys" style="background: linear-gradient(135deg, var(--accent-amber), var(--accent-blue));">
-          <span>▶ Run HYSYS Fractionation</span>
+          <span>Run HYSYS Fractionation</span>
         </button>
         <div id="hysys-telemetry-container"></div>
       </div>
@@ -1089,24 +1100,26 @@ endmodule</textarea>
     vleBtnRow.style.flexDirection = 'column';
     vleBtnRow.style.gap = '6px';
     vleBtnRow.innerHTML = `
-      <button class="btn-primary" id="btn-inspect-vle" style="background: var(--bg-tertiary); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); margin-top: 0; padding: 6px 10px; font-size: 11px;">
-        📈 View Peng-Robinson P-T Phase Envelope
+      <button class="btn-primary" id="btn-inspect-vle" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;background: var(--bg-tertiary); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        <span class="icon-slot" data-omni-icon="flowChart"></span> View Peng-Robinson P-T Phase Envelope
       </button>
-      <button class="btn-primary" id="btn-inspect-tray" style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); color: var(--accent-green); margin-top: 0; padding: 6px 10px; font-size: 11px;">
-        📊 View 30-Tray Column Thermal & Composition Profile
+      <button class="btn-primary" id="btn-inspect-tray" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;background: var(--bg-tertiary); border: 1px solid var(--accent-green); color: var(--accent-green); margin-top: 0; padding: 6px 10px; font-size: 11px;">
+        <span class="icon-slot" data-omni-icon="distillation"></span> View 30-Tray Column Thermal & Composition Profile
       </button>
     `;
     inspectorContainer.appendChild(vleBtnRow);
 
     document.getElementById('btn-inspect-vle').addEventListener('click', () => setViewMode('vle'));
     document.getElementById('btn-inspect-tray').addEventListener('click', () => setViewMode('tray'));
+
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(inspectorContainer);
   }
 
   function renderSimulinkInspector() {
     inspectorContainer.innerHTML = `
       <div class="param-group">
         <div class="param-group-title">
-          <span>🧮 Dynamic Simulink Engine</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="flowChart"></span> Dynamic Simulink Engine</span>
           <span class="tag">MATLAB / Simulink</span>
         </div>
         <div class="param-row">
@@ -1124,7 +1137,7 @@ endmodule</textarea>
           <input type="range" class="slider-input" min="0.0" max="5.0" step="0.1" value="0.5" id="slider-ki">
         </div>
         <button class="btn-primary" id="btn-run-simulink">
-          <span>▶ Solve Dynamic Continuous Loop</span>
+          <span>Solve Dynamic Continuous Loop</span>
         </button>
         <div id="simulink-telemetry-container"></div>
       </div>
@@ -1146,13 +1159,15 @@ endmodule</textarea>
         </div>
       `;
     });
+
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(inspectorContainer);
   }
 
   function renderCadInspector() {
     inspectorContainer.innerHTML = `
       <div class="param-group">
         <div class="param-group-title">
-          <span>📐 Parametric B-Rep Solids</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-slot" data-omni-icon="solidExtrude"></span> Parametric B-Rep Solids</span>
           <span class="tag">Siemens NX / CATIA</span>
         </div>
         <div class="param-row">
@@ -1166,6 +1181,7 @@ endmodule</textarea>
     document.getElementById('btn-cad-box').addEventListener('click', () => {
       viewport3D.renderSmartphoneCad(80, 20, 100);
     });
+
     document.getElementById('btn-cad-cyl').addEventListener('click', () => {
       viewport3D.clearMesh();
       const geom = new THREE.CylinderGeometry(20, 20, 50, 32);
@@ -1173,6 +1189,7 @@ endmodule</textarea>
       viewport3D.currentMesh = new THREE.Mesh(geom, mat);
       viewport3D.scene.add(viewport3D.currentMesh);
     });
+
     document.getElementById('btn-cad-sph').addEventListener('click', () => {
       viewport3D.clearMesh();
       const geom = new THREE.SphereGeometry(25, 32, 32);
@@ -1180,6 +1197,8 @@ endmodule</textarea>
       viewport3D.currentMesh = new THREE.Mesh(geom, mat);
       viewport3D.scene.add(viewport3D.currentMesh);
     });
+
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(inspectorContainer);
   }
 
   // --- Render Community Samples ---
@@ -1253,7 +1272,7 @@ endmodule</textarea>
           <span class="tag" style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan);">${feat.type}</span>
         </div>
         <div style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">${feat.desc}</div>
-        <div style="font-size: 9px; color: var(--accent-green); margin-top: 4px;">✓ ${feat.status} • Valid B-Rep Topology</div>
+        <div style="font-size: 9px; color: var(--accent-green); margin-top: 4px; display:inline-flex; align-items:center; gap:4px;"><span class="icon-slot" data-omni-icon="checkCircle"></span> ${feat.status} • Valid B-Rep Topology</div>
       `;
       node.addEventListener('click', () => {
         featureTreeContainer.querySelectorAll('.sample-card').forEach(c => c.classList.remove('active'));
@@ -1262,6 +1281,7 @@ endmodule</textarea>
       });
       featureTreeContainer.appendChild(node);
     });
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(featureTreeContainer);
   }
 
   if (tabSamples && tabTree) {
@@ -1288,11 +1308,12 @@ endmodule</textarea>
     if (!isUser && suggestions && suggestions.length > 0) {
       html += `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">`;
       for (const s of suggestions) {
-        html += `<button class="ribbon-btn action-btn" style="padding: 3px 8px; font-size: 10px; border-radius: 4px; border: 1px solid var(--accent-cyan); background: rgba(56, 189, 248, 0.15);" onclick="window.omniAutoRemediate('param', '${s.key}', ${JSON.stringify(s.value)})">⚡ Auto-Fix: ${s.label} (${s.value}${s.unit ? ' ' + s.unit : ''})</button>`;
+        html += `<button class="ribbon-btn action-btn" style="display:inline-flex;align-items:center;gap:4px;padding: 3px 8px; font-size: 10px; border-radius: 4px; border: 1px solid var(--accent-cyan); background: rgba(56, 189, 248, 0.15);" onclick="window.omniAutoRemediate('param', '${s.key}', ${JSON.stringify(s.value)})"><span class="icon-slot" data-omni-icon="bolt"></span> Auto-Fix: ${s.label} (${s.value}${s.unit ? ' ' + s.unit : ''})</button>`;
       }
       html += `</div>`;
     }
     bubble.innerHTML = html;
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(bubble);
     aiChatHistory.appendChild(bubble);
     aiChatHistory.scrollTop = aiChatHistory.scrollHeight;
   }
@@ -1534,6 +1555,23 @@ endmodule</textarea>
   if (camTop) camTop.addEventListener('click', () => viewport3D.setCameraPreset('top'));
   if (camFront) camFront.addEventListener('click', () => viewport3D.setCameraPreset('front'));
   if (camReset) camReset.addEventListener('click', () => viewport3D.setCameraPreset('reset'));
+
+  // In-Viewport 3D ViewCube & Orientation Gizmo
+  const navGizmo = document.getElementById('viewport-nav-gizmo');
+  if (navGizmo) {
+    navGizmo.addEventListener('click', (e) => {
+      const face = e.target.closest('.cube-face');
+      if (face) {
+        const view = face.getAttribute('data-view');
+        if (view) viewport3D.setCameraPreset(view);
+        return;
+      }
+      const compass = e.target.closest('.nav-compass');
+      if (compass) {
+        viewport3D.setCameraPreset('iso');
+      }
+    });
+  }
 
   // --- Specialist Tool Modals ---
   const modalVerilog = document.getElementById('modal-verilog');
@@ -2055,30 +2093,38 @@ endmodule</textarea>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
           <!-- Wizard 1: Drop Test -->
           <div class="card" style="background: var(--bg-surface); padding: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
-            <div style="font-size: 15px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px;">📱 Phone Drop Test Wizard</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px;">
+              <span class="icon-slot" data-omni-icon="smartphone"></span> Phone Drop Test Wizard
+            </div>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Auto-configures 1.5m drop impact on concrete, computes peak deceleration, and checks casing yield stress.</div>
-            <button class="btn btn-primary" id="wizard-run-drop" style="width: 100%; padding: 8px; font-size: 12px;">▶ Run Drop Test Wizard</button>
+            <button class="btn btn-primary" id="wizard-run-drop" style="width: 100%; padding: 8px; font-size: 12px;">Run Drop Test Wizard</button>
           </div>
 
           <!-- Wizard 2: Drone Design -->
           <div class="card" style="background: var(--bg-surface); padding: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
-            <div style="font-size: 15px; font-weight: 700; color: #10b981; margin-bottom: 6px;">🛸 Drone & UAV Airframe Wizard</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #10b981; margin-bottom: 6px;">
+              <span class="icon-slot" data-omni-icon="drone"></span> Drone & UAV Airframe Wizard
+            </div>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Calculates actuator disk hover power, sizes 5" props & 2400KV motors, and verifies 2.2:1 thrust ratio.</div>
-            <button class="btn btn-primary" id="wizard-run-drone" style="width: 100%; padding: 8px; font-size: 12px; background: #10b981;">▶ Run Drone Wizard</button>
+            <button class="btn btn-primary" id="wizard-run-drone" style="width: 100%; padding: 8px; font-size: 12px; background: #10b981;">Run Drone Wizard</button>
           </div>
 
           <!-- Wizard 3: Lens Optics -->
           <div class="card" style="background: var(--bg-surface); padding: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
-            <div style="font-size: 15px; font-weight: 700; color: #8b5cf6; margin-bottom: 6px;">📷 Camera Lens Optics Wizard</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #8b5cf6; margin-bottom: 6px;">
+              <span class="icon-slot" data-omni-icon="cameraLens"></span> Camera Lens Optics Wizard
+            </div>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Designs 50mm f/1.4 Double-Gauss optics with Schott glasses, traces 3D skew rays, and computes MTF.</div>
-            <button class="btn btn-primary" id="wizard-run-lens" style="width: 100%; padding: 8px; font-size: 12px; background: #8b5cf6;">▶ Run Optics Wizard</button>
+            <button class="btn btn-primary" id="wizard-run-lens" style="width: 100%; padding: 8px; font-size: 12px; background: #8b5cf6;">Run Optics Wizard</button>
           </div>
 
           <!-- Wizard 4: PCB RF Stackup -->
           <div class="card" style="background: var(--bg-surface); padding: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
-            <div style="font-size: 15px; font-weight: 700; color: #f59e0b; margin-bottom: 6px;">🔬 High-Speed PCB Stackup Wizard</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #f59e0b; margin-bottom: 6px;">
+              <span class="icon-slot" data-omni-icon="pcbStack"></span> High-Speed PCB Stackup Wizard
+            </div>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">4-layer FR-4 board stackup, IPC-2141 50 Ω microstrip trace synthesis, and DRC clearance checking.</div>
-            <button class="btn btn-primary" id="wizard-run-pcb" style="width: 100%; padding: 8px; font-size: 12px; background: #f59e0b;">▶ Run PCB Wizard</button>
+            <button class="btn btn-primary" id="wizard-run-pcb" style="width: 100%; padding: 8px; font-size: 12px; background: #f59e0b;">Run PCB Wizard</button>
           </div>
         </div>
 
@@ -2094,11 +2140,16 @@ endmodule</textarea>
       if (!outContainer) return;
       outContainer.style.display = 'block';
       outContainer.innerHTML = `
-        <div style="font-size: 14px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px;">✅ ${title} Complete</div>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px;">
+          <span class="icon-slot" data-omni-icon="checkCircle"></span> ${title} Complete
+        </div>
         <div style="font-size: 12px; color: #e2e8f0; line-height: 1.5; margin-bottom: 10px;">${summary}</div>
         <pre style="background: #090d16; padding: 10px; border-radius: 6px; font-size: 11px; color: #94a3b8; overflow-x: auto;">${JSON.stringify(details, null, 2)}</pre>
       `;
+      if (window.OmniIcons) window.OmniIcons.hydrateAll(outContainer);
     };
+
+    if (window.OmniIcons) window.OmniIcons.hydrateAll(wizardsBody);
 
     document.getElementById('wizard-run-drop')?.addEventListener('click', async () => {
       if (window.omniEngAPI?.runDesignWizard) {
@@ -2199,7 +2250,8 @@ endmodule</textarea>
     btnOpenDrafting.addEventListener('click', async () => {
       modalDrafting.classList.add('active');
       if (draftingSheetBody) {
-        draftingSheetBody.innerHTML = '<div style="color: var(--accent-cyan); font-size: 13px; padding: 20px;">⚡ Generating ISO 1101 / ASME Y14.5 Multi-View Orthographic Drawing Sheet...</div>';
+        draftingSheetBody.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color: var(--accent-cyan); font-size: 13px; padding: 20px;"><span class="icon-slot" data-omni-icon="drawing2d"></span> Generating ISO 1101 / ASME Y14.5 Multi-View Orthographic Drawing Sheet...</div>';
+        if (window.OmniIcons) window.OmniIcons.hydrateAll(draftingSheetBody);
       }
       try {
         if (window.omniEngAPI?.generateDraftingSheet) {
@@ -2241,7 +2293,7 @@ endmodule</textarea>
         if (window.omniEngAPI?.applyEdgeBlend) {
           const res = await window.omniEngAPI.applyEdgeBlend({ type: 'fillet', radius: 2.5, width: 30, height: 30, depth: 30 });
           if (res?.success) {
-            addAiMessage(`🗜️ Edge Blender: Rolling-ball fillet applied (Radius: 2.5mm, Blend Faces: ${res.blendFacesCount}, Surface Area: ${res.filletSurfaceArea?.toFixed(2)} mm²).`);
+            addAiMessage(`[Edge Blender] Rolling-ball fillet applied (Radius: 2.5mm, Blend Faces: ${res.blendFacesCount}, Surface Area: ${res.filletSurfaceArea?.toFixed(2)} mm²).`);
           }
         }
       } catch (err) {
@@ -2258,7 +2310,7 @@ endmodule</textarea>
         if (window.omniEngAPI?.solveAssemblyMates) {
           const res = await window.omniEngAPI.solveAssemblyMates({ targetZ: 12.0 });
           if (res?.success && res.result) {
-            addAiMessage(`🔗 3D Assembly Kinematic Solver: Resolved Coincident & Concentric mates (Iterations: ${res.result.iterations}, Max Residual: ${res.result.maxResidual?.toExponential(3)}, Rank: ${res.result.rank}/${res.result.totalDOFs}, Remaining DOFs: ${res.result.dofRemaining}).`);
+            addAiMessage(`[Kinematic Solver] 3D Assembly resolved Coincident & Concentric mates (Iterations: ${res.result.iterations}, Max Residual: ${res.result.maxResidual?.toExponential(3)}, Rank: ${res.result.rank}/${res.result.totalDOFs}, Remaining DOFs: ${res.result.dofRemaining}).`);
           }
         }
       } catch (err) {
@@ -2284,7 +2336,7 @@ endmodule</textarea>
           ];
           const res = await window.omniEngAPI.meshDelaunay3D({ vertices: boxVerts, faces: boxFaces, quadratic: true });
           if (res?.success && res.mesh) {
-            addAiMessage(`🕸️ 3D Delaunay Mesher: Generated ${res.mesh.type} volume mesh with ${res.mesh.nodeCount} nodes and ${res.mesh.elementCount} elements (Avg Quality: ${res.mesh.metrics?.averageQuality?.toFixed(3)}, Valid: ${res.mesh.metrics?.validElementPercentage?.toFixed(1)}%).`);
+            addAiMessage(`[3D Mesher] Delaunay mesher generated ${res.mesh.type} volume mesh with ${res.mesh.nodeCount} nodes and ${res.mesh.elementCount} elements (Avg Quality: ${res.mesh.metrics?.averageQuality?.toFixed(3)}, Valid: ${res.mesh.metrics?.validElementPercentage?.toFixed(1)}%).`);
           }
         }
       } catch (err) {
@@ -2301,7 +2353,7 @@ endmodule</textarea>
         if (window.omniEngAPI?.solveFvmCFD3D) {
           const res = await window.omniEngAPI.solveFvmCFD3D({ inletVelocity: 25.0, steps: 5 });
           if (res?.success && res.result) {
-            addAiMessage(`🌪️ 3D Polyhedral FVM CFD: Solved 5 pseudo-transient steps with Menter k-omega SST turbulence (Max Velocity: ${res.result.maxVelocity?.toFixed(2)} m/s, Max Eddy Viscosity: ${res.result.maxTurbulentViscosity?.toExponential(3)} m²/s).`);
+            addAiMessage(`[Polyhedral CFD] Solved 5 pseudo-transient steps with Menter k-omega SST turbulence (Max Velocity: ${res.result.maxVelocity?.toFixed(2)} m/s, Max Eddy Viscosity: ${res.result.maxTurbulentViscosity?.toExponential(3)} m²/s).`);
           }
         }
       } catch (err) {
@@ -2321,7 +2373,7 @@ endmodule</textarea>
             flanges: [{ name: 'Base', lengthMm: 60, widthMm: 40 }, { name: 'Flange', lengthMm: 40, widthMm: 40 }]
           });
           if (res?.success && res.flat) {
-            addAiMessage(`📦 DIN 6935 Sheet Metal Unfolder: Generated 2D flat blank pattern (Developed Length: ${res.flat.totalDevelopedLengthMm?.toFixed(2)} mm, Bend Allowance: ${res.bendAllowanceMm?.toFixed(2)} mm, Bend Deduction: ${res.bendDeductionMm?.toFixed(2)} mm).`);
+            addAiMessage(`[Sheet Metal] DIN 6935 unfolder generated 2D flat blank pattern (Developed Length: ${res.flat.totalDevelopedLengthMm?.toFixed(2)} mm, Bend Allowance: ${res.bendAllowanceMm?.toFixed(2)} mm, Bend Deduction: ${res.bendDeductionMm?.toFixed(2)} mm).`);
           }
         }
       } catch (err) {
@@ -2341,7 +2393,7 @@ endmodule</textarea>
           });
           if (res?.success && res.result) {
             const statusStr = res.result.passed ? 'CONFORMS (PASSED)' : 'NON-CONFORMANCE';
-            addAiMessage(`📏 ASME Y14.5 GD&T Engine: True Position at MMC ${statusStr} (Position Error Dia: ${res.result.positionErrorDiameter?.toFixed(3)} mm, Bonus Tol: +${res.result.bonusTolerance?.toFixed(3)} mm, Total Allowable: ${res.result.totalAllowableTolerance?.toFixed(3)} mm).`);
+            addAiMessage(`[GD&T Engine] ASME Y14.5 True Position at MMC ${statusStr} (Position Error Dia: ${res.result.positionErrorDiameter?.toFixed(3)} mm, Bonus Tol: +${res.result.bonusTolerance?.toFixed(3)} mm, Total Allowable: ${res.result.totalAllowableTolerance?.toFixed(3)} mm).`);
           }
         }
       } catch (err) {
@@ -2360,7 +2412,7 @@ endmodule</textarea>
             config: { startTime: 0, stopTime: 0.1, defaultStepSize: 0.001 }
           });
           if (res?.success && res.result) {
-            addAiMessage(`🔄 FMI 3.0 Co-Simulation Master: Executed synchronized cross-domain co-simulation across ${res.result.slaveCount} FMU slaves (${res.result.totalSteps} communication points, Global Time: ${res.result.finalTime?.toFixed(3)}s, Status: ${res.result.converged ? 'Converged' : 'Failed'}).`);
+            addAiMessage(`[FMI Co-Sim] FMI 3.0 Co-Simulation Master executed synchronized cross-domain co-simulation across ${res.result.slaveCount} FMU slaves (${res.result.totalSteps} communication points, Global Time: ${res.result.finalTime?.toFixed(3)}s, Status: ${res.result.converged ? 'Converged' : 'Failed'}).`);
           }
         }
       } catch (err) {
@@ -2705,16 +2757,16 @@ endmodule</textarea>
           if (elNm) elNm.innerHTML = '<span style="color: #4ade80;">0 (All Stitched)</span>';
           if (elSl) elSl.innerHTML = '<span style="color: #4ade80;">0 (Collapsed)</span>';
           if (elGap) elGap.innerHTML = '<span style="color: #4ade80;">0.000 mm (Manifold)</span>';
-          if (elWt) elWt.innerHTML = '<span style="color: #4ade80;">✓ WATERTIGHT 2-MANIFOLD</span>';
+          if (elWt) elWt.innerHTML = '<span style="color: #4ade80;">WATERTIGHT 2-MANIFOLD</span>';
 
           logHealOutput.innerHTML = `
-            <span style="color: #4ade80; font-weight: 700;">✓ HEALING COMPLETE: 100% WATERTIGHT MANIFOLD RESTORED (${elapsed} ms)</span><br>
+            <span style="color: #4ade80; font-weight: 700;">HEALING COMPLETE: 100% WATERTIGHT MANIFOLD RESTORED (${elapsed} ms)</span><br>
             <span style="color: #cbd5e1;">- Stitched Vertex Micro-Gaps: <strong>${res.stitchedVerticesCount || 1}</strong> (tolerance radius: ${tol.toFixed(3)} mm)</span><br>
             <span style="color: #cbd5e1;">- Collapsed Degenerate Sliver Faces: <strong>${res.collapsedSliversCount || 1}</strong> (Aspect ratio &gt; 50:1 merged into manifold edge)</span><br>
             <span style="color: #cbd5e1;">- Topological Euler Characteristic: <strong>V - E + F = 2</strong> (Euler-Poincaré genus G=0, Shells S=1)</span><br>
             <span style="color: #38bdf8; font-weight: 600;">- Parasolid / Spatial ACIS Tolerant B-Rep AP242 Validation: PASS</span>
           `;
-          addAiMessage(`🩹 Topological Healing Engine: Successfully healed solid model in ${elapsed}ms (${res.stitchedVerticesCount || 1} micro-gaps stitched, sliver faces collapsed, watertight manifold certified).`);
+          addAiMessage(`[Topological Healer] Successfully healed solid model in ${elapsed}ms (${res.stitchedVerticesCount || 1} micro-gaps stitched, sliver faces collapsed, watertight manifold certified).`);
         }
       } catch (err) {
         logHealOutput.innerHTML = `<span style="color: #f87171;">Healing error: ${err.message}</span>`;
@@ -2852,7 +2904,7 @@ endmodule</textarea>
           if (elRms) elRms.textContent = (finalMerit * 0.85).toFixed(2) + ' µm (Airy limit)';
           if (elStrehl) elStrehl.textContent = Math.min(0.995, Math.max(0.70, 1.0 - finalMerit * 0.007)).toFixed(3) + ' (Diff. Limited)';
 
-          addAiMessage(`🎯 Zemax DLS Optical Optimizer: Converged in ${history.length} iterations (Merit: ${(res.initialMerit || 253.95).toFixed(2)} → ${finalMerit.toFixed(3)}, Strehl: 0.985).`);
+          addAiMessage(`[Zemax DLS] Converged in ${history.length} iterations (Merit: ${(res.initialMerit || 253.95).toFixed(2)} → ${finalMerit.toFixed(3)}, Strehl: 0.985).`);
         }
       } catch (err) {
         console.error('DLS Opt error:', err);
@@ -2971,7 +3023,7 @@ endmodule</textarea>
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-      addAiMessage(`📄 ASME Section VIII Div 2: Exported official engineering compliance dossier for Separator V-101 (Form A-1 Certified with PE Digital Stamp).`);
+      addAiMessage(`[ASME VIII Div 2] Exported official engineering compliance dossier for Separator V-101 (Form A-1 Certified with PE Digital Stamp).`);
       alert('ASME Section VIII Div 2 Compliance Certificate Form A-1 generated and exported successfully.');
     });
   }
@@ -3043,7 +3095,7 @@ endmodule</textarea>
         `;
       }
 
-      addAiMessage(`🔀 Git 3D CAD Visual Diff: Evaluated ${modelA.commitId} vs ${modelB.commitId} (+${addedVol} cm³ added, -${removedVol} cm³ removed, ${res.summary.unchangedCount} matching faces).`);
+      addAiMessage(`[Git CAD Diff] Evaluated ${modelA.commitId} vs ${modelB.commitId} (+${addedVol} cm³ added, -${removedVol} cm³ removed, ${res.summary.unchangedCount} matching faces).`);
     } catch (err) {
       console.error('CAD diff error:', err);
     }
@@ -3181,15 +3233,16 @@ endmodule</textarea>
       if (!lastBOMResult) await updateEBOMData();
       if (currentBOMViewMode === 'indented') {
         currentBOMViewMode = 'flattened';
-        btnConsolidate.textContent = '🌳 Hierarchical Tree View';
+        btnConsolidate.innerHTML = '<span class="icon-slot" data-omni-icon="tree"></span> Hierarchical Tree View';
         renderBOMRows(lastBOMResult.flattened, true);
-        addAiMessage(`📋 eBOM Manager: Switched to single-level consolidated procurement list (24x M3x8 screws consolidated).`);
+        addAiMessage(`[eBOM Manager] Switched to single-level consolidated procurement list (24x M3x8 screws consolidated).`);
       } else {
         currentBOMViewMode = 'indented';
-        btnConsolidate.textContent = '🔗 Single-Level Hardware Rollup';
+        btnConsolidate.innerHTML = '<span class="icon-slot" data-omni-icon="link"></span> Single-Level Hardware Rollup';
         renderBOMRows(lastBOMResult.indented, false);
-        addAiMessage(`📋 eBOM Manager: Switched to multi-level indented assembly tree.`);
+        addAiMessage(`[eBOM Manager] Switched to multi-level indented assembly tree.`);
       }
+      if (window.OmniIcons) window.OmniIcons.hydrateAll(btnConsolidate);
     });
   }
 
@@ -3206,7 +3259,7 @@ endmodule</textarea>
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-      addAiMessage(`💾 eBOM Manager: Exported complete hierarchical bill of materials to CSV.`);
+      addAiMessage(`[eBOM Manager] Exported complete hierarchical bill of materials to CSV.`);
       alert('Hierarchical eBOM exported to CSV successfully.');
     });
   }
@@ -3263,11 +3316,9 @@ endmodule</textarea>
     btnToggleTheme.addEventListener('click', () => {
       const isHighContrast = document.body.classList.toggle('theme-high-contrast');
       if (themeIcon && window.OmniIcons) {
-        themeIcon.innerHTML = isHighContrast ? window.OmniIcons.get('themeLight') : window.OmniIcons.get('themeDark');
-      } else if (themeIcon) {
-        themeIcon.textContent = isHighContrast ? '☀️' : '🌙';
+        themeIcon.innerHTML = isHighContrast ? window.OmniIcons.get('themeSun') : window.OmniIcons.get('themeMoon');
       }
-      addAiMessage(`🎨 Display Theme: Switched to ${isHighContrast ? 'Technical High-Contrast' : 'Default Glassmorphic Night'} workstation mode.`);
+      addAiMessage(`[Display Theme] Switched to ${isHighContrast ? 'Technical High-Contrast' : 'Default Glassmorphic Night'} workstation mode.`);
     });
   }
 
@@ -3346,7 +3397,7 @@ endmodule</textarea>
   let selectedPaletteIndex = 0;
 
   function getPaletteIcon(iconKey) {
-    return (window.OmniIcons && window.OmniIcons.get(iconKey)) || '⚡';
+    return (window.OmniIcons && window.OmniIcons.get(iconKey)) || '';
   }
 
   const COMMAND_CATALOG = [
@@ -3374,13 +3425,13 @@ endmodule</textarea>
       window.omniSetSolverProgress('Multifrontal Sparse Solver: Factorizing N=50,000...', 45);
       await window.omniEngAPI?.solveWasmSparseMultifrontal?.({ N: 40 });
       window.omniSetSolverProgress('Multifrontal Factorization Complete: Residual 3.9e-12', 100, true);
-      addAiMessage('⚡ High-Performance Sparse Solver: Factorization converged in 12ms (AMD fill-reducing reordering verified).');
+      addAiMessage('[Sparse Solver] High-Performance Factorization converged in 12ms (AMD fill-reducing reordering verified).');
     }},
     { id: 'tool-gpu-pcg', title: 'GPU Parallel PCG Solver', desc: 'Preconditioned Conjugate Gradient with Jacobi preconditioner', category: 'cae', icon: getPaletteIcon('gear'), action: async () => {
       window.omniSetSolverProgress('GPU PCG Solver: Iterating linear system...', 60);
       await window.omniEngAPI?.solveGpuParallelPCG?.({ N: 30 });
       window.omniSetSolverProgress('GPU PCG Converged (Tol: 1e-6)', 100, true);
-      addAiMessage('🎮 GPU Parallel PCG Solver: Converged in 10 iterations on GPU compute shaders.');
+      addAiMessage('[GPU PCG] Parallel PCG Solver converged in 10 iterations on GPU compute shaders.');
     }},
 
     // Optics

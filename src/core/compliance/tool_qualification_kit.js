@@ -228,7 +228,7 @@ class ToolQualificationKit {
 | Requirement ID | Description | Execution Result | Latency (ms) |
 | :--- | :--- | :--- | :--- |
 | :--- | :--- | :--- | :--- |
-${summary.results.map(r => `| \`${r.id}\` | ${r.description} | ${r.passes ? '✓ PASS' : '✗ FAIL'} | ${r.durationMs}ms |`).join('\n')}
+${summary.results.map(r => `| \`${r.id}\` | ${r.description} | ${r.passes ? '[PASS]' : '[FAIL]'} | ${r.durationMs}ms |`).join('\n')}
 
 ---
 

@@ -33,8 +33,8 @@ class FlowsheetPfdUI {
         <!-- PFD Top Status Banner -->
         <div style="display: flex; justify-content: space-between; align-items: center; background: #0c1220; padding: 12px 16px; border-radius: 6px; border: 1px solid var(--border-color);">
           <div>
-            <div style="font-weight: 700; color: var(--accent-cyan); font-size: 14px;">
-              🛢️ Aspen HYSYS Cyclic Process Flowsheet — Natural Gas Condensate Plant
+            <div style="font-weight: 700; color: var(--accent-cyan); font-size: 14px; display: flex; align-items: center; gap: 8px;">
+              <span class="icon-slot" data-omni-icon="flowsheet"></span> Aspen HYSYS Cyclic Process Flowsheet — Natural Gas Condensate Plant
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
               Wegstein Acceleration Solver • Peng-Robinson (PR-EOS) Cubic Thermodynamics • Recycle Tearing Loop
@@ -42,10 +42,10 @@ class FlowsheetPfdUI {
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
             <span style="font-size: 11px; padding: 4px 10px; border-radius: 12px; background: rgba(52, 211, 153, 0.15); color: #34d399; font-weight: 600; border: 1px solid rgba(52, 211, 153, 0.3);">
-              ✓ CONVERGED (${this.solution.iterations || 5} iters)
+              CONVERGED (${this.solution.iterations || 5} iters)
             </span>
-            <button class="btn-primary" id="btn-recompute-flowsheet" style="margin-top: 0; padding: 5px 12px; font-size: 11px; width: auto;">
-              ⚡ Re-run Flowsheet
+            <button class="btn-primary" id="btn-recompute-flowsheet" style="margin-top: 0; padding: 5px 12px; font-size: 11px; width: auto; display: inline-flex; align-items: center; gap: 6px;">
+              <span class="icon-slot" data-omni-icon="refresh"></span> Re-run Flowsheet
             </button>
           </div>
         </div>
@@ -78,8 +78,8 @@ class FlowsheetPfdUI {
 
         <!-- Unit Operations Flow Architecture -->
         <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 10px;">
-            🔄 Flowsheet Block Diagram Architecture
+          <div style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+            <span class="icon-slot" data-omni-icon="flowsheet"></span> Flowsheet Block Diagram Architecture
           </div>
           <div style="display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 6px 0;">
             <!-- Unit 1: Mixer -->
@@ -89,7 +89,7 @@ class FlowsheetPfdUI {
               <div style="font-size: 9px; color: var(--text-muted);">In: [S1, S_RECYCLE] → Out: S2</div>
             </div>
 
-            <div style="color: var(--text-dim); font-size: 16px;">➔</div>
+            <div style="color: var(--text-dim); font-size: 14px;">&rarr;</div>
 
             <!-- Unit 2: Flash Drum -->
             <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; min-width: 150px; text-align: center;">
@@ -98,7 +98,7 @@ class FlowsheetPfdUI {
               <div style="font-size: 9px; color: var(--text-muted);">-20.0°C • 18.0 bar • VLE Separation</div>
             </div>
 
-            <div style="color: var(--text-dim); font-size: 16px;">➔</div>
+            <div style="color: var(--text-dim); font-size: 14px;">&rarr;</div>
 
             <!-- Unit 3: Splitter -->
             <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; min-width: 150px; text-align: center;">
@@ -107,7 +107,7 @@ class FlowsheetPfdUI {
               <div style="font-size: 9px; color: var(--text-muted);">70% Product / 30% Recycle</div>
             </div>
 
-            <div style="color: var(--text-dim); font-size: 16px;">➔</div>
+            <div style="color: var(--text-dim); font-size: 14px;">&rarr;</div>
 
             <!-- Unit 4: Recycle Loop Back -->
             <div style="background: #1e1b4b; border: 1px dashed #6366f1; border-radius: 6px; padding: 8px 12px; min-width: 150px; text-align: center;">
@@ -120,8 +120,8 @@ class FlowsheetPfdUI {
 
         <!-- Complete Stream Summary Table -->
         <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 8px;">
-            📊 Thermodynamic Stream Property Table (Aspen HYSYS Workbook Parity)
+          <div style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <span class="icon-slot" data-omni-icon="ebom"></span> Thermodynamic Stream Property Table (Aspen HYSYS Workbook Parity)
           </div>
           <div style="max-height: 220px; overflow-y: auto;">
             <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
@@ -145,6 +145,10 @@ class FlowsheetPfdUI {
         </div>
       </div>
     `;
+
+    if (typeof window !== 'undefined' && window.OmniIcons) {
+      window.OmniIcons.hydrateAll(this.container);
+    }
   }
 
   _renderStreamRows(streams) {

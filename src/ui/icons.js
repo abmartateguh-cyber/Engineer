@@ -123,7 +123,29 @@
     cube: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
     printer: `<svg ${SVG_ATTRS} class="icon-svg"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
     maximize: `<svg ${SVG_ATTRS} class="icon-svg"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
-    minimize: `<svg ${SVG_ATTRS} class="icon-svg"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`
+    minimize: `<svg ${SVG_ATTRS} class="icon-svg"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
+
+    // ----------------------------------------------------
+    // Extended Studio & Hardware Domain Symbols
+    // ----------------------------------------------------
+    smartphone: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`,
+    cameraLens: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+    lensElement: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M7 4c4 4 4 12 0 16M17 4c-4 4-4 12 0 16"/><line x1="7" y1="4" x2="17" y2="4"/><line x1="7" y1="20" x2="17" y2="20"/></svg>`,
+    aperture: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="10"/><line x1="14.31" y1="8" x2="20.05" y2="17.94"/><line x1="9.69" y1="8" x2="21.17" y2="8"/><line x1="7.38" y1="12" x2="13.12" y2="2.06"/><line x1="9.69" y1="16" x2="3.95" y2="6.06"/><line x1="14.31" y1="16" x2="2.83" y2="16"/><line x1="16.62" y1="12" x2="10.88" y2="21.94"/></svg>`,
+    dropTest: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M12 2v13M12 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM6 15l2.5-1.5M18 15l-2.5-1.5M3 21h18"/></svg>`,
+    thermalCht: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`,
+    drcCheck: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="9" y2="9"/><line x1="9" y1="3" x2="9" y2="9"/><path d="M13 14l2 2 4-4"/></svg>`,
+    drone: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="3"/><line x1="5" y1="5" x2="19" y2="19"/><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="5" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/></svg>`,
+    piping: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M3 6h6v4h6V6h6v12h-6v-4H9v4H3V6z"/></svg>`,
+    distillation: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="7" y="2" width="10" height="20" rx="3"/><line x1="7" y1="7" x2="17" y2="7"/><line x1="7" y1="11" x2="17" y2="11"/><line x1="7" y1="15" x2="17" y2="15"/><line x1="7" y1="19" x2="17" y2="19"/></svg>`,
+    simulink: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="6" height="6"/><rect x="15" y="15" width="6" height="6"/><path d="M9 6h6v9"/></svg>`,
+    pcbStack: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="4" width="18" height="3" rx="1"/><rect x="3" y="10" width="18" height="3" rx="1"/><rect x="3" y="16" width="18" height="3" rx="1"/></svg>`,
+    spotDiagram: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="10" cy="11" r="0.75" fill="currentColor"/><circle cx="14" cy="13" r="0.75" fill="currentColor"/><circle cx="13" cy="10" r="0.75" fill="currentColor"/><circle cx="11" cy="14" r="0.75" fill="currentColor"/></svg>`,
+    mtfCurve: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M3 3v18h18"/><path d="M3 6c6 0 9 10 18 15"/></svg>`,
+    refresh: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>`,
+    tree: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v9a3 3 0 0 0 3 3h6"/><path d="M6 12h12"/></svg>`,
+    themeSun: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+    themeMoon: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
   };
 
   return {
