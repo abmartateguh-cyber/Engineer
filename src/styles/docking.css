@@ -1,0 +1,217 @@
+/**
+ * OmniEng Modeless Docking System Stylesheet
+ * Enterprise CAD/CAE Multi-Window Docking, Tear-Off & Floating Panel Themes
+ */
+
+:root {
+  --dock-bg: rgba(18, 22, 28, 0.92);
+  --dock-border: rgba(255, 255, 255, 0.08);
+  --dock-header-bg: rgba(26, 32, 42, 0.85);
+  --dock-active-tab: #007acc;
+  --dock-hover-bg: rgba(255, 255, 255, 0.05);
+  --dock-text-primary: #e1e4e8;
+  --dock-text-muted: #8b949e;
+}
+
+/* Docking Containers */
+.dock-container {
+  display: flex;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dock-zone {
+  display: flex;
+  flex-direction: column;
+  background: var(--dock-bg);
+  border: 1px solid var(--dock-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 20;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dock-zone-left {
+  width: 320px;
+  height: 100%;
+  border-right: 1px solid var(--dock-border);
+}
+
+.dock-zone-right {
+  width: 380px;
+  height: 100%;
+  border-left: 1px solid var(--dock-border);
+}
+
+.dock-zone-bottom {
+  width: 100%;
+  height: 240px;
+  border-top: 1px solid var(--dock-border);
+}
+
+/* Dock Panel Header & Controls */
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--dock-header-bg);
+  border-bottom: 1px solid var(--dock-border);
+  user-select: none;
+  cursor: grab;
+}
+
+.dock-header:active {
+  cursor: grabbing;
+}
+
+.dock-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dock-text-primary);
+}
+
+.dock-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-btn {
+  background: transparent;
+  border: none;
+  color: var(--dock-text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dock-btn:hover {
+  background: var(--dock-hover-bg);
+  color: #fff;
+}
+
+/* Dock Tabs Bar */
+.dock-tabs-bar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  background: rgba(14, 18, 24, 0.95);
+  border-bottom: 1px solid var(--dock-border);
+  padding: 0 4px;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.dock-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--dock-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.dock-tab:hover {
+  color: var(--dock-text-primary);
+  background: var(--dock-hover-bg);
+}
+
+.dock-tab.active {
+  color: #fff;
+  border-bottom-color: var(--dock-active-tab);
+  background: rgba(0, 122, 204, 0.1);
+}
+
+/* Modeless Floating Panel */
+.dock-panel-floating {
+  position: absolute;
+  top: 60px;
+  left: 60px;
+  width: 520px;
+  height: 480px;
+  min-width: 320px;
+  min-height: 240px;
+  background: var(--dock-bg);
+  border: 1px solid rgba(0, 122, 204, 0.4);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.dock-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+/* Dock Drop Preview Overlay */
+.dock-drop-indicator {
+  position: absolute;
+  background: rgba(0, 122, 204, 0.25);
+  border: 2px dashed #007acc;
+  pointer-events: none;
+  z-index: 999;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+/* Quad Viewport Layout Styles */
+.quad-viewport-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  background: #0d1117;
+}
+
+.quad-pane {
+  position: relative;
+  background: #11151c;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.quad-pane.active-pane {
+  border-color: #007acc;
+  box-shadow: inset 0 0 0 1px #007acc;
+}
+
+.quad-pane-label {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #8b949e;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 10;
+}

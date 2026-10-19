@@ -13,6 +13,7 @@ const { OpticalThermalSoakEngine } = require('../../core/optics/thermal_soak');
 const { DiffractionPSFMTFEngine } = require('../../core/optics/diffraction_psf_mtf');
 const { DampedLeastSquaresOptimizer } = require('../../core/optics/damped_least_squares_optimizer');
 const { Vector3 } = require('../../core/math/linear_algebra');
+const { ZemaxZmxImporter } = require('../../core/optics/zmx_importer');
 
 function registerOpticsIpc() {
   // 1. Solve Paraxial Optics Metrics
@@ -129,6 +130,24 @@ function registerOpticsIpc() {
     const res = optimizer.optimize(system, variables, operands);
     return { success: true, ...res };
   }, { domain: 'optics', description: 'Levenberg-Marquardt DLS merit function optimization' });
+
+  // 10. Zemax OpticStudio (.ZMX) Lens Prescription Import & Analysis
+  defineHandler('omni:import-zmx-optics', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { content = '', filePath = '' } = params;
+    let rawContent = content;
+    if (!rawContent && filePath) {
+      const fs = require('fs');
+      if (fs.existsSync(filePath)) {
+        rawContent = fs.readFileSync(filePath);
+      }
+    }
+    const system = ZemaxZmxImporter.parse(rawContent);
+    const paraxial = ZemaxZmxImporter.computeParaxialMetrics(system);
+    return { success: true, system, paraxial };
+  }, { domain: 'optics', description: 'Parse Zemax OpticStudio .zmx file into sequential optical model' });
 }
 
 module.exports = { registerOpticsIpc };

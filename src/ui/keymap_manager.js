@@ -27,7 +27,8 @@ const KEYMAP_PROFILES = {
       'Ctrl+KeyJ': 'ACTION_TOGGLE_AI_DOCK',
       'Ctrl+KeyS': 'ACTION_SAVE_PROJECT',
       'Ctrl+KeyZ': 'ACTION_UNDO',
-      'Ctrl+KeyY': 'ACTION_REDO'
+      'Ctrl+KeyY': 'ACTION_REDO',
+      'Ctrl+Alt+KeyQ': 'ACTION_TOGGLE_QUAD_VIEW'
     }
   },
   CATIA_V5: {
@@ -113,6 +114,66 @@ class KeymapManager {
 
   setCustomBinding(keyCombination, actionId) {
     this.customBindings.set(keyCombination, actionId);
+    this.saveToStorage();
+  }
+
+  resetCustomBindings() {
+    this.customBindings.clear();
+    this.saveToStorage();
+  }
+
+  exportCustomBindings() {
+    const obj = {};
+    for (const [k, v] of this.customBindings.entries()) {
+      obj[k] = v;
+    }
+    return JSON.stringify({ profile: this.currentProfile, bindings: obj }, null, 2);
+  }
+
+  importCustomBindings(jsonString) {
+    try {
+      const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+      if (data.profile && KEYMAP_PROFILES[data.profile]) {
+        this.setProfile(data.profile);
+      }
+      if (data.bindings) {
+        for (const [k, v] of Object.entries(data.bindings)) {
+          this.customBindings.set(k, v);
+        }
+      }
+      this.saveToStorage();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  saveToStorage() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const data = {
+        profile: this.currentProfile,
+        custom: Object.fromEntries(this.customBindings)
+      };
+      localStorage.setItem('omnieng_workstation_keymaps', JSON.stringify(data));
+    } catch (_) {}
+  }
+
+  restoreFromStorage() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem('omnieng_workstation_keymaps');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.profile && KEYMAP_PROFILES[data.profile]) {
+        this.currentProfile = data.profile;
+      }
+      if (data.custom) {
+        for (const [k, v] of Object.entries(data.custom)) {
+          this.customBindings.set(k, v);
+        }
+      }
+    } catch (_) {}
   }
 
   onAction(actionId, callback) {

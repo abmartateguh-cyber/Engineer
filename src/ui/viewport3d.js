@@ -32,6 +32,10 @@ class Viewport3D {
     this.cameraDistance = 220;
     this.cameraAngle = { theta: 0.65, phi: 0.85 }; // Spherical coordinates
     this.target = new THREE.Vector3(0, 0, 0);
+    this.isQuadView = false;
+    this.topCamera = null;
+    this.frontCamera = null;
+    this.rightCamera = null;
 
     // Raycaster for interactive component probing
     this.raycaster = new THREE.Raycaster();
@@ -69,6 +73,24 @@ class Viewport3D {
     // 2. Camera setup
     this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 3000);
     this.updateCameraPosition();
+
+    // Quad Viewport Orthographic Cameras
+    const fovH = 150;
+    const aspectQuad = Math.max(0.5, (width / 2) / (height / 2));
+    this.topCamera = new THREE.OrthographicCamera(-fovH * aspectQuad, fovH * aspectQuad, fovH, -fovH, 0.1, 3000);
+    this.topCamera.position.set(0, 400, 0);
+    this.topCamera.up.set(0, 0, -1);
+    this.topCamera.lookAt(0, 0, 0);
+
+    this.frontCamera = new THREE.OrthographicCamera(-fovH * aspectQuad, fovH * aspectQuad, fovH, -fovH, 0.1, 3000);
+    this.frontCamera.position.set(0, 0, 400);
+    this.frontCamera.up.set(0, 1, 0);
+    this.frontCamera.lookAt(0, 0, 0);
+
+    this.rightCamera = new THREE.OrthographicCamera(-fovH * aspectQuad, fovH * aspectQuad, fovH, -fovH, 0.1, 3000);
+    this.rightCamera.position.set(400, 0, 0);
+    this.rightCamera.up.set(0, 1, 0);
+    this.rightCamera.lookAt(0, 0, 0);
 
     // 3. Renderer setup
     this.renderer = new THREE.WebGLRenderer({
@@ -241,8 +263,35 @@ class Viewport3D {
     if (width && height && this.renderer) {
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
+
+      if (this.topCamera && this.frontCamera && this.rightCamera) {
+        const aspectQuad = Math.max(0.5, (width / 2) / (height / 2));
+        const fovH = 150;
+        [this.topCamera, this.frontCamera, this.rightCamera].forEach(cam => {
+          cam.left = -fovH * aspectQuad;
+          cam.right = fovH * aspectQuad;
+          cam.top = fovH;
+          cam.bottom = -fovH;
+          cam.updateProjectionMatrix();
+        });
+      }
+
       this.renderer.setSize(width, height);
     }
+  }
+
+  setQuadView(enabled) {
+    this.isQuadView = !!enabled;
+    const statsEl = document.getElementById('viewport-stats');
+    if (statsEl) {
+      statsEl.title = this.isQuadView ? 'Viewport: Quad View (Top, Front, Right, Isometric)' : 'Viewport: Single Perspective';
+    }
+    this.onResize();
+  }
+
+  toggleQuadView() {
+    this.setQuadView(!this.isQuadView);
+    return this.isQuadView;
   }
 
   animate() {
@@ -269,7 +318,40 @@ class Viewport3D {
     }
 
     if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
+      if (this.isQuadView && this.topCamera && this.frontCamera && this.rightCamera) {
+        const w = this.canvas.clientWidth;
+        const h = this.canvas.clientHeight;
+        const halfW = Math.floor(w / 2);
+        const halfH = Math.floor(h / 2);
+
+        this.renderer.setScissorTest(true);
+
+        // 1. Top View (Top-Left quadrant: x=0, y=halfH)
+        this.renderer.setViewport(0, halfH, halfW, halfH);
+        this.renderer.setScissor(0, halfH, halfW, halfH);
+        this.renderer.render(this.scene, this.topCamera);
+
+        // 2. Perspective Isometric View (Top-Right quadrant: x=halfW, y=halfH)
+        this.renderer.setViewport(halfW, halfH, halfW, halfH);
+        this.renderer.setScissor(halfW, halfH, halfW, halfH);
+        this.renderer.render(this.scene, this.camera);
+
+        // 3. Front View (Bottom-Left quadrant: x=0, y=0)
+        this.renderer.setViewport(0, 0, halfW, halfH);
+        this.renderer.setScissor(0, 0, halfW, halfH);
+        this.renderer.render(this.scene, this.frontCamera);
+
+        // 4. Right View (Bottom-Right quadrant: x=halfW, y=0)
+        this.renderer.setViewport(halfW, 0, halfW, halfH);
+        this.renderer.setScissor(halfW, 0, halfW, halfH);
+        this.renderer.render(this.scene, this.rightCamera);
+
+        this.renderer.setScissorTest(false);
+      } else {
+        this.renderer.setScissorTest(false);
+        this.renderer.setViewport(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+        this.renderer.render(this.scene, this.camera);
+      }
     }
   }
 

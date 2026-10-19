@@ -149,6 +149,14 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   getKeymapProfiles: (params) => ipcRenderer.invoke('omni:get-keymap-profiles', params),
   getAcceleratorInfo: () => ipcRenderer.invoke('omni:get-accelerator-info'),
 
+  // Flagship Domain Depth & Advanced Compute Host (Phases 2, 5, 6)
+  solveContactMechanics3D: (params) => ipcRenderer.invoke('omni:solve-contact-mechanics-3d', params),
+  importZmxOptics: (params) => ipcRenderer.invoke('omni:import-zmx-optics', params),
+  submitComputeJob: (taskType, payload, options) => ipcRenderer.invoke('omni:submit-compute-job', { taskType, payload, options }),
+  cancelComputeJob: (jobId) => ipcRenderer.invoke('omni:cancel-compute-job', { jobId }),
+  getComputeTelemetry: () => ipcRenderer.invoke('omni:get-compute-telemetry'),
+  runVVBenchmarks: (options) => ipcRenderer.invoke('omni:run-vv-benchmarks', options),
+
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

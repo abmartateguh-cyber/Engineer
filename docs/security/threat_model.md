@@ -12,7 +12,7 @@ OmniEng is an industrial-grade engineering computer-aided workstation integratin
 
 The platform employs a **defense-in-depth, zero-trust boundary model**:
 1. **Renderer Isolation:** The UI renderer process is treated as completely untrusted. Even if an adversary achieves arbitrary JavaScript execution inside the renderer (e.g. through a compromised web dependency or malicious dynamic diagram), they are constrained by strict OS sandboxing, context isolation, and a hardened Content Security Policy.
-2. **Schema-Gated IPC Gateway:** Zero raw IPC invocations are permitted. 100% of IPC channels (98/98) are routed through a declarative schema validation engine that strictly types, bounds, and scrubs inputs, neutralizing prototype pollution and path traversal attacks before dispatching to computational kernels.
+2. **Schema-Gated IPC Gateway:** Zero raw IPC invocations are permitted. 100% of IPC channels (104/104) are routed through a declarative schema validation engine that strictly types, bounds, and scrubs inputs, neutralizing prototype pollution and path traversal attacks before dispatching to computational kernels.
 3. **Cryptographic Protection at Rest:** Engineering assemblies, schematics, and simulation results are protected using an AES-256-GCM authenticated vault with PBKDF2 key derivation (100,000 rounds) and decompression bomb protection.
 4. **Fuzz-Hardened Parser Pipeline:** All binary and ASCII file importers (STEP ISO 10303-21, GDSII Stream, SEMI P39 OASIS, IEEE 1800 SystemVerilog, and `.omni` archives) undergo extensive automated fuzzing (12,000+ vector campaigns per release) to eliminate memory safety vulnerabilities and denial-of-service risks.
 
@@ -47,7 +47,7 @@ The platform employs a **defense-in-depth, zero-trust boundary model**:
 +-----------------------------------------------------------------------------------+
 |                      TRUSTED MAIN PROCESS IPC SECURITY GATEWAY                    |
 |  - defineHandler(channel, schema, handler)                                        |
-|  - 100% Schema Validation (98 / 98 Channels Verified)                             |
+|  - 100% Schema Validation (104 / 104 Channels Verified)                            |
 |  - Prototype Pollution Stripper (CWE-1321 Mitigation)                             |
 |  - Path Traversal & Canonicalization Sanitizer (CWE-22 Mitigation)                |
 |  - CI Enforced Gate: scripts/check_ipc.js (Zero raw ipcMain.handle violations)    |

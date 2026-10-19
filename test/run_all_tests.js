@@ -797,6 +797,16 @@ passedTests += fuzzStats.passed;
 failedTests += (fuzzStats.total - fuzzStats.passed);
 
 // ----------------------------------------------------
+// Suite 26: Tier-1 Verification & Validation (V&V) Certification Pack (Phase 6)
+// Standards: NAFEMS (LE1, LE10, FV32, T1), NASA TMR Flat Plate, NIST Sparse, Hertz Contact
+// ----------------------------------------------------
+const { runVVVerificationBenchmarks } = require('./vv/run_vv');
+const vvStats = runVVVerificationBenchmarks();
+totalTests += vvStats.total;
+passedTests += vvStats.passed;
+failedTests += (vvStats.total - vvStats.passed);
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

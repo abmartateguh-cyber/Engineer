@@ -14,6 +14,8 @@ const { MaterialManager } = require('../../core/materials/material_database');
 const { AuditReportGenerator } = require('../../core/reporting/audit_report');
 const { COMMUNITY_SAMPLES } = require('../../samples/community_samples');
 const { accelerator } = require('../../core/math/native_accelerator_interface');
+const { getComputeHost } = require('../compute_host');
+const { runVVVerificationBenchmarks } = require('../../../test/vv/run_vv');
 
 function registerSystemIpc(deps = {}) {
   const aiEngine = deps.aiEngine;
@@ -265,6 +267,44 @@ function registerSystemIpc(deps = {}) {
       tier: 'Local Workstation (Air-Gapped)'
     };
   }, { domain: 'system', description: 'Query host platform architecture, CPU core topology, and memory' });
+
+  // 20. Submit High-Performance Compute Host Job
+  defineHandler('omni:submit-compute-job', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { taskType = 'FEA_SOLVE', payload = {}, options = {} } = params;
+    const host = getComputeHost();
+    const result = await host.submitJob(taskType, payload, options);
+    return { success: true, result };
+  }, { domain: 'system', description: 'Submit parallel compute job to high-performance out-of-process compute host' });
+
+  // 21. Cancel High-Performance Compute Host Job
+  defineHandler('omni:cancel-compute-job', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { jobId } = params;
+    const host = getComputeHost();
+    const cancelled = host.cancelJob(jobId);
+    return { success: true, cancelled };
+  }, { domain: 'system', description: 'Cancel running or queued high-performance compute host job' });
+
+  // 22. Get Compute Host Telemetry
+  defineHandler('omni:get-compute-telemetry', {
+    optional: true
+  }, async () => {
+    const host = getComputeHost();
+    return { success: true, telemetry: host.getTelemetry() };
+  }, { domain: 'system', description: 'Query compute host active concurrency, queued tasks, and memory' });
+
+  // 23. Run V&V Regulatory Benchmark Suite
+  defineHandler('omni:run-vv-benchmarks', {
+    optional: true
+  }, async () => {
+    const report = runVVVerificationBenchmarks();
+    return { success: true, report };
+  }, { domain: 'system', description: 'Execute ASME V&V 10 / NAFEMS regulatory verification benchmark pack' });
 }
 
 module.exports = { registerSystemIpc };

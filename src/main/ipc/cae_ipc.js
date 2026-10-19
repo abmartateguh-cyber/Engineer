@@ -262,6 +262,24 @@ function registerCaeIpc() {
     const res = kernel.solvePressurePoisson(p, b);
     return { success: res.converged, ...res };
   }, { domain: 'cae', description: 'Solve pressure Poisson equation on high-capacity grid' });
+
+  // 17. 3D Nonlinear Contact Mechanics (Augmented Lagrangian & Hertz Parity)
+  defineHandler('omni:solve-contact-mechanics-3d', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { ContactMechanics3D } = require('../../core/cae/contact_mechanics_3d');
+    const contact = new ContactMechanics3D(params.options || {});
+    const res = contact.solveSphereOnFlatContact({
+      radius1: params.radius || 10.0e-3,
+      load: params.load || 1000.0,
+      E1: params.E1 || 210.0e9,
+      nu1: params.nu1 !== undefined ? params.nu1 : 0.3,
+      E2: params.E2 || 210.0e9,
+      nu2: params.nu2 !== undefined ? params.nu2 : 0.3
+    });
+    return { success: res.converged, ...res, maxPressureMpa: parseFloat(res.numerical.maxPressureMpa.toFixed(1)) };
+  }, { domain: 'cae', description: 'Solve 3D multi-body contact with augmented Lagrangian Hertz verification' });
 }
 
 module.exports = { registerCaeIpc };
