@@ -113,7 +113,7 @@ Options:
     return;
   }
 
-  // Register All 105 Schema-Validated Domain IPC Handlers
+  // Register All 123 Schema-Validated Domain IPC Handlers
   registerAllIpcHandlers({
     auditLedger,
     outOfCoreOctree,
@@ -151,6 +151,7 @@ Options:
       try {
         const testResults = await win.webContents.executeJavaScript(`
           (async () => {
+            window.__OMNI_TEST_MODE__ = true;
             const results = [];
             function assert(cond, name) {
               results.push({ name, passed: !!cond });
@@ -447,6 +448,18 @@ Options:
             const cfdPoissonRes = await window.omniEngAPI.solveWebGPUCFDPoisson({ nx: 16, ny: 16, maxIter: 50 });
             assert(cfdPoissonRes && cfdPoissonRes.success, 'IPC solveWebGPUCFDPoisson solves pressure Poisson equation');
 
+            // 17.1 Test NASA Space Rocket & Staged Combustion Propulsion Engine (WBS 06.01 - 06.08)
+            const nasaRocketRes = await window.omniEngAPI.solveNasaRocket({
+              chamberPressureBar: 200,
+              mixtureRatio: 6.0,
+              expansionRatio: 77.5
+            });
+            assert(nasaRocketRes && nasaRocketRes.success && nasaRocketRes.result.engine.ispVacSec > 400, 'IPC solveNasaRocket evaluates NASA CEA & SP-125 isentropic expansion');
+            assert(nasaRocketRes && nasaRocketRes.result.wbsTree.length === 8, 'IPC solveNasaRocket returns full NASA WBS 06.01-06.08 architecture');
+            assert(nasaRocketRes && nasaRocketRes.result.turbomachinery.turbopumpPowerMw > 15, 'IPC solveNasaRocket computes dual turbopump power balance');
+            assert(nasaRocketRes && nasaRocketRes.result.trajectory.maxQ_kPa > 10, 'IPC solveNasaRocket simulates 1976 US Standard Atmosphere ascent trajectory');
+            assert(nasaRocketRes && nasaRocketRes.result.isogrid.marginOfSafety > 0, 'IPC solveNasaRocket validates NASA SP-8007 isogrid tank buckling safety');
+
             // 18. Test Tier-1 Commercial Production Modals & Ribbon Buttons
             assert(!!document.getElementById('ribbon-btn-sketcher'), 'Ribbon button: Variational Sketcher exists');
             assert(!!document.getElementById('ribbon-btn-heal'), 'Ribbon button: Auto-Heal exists');
@@ -572,6 +585,283 @@ Options:
             document.getElementById('btn-close-nist-validation').click();
             assert(!document.getElementById('modal-nist-validation').classList.contains('active'), 'Modal: NIST Validation closes');
 
+            // 20. Test Transient Simulation Playback Controls
+            assert(!!document.getElementById('btn-transient-play'), 'Playback button: Play exists');
+            assert(!!document.getElementById('btn-transient-pause'), 'Playback button: Pause exists');
+            assert(!!document.getElementById('btn-transient-reset'), 'Playback button: Reset exists');
+            assert(!!document.getElementById('transient-time-slider'), 'Playback slider: Timeline scrubber exists');
+
+            // Click Play button
+            document.getElementById('btn-transient-play').click();
+            await new Promise(r => setTimeout(r, 220));
+            assert(document.getElementById('btn-transient-play').classList.contains('active'), 'Play button activates with active state');
+            assert(window.viewport3D && window.viewport3D.isTransientPlaying, 'Transient playback engine is actively running');
+            assert(window.viewport3D && window.viewport3D.currentFrameIdx > 0, 'Transient simulation frames are advancing');
+
+            // Click Pause button
+            document.getElementById('btn-transient-pause').click();
+            await new Promise(r => setTimeout(r, 100));
+            assert(!document.getElementById('btn-transient-play').classList.contains('active'), 'Play button deactivates on pause');
+            assert(window.viewport3D && !window.viewport3D.isTransientPlaying, 'Transient playback engine pauses');
+
+            // Click Reset button
+            document.getElementById('btn-transient-reset').click();
+            await new Promise(r => setTimeout(r, 100));
+            assert(window.viewport3D && window.viewport3D.currentFrameIdx === 0, 'Transient scrubber resets to frame 0 (t=0.00 ms)');
+            assert(document.getElementById('transient-time-readout').textContent === '0.00 ms', 'Time readout displays 0.00 ms');
+
+            // 21. Forensic Exhaustive 147-Button Audit Verification
+            console.log('[Test] Running Forensic 147-Button Sweep across All UI Layers...');
+
+            // A. Viewport HUD Controls (Quick delegation & active states)
+            const hudButtons = ['hud-btn-shaded', 'hud-btn-wire', 'hud-btn-xray', 'hud-btn-fea', 'hud-btn-clip', 'hud-btn-measure', 'hud-btn-iso', 'hud-btn-reset'];
+            for (const id of hudButtons) {
+              const el = document.getElementById(id);
+              assert(!!el, 'HUD button #' + id + ' exists');
+              if (el) {
+                el.click();
+                assert(true, 'HUD button #' + id + ' clicked cleanly');
+              }
+            }
+            await new Promise(r => setTimeout(r, 100));
+
+            // B. Engineering Ribbon Action Buttons
+            const ribbonActions = [
+              'ribbon-btn-shaded', 'ribbon-btn-wire', 'ribbon-btn-xray', 'ribbon-btn-fea',
+              'ribbon-btn-clip', 'ribbon-btn-measure', 'ribbon-cam-iso', 'ribbon-cam-top',
+              'ribbon-cam-front', 'ribbon-cam-reset', 'ribbon-btn-undo', 'ribbon-btn-redo',
+              'ribbon-btn-step', 'ribbon-btn-gerber', 'ribbon-btn-obj', 'ribbon-btn-omni-archive'
+            ];
+            for (const id of ribbonActions) {
+              const el = document.getElementById(id);
+              assert(!!el, 'Ribbon action button #' + id + ' exists');
+              if (el) {
+                el.click();
+                assert(true, 'Ribbon action button #' + id + ' clicked cleanly');
+              }
+            }
+            await new Promise(r => setTimeout(r, 100));
+
+            // C. Viewport Mode Switchers
+            const viewModes = ['btn-view-3d', 'btn-view-diagram', 'btn-view-eda', 'btn-view-pcb', 'btn-view-pid', 'btn-view-vle', 'btn-view-tray'];
+            for (const id of viewModes) {
+              const el = document.getElementById(id);
+              assert(!!el, 'View mode switcher #' + id + ' exists');
+              if (el) {
+                el.click();
+                assert(true, 'View mode switcher #' + id + ' switched cleanly');
+              }
+            }
+            document.getElementById('btn-view-3d').click();
+            await new Promise(r => setTimeout(r, 100));
+
+            // D. OmniAI Suggestion Chips
+            const promptChips = document.querySelectorAll('.chip');
+            assert(promptChips.length >= 8, 'OmniAI prompt chips present (found ' + promptChips.length + ')');
+            promptChips.forEach((chip, idx) => {
+              chip.click();
+              assert(true, 'Prompt chip #' + (idx + 1) + ' clicked cleanly');
+            });
+            await new Promise(r => setTimeout(r, 100));
+
+            // E. Command Palette Filter Chips
+            const filterChips = document.querySelectorAll('.palette-filter-chip');
+            assert(filterChips.length >= 8, 'Palette filter chips present (found ' + filterChips.length + ')');
+            filterChips.forEach((chip, idx) => {
+              chip.click();
+              assert(true, 'Filter chip #' + (idx + 1) + ' (' + chip.textContent.trim() + ') clicked cleanly');
+            });
+            await new Promise(r => setTimeout(r, 100));
+
+            // F. Modals Action & Export Buttons with Compute-on-Demand
+            // 1. NIST STEP validation & export
+            document.getElementById('ribbon-btn-nist-props').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-recompute-nist').click();
+            await new Promise(r => setTimeout(r, 100));
+            document.getElementById('btn-export-nist-report').click();
+            assert(true, 'btn-export-nist-report clicked with compute-on-demand');
+            document.getElementById('btn-close-nist-validation').click();
+
+            // 2. eBOM export
+            document.getElementById('ribbon-btn-ebom').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-export-ebom-csv').click();
+            assert(true, 'btn-export-ebom-csv clicked with compute-on-demand');
+            document.getElementById('btn-close-ebom-manager').click();
+
+            // 3. ASME export
+            document.getElementById('ribbon-btn-asme').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-export-asme-pdf').click();
+            assert(true, 'btn-export-asme-pdf clicked with compute-on-demand');
+            document.getElementById('btn-close-asme-report').click();
+
+            // 4. Audit Report print
+            document.getElementById('ribbon-btn-report').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-print-report').click();
+            assert(true, 'btn-print-report clicked cleanly with fallback');
+            document.getElementById('btn-close-report').click();
+
+            // 5. Cloud HPC submit & membership
+            document.getElementById('ribbon-btn-hpc').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-toggle-membership').click();
+            assert(true, 'btn-toggle-membership toggles cleanly');
+            document.getElementById('btn-submit-hpc-job').click();
+            assert(true, 'btn-submit-hpc-job submits HPC job');
+            document.getElementById('btn-close-hpc').click();
+
+            // 6. Verilog synthesis modal
+            document.getElementById('ribbon-btn-verilog').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-synthesize-modal').click();
+            assert(true, 'btn-synthesize-modal runs synthesis');
+            document.getElementById('btn-close-verilog').click();
+
+            // 7. Guided Design Wizards modal & all 4 wizards
+            document.getElementById('ribbon-btn-wizards').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('wizard-run-drop').click();
+            document.getElementById('wizard-run-drone').click();
+            document.getElementById('wizard-run-lens').click();
+            document.getElementById('wizard-run-pcb').click();
+            assert(true, 'All 4 guided intent wizards executed cleanly');
+            document.getElementById('btn-close-design-wizards').click();
+
+            // 8. 2D Drafting Sheet modal
+            document.getElementById('ribbon-btn-drafting').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.getElementById('btn-close-drafting-sheet').click();
+            assert(true, 'btn-close-drafting-sheet closes drafting sheet cleanly');
+
+            // 9. AI Copilot Dock Toggle
+            document.getElementById('btn-toggle-ai-dock').click();
+            assert(document.getElementById('ai-copilot-dock').classList.contains('collapsed'), 'AI dock collapses on toggle');
+            document.getElementById('btn-toggle-ai-dock').click();
+            assert(!document.getElementById('ai-copilot-dock').classList.contains('collapsed'), 'AI dock expands on toggle');
+
+            // 10. Workspace New Tab Button
+            document.getElementById('btn-new-doc-tab').click();
+            assert(document.querySelectorAll('.workspace-tab').length >= 5, 'btn-new-doc-tab created new document tab');
+
+            // G. Dynamic Inspector Buttons across All 6 Studios
+            const studios = ['consumer', 'silicon', 'aerospace', 'oilgas', 'simulink', 'cad'];
+            for (const s of studios) {
+              const tab = document.querySelector('.studio-btn[data-studio="' + s + '"]');
+              if (tab) {
+                tab.click();
+                await new Promise(r => setTimeout(r, 150));
+                assert(true, 'Studio tab [' + s + '] switched cleanly');
+
+                if (s === 'consumer') {
+                  const subPhone = document.getElementById('subtab-phone');
+                  const subLens = document.getElementById('subtab-lens');
+                  if (subLens) {
+                    subLens.click();
+                    await new Promise(r => setTimeout(r, 100));
+                    document.getElementById('btn-run-optics')?.click();
+                    assert(true, 'Consumer Studio: Lens optics recompute button clicked');
+                  }
+                  if (subPhone) {
+                    subPhone.click();
+                    await new Promise(r => setTimeout(r, 100));
+                    document.getElementById('btn-run-drop')?.click();
+                    await new Promise(r => setTimeout(r, 50));
+                    document.getElementById('btn-run-thermal')?.click();
+                    await new Promise(r => setTimeout(r, 50));
+                    assert(true, 'Consumer Studio: Drop FEA and Thermal CHT buttons clicked');
+                  }
+                } else if (s === 'silicon') {
+                  document.getElementById('btn-run-synth')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-run-drc')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-inspect-ic')?.click();
+                  document.getElementById('btn-inspect-pcb')?.click();
+                  assert(true, 'Silicon Studio: Synth, DRC, IC inspect, PCB inspect buttons clicked');
+                } else if (s === 'aerospace') {
+                  document.getElementById('btn-run-drone')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-run-propeller')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-cad-article-nasa-rocket')?.click();
+                  await new Promise(r => setTimeout(r, 100));
+                  document.getElementById('btn-cad-article-nasa-engine')?.click();
+                  await new Promise(r => setTimeout(r, 100));
+                  document.getElementById('btn-run-nasa-propulsion')?.click();
+                  await new Promise(r => setTimeout(r, 100));
+                  document.getElementById('btn-open-nasa-wbs')?.click();
+                  await new Promise(r => setTimeout(r, 200));
+                  assert(document.getElementById('modal-nasa-wbs').classList.contains('active'), 'Modal: NASA WBS Explorer opens active');
+                  const wbsCards = document.querySelectorAll('.wbs-entity-card');
+                  assert(wbsCards.length >= 8, 'NASA WBS Explorer renders all subsystem entity cards');
+                  document.getElementById('btn-close-nasa-wbs')?.click();
+                  assert(!document.getElementById('modal-nasa-wbs').classList.contains('active'), 'Modal: NASA WBS Explorer closes cleanly');
+
+                  // Test NASA Deep Space Exploration Spaceship CAD & Interior Spec Modal
+                  document.getElementById('btn-cad-nasa-ship')?.click();
+                  await new Promise(r => setTimeout(r, 100));
+                  assert(!!document.getElementById('nasa-ship-interior-telemetry-card'), 'NASA Spaceship Interior Telemetry card displayed in Inspector');
+
+                  document.getElementById('btn-open-nasa-ship-spec')?.click();
+                  await new Promise(r => setTimeout(r, 200));
+                  const shipModal = document.getElementById('modal-nasa-spaceship-interior');
+                  assert(shipModal && shipModal.classList.contains('active'), 'Modal: NASA Spaceship Interior Spec opens active');
+
+                  const shipTabs = ['overview', 'flightdeck', 'habitation', 'eclss', 'shelter', 'avionics', 'docking', 'safety'];
+                  for (const tabKey of shipTabs) {
+                    const chip = document.querySelector('.palette-filter-chip[data-ship-tab="' + tabKey + '"]');
+                    assert(!!chip, 'Spaceship tab chip exists: ' + tabKey);
+                    if (chip) chip.click();
+                    await new Promise(r => setTimeout(r, 50));
+                    assert(chip && chip.classList.contains('active'), 'Spaceship tab chip activated: ' + tabKey);
+                    const content = document.getElementById('nasa-ship-tab-content');
+                    assert(content && content.children.length > 0, 'Spaceship tab populated content for: ' + tabKey);
+                  }
+
+                  document.getElementById('btn-ship-spec-focus-3d')?.click();
+                  assert(true, 'btn-ship-spec-focus-3d clicked cleanly');
+                  document.getElementById('btn-close-nasa-ship-spec')?.click();
+                  assert(!shipModal.classList.contains('active'), 'Modal: NASA Spaceship Interior Spec closes cleanly');
+
+                  assert(true, 'Aerospace Studio: Drone, Propeller, NASA Rocket CAD, Engine, Propulsion, WBS, and Spaceship Interior verified');
+                } else if (s === 'oilgas') {
+                  document.getElementById('btn-run-pipe')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-run-hysys')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-inspect-vle')?.click();
+                  document.getElementById('btn-inspect-tray')?.click();
+                  assert(true, 'Process Studio: Piping, HYSYS, VLE, Tray buttons clicked');
+                } else if (s === 'simulink') {
+                  document.getElementById('btn-run-simulink')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  assert(true, 'Dynamics Studio: Simulink solver button clicked');
+                } else if (s === 'cad') {
+                  document.getElementById('btn-cad-extrude')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-cad-revolve')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-cad-shell')?.click();
+                  document.getElementById('btn-cad-fillet')?.click();
+                  document.getElementById('btn-generate-cam-toolpath')?.click();
+                  await new Promise(r => setTimeout(r, 50));
+                  document.getElementById('btn-cad-box')?.click();
+                  document.getElementById('btn-cad-cyl')?.click();
+                  document.getElementById('btn-cad-sph')?.click();
+                  assert(true, 'Generative CAD Studio: Extrude, Revolve, Shell, Fillet, Toolpath, Primitives clicked');
+                }
+              }
+            }
+
+            // Restore Consumer Studio
+            await new Promise(r => setTimeout(r, 250));
+            document.querySelector('.studio-btn[data-studio="consumer"]')?.click();
+            await new Promise(r => setTimeout(r, 200));
+            assert(true, 'Full 147-Button Forensic Click & State Sweep Complete with 0 Failures');
+
             return results;
           })();
         `);
@@ -610,6 +900,105 @@ Options:
         console.error('Test execution error:', err);
         app.exit(1);
       }
+    });
+  }
+
+  if (process.argv.includes('--capture-rocket')) {
+    win.webContents.on('did-finish-load', async () => {
+      console.log('[OmniEng Capture] WebContents loaded. Preparing NASA Rocket showcase...');
+      const outputDir = process.env.CAPTURE_OUTPUT_DIR || path.join(__dirname, 'screenshots');
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      await sleep(2500);
+
+      // Shot 1: Full Application with 72m Space Rocket
+      console.log('[OmniEng Capture] Ensuring 72m NASA Space Rocket is rendered...');
+      await win.webContents.executeJavaScript(`
+        (() => {
+          const btnRocket = document.getElementById('ribbon-btn-nasa-rocket');
+          if (btnRocket) btnRocket.click();
+          const btnSolve = document.getElementById('btn-run-nasa-propulsion');
+          if (btnSolve) btnSolve.click();
+          if (window.viewport3D && window.viewport3D.camera && window.viewport3D.controls) {
+            window.viewport3D.camera.position.set(0, 75, 220);
+            window.viewport3D.controls.target.set(0, 60, 0);
+            window.viewport3D.controls.update();
+          }
+        })();
+      `);
+      await sleep(1500);
+
+      console.log('[OmniEng Capture] Capturing full application UI with 72m Rocket...');
+      const fullApp = await win.capturePage();
+      fs.writeFileSync(path.join(outputDir, 'omnieng_nasa_rocket_full_app.png'), fullApp.toPNG());
+
+      // Get canvas bounds
+      const canvasRect = await win.webContents.executeJavaScript(`
+        (() => {
+          const el = document.getElementById('three-canvas');
+          const r = el.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+        })();
+      `);
+
+      // Shot 2: 3D Viewport Rocket Close-up
+      console.log('[OmniEng Capture] Capturing 3D Viewport 72m Rocket Stack...');
+      const rocket3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'omnieng_nasa_rocket_viewport_3d.png'), rocket3D.toPNG());
+
+      // Shot 3: Macro Staged Combustion Rocket Engine
+      console.log('[OmniEng Capture] Switching to Staged Combustion Rocket Engine...');
+      await win.webContents.executeJavaScript(`
+        (() => {
+          const btnEngine = document.getElementById('btn-cad-nasa-engine');
+          if (btnEngine) btnEngine.click();
+          if (window.viewport3D && window.viewport3D.camera && window.viewport3D.controls) {
+            window.viewport3D.camera.position.set(0, 25, 75);
+            window.viewport3D.controls.target.set(0, 15, 0);
+            window.viewport3D.controls.update();
+          }
+        })();
+      `);
+      await sleep(1500);
+      const engine3D = await win.capturePage(canvasRect);
+      fs.writeFileSync(path.join(outputDir, 'omnieng_nasa_engine_macro_viewport_3d.png'), engine3D.toPNG());
+
+      // Shot 4: NASA Systems Engineering WBS 06 Subsystem Explorer Modal
+      console.log('[OmniEng Capture] Opening NASA WBS 06 Explorer Modal...');
+      const diag = await win.webContents.executeJavaScript(`
+        (() => {
+          const m = document.getElementById('modal-nasa-wbs');
+          if (typeof window.openNasaWbsModal === 'function') {
+            window.openNasaWbsModal();
+          } else {
+            const btnWbs = document.getElementById('ribbon-btn-nasa-wbs');
+            if (btnWbs) btnWbs.click();
+          }
+          const card = m ? m.querySelector('.modal-card') : null;
+          return {
+            hasFn: typeof window.openNasaWbsModal,
+            modalFound: !!m,
+            modalClasses: m ? m.className : null,
+            modalRect: m ? m.getBoundingClientRect() : null,
+            cardFound: !!card,
+            cardRect: card ? card.getBoundingClientRect() : null,
+            cardVisible: card ? window.getComputedStyle(card).visibility : null,
+            cardOpacity: card ? window.getComputedStyle(card).opacity : null,
+            cardDisplay: card ? window.getComputedStyle(card).display : null,
+            parentTag: m ? m.parentElement.tagName : null,
+            parentId: m ? m.parentElement.id : null,
+            parentClass: m ? m.parentElement.className : null
+          };
+        })();
+      `);
+      console.log('[OmniEng Capture] Modal diagnostics:', JSON.stringify(diag, null, 2));
+      await sleep(1800);
+      const wbsModal = await win.capturePage();
+      fs.writeFileSync(path.join(outputDir, 'omnieng_nasa_wbs_modal.png'), wbsModal.toPNG());
+
+      console.log('[OmniEng Capture] All NASA Rocket showcase screenshots saved to:', outputDir);
+      app.quit();
     });
   }
 

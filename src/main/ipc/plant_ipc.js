@@ -187,6 +187,47 @@ function registerPlantIpc(deps = {}) {
     });
     return { success: true, sizing };
   }, { domain: 'plant', description: 'Compute required relief area and select standard API 526 orifice designation' });
+
+  // 14. Non-Ideal Liquid Thermodynamics (NRTL & UNIQUAC)
+  defineHandler('omni:plant-nrtl-activity', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { ActivityCoefficientModels } = require('../../core/plant/activity_coefficient_models');
+    const x1 = params.x1 !== undefined ? params.x1 : 0.40;
+    const tempC = params.tempC !== undefined ? params.tempC : 78.15;
+    const v = ActivityCoefficientModels.evaluateNRTLBinary(x1, tempC, params);
+    const azeo = ActivityCoefficientModels.findAzeotrope('ethanol', 'water', tempC);
+    return { success: true, ...v, azeotrope: azeo };
+  }, { domain: 'plant', description: 'Evaluate NRTL activity coefficients, bubble point pressure, and azeotrope point' });
+
+  // 15. Electrolyte NRTL (eNRTL) Ionic Thermodynamics & CO2 Capture
+  defineHandler('omni:evaluate-enrtl-co2', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { ElectrolyteNRTLModel } = require('../../core/plant/enrtl_electrolyte_thermo');
+    const model = new ElectrolyteNRTLModel({
+      temperatureK: params.temperatureK !== undefined ? params.temperatureK : 313.15,
+      meaMassFraction: params.meaMassFraction !== undefined ? params.meaMassFraction : 0.30
+    });
+    const co2Loading = params.co2Loading !== undefined ? params.co2Loading : 0.35;
+    const speciation = model.calculateSpeciation(co2Loading);
+    const vle = model.calculateCO2VLE(co2Loading, params.temperatureK);
+    const richLoading = params.richLoading !== undefined ? params.richLoading : 0.48;
+    const leanLoading = params.leanLoading !== undefined ? params.leanLoading : 0.20;
+    const liquidFlowKgH = params.liquidFlowKgH !== undefined ? params.liquidFlowKgH : 100000.0;
+    const capture = model.evaluateCaptureCapacity(richLoading, leanLoading, liquidFlowKgH);
+    return { success: true, speciation, vle, capture };
+  }, { domain: 'plant', description: 'Evaluate Electrolyte NRTL (eNRTL) speciation, CO2 VLE, and amine capture capacity' });
+
+  // 16. NASA Cryogenic Propellant Loading Cycle (Aspen HYSYS PFD)
+  defineHandler('omni:solve-cryogenic-loading', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    return ProcessFlowsheetSolver.solveCryogenicLoadingCycle(params);
+  }, { domain: 'plant', description: 'Simulate subcooled cryogenic LOX/LCH4 ground loading, chilldown boil-off, and autogenous tank pressurization' });
 }
 
 module.exports = { registerPlantIpc };

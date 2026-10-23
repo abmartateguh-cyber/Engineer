@@ -576,6 +576,73 @@ test('PipingNetwork3D: ASME B31.3 3D pipe network stress with elbow flexibility 
 });
 
 // ----------------------------------------------------------------
+// 7. Aerospace Cross-Disciplinary Systems Integration (NASA Standard)
+// ----------------------------------------------------------------
+console.log('\n7. Aerospace Cross-Disciplinary Systems Integration (NASA Standard):');
+
+test('FeatureTree: Rocket Assembly & Staged Combustion Engine parametric trees build valid B-Rep solids', () => {
+  const rocketTree = FeatureTree.createRocketAssemblyTree();
+  assert.strictEqual(rocketTree.features.length, 8);
+  assert(rocketTree.currentSolid !== null, 'Rocket feature tree solid body should not be null');
+  assert(rocketTree.currentSolid.vertices.length > 0, 'Rocket solid should have vertices');
+  assert(rocketTree.currentSolid.faces.length > 0, 'Rocket solid should have faces');
+
+  const engineTree = FeatureTree.createStagedCombustionEngineTree();
+  assert.strictEqual(engineTree.features.length, 8);
+  assert(engineTree.currentSolid !== null, 'Engine feature tree solid body should not be null');
+  assert(engineTree.currentSolid.vertices.length > 0, 'Engine solid should have vertices');
+
+  // Verify revolve operation generates 3D radial quad ring topology
+  const revolveFeat = engineTree.features.find(f => f.type === 'revolve');
+  assert(revolveFeat, 'Engine tree must contain a revolve feature');
+  assert(revolveFeat.params.segments >= 24);
+});
+
+test('ProcessFlowsheetSolver: Cryogenic Propellant Loading cycle solves mass/energy balance, boil-off & autogenous pressurization', () => {
+  const loxCycle = ProcessFlowsheetSolver.solveCryogenicLoadingCycle({
+    propellant: 'LOX',
+    targetTankMassKg: 850000.0,
+    loadingFlowKgS: 1200.0,
+    supplyTempK: 90.0,
+    supplyPressureBar: 4.5,
+    tankUllagePressureBar: 3.2
+  });
+
+  assert.strictEqual(loxCycle.propellant, 'LOX');
+  assert(loxCycle.fillTimeMinutes > 8.0 && loxCycle.fillTimeMinutes < 25.0, `Expected fill time ~12m, got ${loxCycle.fillTimeMinutes}`);
+  assert(loxCycle.totalBoiloffKg > 0.0, 'Total boiloff mass must be positive');
+  assert(loxCycle.autogenousPressGasKgS > 0.0, 'Autogenous pressurization gas flow must be positive');
+  assert(loxCycle.boiloffLossPercent < 5.0, 'Cryogenic insulation must restrict boiloff under 5%');
+
+  // Verify stream thermodynamics
+  const sSupply = loxCycle.streams.S01_GSE_SUPPLY;
+  const sVent = loxCycle.streams.S04_BOILOFF_GAS_VENT;
+  assert(sSupply.T_C < -180.0, `Supply temp should be ~ -183.15C, got ${sSupply.T_C}`);
+  assert.strictEqual(sVent.vaporFraction, 1.0, 'Boiloff vent stream must be 100% vapor');
+
+  // Also test LCH4 propellant cycle
+  const ch4Cycle = ProcessFlowsheetSolver.solveCryogenicLoadingCycle({
+    propellant: 'LCH4',
+    targetTankMassKg: 260000.0,
+    loadingFlowKgS: 650.0
+  });
+  assert.strictEqual(ch4Cycle.propellant, 'LCH4');
+  assert(ch4Cycle.fillTimeMinutes > 5.0 && ch4Cycle.fillTimeMinutes < 20.0);
+});
+
+test('SpiceEngine: NASA Dual Augmented Spark Igniter (ASI) controller transient MNA simulation', () => {
+  const ignTelemetry = SpiceEngine.simulateDualAugmentedSparkIgniter(0.003, 1e-5);
+
+  assert.strictEqual(ignTelemetry.channelA.status, 'OPERATIONAL');
+  assert.strictEqual(ignTelemetry.channelB.status, 'OPERATIONAL');
+  assert.strictEqual(ignTelemetry.redundancyMode, 'DUAL-ACTIVE-HOT-STANDBY');
+  assert(ignTelemetry.sparkEnergyPerPulseMJ >= 150.0, `Spark pulse energy ${ignTelemetry.sparkEnergyPerPulseMJ} mJ must meet NASA 150 mJ requirement`);
+  assert(ignTelemetry.channelA.peakSecondarySparkVoltage > 5000.0, `Secondary spark voltage ${ignTelemetry.channelA.peakSecondarySparkVoltage} V must exceed breakdown threshold`);
+  assert(ignTelemetry.flameKernelIgnitionProbability > 0.99, 'Ignition kernel probability should exceed 99%');
+  assert.strictEqual(ignTelemetry.sparkRepetitionRateHz, 400.0);
+});
+
+// ----------------------------------------------------------------
 // Summary
 // ----------------------------------------------------------------
 console.log('\n================================================================');

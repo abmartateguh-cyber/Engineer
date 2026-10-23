@@ -9,10 +9,15 @@
  */
 
 (function (root, factory) {
+  const instance = factory();
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory();
-  } else {
-    root.OmniIcons = factory();
+    module.exports = instance;
+  }
+  if (typeof root !== 'undefined') {
+    root.OmniIcons = instance;
+  }
+  if (typeof window !== 'undefined') {
+    window.OmniIcons = instance;
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
@@ -145,18 +150,63 @@
     refresh: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>`,
     tree: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v9a3 3 0 0 0 3 3h6"/><path d="M6 12h12"/></svg>`,
     themeSun: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
-    themeMoon: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
+    themeMoon: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+
+    // ----------------------------------------------------
+    // Production Parity & Missing UI Icons
+    // ----------------------------------------------------
+    checkCircle: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>`,
+    circuit: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M4 9h5M15 9h5M4 15h5M15 15h5M9 4v5M9 15v5M15 4v5M15 15v5"/></svg>`,
+    cfdStreamlines: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M3 6h12a4 4 0 0 1 0 8H7a2 2 0 0 0 0 4h14"/><line x1="3" y1="10" x2="10" y2="10"/><line x1="3" y1="14" x2="6" y2="14"/></svg>`,
+    flowChart: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="3" width="6" height="5" rx="1"/><rect x="9" y="16" width="6" height="5" rx="1"/><path d="M6 8v3h12V8M12 11v5"/></svg>`,
+    solidExtrude: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 7v10M22 7v10M12 12v10"/><line x1="12" y1="2" x2="12" y2="6" stroke-width="2.5"/></svg>`,
+    link: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+
+    // ----------------------------------------------------
+    // CAD Feature Modeling & CAM Icons
+    // ----------------------------------------------------
+    cadExtrude: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/><line x1="12" y1="2" x2="12" y2="8" stroke="currentColor"/></svg>`,
+    cadRevolve: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19"/><circle cx="12" cy="12" r="3"/></svg>`,
+    cadSweep: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M4 19c4-1 6-5 6-9s2-6 6-6h4"/><circle cx="4" cy="19" r="2"/><rect x="16" y="2" width="6" height="6" rx="1"/></svg>`,
+    cadLoft: `<svg ${SVG_ATTRS} class="icon-svg"><polygon points="6 4 18 4 15 10 9 10 6 4"/><polygon points="9 10 15 10 19 20 5 20 9 10"/><line x1="6" y1="4" x2="5" y2="20"/><line x1="18" y1="4" x2="19" y2="20"/></svg>`,
+    cadShell: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1" stroke-dasharray="2 2"/></svg>`,
+    cadPattern: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+    cadMirror: `<svg ${SVG_ATTRS} class="icon-svg"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="3 3"/><polygon points="8 6 3 12 8 18 8 6"/><polygon points="16 6 21 12 16 18 16 6"/></svg>`,
+    cadHole: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>`,
+    camGcode: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M12 2v6"/><rect x="9" y="8" width="6" height="4"/><path d="M12 12v3"/><circle cx="12" cy="18" r="3"/><path d="M4 22h16"/></svg>`,
+    gizmo3d: `<svg ${SVG_ATTRS} class="icon-svg"><line x1="12" y1="12" x2="20" y2="12" stroke="#f87171" stroke-width="2.5"/><line x1="12" y1="12" x2="12" y2="4" stroke="#4ade80" stroke-width="2.5"/><line x1="12" y1="12" x2="6" y2="18" stroke="#38bdf8" stroke-width="2.5"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`,
+    contextMenu: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="14" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>`,
+    historyStack: `<svg ${SVG_ATTRS} class="icon-svg"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>`,
+    cursor: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M4 4l7 17 2.5-6.5L20 12 4 4z"/></svg>`,
+    plus: `<svg ${SVG_ATTRS} class="icon-svg"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+    trash: `<svg ${SVG_ATTRS} class="icon-svg"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+    chartLine: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M3 3v18h18"/><path d="M19 9l-5 5-4-4-3 3"/></svg>`,
+    designSystem: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/><circle cx="6" cy="6" r="1.5"/></svg>`,
+    anatomyCard: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/><circle cx="6" cy="6" r="1.5"/></svg>`,
+    rocket: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4.5c1.62-1.63 5-2.5 5-2.5"/><path d="M12 15v5s3.03-.55 4.5-2c1.63-1.62 2.5-5 2.5-5"/></svg>`,
+    spaceEngine: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M8 3h8l2 6H6l2-6zM6 9l-2 10h16L18 9M10 19v2M14 19v2M7 19c0 2 2 3 5 3s5-1 5-3"/><circle cx="12" cy="6" r="1"/></svg>`,
+    shield: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    info: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+    satellite: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4Z"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg>`,
+    download: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
   };
 
   return {
     get: function (name) {
       return ICONS[name] || '';
     },
+    has: function (name) {
+      return Boolean(ICONS[name]);
+    },
     getAll: function () {
       return ICONS;
     },
+    getAllKeys: function () {
+      return Object.keys(ICONS);
+    },
     hydrateAll: function (container) {
       const root = container || document;
+      if (!root.querySelectorAll) return;
       const slots = root.querySelectorAll('[data-omni-icon]');
       slots.forEach(slot => {
         const iconKey = slot.getAttribute('data-omni-icon');
@@ -164,6 +214,9 @@
           slot.innerHTML = ICONS[iconKey];
         }
       });
+    },
+    hydrateIcons: function (container) {
+      return this.hydrateAll(container);
     }
   };
 });

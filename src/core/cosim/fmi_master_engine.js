@@ -3,8 +3,9 @@
  * 
  * Provides an industrial-grade cross-domain co-simulation master orchestrator:
  * - FMI 2.0 / 3.0 Co-Simulation slave FMU abstraction with state save/rollback
+ * - FMI 3.0 fmi3DoStep, fmi3GetFloat64, fmi3SetFloat64 API support
  * - Gauss-Seidel and Jacobi slave synchronization schemes
- * - Algebraic loop detection and resolution via Picard/Newton iteration
+ * - Algebraic loop detection and resolution via Picard/Newton fixed-point relaxation
  * - Adaptive communication step size control (h_c) with local error estimation
  * - Continuous signal interpolation using Cubic Hermite polynomials
  * - Rollback and replay capability upon step rejection or numerical divergence
@@ -14,7 +15,7 @@
 'use strict';
 
 /**
- * Interface and base class for an FMU Co-Simulation Slave
+ * Interface and base class for an FMU Co-Simulation Slave (FMI 2.0 & FMI 3.0)
  */
 class FmuSlave {
   /**
@@ -30,6 +31,7 @@ class FmuSlave {
     this.values = new Map();
     this.state = null;
     this.time = 0;
+    this.hasDirectFeedthrough = desc.hasDirectFeedthrough || false;
 
     for (const v of this.variables) {
       this.values.set(v.vr, v.initial !== undefined ? v.initial : 0.0);
@@ -46,6 +48,15 @@ class FmuSlave {
     }
   }
 
+  // FMI 3.0 standard Float64 aliases
+  fmi3GetFloat64(valueRefs) {
+    return this.getReal(valueRefs);
+  }
+
+  fmi3SetFloat64(valueRefs, values) {
+    this.setReal(valueRefs, values);
+  }
+
   /**
    * Save internal FMU state for rollback
    */
@@ -57,6 +68,10 @@ class FmuSlave {
     };
   }
 
+  fmi3GetFMUState() {
+    return this.getFMUState();
+  }
+
   /**
    * Restore internal FMU state
    */
@@ -64,6 +79,10 @@ class FmuSlave {
     this.time = saved.time;
     this.values = new Map(saved.values);
     this._restoreInternalState(saved.internalState);
+  }
+
+  fmi3SetFMUState(saved) {
+    this.setFMUState(saved);
   }
 
   _saveInternalState() {
@@ -81,6 +100,13 @@ class FmuSlave {
   doStep(t, h) {
     this.time = t + h;
     return true;
+  }
+
+  /**
+   * FMI 3.0 Step execution signature
+   */
+  fmi3DoStep(currentCommunicationPoint, communicationStepSize, noSetFMUStatePriorToCurrentPoint = false) {
+    return this.doStep(currentCommunicationPoint, communicationStepSize);
   }
 }
 
@@ -114,22 +140,26 @@ class FmiMasterEngine {
    * @param {Object} [config]
    * @param {number} [config.startTime=0]
    * @param {number} [config.stopTime=1.0]
+   * @param {number} [config.totalTimeSec]
    * @param {number} [config.defaultStepSize=0.001] Default communication step h_c
+   * @param {number} [config.stepSizeSec]
    * @param {number} [config.minStepSize=1e-6]
    * @param {number} [config.maxStepSize=0.01]
    * @param {'gauss_seidel'|'jacobi'} [config.scheme='gauss_seidel']
    * @param {boolean} [config.adaptiveStep=true]
    * @param {number} [config.tolerance=1e-5]
+   * @param {string} [config.fmiVersion='3.0']
    */
   constructor(config = {}) {
     this.startTime = config.startTime || 0;
-    this.stopTime = config.stopTime || 1.0;
-    this.stepSize = config.defaultStepSize || 0.001;
+    this.stopTime = config.stopTime || config.totalTimeSec || 1.0;
+    this.stepSize = config.defaultStepSize || config.stepSizeSec || 0.001;
     this.minStepSize = config.minStepSize || 1e-6;
     this.maxStepSize = config.maxStepSize || 0.01;
     this.scheme = config.scheme || 'gauss_seidel';
     this.adaptiveStep = config.adaptiveStep !== undefined ? config.adaptiveStep : true;
     this.tolerance = config.tolerance || 1e-5;
+    this.fmiVersion = config.fmiVersion || '3.0';
 
     this.slaves = [];
     this.connections = []; // Array of { sourceSlave, sourceVr, targetSlave, targetVr }
@@ -171,6 +201,79 @@ class FmiMasterEngine {
   }
 
   /**
+   * Detects algebraic loops (cycles in connection graph where slaves have direct feedthrough)
+   * @returns {boolean}
+   */
+  hasAlgebraicLoop() {
+    const adj = new Map();
+    for (const s of this.slaves) adj.set(s, []);
+    for (const conn of this.connections) {
+      if (conn.sourceSlave !== conn.targetSlave) {
+        adj.get(conn.sourceSlave).push(conn.targetSlave);
+      }
+    }
+
+    const visited = new Set();
+    const recStack = new Set();
+
+    const isCyclic = (node) => {
+      visited.add(node);
+      recStack.add(node);
+      for (const neighbor of adj.get(node) || []) {
+        if (!visited.has(neighbor)) {
+          if (isCyclic(neighbor)) return true;
+        } else if (recStack.has(neighbor)) {
+          return true;
+        }
+      }
+      recStack.delete(node);
+      return false;
+    };
+
+    for (const s of this.slaves) {
+      if (!visited.has(s)) {
+        if (isCyclic(s)) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Solves algebraic loop using fixed-point Picard iteration with relaxation omega
+   * @param {number} [maxIterations=50]
+   * @param {number} [omega=0.8] Relaxation parameter (0 < omega <= 1.0)
+   * @param {number} [tol=1e-6]
+   * @returns {{ converged: boolean, iterations: number, maxResidual: number }}
+   */
+  solveAlgebraicLoop(maxIterations = 50, omega = 0.8, tol = 1e-6) {
+    let iterations = 0;
+    let maxResidual = 0;
+
+    for (let it = 0; it < maxIterations; it++) {
+      iterations++;
+      maxResidual = 0;
+
+      for (const conn of this.connections) {
+        const currentTargetVal = conn.targetSlave.getReal([conn.targetVr])[0];
+        const newSourceVal = conn.sourceSlave.getReal([conn.sourceVr])[0];
+
+        // Relaxed Picard update: y_next = (1 - omega) * y_old + omega * y_new
+        const updatedVal = (1.0 - omega) * currentTargetVal + omega * newSourceVal;
+        const residual = Math.abs(updatedVal - currentTargetVal);
+        maxResidual = Math.max(maxResidual, residual);
+
+        conn.targetSlave.setReal([conn.targetVr], [updatedVal]);
+      }
+
+      if (maxResidual < tol) {
+        return { converged: true, iterations, maxResidual };
+      }
+    }
+
+    return { converged: maxResidual < tol, iterations, maxResidual };
+  }
+
+  /**
    * Save states of all slaves
    */
   _saveAllStates() {
@@ -197,9 +300,14 @@ class FmiMasterEngine {
     let rejectedSteps = 0;
 
     const timeSeries = [];
+    const isLoopPresent = this.hasAlgebraicLoop();
 
-    // Initial propagation
-    this._propagateConnections();
+    // Initial propagation / loop solve
+    if (isLoopPresent) {
+      this.solveAlgebraicLoop(30, 0.8, this.tolerance);
+    } else {
+      this._propagateConnections();
+    }
 
     // Record initial snapshot
     timeSeries.push(this._recordSnapshot(t));
@@ -223,7 +331,11 @@ class FmiMasterEngine {
           }
         }
         if (stepAccepted) {
-          this._propagateConnections();
+          if (isLoopPresent) {
+            this.solveAlgebraicLoop(30, 0.8, this.tolerance);
+          } else {
+            this._propagateConnections();
+          }
         }
       } else {
         // Gauss-Seidel: Sequential stepping with immediate propagation
@@ -233,7 +345,11 @@ class FmiMasterEngine {
             stepAccepted = false;
             break;
           }
-          this._propagateConnections();
+          if (isLoopPresent) {
+            this.solveAlgebraicLoop(15, 0.8, this.tolerance);
+          } else {
+            this._propagateConnections();
+          }
         }
       }
 

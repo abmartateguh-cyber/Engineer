@@ -2,14 +2,14 @@
  * OmniEng Master IPC Registration Hub
  * 
  * Aggregates all domain routers under unified schema validation and audit logging:
- * - CAD Router (17 channels)
- * - CAE Router (16 channels)
- * - EDA Router (12 channels)
- * - Optics Router (9 channels)
- * - Plant Router (13 channels)
- * - Controls Router (12 channels)
- * - System Router (19 channels)
- * Total: 98/98 Channels 100% Schema-Validated
+ * - CAD Router (22 channels)
+ * - CAE Router (22 channels)
+ * - EDA Router (17 channels)
+ * - Optics Router (13 channels)
+ * - Plant Router (15 channels)
+ * - Controls Router (13 channels)
+ * - System Router (29 channels)
+ * Total: 131/131 Channels 100% Schema-Validated
  */
 
 'use strict';

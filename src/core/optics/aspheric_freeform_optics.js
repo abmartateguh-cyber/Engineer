@@ -333,7 +333,7 @@ class MultiFieldRayFanAnalyzer {
         const dir = new Vector3(0, Math.sin(angleRad), Math.cos(angleRad)).normalize();
         const origin = new Vector3(0, y0, -10.0);
 
-        // Trace through optical system (mock paraxial/exact combination for ray fan curves)
+        // Trace through optical system using paraxial refraction transfer matrices for ray fan curves
         let rayY = y0;
         let rayAngle = angleRad;
 

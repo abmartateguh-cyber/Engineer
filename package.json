@@ -8,6 +8,8 @@
     "test": "node test/run_all_tests.js",
     "test:ui": "electron . --test-ui",
     "test:vv": "node test/vv/run_vv.js",
+    "test:100": "node test/vv/suite_100_gold_benchmarks.js",
+    "solver:headless": "node src/main/headless_solver_daemon.js",
     "check:ipc": "node scripts/check_ipc.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"

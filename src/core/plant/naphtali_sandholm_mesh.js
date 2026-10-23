@@ -44,6 +44,8 @@ class NaphtaliSandholmColumnSolver {
     const D = spec.distillateRate || (F_comp[0] + 0.5 * F_comp[1]);
     const B_bottoms = F_total - D;
 
+    const Emv = (spec.murphreeEfficiency !== undefined) ? Math.max(0.1, Math.min(1.0, spec.murphreeEfficiency)) : 1.0;
+
     // Approximate component K-value temperature parameters: ln(K_i) ~ A_i - B_i / T
     // Calibrated for typical hydrocarbon de-ethanizer / debutanizer ranges
     const K_params = comps.map((name, i) => {
@@ -109,9 +111,11 @@ class NaphtaliSandholmColumnSolver {
           T[j] -= 0.6 * (errBubble / dSum_dT);
         }
 
-        // Re-evaluate K and update vapor
+        // Re-evaluate K and update vapor with Murphree tray efficiency Emv
         for (let i = 0; i < C; i++) {
-          y[j][i] = getK(i, T[j]) * x[j][i];
+          const yEq = getK(i, T[j]) * x[j][i];
+          const yPrev = (j < N - 1) ? y[j + 1][i] : yEq;
+          y[j][i] = yPrev + Emv * (yEq - yPrev);
         }
 
         // Normalize
@@ -219,12 +223,69 @@ class NaphtaliSandholmColumnSolver {
       condenserDutyKW: Number((V[0] * 32.0).toFixed(2)), // Approx heat of vaporization
       reboilerDutyKW: Number((V[N - 1] * 36.0).toFixed(2)),
       components: comps,
+      temperatureProfile: stages.map(s => s.temperatureK),
+      distillateComposition: stages[0].liquidMoleFractions,
+      bottomsComposition: stages[N - 1].liquidMoleFractions,
       stages
     };
   }
 }
 
 class WaterHammerMOC {
+  /**
+   * Unified solve method for ASME B31.3 Method of Characteristics water hammer analysis.
+   */
+  static solve(options = {}) {
+    const D = options.innerDiameterM || options.pipeDiameterM || 0.150;
+    const t = options.wallThicknessM || 0.00711;
+    const E = options.elasticModulusPa || options.pipeModulusPa || 200e9;
+    const rho = options.fluidDensityKgM3 || 1000.0;
+    const K = options.fluidBulkModulusPa || 2.19e9;
+    const v0 = (options.initialVelocityMps !== undefined) ? options.initialVelocityMps : (options.initialVelocityMs || 3.0);
+    const P0 = (options.steadyPressurePa !== undefined) ? options.steadyPressurePa : (options.initialPressurePa || 5.0e5);
+    const T_close = (options.valveClosureTimeS !== undefined) ? options.valveClosureTimeS : (options.closureTimeSec || 0.2);
+    const L = options.pipeLengthM || 500.0;
+    const f = options.frictionFactor || 0.018;
+
+    const waveSpeedMps = this.computeWaveSpeed({
+      fluidBulkModulusPa: K,
+      fluidDensityKgM3: rho,
+      pipeModulusPa: E,
+      pipeDiameterM: D,
+      wallThicknessM: t
+    });
+
+    const surge = this.computeJoukowskySurge(rho, waveSpeedMps, v0);
+
+    const mocRes = this.simulateMOC({
+      pipeLengthM: L,
+      initialVelocityMs: v0,
+      initialPressurePa: P0,
+      closureTimeSec: T_close,
+      frictionFactor: f,
+      totalTimeSec: options.totalTimeSec || 2.0,
+      fluidDensityKgM3: rho,
+      pipeDiameterM: D,
+      wallThicknessM: t,
+      fluidBulkModulusPa: K,
+      pipeModulusPa: E
+    });
+
+    return {
+      waveSpeedMps,
+      joukowskyDeltaP_Pa: surge.pressureSurgePa,
+      headSurgeM: surge.headSurgeM,
+      steadyPressurePa: P0,
+      maxPressurePa: P0 + surge.pressureSurgePa,
+      peakPressureMocBar: mocRes.peakPressureBar,
+      pipeHoopStressMPa: mocRes.pipeHoopStressMPa,
+      asmeAllowableStressMPa: mocRes.asmeAllowableStressMPa,
+      safetyFactor: mocRes.safetyFactor,
+      passedAsmeB31_3: mocRes.passedAsmeB31_3,
+      history: mocRes.history
+    };
+  }
+
   /**
    * Evaluates acoustic wavespeed a (m/s) in elastic pipe walls:
    * a = sqrt(K / rho) / sqrt(1 + (K/E) * (D/t) * c1)

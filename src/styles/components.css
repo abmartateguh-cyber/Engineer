@@ -1,0 +1,1170 @@
+/**
+ * OmniEng Reusable UI Component Styles (Quiet Technical Precision)
+ * Pure CSS components adhering to tokens.css design system.
+ */
+
+/* =========================================================================
+   1. Buttons & Segmented Controls
+   ========================================================================= */
+
+/* General Button Primitive */
+.btn {
+  height: var(--ctl-h);
+  padding: 0 var(--sp-2);
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.btn:active, .btn.active, .btn[aria-selected="true"], .btn[aria-pressed="true"] {
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-color: rgba(76, 141, 255, 0.35);
+}
+.btn.primary, .btn-primary {
+  height: var(--ctl-h);
+  padding: 0 var(--sp-3);
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s var(--ease);
+}
+.btn.primary:hover, .btn-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-secondary {
+  height: var(--ctl-h);
+  padding: 0 var(--sp-3);
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  color: var(--fg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.btn-secondary:hover {
+  background: var(--surface-3);
+  border-color: var(--fg-3);
+}
+
+.icon-btn {
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.icon-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+
+/* Studio Switcher (Segmented Control in Top Bar) */
+.studio-switcher {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 2px;
+  gap: 2px;
+}
+
+.studio-btn {
+  height: calc(var(--ctl-h) - 4px);
+  padding: 0 var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.studio-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.studio-btn.active, .studio-btn[aria-selected="true"] {
+  background: var(--surface-0);
+  color: var(--fg-1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  font-weight: 600;
+}
+
+/* Context Toolbar Buttons */
+.ribbon-btn,
+.v-tool-btn,
+.hud-btn {
+  height: var(--ctl-h);
+  padding: 0 var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.ribbon-btn:hover,
+.v-tool-btn:hover,
+.hud-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.ribbon-btn.active,
+.v-tool-btn.active,
+.hud-btn.active {
+  background: var(--accent-tint);
+  border-color: rgba(76, 141, 255, 0.35);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Stage Viewport Mode Buttons */
+.viewport-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 2px;
+  gap: 2px;
+}
+
+.v-mode-btn {
+  height: 22px;
+  padding: 0 var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.v-mode-btn:hover {
+  color: var(--fg-1);
+}
+.v-mode-btn.active, .v-mode-btn[aria-selected="true"] {
+  background: var(--surface-0);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+}
+
+/* Form Controls & Inputs */
+.ribbon-select,
+.status-select {
+  height: var(--ctl-h);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--fg-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  padding: 0 var(--sp-2);
+  outline: none;
+  cursor: pointer;
+}
+.ribbon-select:focus,
+.status-select:focus {
+  border-color: var(--accent);
+}
+
+.ribbon-slider,
+.transient-slider {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.code-editor-textarea {
+  width: 100%;
+  height: 220px;
+  background: var(--surface-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  padding: var(--sp-2);
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+.code-editor-textarea:focus {
+  border-color: var(--accent);
+}
+
+/* =========================================================================
+   2. Workspace Document Tabs
+   ========================================================================= */
+
+.workspace-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.workspace-tab {
+  height: 28px;
+  padding: 0 var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  border-bottom: 2px solid transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.workspace-tab:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.workspace-tab.active {
+  background: var(--surface-0);
+  color: var(--fg-1);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.workspace-tab .doc-badge {
+  font-size: 9px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+  font-weight: 600;
+}
+
+.workspace-tab .doc-close-btn {
+  margin-left: 2px;
+  font-size: 13px;
+  color: var(--fg-3);
+  border-radius: var(--r-sm);
+  padding: 0 2px;
+  line-height: 1;
+}
+.workspace-tab .doc-close-btn:hover {
+  color: var(--err);
+  background: rgba(229, 86, 107, 0.15);
+}
+
+.workspace-new-tab-btn {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--fg-3);
+  font-size: 14px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all 0.12s;
+}
+.workspace-new-tab-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* Sidebar & Inspector Tabs */
+.sidebar-tab,
+.inspector-tab-btn {
+  height: 28px;
+  padding: 0 var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--fg-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.sidebar-tab:hover,
+.inspector-tab-btn:hover {
+  color: var(--fg-1);
+}
+.sidebar-tab.active,
+.inspector-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* =========================================================================
+   3. Badges, Chips, Indicators & Telemetry
+   ========================================================================= */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--fg-2);
+  border: 1px solid var(--line);
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(63, 182, 139, 0.1);
+  border: 1px solid rgba(63, 182, 139, 0.3);
+  color: var(--ok);
+  font-weight: 500;
+}
+
+.tier-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  display: inline-block;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  font-size: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--fg-2);
+}
+
+.viewport-stats-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.chip {
+  height: 24px;
+  padding: 0 var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.chip:hover {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--fg-1);
+}
+
+.telemetry-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+}
+.telemetry-label {
+  font-size: 10px;
+  color: var(--fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.telemetry-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+  margin-top: 2px;
+}
+
+/* =========================================================================
+   4. Modals & Dialogs
+   ========================================================================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+}
+.modal-overlay.active {
+  display: flex !important;
+}
+
+.modal-card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--fg-1);
+}
+
+.modal-header {
+  height: 44px;
+  padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-1);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--fg-1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-close-btn {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 0;
+  color: var(--fg-3);
+  font-size: 18px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all 0.12s;
+}
+.modal-close-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+
+.modal-body {
+  padding: var(--sp-3);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* =========================================================================
+   5. Command Palette (Ctrl+K)
+   ========================================================================= */
+
+.command-palette-card {
+  width: 640px;
+  max-width: 90vw;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+
+.command-palette-header {
+  display: flex;
+  align-items: center;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  background: var(--surface-1);
+}
+
+.command-palette-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--fg-1);
+  font-size: var(--fs-md);
+  font-family: var(--font-ui);
+  outline: none;
+}
+.command-palette-input::placeholder {
+  color: var(--fg-3);
+}
+
+.command-palette-filter-bar {
+  display: flex;
+  gap: 4px;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow-x: auto;
+}
+
+.palette-filter-chip {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  color: var(--fg-3);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.palette-filter-chip:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.palette-filter-chip.active {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.command-palette-results {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: var(--sp-1);
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.command-item:hover, .command-item.selected {
+  background: var(--surface-3);
+}
+.command-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.command-item-icon {
+  width: 20px;
+  text-align: center;
+  color: var(--accent);
+}
+.command-item-title {
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+  font-weight: 500;
+}
+.command-item-desc {
+  font-size: 11px;
+  color: var(--fg-3);
+  margin-top: 2px;
+}
+.command-item-category {
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-tint);
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.command-palette-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface-1);
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.palette-footer-hint kbd,
+.shortcut-hint,
+.shortcut-tag {
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 1px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-2);
+}
+
+/* =========================================================================
+   6. Global Solver Asynchronous Progress Bar
+   ========================================================================= */
+
+.global-solver-progress-bar {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+}
+
+.solver-progress-track {
+  width: 100%;
+  height: 2px;
+  background: var(--line-soft);
+}
+
+.solver-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s ease-out;
+}
+
+.solver-progress-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.solver-progress-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-1);
+}
+
+.solver-progress-spinner {
+  display: inline-block;
+  animation: spin 1.5s linear infinite;
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+.solver-progress-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.solver-progress-pct {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.solver-progress-cancel {
+  background: transparent;
+  border: 0;
+  color: var(--fg-3);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+.solver-progress-cancel:hover {
+  color: var(--err);
+}
+
+/* =========================================================================
+   7. 3D ViewCube & Orientation Gizmo
+   ========================================================================= */
+
+.viewport-nav-gizmo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  width: 72px;
+  height: 94px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.nav-cube-scene {
+  width: 50px;
+  height: 50px;
+  perspective: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-cube {
+  width: 40px;
+  height: 40px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(-25deg) rotateY(35deg);
+  transition: transform 0.25s var(--ease);
+  cursor: pointer;
+}
+
+.cube-face {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--fg-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  transition: all 0.15s ease;
+}
+.cube-face:hover {
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.cube-face-front  { transform: rotateY(0deg) translateZ(20px); }
+.cube-face-back   { transform: rotateY(180deg) translateZ(20px); }
+.cube-face-right  { transform: rotateY(90deg) translateZ(20px); }
+.cube-face-left   { transform: rotateY(-90deg) translateZ(20px); }
+.cube-face-top    { transform: rotateX(90deg) translateZ(20px); }
+.cube-face-bottom { transform: rotateX(-90deg) translateZ(20px); }
+
+.nav-compass {
+  position: relative;
+  width: 60px;
+  height: 32px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.compass-ring {
+  position: absolute;
+  width: 50px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px dashed var(--line);
+  background: var(--surface-1);
+}
+
+.compass-dir {
+  position: absolute;
+  top: 1px;
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.nav-axes-triad {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.axis-lbl {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+.axis-x { color: var(--err); background: rgba(229, 86, 107, 0.15); }
+.axis-y { color: var(--ok); background: rgba(63, 182, 139, 0.15); }
+.axis-z { color: var(--accent); background: var(--accent-tint); }
+
+/* =========================================================================
+   8. Anatomy Card Presentation Overlay (Fig 1.0)
+   ========================================================================= */
+
+.anatomy-card-overlay {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  background: rgba(11, 13, 18, 0.85);
+}
+
+.anatomy-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.anatomy-fig-badge {
+  padding: 2px 6px;
+  background: var(--accent-tint);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.anatomy-fig-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-1);
+  text-transform: uppercase;
+}
+
+.anatomy-card-meta-topright {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-2);
+  background: var(--surface-1);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+}
+
+.anatomy-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.anatomy-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-3);
+  border-top: 1px dashed var(--line);
+  padding-top: 6px;
+}
+
+/* =========================================================================
+   9. Transient Playback Controls
+   ========================================================================= */
+
+.transient-playback-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.playback-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.playback-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.playback-btn.active {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.playback-timeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.playback-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--fg-2);
+}
+
+/* =========================================================================
+   10. AI Co-Pilot Dock UI
+   ========================================================================= */
+
+.ai-header {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-3);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.ai-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  color: var(--fg-1);
+}
+
+.ai-header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.dock-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.12s;
+}
+.dock-toggle-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+
+.ai-copilot-panel.collapsed .ai-chat-history,
+.ai-copilot-panel.collapsed .ai-suggestion-chips,
+.ai-copilot-panel.collapsed .ai-input-bar {
+  display: none !important;
+}
+
+.ai-chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.chat-bubble {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  max-width: 90%;
+}
+.chat-bubble.ai {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--fg-1);
+  align-self: flex-start;
+}
+.chat-bubble.user {
+  background: var(--accent);
+  color: #ffffff;
+  align-self: flex-end;
+}
+
+.ai-suggestion-chips {
+  display: flex;
+  gap: 4px;
+  padding: 4px var(--sp-3);
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ai-input-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-1);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.ai-prompt-input {
+  flex: 1;
+  height: var(--ctl-h);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--fg-1);
+  padding: 0 var(--sp-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  outline: none;
+}
+.ai-prompt-input:focus {
+  border-color: var(--accent);
+}
+
+.ai-send-btn {
+  height: var(--ctl-h);
+  padding: 0 var(--sp-3);
+  background: var(--accent);
+  color: #ffffff;
+  border: 0;
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+.ai-send-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* =========================================================================
+   11. Native Vector Icons Integration
+   ========================================================================= */
+
+.icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.icon-svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: inline-block;
+  vertical-align: middle;
+}

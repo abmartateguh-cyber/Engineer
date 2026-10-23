@@ -319,10 +319,120 @@ function registerCadIpc(deps = {}) {
       body = defaultGeometryKernel.makeBox(dx, dy, dz, 'BoxComponent');
     }
     const props = defaultGeometryKernel.computeValidationProperties(body);
-    const kernelInfo = defaultGeometryKernel.getKernelInfo();
-    return { success: true, props, kernelInfo };
-  }, { domain: 'cad', description: 'Compute NIST AP242 analytical validation properties (Volume, Area, Centroid, BBox)' });
+    return { success: true, properties: props, bodyName: body.name };
+  }, { domain: 'cad', description: 'Compute NIST AP242 / CAx-IF geometric validation properties (volume, area, centroid)' });
+  defineHandler('omni:cad-extrude-profile', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { FeatureOperations } = require('../../core/cad/feature_operations');
+    const profile = params.profile || [
+      { x: -30, y: -20 },
+      { x: 30, y: -20 },
+      { x: 30, y: 20 },
+      { x: -30, y: 20 }
+    ];
+    const depth = params.depth || 40.0;
+    const body = FeatureOperations.extrude(profile, depth, params);
+    return {
+      success: true,
+      id: body.id,
+      name: body.name,
+      volume: body.computeVolume(),
+      bbox: body.getBoundingBox(),
+      triangles: body.toTriangles(),
+      faceCount: body.faces.length
+    };
+  }, { domain: 'cad', description: 'Extrude 2D parametric profile into 3D B-Rep solid body' });
+
+  // 20. Parametric CAD 3D Rotational Revolution
+  defineHandler('omni:cad-revolve-profile', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { FeatureOperations } = require('../../core/cad/feature_operations');
+    const profile = params.profile || [
+      { x: 10, y: 0 },
+      { x: 25, y: 10 },
+      { x: 20, y: 35 },
+      { x: 10, y: 50 }
+    ];
+    const angle = params.angleDeg || 360;
+    const axis = params.axis || 'Y';
+    const body = FeatureOperations.revolve(profile, angle, axis, params.segments || 24);
+    return {
+      success: true,
+      id: body.id,
+      name: body.name,
+      faceCount: body.faces.length,
+      triangles: body.toTriangles()
+    };
+  }, { domain: 'cad', description: 'Revolve 2D parametric profile around spatial axis' });
+
+  // 21. Parametric CAD Thin-Wall Shell
+  defineHandler('omni:cad-shell-body', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { FeatureOperations } = require('../../core/cad/feature_operations');
+    const baseBox = BRepPrimitives.createBox(params.width || 60, params.height || 40, params.depth || 80);
+    const shelled = FeatureOperations.shell(baseBox, params.wallThickness || 2.0, params.openFaceIndex !== undefined ? params.openFaceIndex : 1);
+    return {
+      success: true,
+      id: shelled.id,
+      name: shelled.name,
+      faceCount: shelled.faces.length,
+      wallThickness: params.wallThickness || 2.0,
+      triangles: shelled.toTriangles()
+    };
+  }, { domain: 'cad', description: 'Shell 3D solid body into uniform thin-wall hollow structure' });
+
+  // 22. CAM 3-Axis CNC Toolpath Generation & G-Code Post-Processor
+  defineHandler('omni:cam-generate-toolpath', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { CNCToolpathEngine } = require('../../core/cam/cnc_toolpath_engine');
+    const cam = new CNCToolpathEngine(params.options || {});
+    const bounds = params.bounds || { minX: -50, maxX: 50, minY: -30, maxY: 30, minZ: 0, maxZ: 25 };
+    const toolpathData = cam.planRoughingToolpath(bounds);
+    const gcode = cam.generateGCode(toolpathData, params.programNumber || 'O1001');
+    return {
+      success: true,
+      telemetry: toolpathData.telemetry,
+      layers: toolpathData.layers,
+      toolpath: toolpathData,
+      machiningTimeMin: toolpathData.telemetry?.estimatedTimeMin,
+      gcode,
+      gcodePreview: gcode.split('\n').slice(0, 30).join('\n'),
+      totalGcodeLines: gcode.split('\n').length
+    };
+  }, { domain: 'cad', description: 'Generate 3-axis CNC planar roughing toolpath and ISO G-code' });
+
+  // 23. NASA Space Rocket, Spaceship Interior & Engine Parametric CAD Feature History Tree
+  defineHandler('omni:get-rocket-feature-tree', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { FeatureTree } = require('../../core/cad/feature_tree');
+    const isInterior = params.article === 'interior' || params.article === 'spacecraft_interior' || params.article === 'spaceship_interior';
+    const isEngine = params.article === 'engine' || params.article === 'engine_macro' || params.article === 'macro_engine';
+    const tree = isInterior
+      ? (FeatureTree.createSpacecraftInteriorTree ? FeatureTree.createSpacecraftInteriorTree() : FeatureTree.createRocketAssemblyTree())
+      : (isEngine ? FeatureTree.createStagedCombustionEngineTree() : FeatureTree.createRocketAssemblyTree());
+    return {
+      success: true,
+      article: isInterior ? 'spacecraft_interior' : (isEngine ? 'engine_macro' : 'full_stack'),
+      features: tree.toJSON().features,
+      featureCount: tree.features.length,
+      currentSolidStats: tree.currentSolid ? {
+        vertexCount: tree.currentSolid.vertices.length,
+        faceCount: tree.currentSolid.faces.length
+      } : null
+    };
+  }, { domain: 'cad', description: 'Retrieve NASA launch vehicle, spaceship interior, or staged-combustion engine parametric B-Rep feature tree' });
 }
 
 module.exports = { registerCadIpc };
+
 

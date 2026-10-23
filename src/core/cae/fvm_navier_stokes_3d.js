@@ -82,6 +82,9 @@ class FVMNavierStokes3D {
     // Moving Reference Frame (MRF) rotation vector (rad/s)
     this.omegaMRF = options.omegaMRF || { x: 0, y: 0, z: 0 };
 
+    // Riemann flux solver: 'hllc', 'roe', or 'ausm_plus'
+    this.fluxScheme = options.fluxScheme || 'hllc';
+
     this.cells = [];
     this.faces = [];
     this.stepCount = 0;
@@ -327,6 +330,143 @@ class FVMNavierStokes3D {
   }
 
   /**
+   * Roe Approximate Riemann Solver with Harten-Hyman entropy fix for transonic shock capturing
+   */
+  solveRoeRiemannFlux(cellL, cellR, normal, area) {
+    const { gamma } = this;
+    const nx = normal.x, ny = normal.y, nz = normal.z;
+
+    const unL = cellL.u * nx + cellL.v * ny + cellL.w * nz;
+    const unR = cellR.u * nx + cellR.v * ny + cellR.w * nz;
+
+    const q2L = cellL.u * cellL.u + cellL.v * cellL.v + cellL.w * cellL.w;
+    const q2R = cellR.u * cellR.u + cellR.v * cellR.v + cellR.w * cellR.w;
+
+    // Total enthalpy: H = gamma / (gamma - 1) * (p / rho) + 0.5 * q^2
+    const HL = (gamma / (gamma - 1.0)) * (cellL.p / cellL.rho) + 0.5 * q2L;
+    const HR = (gamma / (gamma - 1.0)) * (cellR.p / cellR.rho) + 0.5 * q2R;
+
+    // Roe density weights
+    const sqrtRhoL = Math.sqrt(Math.max(1e-6, cellL.rho));
+    const sqrtRhoR = Math.sqrt(Math.max(1e-6, cellR.rho));
+    const denom = sqrtRhoL + sqrtRhoR;
+
+    const uRoe = (sqrtRhoL * cellL.u + sqrtRhoR * cellR.u) / denom;
+    const vRoe = (sqrtRhoL * cellL.v + sqrtRhoR * cellR.v) / denom;
+    const wRoe = (sqrtRhoL * cellL.w + sqrtRhoR * cellR.w) / denom;
+    const HRoe = (sqrtRhoL * HL + sqrtRhoR * HR) / denom;
+
+    const unRoe = uRoe * nx + vRoe * ny + wRoe * nz;
+    const q2Roe = uRoe * uRoe + vRoe * vRoe + wRoe * wRoe;
+
+    // Roe speed of sound
+    const a2Roe = (gamma - 1.0) * (HRoe - 0.5 * q2Roe);
+    const aRoe = Math.sqrt(Math.max(1.0, a2Roe));
+
+    // Eigenvalues
+    const lambda1 = unRoe - aRoe;
+    const lambda2 = unRoe;
+    const lambda5 = unRoe + aRoe;
+
+    // Harten-Hyman entropy fix: epsilon = 0.2 * aRoe
+    const eps = 0.2 * aRoe;
+    const fixEigenvalue = (lam) => {
+      const absL = Math.abs(lam);
+      return absL >= eps ? absL : (lam * lam + eps * eps) / (2.0 * eps);
+    };
+
+    const absL1 = fixEigenvalue(lambda1);
+    const absL2 = fixEigenvalue(lambda2);
+    const absL5 = fixEigenvalue(lambda5);
+
+    // Primitive differences
+    const dRho = cellR.rho - cellL.rho;
+    const dP = cellR.p - cellL.p;
+    const dUn = unR - unL;
+    const rhoRoe = sqrtRhoL * sqrtRhoR;
+
+    // Wave strengths
+    const alpha1 = (dP - rhoRoe * aRoe * dUn) / (2.0 * a2Roe);
+    const alpha2 = dRho - dP / a2Roe;
+    const alpha5 = (dP + rhoRoe * aRoe * dUn) / (2.0 * a2Roe);
+
+    // Dissipation for mass flux: 0.5 * sum(alpha_k * |lambda_k| * K_k[0])
+    const dissMass = 0.5 * (alpha1 * absL1 + alpha2 * absL2 + alpha5 * absL5);
+
+    // Average central mass flux: 0.5 * (rhoL * unL + rhoR * unR)
+    const massFlux = (0.5 * (cellL.rho * unL + cellR.rho * unR) - dissMass) * area;
+
+    // Dissipation for pressure/momentum
+    const dissPress = 0.5 * (alpha1 * absL1 * (unRoe - aRoe) + alpha2 * absL2 * unRoe + alpha5 * absL5 * (unRoe + aRoe)) * rhoRoe;
+    const pFlux = (0.5 * (cellL.p + cellR.p) - dissPress) * area;
+
+    return {
+      massFlux,
+      pressureForce: pFlux,
+      waveSpeeds: { lambda1, lambda2, lambda5, aRoe, unRoe },
+      scheme: 'roe'
+    };
+  }
+
+  /**
+   * AUSM+ (Advection Upstream Splitting Method) for Transonic and Supersonic Mach regimes
+   */
+  solveAUSMPlusFlux(cellL, cellR, normal, area) {
+    const { gamma } = this;
+    const nx = normal.x, ny = normal.y, nz = normal.z;
+
+    const unL = cellL.u * nx + cellL.v * ny + cellL.w * nz;
+    const unR = cellR.u * nx + cellR.v * ny + cellR.w * nz;
+
+    const aL = Math.sqrt((gamma * cellL.p) / cellL.rho);
+    const aR = Math.sqrt((gamma * cellR.p) / cellR.rho);
+
+    // Interface sound speed: a_1/2 = 0.5 * (aL + aR)
+    const aHalf = 0.5 * (aL + aR);
+
+    // Mach numbers
+    const ML = unL / aHalf;
+    const MR = unR / aHalf;
+
+    // AUSM+ polynomial split functions
+    const M4Plus = (M) => {
+      if (Math.abs(M) >= 1.0) return 0.5 * (M + Math.abs(M));
+      return 0.25 * Math.pow(M + 1.0, 2) + 0.125 * Math.pow(M * M - 1.0, 2);
+    };
+
+    const M4Minus = (M) => {
+      if (Math.abs(M) >= 1.0) return 0.5 * (M - Math.abs(M));
+      return -0.25 * Math.pow(M - 1.0, 2) - 0.125 * Math.pow(M * M - 1.0, 2);
+    };
+
+    const P5Plus = (M) => {
+      if (Math.abs(M) >= 1.0) return 0.5 * (1.0 + Math.sign(M));
+      return 0.25 * Math.pow(M + 1.0, 2) * (2.0 - M) + 0.1875 * M * Math.pow(M * M - 1.0, 2);
+    };
+
+    const P5Minus = (M) => {
+      if (Math.abs(M) >= 1.0) return 0.5 * (1.0 - Math.sign(M));
+      return 0.25 * Math.pow(M - 1.0, 2) * (2.0 + M) - 0.1875 * M * Math.pow(M * M - 1.0, 2);
+    };
+
+    const MHalf = M4Plus(ML) + M4Minus(MR);
+    const pHalf = P5Plus(ML) * cellL.p + P5Minus(MR) * cellR.p;
+
+    // Convective mass flux
+    const rhoHalf = MHalf >= 0.0 ? cellL.rho : cellR.rho;
+    const massFlux = rhoHalf * aHalf * MHalf * area;
+    const pressureForce = pHalf * area;
+
+    return {
+      massFlux,
+      pressureForce,
+      interfaceMach: MHalf,
+      interfaceSoundSpeed: aHalf,
+      scheme: 'ausm_plus'
+    };
+  }
+
+  /**
    * Moving Reference Frame (MRF) Coriolis and Centrifugal Source Terms
    */
   computeMRFSource(cell) {
@@ -362,7 +502,7 @@ class FVMNavierStokes3D {
   /**
    * Runs FVM iteration steps with pseudo-transient under-relaxation
    */
-  step(inletVelocity = 15.0, steps = 10) {
+  step(inletVelocity = 15.0, steps = 10, fluxScheme = this.fluxScheme) {
     const pRef = 101325.0;
     const dt = 0.0005;
 
@@ -378,7 +518,14 @@ class FVMNavierStokes3D {
 
         if (face.neighborId >= 0) {
           const cellR = this.cells[face.neighborId];
-          const riemann = this.solveHLLCRiemannFlux(cellL, cellR, face.normal, face.area);
+          let riemann;
+          if (fluxScheme === 'roe') {
+            riemann = this.solveRoeRiemannFlux(cellL, cellR, face.normal, face.area);
+          } else if (fluxScheme === 'ausm' || fluxScheme === 'ausm_plus') {
+            riemann = this.solveAUSMPlusFlux(cellL, cellR, face.normal, face.area);
+          } else {
+            riemann = this.solveHLLCRiemannFlux(cellL, cellR, face.normal, face.area);
+          }
 
           cellL.resMass -= riemann.massFlux;
           cellR.resMass += riemann.massFlux;

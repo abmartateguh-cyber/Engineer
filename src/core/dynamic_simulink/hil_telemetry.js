@@ -38,10 +38,45 @@ class HILTelemetryEngine {
       offset += 8;
     }
 
-    // CRC32 checksum placeholder
-    view.setUint32(offset, (seqId ^ 0xDEADBEEF) >>> 0, false);
+    // Compute full IEEE 802.3 CRC-32 checksum across sync header and state payload
+    const payloadBytes = new Uint8Array(buffer, 0, offset);
+    const crc32 = HILTelemetryEngine.calculateCrc32(payloadBytes);
+    view.setUint32(offset, crc32, false);
 
     return new Uint8Array(buffer);
+  }
+
+  /**
+   * Pre-computed IEEE 802.3 32-bit polynomial lookup table (0xEDB88320)
+   */
+  static get _crcTable() {
+    if (!this.__crcTable) {
+      const table = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let k = 0; k < 8; k++) {
+          c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        table[i] = c >>> 0;
+      }
+      this.__crcTable = table;
+    }
+    return this.__crcTable;
+  }
+
+  /**
+   * Calculates IEEE 802.3 standard CRC-32 checksum across a byte buffer
+   * @param {Uint8Array} uint8Array
+   * @param {number} [length=uint8Array.length]
+   * @returns {number} 32-bit unsigned CRC-32
+   */
+  static calculateCrc32(uint8Array, length = uint8Array.length) {
+    const table = this._crcTable;
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < length; i++) {
+      crc = (crc >>> 8) ^ table[(crc ^ uint8Array[i]) & 0xFF];
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
   /**
@@ -67,13 +102,16 @@ class HILTelemetryEngine {
     }
 
     const crc = view.getUint32(offset, false);
+    const payloadBytes = new Uint8Array(bytes.buffer, bytes.byteOffset, offset);
+    const expectedCrc = this.calculateCrc32(payloadBytes);
 
     return {
       seqId,
       timestampUs,
       numStates,
       states: Array.from(states),
-      crcValid: crc === ((seqId ^ 0xDEADBEEF) >>> 0)
+      crc,
+      crcValid: crc === expectedCrc
     };
   }
 

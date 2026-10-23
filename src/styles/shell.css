@@ -1,0 +1,425 @@
+/**
+ * OmniEng Shell Grid Layout (CSS Grid Architecture)
+ * Responsive, zero-overlap technical workstation shell.
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--surface-0);
+  color: var(--fg-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* Main Shell Grid */
+body.app-shell {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  grid-template-columns: var(--rail-w) var(--left-w) minmax(0, 1fr) var(--right-w);
+  grid-template-rows: var(--topbar-h) var(--toolbar-h) minmax(0, 1fr) var(--status-h);
+  grid-template-areas:
+    "top  top   top   top"
+    "tool tool  tool  tool"
+    "rail left  stage right"
+    "stat stat  stat  stat";
+}
+
+/* Panel Collapse States */
+body.left-collapsed {
+  --left-w: 0px;
+}
+body.left-collapsed .left-sidebar {
+  display: none;
+}
+
+body.right-collapsed {
+  --right-w: 0px;
+}
+body.right-collapsed .right-inspector {
+  display: none;
+}
+
+/* 1. Top Bar Region */
+.topbar {
+  grid-area: top;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-3);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line);
+  z-index: 40;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+.topbar-logo {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  color: var(--fg-1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topbar-logo .logo-mark {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.topbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+/* 2. Context Toolbar Region */
+.context-toolbar {
+  grid-area: tool;
+  height: var(--toolbar-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+  gap: var(--sp-2);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line);
+  z-index: 30;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.context-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--line);
+  margin: 0 var(--sp-1);
+  flex-shrink: 0;
+}
+
+/* 3. Activity Rail Region */
+.activity-rail {
+  grid-area: rail;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sp-2) 0;
+  background: var(--surface-1);
+  border-right: 1px solid var(--line);
+  z-index: 25;
+  gap: var(--sp-2);
+}
+
+.activity-rail-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 4. Left Sidebar Region */
+.left-sidebar {
+  grid-area: left;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  min-width: 0;
+  z-index: 20;
+}
+
+.sidebar-tab-header {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--sp-2);
+  gap: var(--sp-1);
+  flex-shrink: 0;
+  background: var(--surface-1);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sp-2);
+}
+
+/* 5. Center Stage Region */
+.stage {
+  grid-area: stage;
+  display: grid;
+  grid-template-rows: 32px 32px minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: var(--surface-0);
+}
+
+/* Document Tab Bar in Stage */
+.workspace-tab-bar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--sp-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  min-width: 0;
+  gap: 2px;
+}
+.workspace-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Stage Mode / Viewport Modes Row */
+.stage-mode-bar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--sp-2);
+  gap: var(--sp-2);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.stage-mode-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Canvas Host Container */
+.canvas-host,
+.canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-0);
+  --safe-top: 12px;
+  --safe-right: 96px;
+  --safe-bottom: 12px;
+  --safe-left: 12px;
+}
+
+.canvas-host > canvas,
+.canvas-container > canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Canvas Overlays */
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 10;
+}
+.overlay-layer > * {
+  pointer-events: auto;
+}
+
+/* 6. AI Co-Pilot Dock in Stage */
+.ai-copilot-panel {
+  width: 100%;
+  height: var(--ai-h-collapsed);
+  min-height: var(--ai-h-collapsed);
+  max-height: var(--ai-h-expanded);
+  background: var(--surface-1);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 0.18s var(--ease);
+  z-index: 20;
+}
+
+.ai-copilot-panel:not(.collapsed) {
+  height: var(--ai-h-expanded);
+}
+
+.ai-copilot-panel.collapsed {
+  height: var(--ai-h-collapsed);
+}
+
+/* 7. Right Inspector Region */
+.right-inspector {
+  grid-area: right;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+  min-width: 0;
+  z-index: 20;
+}
+
+.inspector-header {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--sp-2);
+  flex-shrink: 0;
+  background: var(--surface-1);
+}
+
+.inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sp-2);
+}
+
+/* 8. Status Bar Region */
+.workstation-status-bar {
+  grid-area: stat;
+  height: var(--status-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-3);
+  background: var(--surface-1);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  z-index: 40;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.status-bar-left,
+.status-bar-center,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+
+/* Popover Tools Menu (Native Popover API) */
+#tools-menu {
+  position: fixed;
+  inset: unset;
+  top: calc(var(--topbar-h) + var(--toolbar-h));
+  right: var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  padding: var(--sp-3);
+  width: 580px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 1000;
+  color: var(--fg-1);
+}
+#tools-menu:not(:popover-open) {
+  display: none;
+}
+
+/* Responsive Behavior */
+@media (max-width: 1440px) {
+  :root {
+    --left-w: 232px;
+    --right-w: 296px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .studio-btn .studio-label,
+  .v-tool-btn .v-tool-label {
+    display: none;
+  }
+  .studio-switcher {
+    gap: 2px;
+  }
+}
+
+@media (max-width: 1100px) {
+  body.app-shell:not(.left-pinned) {
+    --left-w: 0px;
+  }
+  body.app-shell:not(.left-pinned) .left-sidebar {
+    display: none;
+  }
+}
+
+@media (max-height: 720px) {
+  :root {
+    --ai-h-expanded: 180px;
+  }
+}

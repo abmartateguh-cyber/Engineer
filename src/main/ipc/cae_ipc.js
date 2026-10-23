@@ -280,6 +280,97 @@ function registerCaeIpc() {
     });
     return { success: res.converged, ...res, maxPressureMpa: parseFloat(res.numerical.maxPressureMpa.toFixed(1)) };
   }, { domain: 'cae', description: 'Solve 3D multi-body contact with augmented Lagrangian Hertz verification' });
+
+  // 18. Nonlinear Large Deflection & Geometric Non-Linearity FEA (Total Lagrangian)
+  defineHandler('omni:cae-nonlinear-large-deflection', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { NonlinearLargeDeflectionSolver } = require('../../core/cae/nonlinear_large_deflection');
+    const solver = new NonlinearLargeDeflectionSolver(params.options || {});
+    const res = solver.solveLargeDeflectionCantilever(params);
+    return { success: true, ...res };
+  }, { domain: 'cae', description: 'Solve geometric non-linear large deflection structural mechanics via Total Lagrangian formulation' });
+
+  // 19. Hybrid Boundary Layer Prism + Interior Delaunay TET10 Meshing (Phase 3)
+  defineHandler('omni:mesh-hybrid-prism-tet', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const mesher = new DelaunayMesher3D(params.mesherOptions || {});
+    const surfaceMesh = params.surfaceMesh || {
+      vertices: [
+        { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0.5, y: 1, z: 0 },
+        { x: 0.5, y: 0.5, z: 1 }
+      ],
+      faces: [[0, 1, 2], [0, 1, 3], [1, 2, 3], [2, 0, 3]]
+    };
+    const hybridMesh = mesher.generateHybridPrismTetMesh(
+      surfaceMesh,
+      params.prismOptions || { numLayers: 3, totalHeight: 0.05, growthRatio: 1.2 },
+      params.tetOptions || { targetEdgeLength: 0.2, quadratic: true }
+    );
+    return { success: true, hybridMesh };
+  }, { domain: 'cae', description: 'Generate hybrid boundary-layer prism + interior quadratic Delaunay tetrahedral mesh' });
+
+  // 20. Transonic Shock-Capturing Riemann CFD (Phase 3)
+  defineHandler('omni:solve-transonic-riemann', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { TransonicRiemannSolver } = require('../../core/cae/transonic_riemann_solver');
+    const method = params.method || 'roe';
+    if (method === 'shocktube') {
+      const result = TransonicRiemannSolver.runShockTube1D(params.nCells || 50, params.tEnd || 0.005, params.cfl || 0.4);
+      return { success: true, ...result };
+    }
+    const left = params.leftState || { rho: 1.0, u: 0.0, v: 0.0, w: 0.0, p: 101325 };
+    const right = params.rightState || { rho: 0.125, u: 0.0, v: 0.0, w: 0.0, p: 10132.5 };
+    const normal = params.normal || { x: 1, y: 0, z: 0 };
+    const flux = method === 'ausm'
+      ? TransonicRiemannSolver.solveAUSMPlusFlux(left, right, normal)
+      : TransonicRiemannSolver.solveRoeFlux(left, right, normal);
+    return { success: true, method, flux };
+  }, { domain: 'cae', description: 'Solve transonic compressible flow with Roe and AUSM+ Riemann flux solvers' });
+
+  // 21. Quadratic Serendipity Hexahedral (HEX20) FEA Static Analysis (Phase 2)
+  defineHandler('omni:solve-fea-hex20', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { ElementHEX20 } = require('../../core/cae/element_hex20');
+    const { FEASolver } = require('../../core/cae/fea_structural');
+    const solver = new FEASolver();
+    const coords = params.coords || ElementHEX20.NATURAL_COORDS.map(pt => ({
+      x: (pt.xi + 1) * 0.05,
+      y: (pt.eta + 1) * 0.05,
+      z: (pt.zeta + 1) * 0.05
+    }));
+    coords.forEach(pt => solver.addNode(pt.x, pt.y, pt.z));
+    solver.addElement(Array.from({ length: 20 }, (_, i) => i), params.material || { E: 200e9, nu: 0.3 });
+    const fixedIndices = params.fixedNodes || [0, 3, 4, 7, 11, 15, 16, 19];
+    fixedIndices.forEach(idx => solver.fixNode(idx, true, true, true));
+    const loadNode = params.loadNode !== undefined ? params.loadNode : 1;
+    solver.applyForce(loadNode, params.forceX || 0, params.forceY || -1000, params.forceZ || 0);
+    const result = solver.solveStatic();
+    return { success: true, result };
+  }, { domain: 'cae', description: 'Solve 20-node serendipity quadratic hexahedron FEA static analysis' });
+
+  // 22. Penalty & Augmented Lagrangian Contact Mechanics (Phase 2)
+  defineHandler('omni:solve-penalty-contact', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { PenaltyContact } = require('../../core/cae/penalty_contact');
+    const contact = new PenaltyContact(params.options || { penaltyStiffness: 1e8, augmentedLagrangian: true });
+    const slaveNodes = params.slaveNodes || [{ x: 0, y: 0, z: -0.002, id: 0 }];
+    const masterFacets = params.masterFacets || [{
+      vertices: [{ x: -0.1, y: -0.1, z: 0 }, { x: 0.1, y: -0.1, z: 0 }, { x: 0, y: 0.1, z: 0 }],
+      normal: { x: 0, y: 0, z: 1 }
+    }];
+    const result = contact.evaluateAugmentedLagrangianContact(slaveNodes, masterFacets);
+    return { success: true, ...result };
+  }, { domain: 'cae', description: 'Evaluate contact forces and penetration via Augmented Lagrangian multiplier formulation' });
 }
 
 module.exports = { registerCaeIpc };

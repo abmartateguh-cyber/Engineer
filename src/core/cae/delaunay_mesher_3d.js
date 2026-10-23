@@ -6,6 +6,8 @@
  * 100% Proprietary In-House Implementation - Zero External Dependencies.
  */
 
+const { PrismLayerMesher } = require('./prism_layer_mesher');
+
 class Point3D {
   constructor(x, y, z, id = -1) {
     this.x = x;
@@ -467,6 +469,49 @@ class DelaunayMesher3D {
         tet.midNodes.push(midNode);
       }
     }
+  }
+
+  /**
+   * Generates a hybrid boundary-layer prism + interior Delaunay tetrahedral volume mesh.
+   * Resolves near-wall turbulent boundary layers (y+ <= 1.0) while filling core volume with isotropic tets.
+   * @param {Object} surfaceMesh - { vertices: [[x,y,z], ...], triangles: [[i0,i1,i2], ...] }
+   * @param {Object} [prismOptions] - { firstLayerHeight, growthRatio, layerCount }
+   * @param {Object} [tetOptions] - { targetEdgeLength }
+   * @returns {Object} { nodes, prisms, tets, statistics }
+   */
+  generateHybridPrismTetMesh(surfaceMesh, prismOptions = {}, tetOptions = {}) {
+    // 1. Generate anisotropic prism boundary layers
+    const firstLayerHeight = prismOptions.firstLayerHeight || 0.001;
+    const prismMesh = PrismLayerMesher.generatePrismLayers(surfaceMesh, {
+      firstLayerHeight,
+      growthRatio: prismOptions.growthRatio || 1.2,
+      layerCount: prismOptions.layerCount || 5
+    });
+
+    // 2. Extract outer cap vertices and triangles representing the interior interface
+    const capVertices = prismMesh.vertices;
+    const capTriangles = prismMesh.outerCapTriangles || [];
+    const capPoint3Ds = capVertices.map((v, idx) => new Point3D(v[0], v[1], v[2], idx));
+
+    // 3. Mesh core volume interior using Delaunay advancing-front mesher
+    let coreMesh = { nodes: capPoint3Ds, tets: [] };
+    if (capTriangles.length >= 4) {
+      coreMesh = this.meshClosedSurface(capPoint3Ds, capTriangles, tetOptions);
+    }
+
+    return {
+      nodes: coreMesh.nodes,
+      prisms: prismMesh.prisms,
+      tets: coreMesh.tets,
+      statistics: {
+        prismCount: prismMesh.prisms.length,
+        tetCount: coreMesh.tets.length,
+        totalNodes: coreMesh.nodes.length,
+        firstLayerHeightM: firstLayerHeight,
+        growthRatio: prismOptions.growthRatio || 1.2,
+        layerCount: prismOptions.layerCount || 5
+      }
+    };
   }
 }
 

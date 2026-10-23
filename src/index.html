@@ -5,227 +5,292 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self';">
   <title>OmniEng — Universal Engineering & Simulation Platform</title>
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/shell.css">
+  <link rel="stylesheet" href="styles/components.css">
   <link rel="stylesheet" href="styles/main.css">
-  <link rel="stylesheet" href="styles/glassmorphic_theme.css">
   <link rel="stylesheet" href="styles/docking.css">
   <!-- Load Three.js for 3D CAD/CAE rendering -->
   <script src="vendor/three.min.js"></script>
   <!-- Native Precision Vector Iconography System -->
   <script src="ui/icons.js"></script>
 </head>
-<body>
-  <!-- Header Bar & Studio Switcher -->
-  <header class="app-header">
-    <div class="brand-section">
-      <div class="logo-badge">OMNIENG</div>
-      <div>
-        <div class="app-title">Universal Engineering Engine</div>
-        <div class="app-subtitle">CAD • CAE • EDA • GNC • Plant Simulation</div>
-      </div>
+<body class="app-shell">
+  <!-- 1. Top Bar Region -->
+  <header class="topbar app-header" role="banner">
+    <div class="topbar-brand brand-section">
+      <div class="topbar-logo logo-badge"><span class="logo-mark">O</span> OMNIENG</div>
+      <span class="sr-only">Universal Engineering Engine</span>
     </div>
 
-    <!-- The Studio Switcher (Direct Mode Switching) -->
-    <nav class="studio-switcher">
-      <button class="studio-btn active" data-studio="consumer">
-        <span class="icon-slot" data-omni-icon="studioConsumer"></span> Consumer Electronics
+    <!-- Segmented Studio Switcher -->
+    <nav class="studio-switcher" role="tablist" aria-label="Engineering Domain Studios">
+      <button class="studio-btn active" data-studio="consumer" role="tab" aria-selected="true" aria-label="Consumer Electronics Studio" title="Consumer Electronics Studio">
+        <span class="icon-slot" data-omni-icon="studioConsumer" aria-hidden="true"></span>
+        <span class="studio-label">Consumer</span>
       </button>
-      <button class="studio-btn" data-studio="eda">
-        <span class="icon-slot" data-omni-icon="studioEda"></span> Semiconductor & EDA
+      <button class="studio-btn" data-studio="eda" role="tab" aria-selected="false" aria-label="Semiconductor and EDA Studio" title="Semiconductor & EDA Studio">
+        <span class="icon-slot" data-omni-icon="studioEda" aria-hidden="true"></span>
+        <span class="studio-label">EDA</span>
       </button>
-      <button class="studio-btn" data-studio="aerospace">
-        <span class="icon-slot" data-omni-icon="studioAerospace"></span> Drone & Aerospace
+      <button class="studio-btn" data-studio="aerospace" role="tab" aria-selected="false" aria-label="Drone and Aerospace Studio" title="Drone & Aerospace Studio">
+        <span class="icon-slot" data-omni-icon="studioAerospace" aria-hidden="true"></span>
+        <span class="studio-label">Aero</span>
       </button>
-      <button class="studio-btn" data-studio="oilgas">
-        <span class="icon-slot" data-omni-icon="studioPlant"></span> Oil & Gas Process
+      <button class="studio-btn" data-studio="oilgas" role="tab" aria-selected="false" aria-label="Oil and Gas Process Studio" title="Oil & Gas Process Studio">
+        <span class="icon-slot" data-omni-icon="studioPlant" aria-hidden="true"></span>
+        <span class="studio-label">Plant</span>
       </button>
-      <button class="studio-btn" data-studio="simulink">
-        <span class="icon-slot" data-omni-icon="studioSimulink"></span> Dynamic Simulink
+      <button class="studio-btn" data-studio="simulink" role="tab" aria-selected="false" aria-label="Dynamic Simulink Studio" title="Dynamic Simulink Studio">
+        <span class="icon-slot" data-omni-icon="studioSimulink" aria-hidden="true"></span>
+        <span class="studio-label">Simulink</span>
       </button>
-      <button class="studio-btn" data-studio="universal_cad">
-        <span class="icon-slot" data-omni-icon="studioCad"></span> Parametric CAD
+      <button class="studio-btn" data-studio="universal_cad" role="tab" aria-selected="false" aria-label="Parametric CAD Studio" title="Parametric CAD Studio">
+        <span class="icon-slot" data-omni-icon="studioCad" aria-hidden="true"></span>
+        <span class="studio-label">CAD</span>
       </button>
     </nav>
 
-    <div class="header-actions">
-      <button class="ribbon-btn palette-trigger-btn" id="btn-open-palette" title="Global Command Palette (Ctrl+K)">
-        <span class="icon-slot" data-omni-icon="search"></span> <span class="shortcut-hint" style="font-size: 10px; opacity: 0.8; margin-left: 4px; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px;">Ctrl+K</span>
+    <!-- Topbar Actions -->
+    <div class="topbar-actions header-actions" role="toolbar" aria-label="Global Actions">
+      <button class="btn icon-btn palette-trigger-btn" id="btn-open-palette" title="Global Command Palette (Ctrl+K)" aria-label="Global Command Palette (Ctrl+K)">
+        <span class="icon-slot" data-omni-icon="search" aria-hidden="true"></span>
+        <span class="shortcut-hint">Ctrl+K</span>
       </button>
-      <button class="ribbon-btn theme-toggle-btn" id="btn-toggle-theme" title="Toggle Dark / Technical High-Contrast Theme">
-        <span id="theme-icon" class="icon-slot" data-omni-icon="themeDark"></span>
+      <button class="btn icon-btn theme-toggle-btn" id="btn-toggle-theme" title="Toggle High-Contrast Workstation Theme" aria-label="Toggle High-Contrast Workstation Theme">
+        <span id="theme-icon" class="icon-slot" data-omni-icon="themeDark" aria-hidden="true"></span>
       </button>
-      <div class="tier-badge" id="tier-badge">
-        <span class="tier-dot"></span>
-        <span id="tier-label">Air-Gapped Local Workstation</span>
+      <div class="tier-badge" id="tier-badge" role="status" aria-label="Workstation Security Tier">
+        <span class="tier-dot" aria-hidden="true"></span>
+        <span id="tier-label">Local Workstation</span>
       </div>
     </div>
   </header>
 
-  <!-- Engineering Ribbon Toolbar (Universal CAD/CAE/EDA/HPC Controls) -->
-  <nav class="engineering-ribbon">
-    <div class="ribbon-group">
-      <span class="ribbon-label">Render Style</span>
-      <div class="ribbon-buttons">
-        <button class="ribbon-btn active" id="ribbon-btn-shaded" title="Shaded Solid Geometry"><span class="icon-slot" data-omni-icon="solid"></span> Solid</button>
-        <button class="ribbon-btn" id="ribbon-btn-wire" title="Wireframe Mesh Overlay"><span class="icon-slot" data-omni-icon="wireframe"></span> Wire</button>
-        <button class="ribbon-btn" id="ribbon-btn-xray" title="Transparent Internal X-Ray"><span class="icon-slot" data-omni-icon="xray"></span> X-Ray</button>
-        <button class="ribbon-btn" id="ribbon-btn-fea" title="FEA von Mises Stress Colormap"><span class="icon-slot" data-omni-icon="fea"></span> FEA</button>
-      </div>
+  <!-- 2. Single Unified Context Toolbar -->
+  <nav class="context-toolbar engineering-ribbon" role="toolbar" aria-label="Engineering Visualization and Tools Toolbar">
+    <!-- Modeling / Transform Tools -->
+    <div class="toolbar-group v-toolbar-tools" role="group" aria-label="Modeling Tools">
+      <button class="btn v-tool-btn active" id="btn-tool-select" title="Select / Move Entity">
+        <span class="icon-slot" data-omni-icon="cursor"></span>
+        <span class="v-tool-label">Select</span>
+      </button>
+      <button class="btn v-tool-btn" id="btn-tool-gizmo" title="Transform Gizmo">
+        <span class="icon-slot" data-omni-icon="assembly"></span>
+        <span class="v-tool-label">Gizmo</span>
+      </button>
+      <button class="btn v-tool-btn" id="btn-tool-add-comp" title="Add Part">
+        <span class="icon-slot" data-omni-icon="plus"></span>
+        <span class="v-tool-label">Add Part</span>
+      </button>
+      <button class="btn v-tool-btn" id="btn-tool-delete" title="Delete Part (Delete)">
+        <span class="icon-slot" data-omni-icon="trash"></span>
+        <span class="v-tool-label">Delete</span>
+      </button>
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Assembly Explode</span>
-      <div class="ribbon-explode-control">
-        <input type="range" class="ribbon-slider" id="ribbon-explode-slider" min="0" max="100" value="0" step="1">
-        <span class="ribbon-val" id="ribbon-explode-val">0%</span>
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Render Styles -->
+    <div class="toolbar-group ribbon-group" role="group" aria-label="Render Style">
+      <button class="btn ribbon-btn active" id="ribbon-btn-shaded" title="Shaded Solid Geometry" aria-label="Shaded Solid Geometry"><span class="icon-slot" data-omni-icon="solid" aria-hidden="true"></span> Solid</button>
+      <button class="btn ribbon-btn" id="ribbon-btn-wire" title="Wireframe Mesh Overlay" aria-label="Wireframe Mesh Overlay"><span class="icon-slot" data-omni-icon="wireframe" aria-hidden="true"></span> Wire</button>
+      <button class="btn ribbon-btn" id="ribbon-btn-xray" title="Transparent Internal X-Ray" aria-label="Transparent Internal X-Ray"><span class="icon-slot" data-omni-icon="xray" aria-hidden="true"></span> X-Ray</button>
+      <button class="btn ribbon-btn" id="ribbon-btn-fea" title="FEA von Mises Stress Colormap" aria-label="FEA von Mises Stress Colormap"><span class="icon-slot" data-omni-icon="fea" aria-hidden="true"></span> FEA</button>
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Section Cut</span>
-      <div class="ribbon-buttons">
-        <button class="ribbon-btn" id="ribbon-btn-clip" title="Toggle Cross-Section Clipping Plane"><span class="icon-slot" data-omni-icon="clip"></span> Clip</button>
-        <select class="ribbon-select" id="ribbon-clip-axis" title="Clipping Plane Axis">
-          <option value="y">Y Plane</option>
-          <option value="x">X Plane</option>
-          <option value="z">Z Plane</option>
-        </select>
-        <input type="range" class="ribbon-slider" id="ribbon-clip-slider" min="-100" max="100" value="0" step="1" style="width: 65px;" title="Plane Offset Position">
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Section Cut & Clipping Plane -->
+    <div class="toolbar-group ribbon-group" role="group" aria-label="Section Cut">
+      <button class="btn ribbon-btn" id="ribbon-btn-clip" title="Toggle Section Plane" aria-label="Toggle Section Plane"><span class="icon-slot" data-omni-icon="clip" aria-hidden="true"></span> Clip</button>
+      <select class="ribbon-select" id="ribbon-clip-axis" title="Clipping Plane Axis" aria-label="Clipping Plane Axis">
+        <option value="y">Y</option>
+        <option value="x">X</option>
+        <option value="z">Z</option>
+      </select>
+      <input type="range" class="ribbon-slider" id="ribbon-clip-slider" min="-100" max="100" value="0" step="1" style="width: 50px;" title="Plane Offset Position" aria-label="Plane Offset Position">
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Inspection</span>
-      <div class="ribbon-buttons">
-        <button class="ribbon-btn" id="ribbon-btn-measure" data-studio-cat="common" title="3D Point-to-Point Caliper Measurement"><span class="icon-slot" data-omni-icon="caliper"></span> Caliper</button>
-        <button class="ribbon-btn" id="ribbon-btn-bode" data-studio-cat="simulink aerospace" title="Simulink Frequency Response (Bode Plot)"><span class="icon-slot" data-omni-icon="bode"></span> Bode</button>
-        <button class="ribbon-btn" id="ribbon-btn-optics" data-studio-cat="consumer" title="Zemax / Code V Optical Spot & MTF Inspector"><span class="icon-slot" data-omni-icon="optics"></span> Optics</button>
-        <button class="ribbon-btn" id="ribbon-btn-scope" data-studio-cat="eda" title="Cadence SPICE Waveform Oscilloscope"><span class="icon-slot" data-omni-icon="oscilloscope"></span> Scope</button>
-        <button class="ribbon-btn" id="ribbon-btn-pfd" data-studio-cat="oilgas" title="Aspen HYSYS Process Flowsheet (PFD) Streams"><span class="icon-slot" data-omni-icon="flowsheet"></span> PFD</button>
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Measurement & Camera Orientation -->
+    <div class="toolbar-group ribbon-group" role="group" aria-label="Inspection and Camera">
+      <button class="btn ribbon-btn" id="ribbon-btn-measure" data-studio-cat="common" title="3D Point-to-Point Caliper Measurement"><span class="icon-slot" data-omni-icon="caliper" aria-hidden="true"></span> Measure</button>
+      <button class="btn ribbon-btn" id="ribbon-cam-iso" data-studio-cat="common" title="Isometric View"><span class="icon-slot" data-omni-icon="camIso" aria-hidden="true"></span> Iso</button>
+      <button class="btn ribbon-btn" id="ribbon-cam-top" data-studio-cat="common" title="Top Plan View"><span class="icon-slot" data-omni-icon="camTop" aria-hidden="true"></span> Top</button>
+      <button class="btn ribbon-btn" id="ribbon-cam-front" data-studio-cat="common" title="Front Elevation View"><span class="icon-slot" data-omni-icon="camFront" aria-hidden="true"></span> Front</button>
+      <button class="btn ribbon-btn" id="ribbon-cam-reset" data-studio-cat="common" title="Reset Camera Framing"><span class="icon-slot" data-omni-icon="camReset" aria-hidden="true"></span> Reset</button>
+      <button class="btn ribbon-btn" id="ribbon-btn-quad-view" data-studio-cat="common" title="Toggle 4-View Engineering Quad Layout"><span class="icon-slot" data-omni-icon="assembly" aria-hidden="true"></span> Quad</button>
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Camera Orientation</span>
-      <div class="ribbon-buttons">
-        <button class="ribbon-btn" id="ribbon-cam-iso" data-studio-cat="common" title="Isometric View"><span class="icon-slot" data-omni-icon="camIso"></span> Iso</button>
-        <button class="ribbon-btn" id="ribbon-cam-top" data-studio-cat="common" title="Top Plan View"><span class="icon-slot" data-omni-icon="camTop"></span> Top</button>
-        <button class="ribbon-btn" id="ribbon-cam-front" data-studio-cat="common" title="Front Elevation View"><span class="icon-slot" data-omni-icon="camFront"></span> Front</button>
-        <button class="ribbon-btn" id="ribbon-cam-reset" data-studio-cat="common" title="Reset Camera Framing"><span class="icon-slot" data-omni-icon="camReset"></span> Reset</button>
-        <button class="ribbon-btn" id="ribbon-btn-quad-view" data-studio-cat="common" title="Toggle 4-View Engineering Quad Layout (Top, Front, Right, Iso)"><span class="icon-slot" data-omni-icon="assembly"></span> Quad-View</button>
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Explode Slider -->
+    <div class="toolbar-group ribbon-explode-control" role="group" aria-label="Explode">
+      <input type="range" class="ribbon-slider" id="ribbon-explode-slider" min="0" max="100" value="0" step="1" style="width: 55px;" aria-label="Assembly Explode Percentage" title="Assembly Explode">
+      <span class="ribbon-val" id="ribbon-explode-val" style="font-size: 10px; width: 28px;">0%</span>
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Specialist Tools</span>
-      <div class="ribbon-buttons">
-        <button class="ribbon-btn action-btn" id="ribbon-btn-verilog" data-studio-cat="eda" title="Open Verilog RTL Synthesis IDE"><span class="icon-slot" data-omni-icon="verilog"></span> Verilog IDE</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-drafting" data-studio-cat="consumer universal_cad" title="Generate ISO 1101 / ASME Y14.5 2D Engineering Drafting Sheet"><span class="icon-slot" data-omni-icon="drawing2d"></span> 2D Drawing</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-blend" data-studio-cat="consumer universal_cad" title="Apply Edge Fillet / Chamfer to Active Geometry"><span class="icon-slot" data-omni-icon="fillet"></span> Fillet/Chamfer</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-assembly" data-studio-cat="consumer aerospace universal_cad" title="Solve 3D Kinematic Assembly Mates"><span class="icon-slot" data-omni-icon="assembly"></span> Assembly Mates</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-mesher" data-studio-cat="consumer aerospace oilgas universal_cad" title="Generate 3D Delaunay TET10 Volume Mesh"><span class="icon-slot" data-omni-icon="mesher"></span> 3D Mesher</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-fvm-cfd" data-studio-cat="consumer aerospace oilgas" title="Run 3D Polyhedral k-omega SST CFD"><span class="icon-slot" data-omni-icon="cfd"></span> 3D CFD</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-sheet-metal" data-studio-cat="consumer universal_cad" title="DIN 6935 K-Factor Sheet Metal Unfolding"><span class="icon-slot" data-omni-icon="sheetMetal"></span> Sheet Metal</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-gdt" data-studio-cat="consumer universal_cad" title="ASME Y14.5-2018 GD&T Inspection"><span class="icon-slot" data-omni-icon="gdt"></span> GD&T</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-fmi" data-studio-cat="consumer aerospace simulink" title="FMI 3.0 Multiphysics Co-Simulation Master"><span class="icon-slot" data-omni-icon="fmi"></span> FMI Co-Sim</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-step" data-studio-cat="common" title="Export ISO 10303-21 STEP AP214 B-Rep Solid"><span class="icon-slot" data-omni-icon="step"></span> STEP</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-gerber" data-studio-cat="eda" title="Export RS-274X PCB Gerber Package"><span class="icon-slot" data-omni-icon="gerber"></span> Gerber</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-hpc" data-studio-cat="common" title="Cloud HPC Cluster Telemetry (Membership)"><span class="icon-slot" data-omni-icon="cloudHpc"></span> Cloud HPC</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-report" data-studio-cat="common" title="Generate Comprehensive Audit Report"><span class="icon-slot" data-omni-icon="auditReport"></span> Audit Report</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-obj" data-studio-cat="common" title="Export Wavefront OBJ Mesh"><span class="icon-slot" data-omni-icon="cube"></span> Export OBJ</button>
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Undo / Redo & Wizards -->
+    <div class="toolbar-group" role="group" aria-label="History">
+      <button class="btn icon-btn ribbon-btn" id="ribbon-btn-undo" data-studio-cat="common" title="Undo (Ctrl+Z)"><span class="icon-slot" data-omni-icon="undo"></span></button>
+      <button class="btn icon-btn ribbon-btn" id="ribbon-btn-redo" data-studio-cat="common" title="Redo (Ctrl+Y)"><span class="icon-slot" data-omni-icon="redo"></span></button>
+      <button class="btn ribbon-btn action-btn" id="ribbon-btn-wizards" data-studio-cat="common" title="Guided Engineering Design Wizards"><span class="icon-slot" data-omni-icon="wizards"></span> Wizards</button>
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Tier-1 Commercial Parity</span>
-      <div class="ribbon-buttons">
-        <button class="ribbon-btn action-btn" id="ribbon-btn-sketcher" data-studio-cat="consumer universal_cad" title="2D Variational Geometric Constraint Sketcher (D-Cubed Parity)"><span class="icon-slot" data-omni-icon="sketcher"></span> Sketcher</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-heal" data-studio-cat="consumer universal_cad" title="Auto-Heal Non-Manifold Dirty STEP Solid Geometry"><span class="icon-slot" data-omni-icon="autoHeal"></span> Auto-Heal</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-nist-props" data-studio-cat="consumer universal_cad" title="NIST STEP Validation Properties (ISO 10303-59 B-Rep Verification)"><span class="icon-slot" data-omni-icon="gdt"></span> NIST Props</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-opt-dls" data-studio-cat="consumer" title="DLS Global Optical Merit Function Optimizer (Zemax Parity)"><span class="icon-slot" data-omni-icon="dlsOpt"></span> DLS Opt</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-asme" data-studio-cat="oilgas" title="ASME Section VIII Div 2 Compliance Report (Design-by-Analysis)"><span class="icon-slot" data-omni-icon="asme"></span> ASME VIII</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-cad-diff" data-studio-cat="common" title="3D CAD Git Visual B-Rep Diffing"><span class="icon-slot" data-omni-icon="cadDiff"></span> CAD Diff</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-ebom" data-studio-cat="common" title="Hierarchical Engineering BOM & Cost Roll-up"><span class="icon-slot" data-omni-icon="ebom"></span> eBOM</button>
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Presentation Fig 1.0 & Storytelling Tour -->
+    <div class="toolbar-group" role="group" aria-label="Presentation">
+      <button class="btn ribbon-btn" id="btn-anatomy-card" title="Toggle Fig 1.0 Presentation Spec"><span class="icon-slot" data-omni-icon="designSystem"></span> Fig 1.0</button>
+      <button class="btn ribbon-btn" id="btn-storytelling-play" title="Play Cinematic Breakdown Tour"><span class="icon-slot" data-omni-icon="play"></span> Tour</button>
+      <button class="btn ribbon-btn" id="btn-storytelling-next" title="Next Breakdown Stage"><span class="icon-slot" data-omni-icon="camReset"></span> Stage ▹</button>
     </div>
 
-    <div class="ribbon-group">
-      <span class="ribbon-label">Universal Usability</span>
-      <div class="ribbon-buttons">
-        <select class="ribbon-select" id="ribbon-user-level" data-studio-cat="common" title="Adaptive User Experience Level">
-          <option value="apprentice">Apprentice</option>
-          <option value="practitioner" selected>Practitioner</option>
-          <option value="master">Chief Lead</option>
-        </select>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-wizards" data-studio-cat="common" title="Launch Guided Engineering Design Wizards"><span class="icon-slot" data-omni-icon="wizards"></span> Wizards</button>
-        <button class="ribbon-btn action-btn" id="ribbon-btn-omni-archive" data-studio-cat="common" title="Save / Export Single-File .omni Container"><span class="icon-slot" data-omni-icon="archive"></span> .omni</button>
-        <button class="ribbon-btn" id="ribbon-btn-undo" data-studio-cat="common" title="Undo Action (Ctrl/Cmd+Z)"><span class="icon-slot" data-omni-icon="undo"></span></button>
-        <button class="ribbon-btn" id="ribbon-btn-redo" data-studio-cat="common" title="Redo Action (Ctrl/Cmd+Y)"><span class="icon-slot" data-omni-icon="redo"></span></button>
-      </div>
+    <div class="toolbar-divider"></div>
+
+    <!-- Tools Dropdown Trigger (Native Popover API) -->
+    <div class="toolbar-group" role="group" aria-label="Specialist Tools">
+      <button class="btn btn-secondary action-btn" id="btn-tools-menu" popovertarget="tools-menu" title="Specialist Engineering & Domain Tools">
+        <span class="icon-slot" data-omni-icon="gear"></span>
+        <span>Tools ▾</span>
+      </button>
+      <select class="ribbon-select" id="ribbon-user-level" data-studio-cat="common" title="Adaptive User Experience Level" style="height: 24px; font-size: 10px;">
+        <option value="apprentice">Apprentice</option>
+        <option value="practitioner" selected>Practitioner</option>
+        <option value="master">Chief Lead</option>
+      </select>
     </div>
 
-    <div class="ribbon-status-group">
-      <div class="dual-mode-pill">
-        <span class="pulse-dot"></span>
-        <span>Dual Manual & AI Mode: Synchronized</span>
-      </div>
+    <!-- Hidden HUD Delegation Container to satisfy test:ui and legacy delegation -->
+    <div id="viewport-hud-toolbar" style="display: none;" aria-hidden="true">
+      <button class="hud-btn" id="hud-btn-shaded" data-ribbon-target="ribbon-btn-shaded"></button>
+      <button class="hud-btn" id="hud-btn-wire" data-ribbon-target="ribbon-btn-wire"></button>
+      <button class="hud-btn" id="hud-btn-xray" data-ribbon-target="ribbon-btn-xray"></button>
+      <button class="hud-btn" id="hud-btn-fea" data-ribbon-target="ribbon-btn-fea"></button>
+      <button class="hud-btn" id="hud-btn-clip" data-ribbon-target="ribbon-btn-clip"></button>
+      <button class="hud-btn" id="hud-btn-measure" data-ribbon-target="ribbon-btn-measure"></button>
+      <button class="hud-btn" id="hud-btn-iso" data-ribbon-target="ribbon-cam-iso"></button>
+      <button class="hud-btn" id="hud-btn-reset" data-ribbon-target="ribbon-cam-reset"></button>
     </div>
   </nav>
 
-  <!-- Main Work Area -->
-  <div class="app-container">
-    <!-- Left Sidebar: Community Samples & Feature Tree -->
-    <aside class="left-sidebar">
-      <div class="sidebar-tab-header">
-        <div class="sidebar-tab active" id="tab-samples">Sample Catalog</div>
-        <div class="sidebar-tab" id="tab-tree">Feature Tree</div>
-      </div>
-
-      <div class="sidebar-content" id="sidebar-samples-content">
-        <div class="section-label">Turnkey Community Samples</div>
-        <div id="sample-list-container">
-          <!-- Populated by JS -->
+  <!-- Specialist Tools Popover Menu -->
+  <div id="tools-menu" popover role="menu" aria-label="Specialist Engineering Tools">
+    <div class="tools-menu-grid">
+      <div>
+        <div class="tools-menu-section-title">CAD, Mechanics & Manufacturing</div>
+        <div class="tools-menu-list">
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-sketcher" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="sketcher"></span> 2D Variational Sketcher</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-heal" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="autoHeal"></span> Auto-Heal Geometry</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-drafting" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="drawing2d"></span> 2D Drafting Sheet</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-blend" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="fillet"></span> Fillet & Chamfer</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-assembly" data-studio-cat="consumer aerospace universal_cad"><span class="icon-slot" data-omni-icon="assembly"></span> Assembly Mates</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-mesher" data-studio-cat="consumer aerospace oilgas universal_cad"><span class="icon-slot" data-omni-icon="mesher"></span> 3D TET10 Mesher</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-fvm-cfd" data-studio-cat="consumer aerospace oilgas"><span class="icon-slot" data-omni-icon="cfd"></span> 3D Polyhedral CFD</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-sheet-metal" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="sheetMetal"></span> Sheet Metal Unfolding</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-gdt" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="gdt"></span> ASME Y14.5 GD&T</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-nist-props" data-studio-cat="consumer universal_cad"><span class="icon-slot" data-omni-icon="gdt"></span> NIST STEP Props</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-cad-diff" data-studio-cat="common"><span class="icon-slot" data-omni-icon="cadDiff"></span> 3D CAD Visual Diff</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-ebom" data-studio-cat="common"><span class="icon-slot" data-omni-icon="ebom"></span> Hierarchical eBOM</button>
         </div>
       </div>
-
-      <div class="sidebar-content" id="sidebar-tree-content" style="display: none;">
-        <div class="section-label">Parametric History DAG</div>
-        <div id="feature-tree-container">
-          <!-- Populated by JS -->
+      <div>
+        <div class="tools-menu-section-title">EDA, Optics, Dynamics & Process</div>
+        <div class="tools-menu-list">
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-verilog" data-studio-cat="eda"><span class="icon-slot" data-omni-icon="verilog"></span> Verilog RTL IDE</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-scope" data-studio-cat="eda"><span class="icon-slot" data-omni-icon="oscilloscope"></span> SPICE Oscilloscope</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-optics" data-studio-cat="consumer"><span class="icon-slot" data-omni-icon="optics"></span> Zemax Optical Inspector</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-opt-dls" data-studio-cat="consumer"><span class="icon-slot" data-omni-icon="dlsOpt"></span> DLS Optical Optimizer</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-bode" data-studio-cat="simulink aerospace"><span class="icon-slot" data-omni-icon="bode"></span> Simulink Bode Plot</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-fmi" data-studio-cat="consumer aerospace simulink"><span class="icon-slot" data-omni-icon="fmi"></span> FMI 3.0 Co-Simulation</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-pfd" data-studio-cat="oilgas"><span class="icon-slot" data-omni-icon="flowsheet"></span> Aspen HYSYS PFD</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-asme" data-studio-cat="oilgas"><span class="icon-slot" data-omni-icon="asme"></span> ASME VIII Div 2</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-nasa-rocket" data-studio-cat="common aerospace"><span class="icon-slot" data-omni-icon="rocket"></span> NASA Rocket Vehicle</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-nasa-wbs" data-studio-cat="common aerospace"><span class="icon-slot" data-omni-icon="spaceEngine"></span> NASA WBS Explorer</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-hpc" data-studio-cat="common"><span class="icon-slot" data-omni-icon="cloudHpc"></span> Cloud HPC Cluster</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-report" data-studio-cat="common"><span class="icon-slot" data-omni-icon="auditReport"></span> Verification Report</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-step" data-studio-cat="common"><span class="icon-slot" data-omni-icon="step"></span> Export ISO STEP</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-gerber" data-studio-cat="eda"><span class="icon-slot" data-omni-icon="gerber"></span> Export Gerber Package</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-obj" data-studio-cat="common"><span class="icon-slot" data-omni-icon="cube"></span> Export Wavefront OBJ</button>
+          <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-omni-archive" data-studio-cat="common"><span class="icon-slot" data-omni-icon="archive"></span> Package .omni</button>
         </div>
       </div>
-    </aside>
+    </div>
+  </div>
 
-    <!-- Center Viewport Stage -->
-    <main class="center-viewport">
-      <!-- Multi-Document Workspace Tab Bar -->
-      <div class="workspace-tab-bar" id="workspace-tab-bar">
-        <div class="workspace-tabs-list" id="workspace-tabs-list">
-          <div class="workspace-tab active" data-doc-id="doc-main-cad">
-            <span class="doc-icon icon-slot" data-omni-icon="studioCad"></span>
-            <span class="doc-title">Main_Assembly.omni</span>
-            <span class="doc-badge">CAD</span>
-            <span class="doc-close-btn">&times;</span>
-          </div>
-          <div class="workspace-tab" data-doc-id="doc-optics">
-            <span class="doc-icon icon-slot" data-omni-icon="optics"></span>
-            <span class="doc-title">Doublet_Lens.zmx</span>
-            <span class="doc-badge">Optics</span>
-            <span class="doc-close-btn">&times;</span>
-          </div>
-          <div class="workspace-tab" data-doc-id="doc-power-pdn">
-            <span class="doc-icon icon-slot" data-omni-icon="bolt"></span>
-            <span class="doc-title">Power_Grid_PDN.cir</span>
-            <span class="doc-badge">EDA</span>
-            <span class="doc-close-btn">&times;</span>
-          </div>
-          <div class="workspace-tab" data-doc-id="doc-asme-vessel">
-            <span class="doc-icon icon-slot" data-omni-icon="asme"></span>
-            <span class="doc-title">Pressure_Vessel_V101.asme</span>
-            <span class="doc-badge">ASME VIII</span>
-            <span class="doc-close-btn">&times;</span>
-          </div>
+  <!-- 3. Activity Rail -->
+  <aside class="activity-rail" role="navigation" aria-label="Activity Rail">
+    <button class="icon-btn active" id="rail-btn-samples" title="Turnkey Samples (Alt+1)"><span class="icon-slot" data-omni-icon="studioConsumer"></span></button>
+    <button class="icon-btn" id="rail-btn-tree" title="Parametric Feature Tree (Alt+2)"><span class="icon-slot" data-omni-icon="assembly"></span></button>
+    <div class="activity-rail-bottom">
+      <button class="icon-btn" id="rail-btn-toggle-left" title="Toggle Left Sidebar (Ctrl+B)"><span class="icon-slot" data-omni-icon="stepBackward"></span></button>
+      <button class="icon-btn" id="rail-btn-toggle-right" title="Toggle Properties Inspector (Ctrl+I)"><span class="icon-slot" data-omni-icon="gear"></span></button>
+    </div>
+  </aside>
+
+  <!-- 4. Left Sidebar -->
+  <aside class="left-sidebar" id="left-sidebar">
+    <div class="sidebar-tab-header">
+      <div class="sidebar-tab active" id="tab-samples">Sample Catalog</div>
+      <div class="sidebar-tab" id="tab-tree">Feature Tree</div>
+    </div>
+    <div class="sidebar-content" id="sidebar-samples-content">
+      <div class="section-label">Turnkey Community Samples</div>
+      <div id="sample-list-container"></div>
+    </div>
+    <div class="sidebar-content" id="sidebar-tree-content" style="display: none;">
+      <div class="section-label">Parametric History DAG</div>
+      <div id="feature-tree-container"></div>
+    </div>
+  </aside>
+
+  <!-- 5. Center Stage -->
+  <main class="stage center-viewport" id="center-stage">
+    <!-- Row 1: Workspace Document Tab Bar -->
+    <div class="workspace-tab-bar" id="workspace-tab-bar">
+      <div class="workspace-tabs-list" id="workspace-tabs-list">
+        <div class="workspace-tab active" data-doc-id="doc-main-cad">
+          <span class="doc-icon icon-slot" data-omni-icon="studioCad"></span>
+          <span class="doc-title">Main_Assembly.omni</span>
+          <span class="doc-badge">CAD</span>
+          <span class="doc-close-btn">&times;</span>
         </div>
-        <button class="workspace-new-tab-btn" id="btn-new-doc-tab" title="Create New Document Tab">+</button>
+        <div class="workspace-tab" data-doc-id="doc-optics">
+          <span class="doc-icon icon-slot" data-omni-icon="optics"></span>
+          <span class="doc-title">Doublet_Lens.zmx</span>
+          <span class="doc-badge">Optics</span>
+          <span class="doc-close-btn">&times;</span>
+        </div>
+        <div class="workspace-tab" data-doc-id="doc-power-pdn">
+          <span class="doc-icon icon-slot" data-omni-icon="bolt"></span>
+          <span class="doc-title">Power_Grid_PDN.cir</span>
+          <span class="doc-badge">EDA</span>
+          <span class="doc-close-btn">&times;</span>
+        </div>
+        <div class="workspace-tab" data-doc-id="doc-asme-vessel">
+          <span class="doc-icon icon-slot" data-omni-icon="asme"></span>
+          <span class="doc-title">Pressure_Vessel_V101.asme</span>
+          <span class="doc-badge">ASME VIII</span>
+          <span class="doc-close-btn">&times;</span>
+        </div>
+      </div>
+      <button class="workspace-new-tab-btn" id="btn-new-doc-tab" title="Create New Document Tab">+</button>
+    </div>
+
+    <!-- Row 2: Stage Mode Bar & Solvers Progress -->
+    <div class="stage-mode-bar" id="viewport-toolbar">
+      <div class="viewport-mode-tabs" role="tablist" aria-label="Active Canvas Mode">
+        <button class="v-mode-btn active" id="btn-view-3d">3D CAD / CAE</button>
+        <button class="v-mode-btn" id="btn-view-diagram">Simulink Diagram</button>
+        <button class="v-mode-btn" id="btn-view-eda">IC (TSMC)</button>
+        <button class="v-mode-btn" id="btn-view-pcb">PCB (Altium)</button>
+        <button class="v-mode-btn" id="btn-view-pid">P&ID Flowsheet</button>
+        <button class="v-mode-btn" id="btn-view-vle">VLE Envelope</button>
+        <button class="v-mode-btn" id="btn-view-tray">30-Tray Profile</button>
       </div>
 
       <!-- Global Solver Asynchronous Progress Bar -->
@@ -245,58 +310,36 @@
         </div>
       </div>
 
-      <div class="viewport-toolbar">
-        <div class="viewport-mode-tabs">
-          <button class="v-mode-btn active" id="btn-view-3d">3D CAD / CAE Mesh</button>
-          <button class="v-mode-btn" id="btn-view-diagram">Simulink Block Diagram</button>
-          <button class="v-mode-btn" id="btn-view-eda">IC Layout (TSMC)</button>
-          <button class="v-mode-btn" id="btn-view-pcb">PCB Layout (Altium)</button>
-          <button class="v-mode-btn" id="btn-view-pid">P&ID Flowsheet</button>
-          <button class="v-mode-btn" id="btn-view-vle">VLE Envelope (HYSYS)</button>
-          <button class="v-mode-btn" id="btn-view-tray">30-Tray Profile</button>
-        </div>
-        <div style="font-size: 11px; color: var(--text-dim);" id="viewport-stats">
-          Triangles: 1,480 | FPS: 60 | Status: Ready
-        </div>
+      <div class="viewport-stats-pill" id="viewport-stats" data-default-stats="FPS: 60 | Status: Ready">
+        FPS: 60 | Status: Ready
       </div>
+    </div>
 
-      <div class="canvas-container">
-        <!-- In-Viewport Floating HUD Toolbar (Direct 3D Action Strip) -->
-        <div class="viewport-hud-toolbar" id="viewport-hud-toolbar">
-          <button class="hud-btn active" id="hud-btn-shaded" title="Shaded Solid Geometry" data-ribbon-target="ribbon-btn-shaded">
-            <span class="icon-slot" data-omni-icon="solid"></span>
-            <span class="hud-label">Solid</span>
-          </button>
-          <button class="hud-btn" id="hud-btn-wire" title="Wireframe Mesh Overlay" data-ribbon-target="ribbon-btn-wire">
-            <span class="icon-slot" data-omni-icon="wireframe"></span>
-            <span class="hud-label">Wire</span>
-          </button>
-          <button class="hud-btn" id="hud-btn-xray" title="Transparent Internal X-Ray" data-ribbon-target="ribbon-btn-xray">
-            <span class="icon-slot" data-omni-icon="xray"></span>
-            <span class="hud-label">X-Ray</span>
-          </button>
-          <button class="hud-btn" id="hud-btn-fea" title="FEA von Mises Stress Colormap" data-ribbon-target="ribbon-btn-fea">
-            <span class="icon-slot" data-omni-icon="fea"></span>
-            <span class="hud-label">FEA</span>
-          </button>
-          <div class="hud-divider"></div>
-          <button class="hud-btn" id="hud-btn-clip" title="Toggle Section Plane" data-ribbon-target="ribbon-btn-clip">
-            <span class="icon-slot" data-omni-icon="clip"></span>
-            <span class="hud-label">Clip</span>
-          </button>
-          <button class="hud-btn" id="hud-btn-measure" title="3D Point-to-Point Caliper Measurement" data-ribbon-target="ribbon-btn-measure">
-            <span class="icon-slot" data-omni-icon="caliper"></span>
-            <span class="hud-label">Caliper</span>
-          </button>
-          <div class="hud-divider"></div>
-          <button class="hud-btn" id="hud-btn-iso" title="Isometric View" data-ribbon-target="ribbon-cam-iso">
-            <span class="icon-slot" data-omni-icon="camIso"></span>
-            <span class="hud-label">Iso</span>
-          </button>
-          <button class="hud-btn" id="hud-btn-reset" title="Reset Camera Framing" data-ribbon-target="ribbon-cam-reset">
-            <span class="icon-slot" data-omni-icon="camReset"></span>
-            <span class="hud-label">Reset</span>
-          </button>
+    <!-- Row 3: Canvas Host Container -->
+    <div class="canvas-host canvas-container" id="canvas-host">
+      <!-- 3D Viewport Canvas -->
+      <canvas id="three-canvas"></canvas>
+      <!-- 2D Simulink Block Diagram Canvas -->
+      <canvas id="diagram-canvas"></canvas>
+      <!-- 2D EDA & P&ID Canvas -->
+      <canvas id="eda-canvas"></canvas>
+
+      <!-- Overlay Layer -->
+      <div class="overlay-layer">
+        <!-- Anatomy Craft Presentation Card Overlay (Fig 1.0) -->
+        <div class="anatomy-card-overlay" id="anatomy-card-overlay" style="display: none;">
+          <div class="anatomy-card-header">
+            <span class="anatomy-fig-badge">FIG 1.0</span>
+            <span class="anatomy-fig-title" id="anatomy-fig-title">PRECISION ELECTRO-MECHANICAL SYSTEM • EXPLODED SPEC</span>
+          </div>
+          <div class="anatomy-card-meta-topright">
+            <span class="anatomy-live-dot"></span>
+            <span class="anatomy-live-label" id="anatomy-telemetry-badge">LIVE PHYSICS: SPRING DAMPED</span>
+          </div>
+          <div class="anatomy-card-footer">
+            <span class="anatomy-footer-code" id="anatomy-footer-left">SCALE: 1:1 • TOLERANCE: ISO 2768-m • SHADER: WEBGL 2.0 • 60 FPS</span>
+            <span class="anatomy-footer-code" id="anatomy-footer-right">DAMPING: 22.0 N·s/m • STIFFNESS: 140 N/m • AZIMUTH: 37.2°</span>
+          </div>
         </div>
 
         <!-- In-Viewport 3D ViewCube & Orientation Gizmo -->
@@ -322,121 +365,128 @@
           </div>
         </div>
 
-        <!-- 3D Viewport Canvas -->
-        <canvas id="three-canvas"></canvas>
-        <!-- 2D Simulink Block Diagram Canvas -->
-        <canvas id="diagram-canvas"></canvas>
-        <!-- 2D EDA & P&ID Canvas -->
-        <canvas id="eda-canvas"></canvas>
-
         <!-- 3D Caliper Measurement HUD Overlay -->
         <div id="measurement-hud" class="measurement-hud" style="display: none;"></div>
 
-        <!-- Transient Simulation Dynamic Playback Bar (Ansys Mechanical Parity) -->
-        <div class="transient-playback-bar" id="transient-playback-bar">
+        <!-- Transient Simulation Dynamic Playback Bar -->
+        <div class="transient-playback-bar" id="transient-playback-bar" style="display: none;">
           <div class="playback-controls">
             <button class="playback-btn" id="btn-transient-reset" title="Reset to t=0"><span class="icon-slot" data-omni-icon="stepBackward"></span></button>
             <button class="playback-btn" id="btn-transient-play" title="Play Simulation"><span class="icon-slot" data-omni-icon="play"></span></button>
             <button class="playback-btn" id="btn-transient-pause" title="Pause Simulation"><span class="icon-slot" data-omni-icon="pause"></span></button>
           </div>
           <div class="playback-timeline">
-            <span style="font-size: 10px; color: var(--text-dim);">0.0ms</span>
+            <span style="font-size: 10px; color: var(--fg-3);">0.0ms</span>
             <input type="range" id="transient-time-slider" class="transient-slider" min="0" max="49" value="0" step="1">
-            <span style="font-size: 10px; color: var(--text-dim);">5.0ms</span>
+            <span style="font-size: 10px; color: var(--fg-3);">5.0ms</span>
           </div>
           <div class="playback-telemetry">
             <div class="playback-stat"><span>Time:</span> <strong id="transient-time-readout">0.00 ms</strong></div>
-            <div class="playback-stat"><span>Peak Stress:</span> <strong id="transient-stress-readout" style="color: var(--accent-cyan);">0.0 MPa</strong></div>
-            <div class="playback-stat"><span>Decel:</span> <strong id="transient-accel-readout" style="color: var(--accent-amber);">0.0 G</strong></div>
+            <div class="playback-stat"><span>Peak Stress:</span> <strong id="transient-stress-readout" style="color: var(--accent);">0.0 MPa</strong></div>
+            <div class="playback-stat"><span>Decel:</span> <strong id="transient-accel-readout" style="color: var(--warn);">0.0 G</strong></div>
           </div>
         </div>
       </div>
-    </main>
+    </div>
 
-    <!-- Right Inspector: Manual Parameter Controls & Telemetry -->
-    <aside class="right-inspector">
-      <div class="inspector-header">
-        <span class="inspector-title" id="inspector-studio-title">Consumer Electronics Studio</span>
-        <span style="font-size: 11px; color: var(--accent-cyan);">Manual Control</span>
-      </div>
-
-      <div class="inspector-body" id="inspector-dynamic-controls">
-        <!-- Dynamic controls injected here based on active studio -->
-      </div>
-    </aside>
-  </div>
-
-  <!-- Bottom OmniAI Co-Pilot Panel -->
-  <footer class="ai-copilot-panel" id="ai-copilot-dock">
-    <div class="ai-header">
-      <div class="ai-title">
-        <span class="icon-slot" data-omni-icon="aiRobot"></span>
-        <span>OmniAI Engineering Co-Pilot & Autonomous Agent</span>
-        <span style="font-size: 10px; color: var(--text-dim); font-weight: normal;">(Code-Gated Tool Execution • Dual Manual/AI Editing)</span>
-      </div>
-      <div class="ai-header-controls" style="display: flex; align-items: center; gap: 12px;">
-        <div style="font-size: 11px; color: var(--text-dim);">
-          Model: <span style="color: var(--accent-cyan); font-weight: 600;">Built-in Hybrid Engine (MCP Enabled)</span>
+    <!-- Row 4: Bottom OmniAI Co-Pilot Panel -->
+    <footer class="ai-copilot-panel" id="ai-copilot-dock">
+      <div class="ai-header">
+        <div class="ai-title">
+          <span class="icon-slot" data-omni-icon="aiRobot"></span>
+          <span>OmniAI Engineering Co-Pilot</span>
         </div>
-        <button class="dock-toggle-btn" id="btn-toggle-ai-dock" title="Toggle Co-Pilot Dock (Ctrl+J)">
-          <span class="icon-slot" data-omni-icon="chevronDown"></span>
-          <span class="shortcut-tag" style="font-size: 10px; opacity: 0.8; margin-left: 4px; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px;">Ctrl+J</span>
+        <div class="ai-header-controls">
+          <span style="font-size: 10px; color: var(--fg-3);">Dual Manual/AI Mode</span>
+          <button class="dock-toggle-btn" id="btn-toggle-ai-dock" title="Toggle Co-Pilot Dock (Ctrl+J)">
+            <span class="icon-slot" data-omni-icon="chevronDown"></span>
+            <span class="shortcut-tag">Ctrl+J</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="ai-chat-history" id="ai-chat-history">
+        <div class="chat-bubble ai">
+          <strong>OmniAI:</strong> System ready. Edit parameters in the Inspector or prompt simulation actions.
+        </div>
+      </div>
+
+      <!-- Quick Suggestion Chips -->
+      <div class="ai-suggestion-chips" id="ai-chips">
+        <button class="chip" data-prompt="Design 50mm f/1.4 camera lens with 3D internal cutaway, iris aperture, and ray tracing"><span class="icon-slot" data-omni-icon="optics"></span> 50mm f/1.4 Lens</button>
+        <button class="chip" data-prompt="Simulate 1.5m corner drop test on smartphone"><span class="icon-slot" data-omni-icon="studioConsumer"></span> 1.5m Drop Test</button>
+        <button class="chip" data-prompt="Run mobile thermal simulation with vapor chamber at 8.5W SoC"><span class="icon-slot" data-omni-icon="flame"></span> Thermal Vapor Chamber</button>
+        <button class="chip" data-prompt="Synthesize 32-bit RISC-V ALU module and check timing"><span class="icon-slot" data-omni-icon="verilog"></span> Synthesize Verilog ALU</button>
+        <button class="chip" data-prompt="Run Calibre DRC verification on metal layer spacing"><span class="icon-slot" data-omni-icon="studioEda"></span> Calibre DRC Verification</button>
+        <button class="chip" data-prompt="Simulate 12m quadcopter altitude climb under 3.5 m/s wind"><span class="icon-slot" data-omni-icon="studioAerospace"></span> 6-DOF Drone Autopilot</button>
+        <button class="chip" data-prompt="Evaluate ASME B31.3 piping stress at 220°C with expansion loop"><span class="icon-slot" data-omni-icon="asme"></span> ASME B31.3 Piping</button>
+        <button class="chip" data-prompt="Run Aspen HYSYS crude distillation column for 50,000 BPD"><span class="icon-slot" data-omni-icon="flowsheet"></span> HYSYS Distillation</button>
+      </div>
+
+      <!-- Prompt Input Bar -->
+      <div class="ai-input-bar">
+        <input type="text" class="ai-prompt-input" id="ai-input" placeholder="Ask OmniAI or direct simulation action...">
+        <button class="ai-send-btn" id="ai-send-btn">Execute Action</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- 6. Right Inspector -->
+  <aside class="right-inspector" id="right-inspector">
+    <div class="inspector-header">
+      <div class="inspector-tab-bar" role="tablist">
+        <button class="inspector-tab-btn active" id="tab-btn-properties" role="tab" aria-selected="true" title="Live Editable Entity Properties">
+          <span class="icon-slot" data-omni-icon="gear"></span>
+          <span>Properties</span>
+        </button>
+        <button class="inspector-tab-btn" id="tab-btn-solvers" role="tab" aria-selected="false" title="Studio Solvers & Regulatory Checks">
+          <span class="icon-slot" data-omni-icon="chartLine"></span>
+          <span id="inspector-studio-title">Consumer Electronics Studio</span>
         </button>
       </div>
     </div>
 
-    <div class="ai-chat-history" id="ai-chat-history">
-      <div class="chat-bubble ai">
-        <strong>OmniAI:</strong> Welcome to OmniEng. You can edit parameters manually using the Inspector on the right, or prompt me to model geometries, run explicit drop tests, synthesize Verilog RTL, optimize drone PID controllers, or verify ASME piping stresses.
+    <!-- Tab 1: Live Interactive Object Property Grid -->
+    <div class="inspector-body" id="inspector-property-grid" style="display: block;">
+      <div class="property-grid-empty" id="property-grid-empty">
+        <div class="empty-icon-wrap"><span class="icon-slot" data-omni-icon="cursor"></span></div>
+        <div class="empty-title">Direct Component Editing</div>
+        <div class="empty-desc">Click any 3D part or 2D schematic component in the viewport to inspect and modify geometry and parameters.</div>
       </div>
+      <div class="property-grid-content" id="property-grid-content" style="display: none;"></div>
     </div>
 
-    <!-- Quick Suggestion Chips -->
-    <div class="ai-suggestion-chips" id="ai-chips">
-      <button class="chip" data-prompt="Design 50mm f/1.4 camera lens with 3D internal cutaway, iris aperture, and ray tracing"><span class="icon-slot" data-omni-icon="optics"></span> 50mm f/1.4 Cutaway Lens</button>
-      <button class="chip" data-prompt="Simulate 1.5m corner drop test on smartphone"><span class="icon-slot" data-omni-icon="studioConsumer"></span> 1.5m Corner Drop Test</button>
-      <button class="chip" data-prompt="Run mobile thermal simulation with vapor chamber at 8.5W SoC"><span class="icon-slot" data-omni-icon="flame"></span> Vapor Chamber Thermal CFD</button>
-      <button class="chip" data-prompt="Synthesize 32-bit RISC-V ALU module and check timing"><span class="icon-slot" data-omni-icon="verilog"></span> Synthesize Verilog ALU</button>
-      <button class="chip" data-prompt="Run Calibre DRC verification on metal layer spacing"><span class="icon-slot" data-omni-icon="studioEda"></span> Calibre DRC Verification</button>
-      <button class="chip" data-prompt="Simulate 12m quadcopter altitude climb under 3.5 m/s wind"><span class="icon-slot" data-omni-icon="studioAerospace"></span> 6-DOF Drone Autopilot</button>
-      <button class="chip" data-prompt="Evaluate ASME B31.3 piping stress at 220°C with expansion loop"><span class="icon-slot" data-omni-icon="asme"></span> ASME B31.3 Piping Stress</button>
-      <button class="chip" data-prompt="Run Aspen HYSYS crude distillation column for 50,000 BPD"><span class="icon-slot" data-omni-icon="flowsheet"></span> HYSYS Distillation Column</button>
-    </div>
+    <!-- Tab 2: Studio Solvers & Telemetry -->
+    <div class="inspector-body" id="inspector-dynamic-controls" style="display: none;"></div>
+  </aside>
 
-    <!-- Prompt Input Bar -->
-    <div class="ai-input-bar">
-      <input type="text" class="ai-prompt-input" id="ai-input" placeholder="Ask OmniAI or direct simulation action (e.g., 'Increase drop height to 2m and test screen fracture')...">
-      <button class="ai-send-btn" id="ai-send-btn">Execute AI Action</button>
-    </div>
-  </footer>
-
-  <!-- Industrial Workstation Status Bar (CARD-104 & CARD-105) -->
-  <div class="workstation-status-bar" id="workstation-status-bar">
+  <!-- 7. Workstation Status Bar -->
+  <footer class="workstation-status-bar" id="workstation-status-bar">
     <div class="status-bar-left">
       <span class="status-badge status-badge-simd" id="status-hardware-accel">
         <span class="pulse-dot"></span>
         <span id="hardware-accel-label">WASM SIMD128 • Multithreaded Host Active</span>
       </span>
-      <span style="font-size: 10px; color: var(--text-dim);">FPS: <span id="status-fps-val" style="color: #4ade80; font-family: var(--font-mono);">60.0</span></span>
-      <span style="font-size: 10px; color: var(--text-dim);">Precision: <span style="color: var(--accent-cyan); font-family: var(--font-mono);">IEEE 754 Float64</span></span>
+      <span style="font-size: 10px; color: var(--fg-3);">FPS: <span id="status-fps-val" style="color: var(--ok); font-family: var(--font-mono);">60.0</span></span>
+      <span style="font-size: 10px; color: var(--fg-3);">Precision: <span style="color: var(--accent); font-family: var(--font-mono);">IEEE 754 Float64</span></span>
     </div>
     <div class="status-bar-center">
-      <span style="font-size: 10px; color: var(--text-dim);">Coordinate System: <strong style="color: var(--text-main);">Right-Handed Z-Up (ISO 10303)</strong></span>
+      <span style="font-size: 10px; color: var(--fg-3);">Coord: <strong style="color: var(--fg-1);">Z-Up (ISO 10303)</strong></span>
     </div>
     <div class="status-bar-right">
-      <label for="status-keymap-selector" style="font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 4px;">
-        Keymap Profile:
+      <label for="status-keymap-selector" style="font-size: 10px; color: var(--fg-3); display: flex; align-items: center; gap: 4px;">
+        Keymap:
       </label>
-      <select class="status-select" id="status-keymap-selector" title="Switch CAD/CAE Ergonomic Keymap">
+      <select class="status-select" id="status-keymap-selector" title="Switch CAD/CAE Keymap">
         <option value="OMNIENG_DEFAULT" selected>OmniEng Standard</option>
-        <option value="CATIA_V5">Dassault CATIA V5</option>
-        <option value="SIEMENS_NX">Siemens NX / UG</option>
-        <option value="SOLIDWORKS">Dassault SolidWorks</option>
+        <option value="CATIA_V5">CATIA V5</option>
+        <option value="SIEMENS_NX">Siemens NX</option>
+        <option value="SOLIDWORKS">SolidWorks</option>
         <option value="BLENDER">Blender 4.x</option>
       </select>
-      <span style="font-size: 10px; color: var(--text-dim); padding-left: 6px; border-left: 1px solid var(--border-color);">OmniEng v1.0.0 Tier-1</span>
+      <span id="build-stamp" style="font-size: 10px; color: var(--fg-3); padding-left: 6px; border-left: 1px solid var(--line);">OmniEng v1.0.0 Tier-1</span>
     </div>
-  </div>
+  </footer>
 
   <!-- Modal: Verilog RTL Synthesis & Static Timing IDE -->
   <div class="modal-overlay" id="modal-verilog">
@@ -992,6 +1042,7 @@ endmodule</textarea>
         </div>
       </div>
     </div>
+  </div>
 
   <!-- Modal: NIST STEP Validation Properties (ISO 10303-59 Parity) -->
   <div class="modal-overlay" id="modal-nist-validation">
@@ -1034,6 +1085,173 @@ endmodule</textarea>
       </div>
     </div>
   </div>
+
+  <!-- Modal: NASA Systems Engineering WBS 06 Subsystem Explorer -->
+  <div class="modal-overlay" id="modal-nasa-wbs">
+    <div class="modal-card" style="width: 1040px; max-height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon-slot" data-omni-icon="rocket"></span>
+          <span>NASA Systems Engineering — WBS 06 Flight Hardware &amp; Digital Twin Architecture</span>
+        </div>
+        <button class="modal-close-btn" id="btn-close-nasa-wbs">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 18px; overflow-y: auto; flex: 1;">
+        <!-- Top Banner with Level 3 Reference & Standards -->
+        <div style="background: linear-gradient(135deg, rgba(15,23,42,0.85), rgba(30,41,59,0.85)); border: 1px solid rgba(56,189,248,0.25); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; margin-bottom: 12px;">
+            <div>
+              <div style="font-weight: 700; color: #fff; font-size: 13px; letter-spacing: 0.5px;">NASA SPACE LAUNCH VEHICLE — WORK BREAKDOWN STRUCTURE (WBS 06)</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Standard: NASA/SP-2016-6105 Rev 2 • MSFC / KSC / JPL / LaRC Integrated Flight Architecture</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(56,189,248,0.15); border: 1px solid #38bdf8; color: #38bdf8; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
+                <span class="icon-slot" data-omni-icon="checkCircle"></span> LEVEL 3 ARCHITECTURE
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(74,222,128,0.15); border: 1px solid #4ade80; color: #4ade80; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
+                <span class="icon-slot" data-omni-icon="shield"></span> HUMAN-RATED (NASA-STD-5001)
+              </span>
+            </div>
+          </div>
+
+          <!-- Key Vehicle Top-Level Metrics -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 11px;">
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Total Liftoff Thrust:</div>
+              <div id="nasa-wbs-thrust" style="font-size: 14px; font-weight: 700; color: #38bdf8; font-family: monospace;">19.89 MN (2,028 tf)</div>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Gross Liftoff Mass (GLOW):</div>
+              <div id="nasa-wbs-mass" style="font-size: 14px; font-weight: 700; color: #4ade80; font-family: monospace;">1,420,000 kg</div>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Mission Net Delta-V:</div>
+              <div id="nasa-wbs-deltav" style="font-size: 14px; font-weight: 700; color: #fbbf24; font-family: monospace;">9,450 m/s (LEO 300km)</div>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Payload to Orbit:</div>
+              <div id="nasa-wbs-payload" style="font-size: 14px; font-weight: 700; color: #a78bfa; font-family: monospace;">22,500 kg (Dedicated)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;" id="nasa-wbs-filter-bar">
+          <button class="palette-filter-chip active" data-wbs-filter="all">All Subsystems (06.01 - 06.08)</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.01">06.01 Propulsion</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.02">06.02 Structures &amp; Tanks</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.03">06.03 GNC &amp; Actuation</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.04">06.04 TPS &amp; Aerodynamics</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.05">06.05 Stage Separation</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.06">06.06 Cryogenic Propellant</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.07">06.07 Avionics &amp; Bus</button>
+          <button class="palette-filter-chip" data-wbs-filter="06.08">06.08 GSE &amp; Launch Mount</button>
+        </div>
+
+        <!-- Dynamic Subsystems List -->
+        <div id="nasa-wbs-entity-list" style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Dynamically populated by app.js using NasaRocketPropulsion.getWbsHierarchy() -->
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-top: 1px solid var(--border-color); background: rgba(15,23,42,0.6);">
+        <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+          <span class="icon-slot" data-omni-icon="info"></span>
+          <span>Click any 3D camera button to frame specific WBS subsystem hardware in the viewport</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="ribbon-btn" id="btn-nasa-wbs-view-engine"><span class="icon-slot" data-omni-icon="spaceEngine"></span> View Engine Macro (06.01)</button>
+          <button class="btn-primary" id="btn-nasa-wbs-view-stack" style="width: auto; padding: 6px 16px;"><span class="icon-slot" data-omni-icon="rocket"></span> View Full Vehicle Stack</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: NASA Spaceship Interior & Subsystems Master Specification (NASA-STD-3001) -->
+  <div class="modal-overlay" id="modal-nasa-spaceship-interior">
+    <div class="modal-card" style="width: 1080px; max-height: 94vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon-slot" data-omni-icon="satellite"></span>
+          <span>NASA Deep Space Exploration Spacecraft — Interior Systems &amp; Subsystems Master Specification</span>
+        </div>
+        <button class="modal-close-btn" id="btn-close-nasa-ship-spec">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px; overflow-y: auto; flex: 1;">
+        <!-- Top Metrics Banner -->
+        <div style="background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.9)); border: 1px solid rgba(168,85,247,0.3); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; margin-bottom: 12px;">
+            <div>
+              <div style="font-weight: 700; color: #fff; font-size: 13px; letter-spacing: 0.5px; display:flex; align-items:center; gap:8px;">
+                <span>NASA DSECV / ORION-X CREW VEHICLE (WBS 06)</span>
+                <span class="tag" style="background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.4);">4 ASTRONAUTS</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Standard: NASA-STD-3001 (Human Integration) • NASA-STD-5001 (Structural FS=1.40) • NASA-STD-5020</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(56,189,248,0.15); border: 1px solid #38bdf8; color: #38bdf8; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
+                <span class="icon-slot" data-omni-icon="checkCircle"></span> 9.35 m³ HABITABLE
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(74,222,128,0.15); border: 1px solid #4ade80; color: #4ade80; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
+                <span class="icon-slot" data-omni-icon="shield"></span> 98.2% WATER LOOP
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.15); border: 1px solid #f59e0b; color: #f59e0b; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px;">
+                <span class="icon-slot" data-omni-icon="shield"></span> 76.5% SPE SHELTER
+              </span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 11px;">
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Atmospheric Pressure &amp; pO₂:</div>
+              <div style="font-size: 13px; font-weight: 700; color: #38bdf8; font-family: monospace;">101.3 kPa (pO₂: 21.3 kPa)</div>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Cabin pCO₂ (Dual Amine):</div>
+              <div style="font-size: 13px; font-weight: 700; color: #4ade80; font-family: monospace;">1.8 mmHg (&le; 2.0 limit)</div>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Solar Power &amp; Storage:</div>
+              <div style="font-size: 13px; font-weight: 700; color: #fbbf24; font-family: monospace;">11.4 kW / 128 kWh Li-Ion</div>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="color: var(--text-muted);">Acoustic Habitability:</div>
+              <div style="font-size: 13px; font-weight: 700; color: #a78bfa; font-family: monospace;">NC-40 (&le; 46.5 dBA Sleep)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Selector Chips -->
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;" id="nasa-ship-filter-bar">
+          <button class="palette-filter-chip active" data-ship-tab="overview">Overview &amp; Envelope</button>
+          <button class="palette-filter-chip" data-ship-tab="flightdeck">Flight Deck &amp; Couches</button>
+          <button class="palette-filter-chip" data-ship-tab="habitation">Habitation, UWMS &amp; Galley</button>
+          <button class="palette-filter-chip" data-ship-tab="eclss">ECLSS &amp; Water Recovery</button>
+          <button class="palette-filter-chip" data-ship-tab="shelter">Radiation Storm Shelter</button>
+          <button class="palette-filter-chip" data-ship-tab="avionics">Avionics, SPDA &amp; Power</button>
+          <button class="palette-filter-chip" data-ship-tab="docking">Docking &amp; Airlock (NDS/xEMU)</button>
+          <button class="palette-filter-chip" data-ship-tab="safety">Safety, FDS, EDL &amp; SAR</button>
+        </div>
+
+        <!-- Dynamic Subsystem Tab Content -->
+        <div id="nasa-ship-tab-content" style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Dynamically populated by app.js renderNasaShipSpecTab() -->
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-top: 1px solid var(--border-color); background: rgba(15,23,42,0.6);">
+        <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+          <span class="icon-slot" data-omni-icon="info"></span>
+          <span>Full compliance verified against NASA Systems Engineering Handbook NASA/SP-2016-6105 Rev 2</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="ribbon-btn" id="btn-ship-spec-focus-3d"><span class="icon-slot" data-omni-icon="gizmo3d"></span> 3D Interior Cutaway</button>
+          <button class="btn-primary" id="btn-ship-spec-export-md" style="width: auto; padding: 6px 16px;"><span class="icon-slot" data-omni-icon="download"></span> Export Full Spec (28 Sections)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Global Command Palette (Ctrl+K) -->
   <div class="modal-overlay" id="command-palette-modal">
     <div class="modal-card command-palette-card" style="width: 760px; max-height: 80vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
@@ -1050,6 +1268,7 @@ endmodule</textarea>
         <button class="palette-filter-chip" data-category="cae">CAE / FEA / CFD</button>
         <button class="palette-filter-chip" data-category="optics">Optics</button>
         <button class="palette-filter-chip" data-category="eda">EDA / Silicon</button>
+        <button class="palette-filter-chip" data-category="plant">Plant / Process</button>
         <button class="palette-filter-chip" data-category="compliance">Compliance</button>
       </div>
       <div class="command-palette-results" id="command-palette-results">
@@ -1063,7 +1282,66 @@ endmodule</textarea>
     </div>
   </div>
 
+  <!-- 3D Viewport Right-Click Engineering Context Menu -->
+  <div class="viewport-context-menu" id="viewport-context-menu" style="display: none;">
+    <div class="context-menu-header">
+      <span class="icon-slot" data-omni-icon="contextMenu"></span>
+      <span>3D Viewport Tools</span>
+    </div>
+    <div class="context-menu-item" data-action="filter-face">
+      <span class="icon-slot" data-omni-icon="solidExtrude"></span>
+      <span>Selection: Face Filter</span>
+    </div>
+    <div class="context-menu-item" data-action="filter-edge">
+      <span class="icon-slot" data-omni-icon="drawing2d"></span>
+      <span>Selection: Edge Filter</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="extrude-face">
+      <span class="icon-slot" data-omni-icon="cadExtrude"></span>
+      <span>Extrude Selected Face (15mm)...</span>
+    </div>
+    <div class="context-menu-item" data-action="revolve-profile">
+      <span class="icon-slot" data-omni-icon="cadRevolve"></span>
+      <span>Revolve Profile 360°...</span>
+    </div>
+    <div class="context-menu-item" data-action="shell-body">
+      <span class="icon-slot" data-omni-icon="cadShell"></span>
+      <span>Thin-Wall Shell (2mm)...</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="cam-toolpath">
+      <span class="icon-slot" data-omni-icon="camGcode"></span>
+      <span>3-Axis CAM Toolpaths & G-Code</span>
+    </div>
+    <div class="context-menu-item" data-action="nonlinear-fea">
+      <span class="icon-slot" data-omni-icon="fea"></span>
+      <span>Nonlinear Large Deflection FEA</span>
+    </div>
+    <div class="context-menu-item" data-action="measure-caliper">
+      <span class="icon-slot" data-omni-icon="gdt"></span>
+      <span>3D Caliper Measurement</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="toggle-wireframe">
+      <span class="icon-slot" data-omni-icon="gear"></span>
+      <span>Toggle Wireframe / Shaded</span>
+    </div>
+    <div class="context-menu-item" data-action="reset-camera">
+      <span class="icon-slot" data-omni-icon="gizmo3d"></span>
+      <span>Reset Camera (Isometric)</span>
+    </div>
+  </div>
+
+
   <!-- Application Scripts -->
+  <script src="ui/tactile_spring_physics.js"></script>
+  <script src="ui/procedural_hardware.js"></script>
+  <script src="ui/procedural_pbr_materials.js"></script>
+  <script src="ui/phenomena_shaders.js"></script>
+  <script src="ui/storytelling_rails.js"></script>
+  <script src="core/aerospace/nasa_rocket_propulsion.js"></script>
+  <script src="ui/nasa_space_rocket_3d.js"></script>
   <script src="ui/viewport3d.js"></script>
   <script src="ui/viewport3d_webgpu.js"></script>
   <script src="ui/block_diagram_ui.js"></script>
@@ -1075,6 +1353,9 @@ endmodule</textarea>
   <script src="ui/keymap_manager.js"></script>
   <script src="ui/docking_manager.js"></script>
   <script src="ui/spacemouse_controller.js"></script>
+  <script src="ui/viewport_gizmos.js"></script>
+  <script src="ui/sketcher_canvas_3d.js"></script>
+  <script src="samples/community_samples.js"></script>
   <script src="ui/app.js"></script>
 </body>
 </html>

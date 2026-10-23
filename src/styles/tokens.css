@@ -1,0 +1,108 @@
+/**
+ * OmniEng Unified Design Tokens (Quiet Technical Precision)
+ * Single source of truth for surfaces, borders, typography, and accents.
+ */
+
+:root {
+  /* Surfaces (dark technical workstation) */
+  --surface-0: #0b0d12;   /* app background / canvas well */
+  --surface-1: #111418;   /* panels / sidebar background */
+  --surface-2: #171b21;   /* raised: menus, inputs, cards */
+  --surface-3: #1f242c;   /* hover / active elevated */
+  --line:      #262c35;   /* region dividers and borders */
+  --line-soft: #1c2129;   /* subtle inner dividers */
+
+  /* Text hierarchy */
+  --fg-1: #e8ebf0;  /* primary label and value */
+  --fg-2: #a3abb8;  /* secondary / muted label */
+  --fg-3: #6b7482;  /* subtle / disabled / caption */
+
+  /* Single focal accent + semantic indicators */
+  --accent: #4c8dff;
+  --accent-tint: rgba(76, 141, 255, 0.14);
+  --accent-hover: #3b7ced;
+  --ok: #3fb68b;
+  --warn: #e0a43a;
+  --err: #e5566b;
+
+  /* Spacing Scale (4px grid) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+
+  /* Corner Radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+
+  /* Font Sizes */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+
+  /* Control Heights */
+  --ctl-h: 28px;
+  --row-h: 32px;
+
+  /* Shell Layout Metrics (read by JS for canvas safe-area) */
+  --topbar-h: 40px;
+  --toolbar-h: 40px;
+  --status-h: 24px;
+  --rail-w: 48px;
+  --left-w: 260px;
+  --right-w: 320px;
+  --ai-h-collapsed: 44px;
+  --ai-h-expanded: 240px;
+
+  /* Typography */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, Monaco, "Liberation Mono", monospace;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Legacy aliases for backward compatibility */
+  --bg-primary: var(--surface-0);
+  --bg-secondary: var(--surface-1);
+  --bg-tertiary: var(--surface-2);
+  --bg-card: var(--surface-2);
+  --border-color: var(--line);
+  --text-main: var(--fg-1);
+  --text-muted: var(--fg-2);
+  --text-dim: var(--fg-3);
+  --accent-cyan: var(--accent);
+  --accent-blue: var(--accent);
+  --accent-green: var(--ok);
+  --accent-amber: var(--warn);
+  --accent-rose: var(--err);
+
+  /* Dock tokens */
+  --dock-bg: var(--surface-1);
+  --dock-border: var(--line);
+  --dock-header-bg: var(--surface-2);
+  --dock-active-tab: var(--accent);
+  --dock-hover-bg: var(--surface-3);
+  --dock-text-primary: var(--fg-1);
+  --dock-text-muted: var(--fg-2);
+}
+
+body.theme-high-contrast {
+  --surface-0: #000000;
+  --surface-1: #0a0c10;
+  --surface-2: #12161f;
+  --surface-3: #1a202c;
+  --line: #5b6472;
+  --line-soft: #38404d;
+  --fg-1: #ffffff;
+  --fg-2: #d0d6df;
+  --fg-3: #949eb0;
+  --accent: #6aa8ff;
+  --accent-tint: rgba(106, 168, 255, 0.22);
+  --accent-hover: #5596f5;
+  --border-color: #5b6472;
+  --dock-bg: #0a0c10;
+  --dock-border: #5b6472;
+  --dock-header-bg: #12161f;
+  --dock-active-tab: #6aa8ff;
+}

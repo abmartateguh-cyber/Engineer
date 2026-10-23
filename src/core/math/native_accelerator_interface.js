@@ -30,17 +30,12 @@ class NativeAcceleratorInterface {
       // Native addon not compiled; gracefully continue to Tier 2
     }
 
-    // Attempt Tier 2: Real Bare-Metal WebAssembly Kernels
+    // Attempt Tier 2: Real Bare-Metal WebAssembly Kernels with SIMD128
     try {
-      const bytes = buildOmniEngWasmBinary();
-      const mod = new WebAssembly.Module(bytes);
-      const instance = new WebAssembly.Instance(mod);
-      this.wasmInstance = instance;
       this.wasmEngine = new WasmKernelEngine();
-      this.wasmEngine.instance = instance;
-      this.wasmEngine.memory = instance.exports.memory;
-      this.wasmEngine.isReady = true;
-      this.activeTier = 'wasm_simd128';
+      this.wasmEngine.initSync();
+      this.wasmInstance = this.wasmEngine.instance;
+      this.activeTier = this.wasmEngine.isSimdAvailable ? 'wasm_simd128' : 'wasm_scalar';
     } catch (e) {
       this.activeTier = 'js_typedarrays_optimized';
     }

@@ -5,6 +5,17 @@
 
 const COMMUNITY_SAMPLES = [
   {
+    id: 'sample_nasa_space_launch_system',
+    title: 'NASA Space Launch System & Engine (CEA Thermochemistry, WBS 06 Digital Twin & Trajectory)',
+    industry: 'Drone & Aerospace',
+    studio: 'aerospace',
+    description: 'High-detail NASA 2-stage orbital launch vehicle digital twin with Al-Li 2195 isogrid cryogenic tanks, octaweb 9-engine cluster, macro staged combustion turbopumps, coaxial injector dome, Bartz Narloy-Z cooling channels, and NASA WBS 06.01-06.08 subsystem entities.',
+    tags: ['NASA SLS', 'NASA CEA', 'NASA-SP-125', 'Bartz Cooling', 'Euler Turbopumps', 'WBS 06 Entities', 'Tsiolkovsky Staging'],
+    cadParams: { type: 'nasa_space_rocket', mode: 'full_stack', vehicleHeightM: 70.0, coreDiameterM: 4.0 },
+    cfdParams: { chamberPressureBar: 300.0, mixtureRatio: 3.4, expansionRatio: 40.0, seaLevelIsp: 324.5, vacuumIsp: 382.4 },
+    gncParams: { liftoffThrustKn: 19890.0, grossLiftoffMassKg: 1420000.0, payloadToLeoKg: 22500.0, netDeltaVMps: 9450.0 }
+  },
+  {
     id: 'sample_smartphone_flagship',
     title: 'Flagship Smartphone (CAD, Drop Test & Vapor Chamber Thermal)',
     industry: 'Consumer Electronics',
@@ -101,8 +112,23 @@ const COMMUNITY_SAMPLES = [
     cadParams: { type: 'camera_lens', focalLengthMm: 50.0, fStop: 1.4, cutawayAngle: 1.5708, showRays: true },
     opticsParams: { focalLengthMm: 50.0, fStop: 1.4, subjectDistM: 2.0 },
     pcbLayers: 4
+  },
+  {
+    id: 'sample_raptor_propulsion_stand',
+    title: 'Raptor Vacuum Test Stand & Supersonic Plume (CFD, STOP Multiphysics & Shock Diamonds)',
+    industry: 'Drone & Aerospace',
+    studio: 'aerospace',
+    description: 'Full-scale methane-LOX staged combustion rocket engine stand featuring regeneratively cooled nozzle, hydraulic gimbal actuator, supersonic shock diamond exhaust plume shader, and STOP coupled thermal deflections.',
+    tags: ['SpaceX Raptor', 'Zemax STOP', 'Ansys Fluent', 'Supersonic Shock Diamonds', 'NASA CEA'],
+    cadParams: { type: 'raptor_test_stand', nozzleRadiusM: 1.2, chamberPressureBar: 300.0 },
+    cfdParams: { machNumber: 2.8, shockDiamonds: 4 },
+    gncParams: { gimbalAngleDeg: 4.5, thrustKn: 2200.0 }
   }
 ];
+
+if (typeof window !== 'undefined') {
+  window.COMMUNITY_SAMPLES = COMMUNITY_SAMPLES;
+}
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { COMMUNITY_SAMPLES };

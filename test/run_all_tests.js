@@ -807,6 +807,51 @@ passedTests += vvStats.passed;
 failedTests += (vvStats.total - vvStats.passed);
 
 // ----------------------------------------------------
+// Suite 27: Industrial Gap Closure & Missing Features Verification Suite
+// ----------------------------------------------------
+const { runIndustrialGapClosureTests } = require('./test_new_industrial_engines');
+const gapStats = runIndustrialGapClosureTests();
+totalTests += gapStats.total;
+passedTests += gapStats.passed;
+failedTests += (gapStats.total - gapStats.passed);
+
+// ----------------------------------------------------
+// Suite 28: Flagship Camera Lens Master Verification Suite (f/1.0 H-APO vs Canon RF 50 f/1.2L)
+// ----------------------------------------------------
+const { runCameraLensMasterTests } = require('./test_camera_lens_master');
+const lensStats = runCameraLensMasterTests();
+totalTests += lensStats.total;
+passedTests += lensStats.passed;
+failedTests += (lensStats.total - lensStats.passed);
+
+// ----------------------------------------------------
+// Suite 29: Anatomy 100% Craft & Visual Parity Suite (wheresryan22/anatomy parity)
+// ----------------------------------------------------
+const { runAnatomyCraftParityTests } = require('./test_anatomy_craft_parity');
+const anatomyStats = runAnatomyCraftParityTests();
+totalTests += anatomyStats.total;
+passedTests += anatomyStats.passed;
+failedTests += (anatomyStats.total - anatomyStats.passed);
+
+// ----------------------------------------------------
+// Suite 30: Industrial Production Grade Multi-Physics Solvers & Engines (Track B)
+// ----------------------------------------------------
+const { runIndustrialMasterEnginesTests } = require('./test_industrial_master_engines');
+const industrialStats = runIndustrialMasterEnginesTests();
+totalTests += industrialStats.total;
+passedTests += industrialStats.passed;
+failedTests += (industrialStats.total - industrialStats.passed);
+
+// ----------------------------------------------------
+// Suite 31: NASA Space Launch Vehicle & Multi-Stage Rocket Propulsion (WBS 06.01 - 06.08)
+// ----------------------------------------------------
+const { runNasaRocketPropulsionTests } = require('./test_nasa_rocket_propulsion');
+const nasaStats = runNasaRocketPropulsionTests();
+totalTests += nasaStats.total;
+passedTests += nasaStats.passed;
+failedTests += (nasaStats.total - nasaStats.passed);
+
+// ----------------------------------------------------
 // Summary
 // ----------------------------------------------------
 console.log('\n====================================================');

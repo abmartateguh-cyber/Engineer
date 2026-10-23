@@ -140,7 +140,8 @@ function defineHandler(channel, schema, handler, options = {}) {
   channelRegistry.set(channel, metadata);
 
   // Wrap with security filter and register with Electron ipcMain
-  ipcMain.handle(channel, async (event, rawPayload) => {
+  if (ipcMain && typeof ipcMain.handle === 'function') {
+    ipcMain.handle(channel, async (event, rawPayload) => {
     try {
       // 1. Prototype Pollution Stripping (CWE-1321)
       const sanitized = IPCValidator.sanitize(rawPayload);
@@ -156,6 +157,7 @@ function defineHandler(channel, schema, handler, options = {}) {
       throw err;
     }
   });
+}
 
   return metadata;
 }

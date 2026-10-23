@@ -167,7 +167,7 @@ class ComputeHostProcess extends EventEmitter {
       }
 
       case 'OPTICAL_DLS': {
-        const { DampedLeastSquaresOptimizer } = require('../core/optics/damped_least_squares');
+        const { DampedLeastSquaresOptimizer } = require('../core/optics/damped_least_squares_optimizer');
         const opt = new DampedLeastSquaresOptimizer(payload.options || {});
         return opt.optimize(payload.variables, payload.meritFn);
       }

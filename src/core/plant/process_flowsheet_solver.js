@@ -373,6 +373,143 @@ class ProcessFlowsheetSolver {
         break;
     }
   }
+
+  /**
+   * NASA Space Launch Vehicle Cryogenic Propellant Loading Cycle Simulation (Aspen / HYSYS equivalent)
+   * Simulates subcooled LOX or LCH4 ground loading, vacuum-jacketed transfer line chilldown,
+   * flash vaporization boil-off separation, and autogenous tank ullage pressurization.
+   *
+   * @param {Object} options Configuration options
+   * @returns {Object} Comprehensive thermodynamic mass and energy balance report
+   */
+  static solveCryogenicLoadingCycle(options = {}) {
+    const propellant = (options.propellant || 'LOX').toUpperCase();
+    const isLOX = propellant === 'LOX';
+
+    const targetMassKg = options.targetTankMassKg || (isLOX ? 850000.0 : 260000.0);
+    const supplyTempK = options.supplyTempK || (isLOX ? 90.0 : 95.0);
+    const supplyPressureBar = options.supplyPressureBar || 4.5;
+    const tankPressureBar = options.tankUllagePressureBar || 3.2;
+    const loadingFlowKgS = options.loadingFlowKgS || 1200.0;
+    const lineLengthM = options.transferLineLengthM || 120.0;
+    const lineDiaMm = options.lineDiameterMm || 150.0;
+    const insulFluxW_m2 = options.insulationHeatFluxW_m2 || 12.5;
+    const autogenousFraction = options.autogenousBleedFraction !== undefined ? options.autogenousBleedFraction : 0.035;
+
+    // Molecular properties
+    const molWeight = isLOX ? 31.9988 : 16.0425; // kg/kmol (g/mol)
+    const latentHeatKjKg = isLOX ? 213.0 : 510.0; // kJ/kg
+    const liquidDensityKgM3 = isLOX ? 1141.0 : 422.6; // kg/m^3
+
+    // Molar flow rate in kmol/h
+    const molarFlowKmolH = Number(((loadingFlowKgS * 3600.0) / molWeight).toFixed(2));
+
+    // Transfer line surface area and ambient heat ingress
+    const lineAreaM2 = Math.PI * (lineDiaMm / 1000.0) * lineLengthM;
+    const heatIngressKW = (lineAreaM2 * insulFluxW_m2) / 1000.0;
+
+    // Line metal chilldown calculation (Schedule 10S 316L Stainless Steel ~10.5 kg/m)
+    const pipeMassKg = 10.5 * lineLengthM;
+    const ambientTempK = 295.15;
+    const deltaT_chill = ambientTempK - supplyTempK;
+    const steelCp_kJ_kgK = 0.45;
+    const chilldownEnergyKJ = pipeMassKg * steelCp_kJ_kgK * deltaT_chill;
+    const chilldownBoiloffKg = Number((chilldownEnergyKJ / latentHeatKjKg).toFixed(1));
+
+    // Initialize Flowsheet
+    const flowsheet = new ProcessFlowsheetSolver();
+
+    const compKey = isLOX ? 'Oxygen' : 'Methane';
+    const compObj = { [compKey]: 1.0 };
+
+    // S01: GSE Ground Supply Stream
+    const s01 = new ProcessStream('S01_GSE_SUPPLY', {
+      temperatureC: Number((supplyTempK - 273.15).toFixed(2)),
+      pressureBar: supplyPressureBar,
+      molarFlowKmolHr: molarFlowKmolH,
+      composition: compObj
+    });
+    s01.vaporFraction = 0.0;
+    flowsheet.addStream(s01);
+
+    // V01: Isenthalpic Transfer Valve (Joule-Thomson flash to tank pressure)
+    flowsheet.addUnit('VALVE', 'V01_TRANSFER_CHILL_VALVE', {
+      inletStreamId: 'S01_GSE_SUPPLY',
+      outletStreamId: 'S02_TRANSFER_LINE_OUT',
+      outletPressureKPa: tankPressureBar * 100.0,
+      jouleThomsonCoeff: isLOX ? 0.022 : 0.038
+    });
+    flowsheet._createStreamIfMissing('S02_TRANSFER_LINE_OUT');
+
+    // FLASH01: Vehicle Cryo Tank Flash Separator
+    flowsheet.addUnit('FLASH_DRUM', 'FLASH01_TANK_SEPARATOR', {
+      feedStreamId: 'S02_TRANSFER_LINE_OUT',
+      vaporStreamId: 'S04_BOILOFF_GAS_VENT',
+      liquidStreamId: 'S03_TANK_LIQUID_FEED',
+      temperatureC: Number((supplyTempK - 273.15 + (heatIngressKW / (loadingFlowKgS * 1.7))).toFixed(2)),
+      pressureKPa: tankPressureBar * 100.0
+    });
+    flowsheet._createStreamIfMissing('S04_BOILOFF_GAS_VENT');
+    flowsheet._createStreamIfMissing('S03_TANK_LIQUID_FEED');
+
+    // SPLIT01: Divert Autogenous Tank Pressurization Bleed
+    flowsheet.addSplitter('SPLIT01_AUTOGENOUS_BLEED', 'S03_TANK_LIQUID_FEED', 'S06_NET_VEHICLE_FILL', 'S05_AUTOGENOUS_PRESS_GAS', {
+      splitRatio: 1.0 - autogenousFraction
+    });
+
+    // Execute Flowsheet Sequential Modular Solution
+    flowsheet.solveWithWegstein(15, 1e-4);
+
+    // Flash drum boil-off rate from thermal heat ingress
+    const boiloffRateKgS = heatIngressKW / latentHeatKjKg;
+    const boiloffMolarFlow = (boiloffRateKgS * 3600.0) / molWeight;
+    const sVent = flowsheet.getStream('S04_BOILOFF_GAS_VENT');
+    if (sVent) {
+      sVent.molarFlowKmolH = Math.max(sVent.molarFlowKmolH, boiloffMolarFlow);
+      sVent.vaporFraction = 1.0;
+    }
+
+    // Fill timing and net accumulation
+    const netFillFlowKgS = loadingFlowKgS * (1.0 - autogenousFraction) - boiloffRateKgS;
+    const fillTimeSec = targetMassKg / Math.max(1.0, netFillFlowKgS);
+    const fillTimeMin = Number((fillTimeSec / 60.0).toFixed(1));
+    const totalBoiloffKg = Number((boiloffRateKgS * fillTimeSec + chilldownBoiloffKg).toFixed(1));
+    const boiloffPercent = Number(((totalBoiloffKg / targetMassKg) * 100.0).toFixed(2));
+    const autogenousMassFlowKgS = Number((loadingFlowKgS * autogenousFraction).toFixed(2));
+    const reliquefactionPowerKW = Number(((boiloffRateKgS * latentHeatKjKg) * 1.35).toFixed(1));
+
+    return {
+      propellant,
+      standard: 'NASA-SP-8089 / NASA-STD-5001',
+      targetTankMassKg: targetMassKg,
+      supplyTempK,
+      supplyPressureBar,
+      tankUllagePressureBar: tankPressureBar,
+      loadingFlowKgS,
+      molarFlowKmolH,
+      lineLengthM,
+      heatIngressKW: Number(heatIngressKW.toFixed(3)),
+      pipeMassKg,
+      chilldownEnergyKJ: Number(chilldownEnergyKJ.toFixed(1)),
+      chilldownBoiloffKg,
+      steadyBoiloffRateKgS: Number(boiloffRateKgS.toFixed(4)),
+      totalBoiloffKg,
+      boiloffLossPercent: boiloffPercent,
+      autogenousPressGasKgS: autogenousMassFlowKgS,
+      netFillFlowKgS: Number(netFillFlowKgS.toFixed(2)),
+      fillTimeMinutes: fillTimeMin,
+      reliquefactionPowerKW,
+      streams: {
+        S01_GSE_SUPPLY: flowsheet.getStream('S01_GSE_SUPPLY'),
+        S02_TRANSFER_LINE_OUT: flowsheet.getStream('S02_TRANSFER_LINE_OUT'),
+        S03_TANK_LIQUID_FEED: flowsheet.getStream('S03_TANK_LIQUID_FEED'),
+        S04_BOILOFF_GAS_VENT: flowsheet.getStream('S04_BOILOFF_GAS_VENT'),
+        S05_AUTOGENOUS_PRESS_GAS: flowsheet.getStream('S05_AUTOGENOUS_PRESS_GAS'),
+        S06_NET_VEHICLE_FILL: flowsheet.getStream('S06_NET_VEHICLE_FILL')
+      },
+      flowsheet
+    };
+  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

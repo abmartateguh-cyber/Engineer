@@ -4,6 +4,8 @@
  */
 
 const { LinearSolver } = require('../math/linear_algebra');
+const { ElementTET10 } = require('./element_tet10');
+const { ElementHEX20 } = require('./element_hex20');
 
 class FEANode {
   constructor(id, x, y, z) {
@@ -85,17 +87,51 @@ class FEASolver {
 
     // Assemble element stiffness matrices
     for (const elem of this.elements) {
-      const Ke = this._computeTet4Stiffness(elem);
-      const edofs = [];
-      for (const nid of elem.nodeIds) {
-        edofs.push(...this.nodes[nid].dof);
-      }
+      if (elem.nodeIds.length === 20) {
+        const hexNodes = elem.nodeIds.map(id => this.nodes[id]);
+        const hex20 = new ElementHEX20(elem.id, elem.nodeIds, hexNodes, elem.material.E, elem.material.nu);
+        elem._hex20Instance = hex20;
+        const KeFlat = hex20.computeStiffnessMatrix();
+        const edofs = [];
+        for (const nid of elem.nodeIds) {
+          edofs.push(...this.nodes[nid].dof);
+        }
+        for (let i = 0; i < 60; i++) {
+          const row = edofs[i];
+          for (let j = 0; j < 60; j++) {
+            const col = edofs[j];
+            K[row][col] += KeFlat[i * 60 + j];
+          }
+        }
+      } else if (elem.nodeIds.length === 10) {
+        const tetNodes = elem.nodeIds.map(id => this.nodes[id]);
+        const tet10 = new ElementTET10(elem.id, elem.nodeIds, tetNodes, elem.material.E, elem.material.nu);
+        elem._tet10Instance = tet10;
+        const KeFlat = tet10.computeStiffnessMatrix();
+        const edofs = [];
+        for (const nid of elem.nodeIds) {
+          edofs.push(...this.nodes[nid].dof);
+        }
+        for (let i = 0; i < 30; i++) {
+          const row = edofs[i];
+          for (let j = 0; j < 30; j++) {
+            const col = edofs[j];
+            K[row][col] += KeFlat[i * 30 + j];
+          }
+        }
+      } else {
+        const Ke = this._computeTet4Stiffness(elem);
+        const edofs = [];
+        for (const nid of elem.nodeIds) {
+          edofs.push(...this.nodes[nid].dof);
+        }
 
-      for (let i = 0; i < 12; i++) {
-        const row = edofs[i];
-        for (let j = 0; j < 12; j++) {
-          const col = edofs[j];
-          K[row][col] += Ke[i][j];
+        for (let i = 0; i < 12; i++) {
+          const row = edofs[i];
+          for (let j = 0; j < 12; j++) {
+            const col = edofs[j];
+            K[row][col] += Ke[i][j];
+          }
         }
       }
     }
@@ -145,9 +181,31 @@ class FEASolver {
     // Compute element strains and von Mises stresses
     let maxStress = 0;
     for (const elem of this.elements) {
-      const stress = this._computeTet4Stress(elem, u);
-      elem.stress = stress;
-      if (stress.vonMises > maxStress) maxStress = stress.vonMises;
+      if (elem.nodeIds.length === 20 && elem._hex20Instance) {
+        const edofs = [];
+        for (const nid of elem.nodeIds) {
+          edofs.push(...this.nodes[nid].dof);
+        }
+        const uElem = new Float64Array(60);
+        for (let i = 0; i < 60; i++) uElem[i] = u[edofs[i]];
+        const stress = elem._hex20Instance.computeStress(uElem);
+        elem.stress = { ...elem.stress, ...stress, vonMises: stress.vonMises };
+        if (stress.vonMises > maxStress) maxStress = stress.vonMises;
+      } else if (elem.nodeIds.length === 10 && elem._tet10Instance) {
+        const edofs = [];
+        for (const nid of elem.nodeIds) {
+          edofs.push(...this.nodes[nid].dof);
+        }
+        const uElem = new Float64Array(30);
+        for (let i = 0; i < 30; i++) uElem[i] = u[edofs[i]];
+        const stress = elem._tet10Instance.computeStress(uElem);
+        elem.stress = { ...elem.stress, ...stress, vonMises: stress.vonMises };
+        if (stress.vonMises > maxStress) maxStress = stress.vonMises;
+      } else {
+        const stress = this._computeTet4Stress(elem, u);
+        elem.stress = stress;
+        if (stress.vonMises > maxStress) maxStress = stress.vonMises;
+      }
     }
 
     this.results = {

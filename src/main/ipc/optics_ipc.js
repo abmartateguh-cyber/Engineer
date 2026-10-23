@@ -14,6 +14,10 @@ const { DiffractionPSFMTFEngine } = require('../../core/optics/diffraction_psf_m
 const { DampedLeastSquaresOptimizer } = require('../../core/optics/damped_least_squares_optimizer');
 const { Vector3 } = require('../../core/math/linear_algebra');
 const { ZemaxZmxImporter } = require('../../core/optics/zmx_importer');
+const { PolarizationRayTracer, Complex, JonesVector } = require('../../core/optics/polarization_ray_tracer');
+const { OpticalGlassCatalog } = require('../../core/optics/optical_glass_catalog');
+const { TolerancingYieldCompensator } = require('../../core/optics/tolerancing_yield_compensator');
+const { CameraLensMaster } = require('../../core/optics/camera_lens_master');
 
 function registerOpticsIpc() {
   // 1. Solve Paraxial Optics Metrics
@@ -148,6 +152,122 @@ function registerOpticsIpc() {
     const paraxial = ZemaxZmxImporter.computeParaxialMetrics(system);
     return { success: true, system, paraxial };
   }, { domain: 'optics', description: 'Parse Zemax OpticStudio .zmx file into sequential optical model' });
+
+  // 11. Polarization Ray Tracing & Birefringence (Phase 6)
+  defineHandler('omni:trace-polarization-ray', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const action = params.action || 'fresnel';
+    if (action === 'fresnel') {
+      const n1 = params.n1 || 1.0;
+      const n2 = params.n2 || 1.5168;
+      const theta = params.thetaRad !== undefined ? params.thetaRad : (params.thetaDeg !== undefined ? (params.thetaDeg * Math.PI / 180) : 0.0);
+      const res = PolarizationRayTracer.evaluateFresnel(n1, n2, theta);
+      return { success: true, action: 'fresnel', ...res };
+    } else if (action === 'birefringent-split') {
+      const crystalProps = params.crystalProps || { no: 1.658, ne: 1.486, opticAxis: [1, 0, 1] };
+      const rayDir = params.rayDir || [0, 0, 1];
+      const norm = params.surfaceNorm || [0, 0, 1];
+      const res = PolarizationRayTracer.splitBirefringentRay(crystalProps, rayDir, norm);
+      return { success: true, action: 'birefringent-split', ...res };
+    }
+    const jVec = new JonesVector(params.Ex || 1.0, params.Ey || 0.0);
+    const stokes = jVec.toStokes();
+    return { success: true, action: 'stokes', stokes };
+  }, { domain: 'optics', description: 'Evaluate vector Jones polarization calculus, Fresnel transmission, and birefringent walk-off' });
+
+  // 12. Global 1,500+ Optical Glass Catalog Database (Phase 6)
+  defineHandler('omni:query-glass-catalog', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const catalog = new OpticalGlassCatalog();
+    const action = params.action || 'get-index';
+    if (action === 'get-glass') {
+      const glass = catalog.getGlass(params.glassName || 'N-BK7');
+      return { success: true, glass };
+    } else if (action === 'summary') {
+      return { success: true, totalMaterials: catalog.database.size, sampleGlasses: ['N-BK7', 'F2', 'SF11', 'CALCITE', 'QUARTZ'] };
+    }
+    const glassName = params.glassName || 'N-BK7';
+    const wavelengthUm = params.wavelengthUm || 0.58756;
+    const index = catalog.getRefractiveIndex(glassName, wavelengthUm);
+    return { success: true, glassName, wavelengthUm, refractiveIndex: index };
+  }, { domain: 'optics', description: 'Query certified Schott, Ohara, Hoya, CDGM optical glass database and Sellmeier dispersion' });
+
+  // 13. Monte Carlo Statistical Optical Tolerancing & Yield Analysis (Phase 6)
+  defineHandler('omni:run-optical-tolerancing', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const compensator = new TolerancingYieldCompensator(params.options || { trials: 100 });
+    const system = params.system || {
+      entrancePupilRadius: 12.5,
+      surfaces: [
+        { radius: 50.0, thickness: 5.0, refractiveIndex: 1.5168 },
+        { radius: -50.0, thickness: 45.0, refractiveIndex: 1.0 },
+        { radius: 0, thickness: 0, refractiveIndex: 1.0 }
+      ]
+    };
+    const nominal = compensator.traceWithCompensator(system, 0.0);
+    return { success: true, nominal, options: compensator.options };
+  }, { domain: 'optics', description: 'Execute Monte Carlo statistical tolerance yield analysis and compensator optimization' });
+
+  // 14. Camera Lens Master System (OmniEng Apex-Master 50mm f/1.0 H-APO)
+  defineHandler('omni:get-camera-lens-master', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const action = params.action || 'all';
+    const prescription = CameraLensMaster.getPrescription();
+
+    if (action === 'prescription') {
+      return { success: true, prescription };
+    } else if (action === 'paraxial') {
+      const paraxial = CameraLensMaster.traceParaxialSystem(params.fStop || 1.0, params.wavelengthNm || 587.6);
+      return { success: true, paraxial };
+    } else if (action === 'chromatic') {
+      const chromatic = CameraLensMaster.evaluateChromaticAberration();
+      return { success: true, chromatic };
+    } else if (action === 'mtf') {
+      const mtf = CameraLensMaster.evaluateMTFPerformance();
+      return { success: true, mtf };
+    } else if (action === 'components') {
+      const components = CameraLensMaster.getDetailedInternalComponents();
+      return { success: true, components };
+    } else if (action === 'comparison') {
+      const comparison = CameraLensMaster.getCompetitorComparison();
+      return { success: true, comparison };
+    } else if (action === 'mechatronics') {
+      const af = CameraLensMaster.evaluateAutofocusMechatronics();
+      const ois = CameraLensMaster.evaluateOISPerformance();
+      return { success: true, autofocus: af, ois };
+    } else if (action === 'athermalization') {
+      const thermal = CameraLensMaster.evaluateAthermalization();
+      return { success: true, thermal };
+    } else if (action === 'coating') {
+      const coating = CameraLensMaster.evaluateAntiReflectiveCoating();
+      return { success: true, coating };
+    }
+
+    return {
+      success: true,
+      prescription,
+      paraxial: CameraLensMaster.traceParaxialSystem(params.fStop || 1.0, 587.6),
+      chromatic: CameraLensMaster.evaluateChromaticAberration(),
+      seidel: CameraLensMaster.evaluateSeidelAberrations(),
+      mtf: CameraLensMaster.evaluateMTFPerformance(),
+      mechatronics: {
+        autofocus: CameraLensMaster.evaluateAutofocusMechatronics(),
+        ois: CameraLensMaster.evaluateOISPerformance()
+      },
+      athermalization: CameraLensMaster.evaluateAthermalization(),
+      coating: CameraLensMaster.evaluateAntiReflectiveCoating(),
+      internalComponents: CameraLensMaster.getDetailedInternalComponents(),
+      competitorComparison: CameraLensMaster.getCompetitorComparison()
+    };
+  }, { domain: 'optics', description: 'OmniEng Apex-Master 50mm f/1.0 H-APO comprehensive optomechanical evaluation and teardown' });
 }
 
 module.exports = { registerOpticsIpc };

@@ -121,9 +121,44 @@ class WorkerPoolEngine {
         const opt = new DampedLeastSquaresOptimizer(payload.surfaces);
         return opt.optimize(payload.variables, payload.targets, payload.options);
       }
+      case 'OUT_OF_CORE_SPARSE': {
+        const { SparseCholeskySolver } = require('./sparse_cholesky');
+        return SparseCholeskySolver.solveBlockTiledOutOfCore(payload.A, payload.b, payload.options);
+      }
+      case 'WASM_SIMD_BLAS': {
+        const { wasmKernelEngine } = require('./wasm_kernel_engine');
+        if (payload.operation === 'dotProduct') {
+          return { dotProduct: wasmKernelEngine.dotProductSIMD128(payload.a, payload.b) };
+        } else if (payload.operation === 'daxpy') {
+          wasmKernelEngine.daxpySIMD128(payload.x, payload.y, payload.alpha);
+          return { y: payload.y };
+        } else if (payload.operation === 'spmv') {
+          wasmKernelEngine.spmvSIMD128(payload.rowPtr, payload.colInd, payload.values, payload.x, payload.y, payload.nRows);
+          return { y: payload.y };
+        } else if (payload.operation === 'norm') {
+          return { norm: wasmKernelEngine.vectorNormSIMD128(payload.vec) };
+        }
+        return { message: 'Unknown SIMD BLAS op' };
+      }
       default:
         return { message: `Task ${taskType} executed on worker pool.`, timestamp: Date.now() };
     }
+  }
+
+  /**
+   * Allocates a zero-copy SharedArrayBuffer or standard ArrayBuffer
+   * @param {number} byteLength 
+   * @returns {ArrayBuffer|SharedArrayBuffer}
+   */
+  allocateSharedBuffer(byteLength) {
+    if (typeof SharedArrayBuffer !== 'undefined') {
+      try {
+        return new SharedArrayBuffer(byteLength);
+      } catch (_) {
+        // Fallback if cross-origin isolated or security restrictions apply
+      }
+    }
+    return new ArrayBuffer(byteLength);
   }
 
   getTelemetry() {

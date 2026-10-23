@@ -65,7 +65,10 @@ function registerSystemIpc(deps = {}) {
     optional: true
   }, async (event, { jobType = 'FEA', params = {}, ranks = 4 } = {}) => {
     if (hpcEngine) return hpcEngine.submitSimulationJob(jobType, params, ranks);
-    return { success: true, jobId: 'hpc_mock_001', ranks };
+    const { HeadlessSolverDaemon } = require('../headless_solver_daemon');
+    const daemon = new HeadlessSolverDaemon();
+    const result = await daemon.dispatchJob({ type: jobType, params, ranks });
+    return { success: true, jobId: result.jobId || `hpc_job_${Date.now()}`, ranks, result };
   }, { domain: 'system', description: 'Dispatch parallel MPI simulation job to cloud cluster' });
 
   // 6. Comprehensive Audit Report Generator
@@ -305,6 +308,105 @@ function registerSystemIpc(deps = {}) {
     const report = runVVVerificationBenchmarks();
     return { success: true, report };
   }, { domain: 'system', description: 'Execute ASME V&V 10 / NAFEMS regulatory verification benchmark pack' });
+
+  // 24. PKCS#11 FIPS 140-3 Hardware Token Signature
+  defineHandler('omni:pkcs11-sign-payload', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { PKCS11HardwareToken, CKR, CKU } = require('../../core/security/pkcs11_smartcard');
+    const hsm = new PKCS11HardwareToken({ userPin: params.pin || '123456' });
+    hsm.C_Initialize();
+    const sessionRes = hsm.C_OpenSession(0);
+    const loginRes = hsm.C_Login(sessionRes.hSession, CKU.CKU_USER, params.pin || '123456');
+    if (loginRes !== CKR.CKR_OK) {
+      return { success: false, error: 'Authentication failed', ckr: loginRes };
+    }
+    const payloadBuf = Buffer.from(params.payload || 'DEFAULT_PAYLOAD', 'utf8');
+    hsm.C_SignInit(sessionRes.hSession, params.mechanism || 'ECDSA-SHA384');
+    const signRes = hsm.C_Sign(sessionRes.hSession, payloadBuf);
+    return {
+      success: true,
+      signatureHex: signRes.signatureHex,
+      mechanism: signRes.mechanism,
+      keyId: signRes.keyId
+    };
+  }, { domain: 'system', description: 'Sign payload with FIPS 140-3 PKCS#11 hardware security token' });
+
+  // 25. PKCS#11 Signature Verification
+  defineHandler('omni:pkcs11-verify-signature', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { PKCS11HardwareToken } = require('../../core/security/pkcs11_smartcard');
+    const hsm = new PKCS11HardwareToken();
+    hsm.C_Initialize();
+    const payloadBuf = Buffer.from(params.payload || '', 'utf8');
+    const signatureBuf = params.signatureHex ? Buffer.from(params.signatureHex, 'hex') : (params.signatureBuffer || Buffer.alloc(0));
+    const res = hsm.C_Verify(params.keyId || 'ROOT_SIGNING_KEY', payloadBuf, signatureBuf);
+    return { success: true, valid: res.valid, mechanism: res.mechanism };
+  }, { domain: 'system', description: 'Verify digital signature with PKCS#11 hardware root key' });
+
+  // 26. Enterprise IAM ABAC/RBAC Access Evaluation
+  defineHandler('omni:iam-evaluate-access', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { EnterpriseIAM } = require('../../core/security/enterprise_iam');
+    const user = params.user || {
+      username: 'engineer',
+      role: 'DesignEngineer',
+      clearance: 'SECRET',
+      itarCertified: true,
+      assignedProjects: ['DEFAULT_PROJECT']
+    };
+    const resource = params.resource || {
+      id: 'RES_001',
+      projectId: 'DEFAULT_PROJECT',
+      classification: 'UNCLASSIFIED',
+      isITAR: false
+    };
+    const action = params.action || 'READ';
+    const evaluation = EnterpriseIAM.evaluateAccess({ user, action, resource });
+    return { success: true, ...evaluation };
+  }, { domain: 'system', description: 'Evaluate enterprise ABAC/RBAC clearance, ITAR, and role permissions' });
+
+  // 27. Regulatory CycloneDX & SPDX SBOM Generation
+  defineHandler('omni:generate-sbom', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { ToolQualificationKit } = require('../../core/compliance/tool_qualification_kit');
+    const kit = new ToolQualificationKit();
+    const cyclonedx = kit.generateCycloneDX_SBOM();
+    const spdx = kit.generateSPDX_SBOM();
+    return { success: true, cyclonedx, spdx };
+  }, { domain: 'system', description: 'Generate formal CycloneDX v1.5 and SPDX v2.3 Software Bill of Materials' });
+
+  // 28. Parallel Mesh Domain Decomposition
+  defineHandler('omni:mesh-domain-decomposition', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { DomainDecompositionEngine } = require('../../core/math/domain_decomposition');
+    const nodes = params.nodes || [
+      { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }
+    ];
+    const elements = params.elements || [[0, 1, 2, 3]];
+    const numPartitions = params.numPartitions || 2;
+    const partition = DomainDecompositionEngine.partitionMesh(nodes, elements, numPartitions);
+    return { success: true, ...partition };
+  }, { domain: 'system', description: 'Partition 3D mesh into balanced subdomains via Recursive Coordinate Bisection' });
+
+  // 29. Unified 100-Case Gold Benchmark Verification Suite
+  defineHandler('omni:run-100-gold-benchmarks', {
+    optional: true
+  }, async () => {
+    const { runSuite100GoldBenchmarks } = require('../../../test/vv/suite_100_gold_benchmarks');
+    const report = runSuite100GoldBenchmarks();
+    return { success: true, report };
+  }, { domain: 'system', description: 'Execute full 100-case unified gold benchmark verification suite' });
 }
 
 module.exports = { registerSystemIpc };

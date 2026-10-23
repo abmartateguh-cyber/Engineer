@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveCFD: (params) => ipcRenderer.invoke('omni:solve-cfd', params),
   solvePropellerThrust: (params) => ipcRenderer.invoke('omni:solve-propeller', params),
   simulateDrone: (params) => ipcRenderer.invoke('omni:simulate-drone', params),
+  solveNasaRocket: (params) => ipcRenderer.invoke('omni:solve-nasa-rocket', params),
+  solveCryogenicLoading: (params) => ipcRenderer.invoke('omni:solve-cryogenic-loading', params),
+  simulateAsiIgnition: (params) => ipcRenderer.invoke('omni:simulate-asi-ignition', params),
+  getRocketFeatureTree: (params) => ipcRenderer.invoke('omni:get-rocket-feature-tree', params),
+  getNasaSpacecraftSpec: (params) => ipcRenderer.invoke('omni:get-nasa-spacecraft-spec', params),
 
   // Oil & Gas
   solveHYSYSFlash: (params) => ipcRenderer.invoke('omni:solve-hysys-flash', params),
@@ -61,6 +66,7 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   traceRays: (params) => ipcRenderer.invoke('omni:trace-rays', params),
   getLensPrescription: () => ipcRenderer.invoke('omni:get-lens-prescription'),
   solveSkewOptics: (params) => ipcRenderer.invoke('omni:solve-skew-optics', params),
+  getCameraLensMaster: (params) => ipcRenderer.invoke('omni:get-camera-lens-master', params),
 
   // Industrial Parity CAD & EDA Exporters
   exportSTEP: (bodyData) => ipcRenderer.invoke('omni:export-step', bodyData),
@@ -157,6 +163,40 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   cancelComputeJob: (jobId) => ipcRenderer.invoke('omni:cancel-compute-job', { jobId }),
   getComputeTelemetry: () => ipcRenderer.invoke('omni:get-compute-telemetry'),
   runVVBenchmarks: (options) => ipcRenderer.invoke('omni:run-vv-benchmarks', options),
+
+  // Industrial Production Parity Engines
+  cadExtrudeProfile: (params) => ipcRenderer.invoke('omni:cad-extrude-profile', params),
+  cadRevolveProfile: (params) => ipcRenderer.invoke('omni:cad-revolve-profile', params),
+  cadShellBody: (params) => ipcRenderer.invoke('omni:cad-shell-body', params),
+  camGenerateToolpath: (params) => ipcRenderer.invoke('omni:cam-generate-toolpath', params),
+  caeNonlinearLargeDeflection: (params) => ipcRenderer.invoke('omni:cae-nonlinear-large-deflection', params),
+  edaPlaceAndRoute: (params) => ipcRenderer.invoke('omni:eda-place-and-route', params),
+  plantNrtlActivity: (params) => ipcRenderer.invoke('omni:plant-nrtl-activity', params),
+
+  // Phase 1-3 Advanced CAE & High-Performance Simulation APIs
+  meshHybridPrismTet: (params) => ipcRenderer.invoke('omni:mesh-hybrid-prism-tet', params),
+  solveTransonicRiemann: (params) => ipcRenderer.invoke('omni:solve-transonic-riemann', params),
+  solveFeaHEX20: (params) => ipcRenderer.invoke('omni:solve-fea-hex20', params),
+  solvePenaltyContact: (params) => ipcRenderer.invoke('omni:solve-penalty-contact', params),
+
+  // Phase 4-6 Open Silicon EDA & Polarization Optics APIs
+  edaSky130Pdk: (params) => ipcRenderer.invoke('omni:eda-sky130-pdk', params),
+  edaParseLef: (params) => ipcRenderer.invoke('omni:eda-parse-lef', params),
+  edaParseDef: (params) => ipcRenderer.invoke('omni:eda-parse-def', params),
+  edaSerializeDef: (params) => ipcRenderer.invoke('omni:eda-serialize-def', params),
+  tracePolarizationRay: (params) => ipcRenderer.invoke('omni:trace-polarization-ray', params),
+  queryGlassCatalog: (params) => ipcRenderer.invoke('omni:query-glass-catalog', params),
+  runOpticalTolerancing: (params) => ipcRenderer.invoke('omni:run-optical-tolerancing', params),
+
+  // Phase 7-10 Chemical eNRTL, AUTOSAR, Hardware Security & Headless HPC APIs
+  evaluateEnrtlCO2: (params) => ipcRenderer.invoke('omni:evaluate-enrtl-co2', params),
+  generateAutosarSWC: (params) => ipcRenderer.invoke('omni:generate-autosar-swc', params),
+  pkcs11SignPayload: (params) => ipcRenderer.invoke('omni:pkcs11-sign-payload', params),
+  pkcs11VerifySignature: (params) => ipcRenderer.invoke('omni:pkcs11-verify-signature', params),
+  iamEvaluateAccess: (params) => ipcRenderer.invoke('omni:iam-evaluate-access', params),
+  generateSBOM: (params) => ipcRenderer.invoke('omni:generate-sbom', params),
+  meshDomainDecomposition: (params) => ipcRenderer.invoke('omni:mesh-domain-decomposition', params),
+  run100GoldBenchmarks: () => ipcRenderer.invoke('omni:run-100-gold-benchmarks'),
 
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')

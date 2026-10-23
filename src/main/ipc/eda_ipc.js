@@ -15,6 +15,8 @@ const { ClockTreeSynthesis, PathFinderRouter, BSIM4CompactModel } = require('../
 const { GdsiiStreamEngine, GdsLibrary } = require('../../core/eda/gdsii_stream');
 const { MCMMStaticTimingEngine } = require('../../core/eda/mcmm_sta_engine');
 const { ParasiticExtraction3D } = require('../../core/eda/parasitic_extraction_3d');
+const { Sky130PdkAdapter } = require('../../core/eda/sky130_pdk_adapter');
+const { LefDefParser } = require('../../core/eda/lef_def_parser');
 
 function registerEdaIpc() {
   // 1. Verilog Logic Synthesis
@@ -178,6 +180,99 @@ function registerEdaIpc() {
     const pex = ParasiticExtraction3D.extractWireRC(params || { lengthUm: 100, widthUm: 0.1, thicknessUm: 0.15, spacingUm: 0.1, dielectricHeightUm: 0.2 });
     return { success: true, result: pex };
   }, { domain: 'eda', description: 'Compute 3D parasitic wire resistance, coupling, and fringe capacitance' });
+
+  // 13. Analytical Place & Route (P&R) Engine
+  defineHandler('omni:eda-place-and-route', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const { PlaceAndRouteEngine } = require('../../core/eda/place_and_route_engine');
+    const pnr = new PlaceAndRouteEngine(params.options || {});
+    const res = pnr.runPlaceAndRoute(params);
+    return { success: true, ...res };
+  }, { domain: 'eda', description: 'Execute analytical standard cell placement and multi-layer A* maze routing' });
+
+  // 14. SkyWater 130nm PDK & NLDM Timing Models (Phase 4)
+  defineHandler('omni:eda-sky130-pdk', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const pdk = new Sky130PdkAdapter();
+    const action = params.action || 'compute-delay';
+    if (action === 'get-cells') {
+      return { success: true, cells: pdk.cells, layers: pdk.layers };
+    } else if (action === 'generate-lef') {
+      const lef = pdk.generateLEF();
+      return { success: true, lef, length: lef.length };
+    }
+    const cellName = params.cellName || 'sky130_fd_sc_hd__inv_1';
+    const loadCap = params.loadCapFf !== undefined ? params.loadCapFf : 10.0;
+    const corner = params.corner || 'tt';
+    const delay = pdk.computeCellDelay(cellName, loadCap, corner);
+    return { success: true, ...delay };
+  }, { domain: 'eda', description: 'Evaluate SkyWater 130nm high-density cell propagation delays and NLDM models' });
+
+  // 15. IEEE LEF 5.8 Parser (Phase 4)
+  defineHandler('omni:eda-parse-lef', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const pdk = new Sky130PdkAdapter();
+    const content = params.content || pdk.generateLEF();
+    const parsed = LefDefParser.parseLEF(content);
+    return {
+      success: true,
+      version: parsed.version,
+      layerCount: Object.keys(parsed.layers).length,
+      macroCount: Object.keys(parsed.macros).length,
+      macros: Object.keys(parsed.macros)
+    };
+  }, { domain: 'eda', description: 'Parse IEEE LEF 5.8 library exchange format file into AST' });
+
+  // 16. IEEE DEF 5.8 Parser (Phase 4)
+  defineHandler('omni:eda-parse-def', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const content = params.content || `VERSION 5.8 ;\nDESIGN top ;\nDIEAREA ( 0 0 ) ( 10000 10000 ) ;\nCOMPONENTS 1 ;\n  - i0 sky130_fd_sc_hd__inv_1 + PLACED ( 1000 1000 ) N ;\nEND COMPONENTS\nEND DESIGN`;
+    const parsed = LefDefParser.parseDEF(content);
+    return {
+      success: true,
+      name: parsed.name,
+      dieArea: parsed.dieArea,
+      componentCount: parsed.components.length,
+      netCount: parsed.nets.length
+    };
+  }, { domain: 'eda', description: 'Parse IEEE DEF 5.8 physical design exchange format file into component and net records' });
+
+  // 17. IEEE DEF 5.8 Serializer (Phase 4)
+  defineHandler('omni:eda-serialize-def', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const defData = params.defData || {
+      version: '5.8',
+      name: 'top_chip',
+      unitsDistanceMicrons: 1000,
+      dieArea: { x1: 0, y1: 0, x2: 25000, y2: 25000 },
+      components: [
+        { id: 'u0', macro: 'sky130_fd_sc_hd__inv_1', status: 'PLACED', x: 5000, y: 5000, orient: 'N' }
+      ],
+      nets: []
+    };
+    const defText = LefDefParser.serializeDEF(defData);
+    return { success: true, defText, length: defText.length };
+  }, { domain: 'eda', description: 'Serialize standard cell placement and routing database into IEEE DEF 5.8 format' });
+
+  // 18. NASA Dual Augmented Spark Igniter (ASI) Controller SPICE Simulation
+  defineHandler('omni:simulate-asi-ignition', {
+    type: 'object',
+    optional: true
+  }, async (event, params = {}) => {
+    const tStop = params.tStop || 0.005;
+    const dt = params.dt || 1e-5;
+    return SpiceEngine.simulateDualAugmentedSparkIgniter(tStop, dt);
+  }, { domain: 'eda', description: 'Simulate transient MNA pulse discharge, spark voltage, and energy of NASA Dual ASI rocket ignition controller' });
 }
 
 module.exports = { registerEdaIpc };

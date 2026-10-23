@@ -46,6 +46,13 @@ class BlockDiagramUI {
   init() {
     this.onResize();
     window.addEventListener('resize', () => this.onResize());
+    if (typeof ResizeObserver !== 'undefined') {
+      const host = this.canvas.closest('.canvas-host') || this.canvas.parentElement;
+      if (host) {
+        this._resizeObs = new ResizeObserver(() => this.onResize());
+        this._resizeObs.observe(host);
+      }
+    }
     this.setupInteractions();
     this.startOscilloscopeAnimation();
     this.render();

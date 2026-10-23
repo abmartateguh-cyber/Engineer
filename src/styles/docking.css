@@ -3,15 +3,7 @@
  * Enterprise CAD/CAE Multi-Window Docking, Tear-Off & Floating Panel Themes
  */
 
-:root {
-  --dock-bg: rgba(18, 22, 28, 0.92);
-  --dock-border: rgba(255, 255, 255, 0.08);
-  --dock-header-bg: rgba(26, 32, 42, 0.85);
-  --dock-active-tab: #007acc;
-  --dock-hover-bg: rgba(255, 255, 255, 0.05);
-  --dock-text-primary: #e1e4e8;
-  --dock-text-muted: #8b949e;
-}
+/* Tokens are now defined centrally in tokens.css */
 
 /* Docking Containers */
 .dock-container {

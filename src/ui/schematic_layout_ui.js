@@ -4,12 +4,23 @@
  * ANSI/ISA-5.1 Refinery P&ID, Aspen HYSYS P-T Phase Envelope, and Column Tray Profiles.
  */
 
+var TactileSpringPhysics = (typeof window !== 'undefined' && window.TactileSpringPhysics)
+  ? window.TactileSpringPhysics
+  : (typeof require !== 'undefined' ? (() => { try { return require('./tactile_spring_physics'); } catch (e) { return null; } })() : null);
+
 class SchematicLayoutUI {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     this.mode = 'eda'; // 'eda', 'pcb', 'pid', 'vle', 'tray_profile'
     this.drcViolations = [];
+
+    // Tactile Spring Follower for Entity Dragging
+    if (TactileSpringPhysics) {
+      this.dragSpring = new TactileSpringPhysics.TactileSpringFollower3D({ stiffness: 220.0, damping: 24.0 });
+    } else {
+      this.dragSpring = null;
+    }
 
     // Pan & Zoom Camera State
     this.zoom = 1.0;
@@ -72,6 +83,13 @@ class SchematicLayoutUI {
   init() {
     this.onResize();
     window.addEventListener('resize', () => this.onResize());
+    if (typeof ResizeObserver !== 'undefined') {
+      const host = this.canvas.closest('.canvas-host') || this.canvas.parentElement;
+      if (host) {
+        this._resizeObs = new ResizeObserver(() => this.onResize());
+        this._resizeObs.observe(host);
+      }
+    }
     this.setupInteractions();
     this.render();
   }
@@ -103,7 +121,40 @@ class SchematicLayoutUI {
   }
 
   setupInteractions() {
+    this.isDraggingEntity = false;
+    this.draggedEntity = null;
+    this.dragOffset = { x: 0, y: 0 };
+    this.onSelect = null;
+    this.onEntityChange = null;
+
     this.canvas.addEventListener('mousedown', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const worldX = (mouseX - this.pan.x) / this.zoom;
+      const worldY = (mouseY - this.pan.y) / this.zoom;
+
+      // Check if clicking on an entity to drag or select
+      this.checkHover(worldX, worldY);
+      if (e.button === 0 && this.hoveredEntity && this.hoveredEntity.data) {
+        this.isDraggingEntity = true;
+        this.draggedEntity = this.hoveredEntity.data;
+        this.selectedEntity = this.hoveredEntity;
+        this.dragOffset = {
+          x: worldX - (this.draggedEntity.x || 0),
+          y: worldY - (this.draggedEntity.y || 0)
+        };
+        if (this.dragSpring) {
+          this.dragSpring.setValue(this.draggedEntity.x || 0, this.draggedEntity.y || 0, 0);
+          this.dragSpring.setTarget(this.draggedEntity.x || 0, this.draggedEntity.y || 0, 0);
+        }
+        if (this.onSelect) {
+          this.onSelect(this.selectedEntity);
+        }
+        this.render();
+        return;
+      }
+
       this.isPanning = true;
       this.lastMouse = { x: e.clientX, y: e.clientY };
     });
@@ -112,15 +163,6 @@ class SchematicLayoutUI {
       const rect = this.canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-
-      if (this.isPanning) {
-        const dx = e.clientX - this.lastMouse.x;
-        const dy = e.clientY - this.lastMouse.y;
-        this.pan.x += dx;
-        this.pan.y += dy;
-        this.lastMouse = { x: e.clientX, y: e.clientY };
-        this.render();
-      }
 
       // Compute Nanometer / Millimeter Coordinates
       const worldX = (mouseX - this.pan.x) / this.zoom;
@@ -134,10 +176,53 @@ class SchematicLayoutUI {
         mmY: Number((worldY * 0.1).toFixed(2))
       };
 
+      if (this.isDraggingEntity && this.draggedEntity) {
+        const targetX = worldX - this.dragOffset.x;
+        const targetY = worldY - this.dragOffset.y;
+        const snappedX = Math.round(targetX / 10) * 10;
+        const snappedY = Math.round(targetY / 10) * 10;
+        if (this.dragSpring) {
+          this.dragSpring.setTarget(snappedX, snappedY, 0);
+          this.dragSpring.update(0.016);
+          const pos = this.dragSpring.getValues();
+          this.draggedEntity.x = pos.x;
+          this.draggedEntity.y = pos.y;
+        } else {
+          this.draggedEntity.x += (snappedX - this.draggedEntity.x) * 0.45;
+          this.draggedEntity.y += (snappedY - this.draggedEntity.y) * 0.45;
+        }
+        this.render();
+        if (this.onEntityChange) {
+          this.onEntityChange(this.selectedEntity);
+        }
+        return;
+      }
+
+      if (this.isPanning) {
+        const dx = e.clientX - this.lastMouse.x;
+        const dy = e.clientY - this.lastMouse.y;
+        this.pan.x += dx;
+        this.pan.y += dy;
+        this.lastMouse = { x: e.clientX, y: e.clientY };
+        this.render();
+      }
+
       this.checkHover(worldX, worldY);
     });
 
     window.addEventListener('mouseup', () => {
+      if (this.isDraggingEntity) {
+        this.isDraggingEntity = false;
+        if (this.draggedEntity) {
+          this.draggedEntity.x = Math.round(this.draggedEntity.x / 10) * 10;
+          this.draggedEntity.y = Math.round(this.draggedEntity.y / 10) * 10;
+        }
+        this.draggedEntity = null;
+        this.render();
+        if (this.onEntityChange) {
+          this.onEntityChange(this.selectedEntity);
+        }
+      }
       this.isPanning = false;
     });
 
@@ -161,18 +246,126 @@ class SchematicLayoutUI {
       this.pan = { x: 0, y: 0 };
       this.zoom = 1.0;
       this.selectedEntity = null;
+      if (this.onSelect) this.onSelect(null);
       this.render();
     });
 
     this.canvas.addEventListener('click', () => {
-      if (this.hoveredEntity) {
-        this.selectedEntity = this.hoveredEntity;
-        this.render();
-      } else {
-        this.selectedEntity = null;
-        this.render();
+      if (!this.isDraggingEntity) {
+        if (this.hoveredEntity) {
+          this.selectedEntity = this.hoveredEntity;
+          if (this.onSelect) this.onSelect(this.selectedEntity);
+          this.render();
+        } else {
+          this.selectedEntity = null;
+          if (this.onSelect) this.onSelect(null);
+          this.render();
+        }
       }
     });
+  }
+
+  addComponent(type, options = {}) {
+    let newEntity = null;
+    if (this.mode === 'eda') {
+      const idx = this.edaCells.length + 1;
+      const cell = {
+        id: 'c' + idx,
+        name: type || 'AND2_X1',
+        x: Math.round((-this.pan.x + 200) / this.zoom / 10) * 10,
+        y: Math.round((-this.pan.y + 150) / this.zoom / 10) * 10,
+        w: 110,
+        h: 220,
+        type: 'Standard CMOS Gate',
+        delay: '5.2 ps',
+        area: '16.5 nm²'
+      };
+      this.edaCells.push(cell);
+      newEntity = { type: 'cell', data: cell };
+    } else if (this.mode === 'pcb') {
+      const idx = this.pcbComponents.length + 1;
+      const comp = {
+        id: 'U' + idx,
+        name: 'U' + idx + ': ' + (type || 'IC Package'),
+        x: Math.round((-this.pan.x + 200) / this.zoom / 10) * 10,
+        y: Math.round((-this.pan.y + 150) / this.zoom / 10) * 10,
+        w: 70,
+        h: 70,
+        type: type || 'SMD IC',
+        net: 'VDD_3V3 / GND',
+        val: 'Active Component'
+      };
+      this.pcbComponents.push(comp);
+      newEntity = { type: 'pcb', data: comp };
+    } else if (this.mode === 'pid') {
+      const idx = 100 + this.pidStreams.length + 1;
+      const stream = {
+        id: 'ST-' + idx,
+        name: type || 'Product Stream',
+        x: Math.round((-this.pan.x + 200) / this.zoom / 10) * 10,
+        y: Math.round((-this.pan.y + 150) / this.zoom / 10) * 10,
+        temp: '160.0 °C',
+        press: '2.50 bar',
+        flow: '11,000 BPD',
+        phase: 'Liquid'
+      };
+      this.pidStreams.push(stream);
+      newEntity = { type: 'stream', data: stream };
+    }
+
+    if (newEntity) {
+      this.selectedEntity = newEntity;
+      this.render();
+      if (this.onSelect) {
+        this.onSelect(this.selectedEntity);
+      }
+    }
+    return newEntity;
+  }
+
+  deleteSelected() {
+    if (!this.selectedEntity || !this.selectedEntity.data) return false;
+    const target = this.selectedEntity.data;
+    if (this.mode === 'eda') {
+      const idx = this.edaCells.findIndex(c => c.id === target.id);
+      if (idx !== -1) this.edaCells.splice(idx, 1);
+    } else if (this.mode === 'pcb') {
+      const idx = this.pcbComponents.findIndex(c => c.id === target.id);
+      if (idx !== -1) this.pcbComponents.splice(idx, 1);
+    } else if (this.mode === 'pid') {
+      const idx = this.pidStreams.findIndex(s => s.id === target.id);
+      if (idx !== -1) this.pidStreams.splice(idx, 1);
+    }
+    this.selectedEntity = null;
+    this.hoveredEntity = null;
+    this.render();
+    if (this.onSelect) {
+      this.onSelect(null);
+    }
+    return true;
+  }
+
+  updateSelectedEntity(properties) {
+    if (!this.selectedEntity || !this.selectedEntity.data || !properties) return;
+    const d = this.selectedEntity.data;
+    if (properties.name !== undefined) d.name = properties.name;
+    if (properties.type !== undefined) d.type = properties.type;
+    if (properties.x !== undefined) d.x = Number(properties.x);
+    if (properties.y !== undefined) d.y = Number(properties.y);
+    if (properties.w !== undefined) d.w = Number(properties.w);
+    if (properties.h !== undefined) d.h = Number(properties.h);
+    if (properties.delay !== undefined) d.delay = properties.delay;
+    if (properties.area !== undefined) d.area = properties.area;
+    if (properties.net !== undefined) d.net = properties.net;
+    if (properties.val !== undefined) d.val = properties.val;
+    if (properties.temp !== undefined) d.temp = properties.temp;
+    if (properties.press !== undefined) d.press = properties.press;
+    if (properties.flow !== undefined) d.flow = properties.flow;
+    if (properties.phase !== undefined) d.phase = properties.phase;
+    this.render();
+    if (this.onEntityChange) {
+      this.onEntityChange(this.selectedEntity);
+    }
   }
 
   checkHover(wx, wy) {
@@ -415,6 +608,19 @@ class SchematicLayoutUI {
     for (const comp of this.pcbComponents) {
       const isSelected = this.selectedEntity && this.selectedEntity.data.id === comp.id;
 
+      // Solder Pads with Silver/ENIG Plating for SMT components
+      if (comp.type.includes('Cap') || comp.type.includes('Choke') || comp.type.includes('Antenna')) {
+        const padW = 6, padH = comp.h;
+        ctx.fillStyle = '#cbd5e1'; // Silver/tin solder
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 1;
+        // Left & Right solder fillet pads
+        ctx.fillRect(comp.x - padW, comp.y, padW, padH);
+        ctx.strokeRect(comp.x - padW, comp.y, padW, padH);
+        ctx.fillRect(comp.x + comp.w, comp.y, padW, padH);
+        ctx.strokeRect(comp.x + comp.w, comp.y, padW, padH);
+      }
+
       // Component Body
       ctx.fillStyle = comp.type.includes('BGA') ? '#1e293b' : comp.type.includes('QFN') ? '#0f172a' : '#1c1917';
       ctx.strokeStyle = isSelected ? '#38bdf8' : '#eab308';
@@ -425,21 +631,51 @@ class SchematicLayoutUI {
       ctx.fill();
       ctx.stroke();
 
-      // BGA Pin Array Dots
+      // Pin 1 Index Dot (Silkscreen white dot in top-left corner)
+      if (comp.type.includes('BGA') || comp.type.includes('QFN') || comp.type.includes('IC')) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(comp.x + 8, comp.y + 8, 2.2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      // BGA Pin Array Dots with Center Thermal Ground Array
       if (comp.type.includes('BGA')) {
         ctx.fillStyle = '#eab308';
         for (let px = comp.x + 12; px < comp.x + comp.w - 10; px += 14) {
           for (let py = comp.y + 12; py < comp.y + comp.h - 10; py += 14) {
-            ctx.beginPath(); ctx.arc(px, py, 2.5, 0, 2 * Math.PI); ctx.fill();
+            ctx.beginPath(); ctx.arc(px, py, 2.2, 0, 2 * Math.PI); ctx.fill();
+          }
+        }
+        // Center ground thermal vias
+        ctx.fillStyle = '#38bdf8';
+        for (let gx = comp.x + comp.w / 2 - 12; gx <= comp.x + comp.w / 2 + 12; gx += 12) {
+          for (let gy = comp.y + comp.h / 2 - 12; gy <= comp.y + comp.h / 2 + 12; gy += 12) {
+            ctx.beginPath(); ctx.arc(gx, gy, 1.8, 0, 2 * Math.PI); ctx.fill();
           }
         }
       }
 
       // Silkscreen RefDes Label
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = isSelected ? '#38bdf8' : '#ffffff';
       ctx.font = 'bold 11px system-ui';
       ctx.fillText(comp.id, comp.x + 6, comp.y - 6);
     }
+
+    // High-Precision Gold Annular Test Points (TP1, TP2)
+    const testPoints = [
+      { id: 'TP1 (VDD_CORE)', x: 430, y: 160 },
+      { id: 'TP2 (GND_SENSE)', x: 430, y: 280 }
+    ];
+    testPoints.forEach(tp => {
+      ctx.fillStyle = '#eab308'; // Gold Pad
+      ctx.beginPath(); ctx.arc(tp.x, tp.y, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#064e3b'; // Drill Hole
+      ctx.beginPath(); ctx.arc(tp.x, tp.y, 2.0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.fillText(tp.id, tp.x + 7, tp.y + 3);
+    });
   }
 
   // =========================================================================
@@ -449,73 +685,210 @@ class SchematicLayoutUI {
   renderPlantPID() {
     const { ctx } = this;
     const colX = 260, colY = 90, colW = 90, colH = 340;
-    ctx.fillStyle = '#162032';
+    const colR = colW / 2;
+
+    // 1. Column Vessel with 2:1 Semi-Elliptical Dished Heads
+    ctx.fillStyle = '#0f172a';
     ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
 
     ctx.beginPath();
-    ctx.roundRect(colX, colY, colW, colH, 24);
+    // Top elliptical head
+    ctx.ellipse(colX + colR, colY + 18, colR, 18, 0, Math.PI, 0, false);
+    // Right wall
+    ctx.lineTo(colX + colW, colY + colH - 18);
+    // Bottom elliptical head
+    ctx.ellipse(colX + colR, colY + colH - 18, colR, 18, 0, 0, Math.PI, false);
+    // Left wall
+    ctx.lineTo(colX, colY + 18);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
+    // Column Identification Text
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 12px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('CRUDE TOWER', colX + colW / 2, colY + 36);
+    ctx.fillText('CRUDE TOWER', colX + colR, colY + 44);
     ctx.font = '10px monospace';
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('V-101 (30 Trays)', colX + colW / 2, colY + 54);
+    ctx.fillText('V-101 (30 Trays)', colX + colR, colY + 60);
 
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1;
-    for (let y = colY + 70; y < colY + colH - 40; y += 16) {
+    // 2. Internal Fractionation Trays with Downcomers & Active Bubbling Decks
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    let trayIdx = 0;
+    for (let y = colY + 76; y < colY + colH - 35; y += 15) {
+      trayIdx++;
       ctx.beginPath();
-      ctx.moveTo(colX + 10, y); ctx.lineTo(colX + colW - 10, y);
+      if (trayIdx % 2 === 0) {
+        // Left-to-right tray with right downcomer
+        ctx.moveTo(colX + 8, y);
+        ctx.lineTo(colX + colW - 14, y);
+        ctx.lineTo(colX + colW - 14, y + 8);
+      } else {
+        // Right-to-left tray with left downcomer
+        ctx.moveTo(colX + colW - 8, y);
+        ctx.lineTo(colX + 14, y);
+        ctx.lineTo(colX + 14, y + 8);
+      }
       ctx.stroke();
+
+      // Liquid level on tray
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+      ctx.fillRect(colX + 10, y - 4, colW - 20, 4);
     }
 
-    // Crude Feed
+    // 3. Crude Feed Line (Stream ST-101) with Flow Direction Arrow
     ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3.0;
     ctx.beginPath();
     ctx.moveTo(40, 240); ctx.lineTo(colX, 240);
     ctx.stroke();
 
-    // Overhead Condenser E-101
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 3;
+    // Feed Flow Arrow
+    ctx.fillStyle = '#f59e0b';
     ctx.beginPath();
-    ctx.moveTo(colX + colW / 2, colY);
-    ctx.lineTo(colX + colW / 2, colY - 45);
+    ctx.moveTo(colX - 8, 240);
+    ctx.lineTo(colX - 18, 235);
+    ctx.lineTo(colX - 18, 245);
+    ctx.closePath();
+    ctx.fill();
+
+    // Feed Nozzle Flange & Dot
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.arc(colX, 240, 3.5, 0, Math.PI * 2); ctx.fill();
+
+    // 4. Overhead Vapor Line & Condenser E-101
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(colX + colR, colY);
+    ctx.lineTo(colX + colR, colY - 45);
     ctx.lineTo(colX + colW + 160, colY - 45);
     ctx.stroke();
 
+    // Condenser E-101 Symbol
     const condX = colX + colW + 160, condY = colY - 45;
     ctx.fillStyle = '#1e293b';
     ctx.beginPath();
-    ctx.arc(condX, condY, 28, 0, 2 * Math.PI);
+    ctx.arc(condX, condY, 26, 0, 2 * Math.PI);
     ctx.fill();
+    ctx.stroke();
+    // Internal Shell & Tube Baffle Lines
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(condX - 18, condY - 10); ctx.lineTo(condX + 18, condY - 10);
+    ctx.moveTo(condX - 18, condY); ctx.lineTo(condX + 18, condY);
+    ctx.moveTo(condX - 18, condY + 10); ctx.lineTo(condX + 18, condY + 10);
     ctx.stroke();
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 11px system-ui';
-    ctx.fillText('E-101', condX, condY + 4);
+    ctx.fillText('E-101', condX, condY - 14);
 
-    // Stream Data Callout Flags
+    // 5. Overhead Reflux Drum D-101 (Horizontal Vessel with 2:1 heads)
+    const drumX = condX, drumY = condY + 70, drumW = 56, drumH = 26;
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(condX, condY + 26); ctx.lineTo(drumX, drumY - drumH / 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(drumX - drumW / 2, drumY - drumH / 2, drumW, drumH, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px monospace';
+    ctx.fillText('D-101', drumX, drumY + 3);
+
+    // 6. Reflux Pump P-101A
+    const pumpX = drumX - 40, pumpY = drumY + 50;
+    ctx.strokeStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.moveTo(drumX, drumY + drumH / 2);
+    ctx.lineTo(drumX, pumpY);
+    ctx.lineTo(pumpX + 12, pumpY);
+    ctx.stroke();
+
+    // Centrifugal Pump Circle & Tangent Discharge Nozzle
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath(); ctx.arc(pumpX, pumpY, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pumpX - 4, pumpY - 12); ctx.lineTo(pumpX + 4, pumpY - 12); ctx.lineTo(pumpX, pumpY);
+    ctx.closePath();
+    ctx.fillStyle = '#38bdf8'; ctx.fill();
+    ctx.font = '9px monospace';
+    ctx.fillText('P-101', pumpX, pumpY + 20);
+
+    // Reflux Return Line back to Column
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(pumpX, pumpY - 12);
+    ctx.lineTo(pumpX, colY + 85);
+    ctx.lineTo(colX + colW, colY + 85);
+    ctx.stroke();
+
+    // Connection dot on column
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.arc(colX + colW, colY + 85, 3.0, 0, Math.PI * 2); ctx.fill();
+
+    // 7. Bottoms Thermosiphon Reboiler E-102
+    const rebX = colX - 90, rebY = colY + colH - 25;
+    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath(); ctx.arc(rebX, rebY, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '10px monospace';
+    ctx.fillText('E-102', rebX, rebY + 3);
+
+    // Bottom draw to reboiler
+    ctx.beginPath();
+    ctx.moveTo(colX + colR, colY + colH);
+    ctx.lineTo(colX + colR, rebY + 20);
+    ctx.lineTo(rebX, rebY + 20);
+    ctx.lineTo(rebX, rebY + 22);
+    ctx.stroke();
+
+    // Reboiler vapor return to column
+    ctx.beginPath();
+    ctx.moveTo(rebX, rebY - 22);
+    ctx.lineTo(rebX, colY + colH - 60);
+    ctx.lineTo(colX, colY + colH - 60);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(colX, colY + colH - 60, 3.0, 0, Math.PI * 2); ctx.fill();
+
+    // 8. Stream Data Callout Flags with Clean Leader Dots (Anatomy Standard)
     for (const stream of this.pidStreams) {
       const isHovered = this.hoveredEntity && this.hoveredEntity.data.id === stream.id;
       ctx.fillStyle = isHovered ? '#38bdf8' : '#1e293b';
-      ctx.strokeStyle = isHovered ? '#38bdf8' : '#64748b';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = isHovered ? '#38bdf8' : '#475569';
+      ctx.lineWidth = 1.2;
 
+      // Draw leader line from stream location to flag if offset
       ctx.beginPath();
-      ctx.roundRect(stream.x - 35, stream.y - 12, 70, 24, 4);
+      ctx.arc(stream.x, stream.y, 2.8, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered ? '#38bdf8' : '#94a3b8';
+      ctx.fill();
+
+      // Flag Box
+      ctx.fillStyle = isHovered ? 'rgba(56, 189, 248, 0.25)' : 'rgba(15, 23, 42, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(stream.x - 36, stream.y - 14, 72, 28, 4);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = isHovered ? '#090d16' : '#f8fafc';
+      ctx.fillStyle = isHovered ? '#38bdf8' : '#f8fafc';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(stream.id, stream.x, stream.y + 4);
+      ctx.fillText(stream.id, stream.x, stream.y);
+      ctx.font = '9px monospace';
+      ctx.fillStyle = isHovered ? '#e2e8f0' : '#94a3b8';
+      ctx.fillText(stream.temp, stream.x, stream.y + 10);
     }
   }
 
@@ -740,5 +1113,9 @@ class SchematicLayoutUI {
     }
   }
 }
-
-window.SchematicLayoutUI = SchematicLayoutUI;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { SchematicLayoutUI };
+}
+if (typeof window !== 'undefined') {
+  window.SchematicLayoutUI = SchematicLayoutUI;
+}
