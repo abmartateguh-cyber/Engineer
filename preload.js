@@ -240,3 +240,106 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   getFeatureMaturity: () => ipcRenderer.invoke('omni:get-feature-maturity'),
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });
+
+// Target Architecture: Grouped OmniEng API namespace
+contextBridge.exposeInMainWorld('omnieng', {
+    projects: {
+        newProject: (params) => ipcRenderer.invoke('omni:new-project', params),
+        saveProject: (params) => ipcRenderer.invoke('omni:save-project', params),
+        openProject: (params) => ipcRenderer.invoke('omni:open-project', params),
+        undo: () => ipcRenderer.invoke('omni:undo'),
+        redo: () => ipcRenderer.invoke('omni:redo'),
+        getHistory: () => ipcRenderer.invoke('omni:get-project-history'),
+        recordCommand: (params) => ipcRenderer.invoke('omni:record-project-command', params),
+        getSummary: () => ipcRenderer.invoke('omni:get-project-summary')
+    },
+    jobs: {
+        submit: (taskType, payload, options) =>
+            ipcRenderer.invoke('omni:submit-compute-job', { taskType, payload, options }),
+        cancel: (jobId) => ipcRenderer.invoke('omni:cancel-compute-job', { jobId }),
+        getTelemetry: () => ipcRenderer.invoke('omni:get-compute-telemetry')
+    },
+    artifacts: {
+        package: (params) => ipcRenderer.invoke('omni:package-omni-archive', params),
+        load: (archiveBytes) => ipcRenderer.invoke('omni:load-omni-archive', archiveBytes),
+        encryptVault: (params) => ipcRenderer.invoke('omni:vault-encrypt-project', params),
+        decryptVault: (params) => ipcRenderer.invoke('omni:vault-decrypt-project', params)
+    },
+    domains: {
+        cad: {
+            createPrimitive: (type, params) => ipcRenderer.invoke('omni:create-cad-primitive', { type, params }),
+            evaluateNurbs: (params) => ipcRenderer.invoke('omni:evaluate-nurbs', params),
+            intersectNurbsSSI: (params) => ipcRenderer.invoke('omni:intersect-nurbs-ssi', params),
+            applyEdgeBlend: (params) => ipcRenderer.invoke('omni:apply-edge-blend', params),
+            solveAssemblyMates: (params) => ipcRenderer.invoke('omni:solve-assembly-mates', params),
+            solveVariationalSketch: (params) => ipcRenderer.invoke('omni:solve-variational-sketch', params),
+            healGeometry: (params) => ipcRenderer.invoke('omni:heal-cad-geometry', params),
+            exportSTEP: (bodyData) => ipcRenderer.invoke('omni:export-step', bodyData),
+            exportCADOBJ: (bodyData) => ipcRenderer.invoke('omni:export-cad-obj', bodyData),
+            visualDiffCAD: (params) => ipcRenderer.invoke('omni:visual-diff-cad', params)
+        },
+        cae: {
+            solveFEA: (params) => ipcRenderer.invoke('omni:solve-fea-hex20', params),
+            solveDropTest: (params) => ipcRenderer.invoke('omni:solve-drop-test', params),
+            solveTransientDrop: (params) => ipcRenderer.invoke('omni:solve-transient-drop', params),
+            solveContinuumPlasticity3D: (params) => ipcRenderer.invoke('omni:solve-continuum-plasticity-3d', params),
+            solveContactMechanics3D: (params) => ipcRenderer.invoke('omni:solve-contact-mechanics-3d', params),
+            meshDelaunay3D: (params) => ipcRenderer.invoke('omni:mesh-delaunay-3d', params),
+            meshHybridPrismTet: (params) => ipcRenderer.invoke('omni:mesh-hybrid-prism-tet', params)
+        },
+        cfd: {
+            solveFvmCFD3D: (params) => ipcRenderer.invoke('omni:solve-fvm-cfd-3d', params),
+            stepSimpleCFD: (params) => ipcRenderer.invoke('omni:step-simple-cfd', params),
+            solveWebGPUCFDPoisson: (params) => ipcRenderer.invoke('omni:solve-webgpu-cfd-poisson', params)
+        },
+        controls: {
+            simulateBlockDiagram: (graphData, tEnd, dt) =>
+                ipcRenderer.invoke('omni:simulate-block-diagram', { graphData, tEnd, dt }),
+            solveBode: (params) => ipcRenderer.invoke('omni:solve-bode', params),
+            solveMPC: (params) => ipcRenderer.invoke('omni:solve-mpc', params),
+            runFmiCoSimulation: (params) => ipcRenderer.invoke('omni:run-fmi-cosimulation', params),
+            scheduleMultiRate: (params) => ipcRenderer.invoke('omni:schedule-multi-rate', params),
+            solveAlgebraicLoop: (params) => ipcRenderer.invoke('omni:solve-algebraic-loop', params)
+        },
+        eda: {
+            synthesizeVerilog: (source) => ipcRenderer.invoke('omni:synthesize-verilog', source),
+            synthesizeSystemVerilog: (params) => ipcRenderer.invoke('omni:synthesize-system-verilog', params),
+            runDRC: (shapes, rules) => ipcRenderer.invoke('omni:run-drc', { shapes, rules }),
+            runLVS: (schematic, layout) => ipcRenderer.invoke('omni:run-lvs', { schematic, layout }),
+            runMcmmSTA: (params) => ipcRenderer.invoke('omni:run-mcmm-sta', params),
+            extractPex3D: (params) => ipcRenderer.invoke('omni:extract-pex-3d', params),
+            solveSpiceCircuit: (netlist) => ipcRenderer.invoke('omni:solve-spice-circuit', netlist),
+            exportGerber: (pcbData) => ipcRenderer.invoke('omni:export-gerber', pcbData),
+            exportGdsii: (params) => ipcRenderer.invoke('omni:export-gdsii', params),
+            importGdsii: (buffer) => ipcRenderer.invoke('omni:import-gdsii', buffer)
+        },
+        optics: {
+            solveOptics: (params) => ipcRenderer.invoke('omni:solve-optics', params),
+            traceRays: (params) => ipcRenderer.invoke('omni:trace-rays', params),
+            solveSkewOptics: (params) => ipcRenderer.invoke('omni:solve-skew-optics', params),
+            tracePolarizationRay: (params) => ipcRenderer.invoke('omni:trace-polarization-ray', params),
+            queryGlassCatalog: (params) => ipcRenderer.invoke('omni:query-glass-catalog', params),
+            runOpticalTolerancing: (params) => ipcRenderer.invoke('omni:run-optical-tolerancing', params)
+        },
+        plant: {
+            solveHYSYSFlash: (params) => ipcRenderer.invoke('omni:solve-hysys-flash', params),
+            flashPengRobinson: (params) => ipcRenderer.invoke('omni:flash-peng-robinson', params),
+            simulateDistillation: (params) => ipcRenderer.invoke('omni:simulate-distillation', params),
+            solveMeshDistillation: (params) => ipcRenderer.invoke('omni:solve-mesh-distillation', params),
+            solveWaterHammerMOC: (params) => ipcRenderer.invoke('omni:solve-water-hammer-moc', params),
+            getVLEEnvelope: (params) => ipcRenderer.invoke('omni:get-vle-envelope', params),
+            plantNrtlActivity: (params) => ipcRenderer.invoke('omni:plant-nrtl-activity', params)
+        },
+        cam: {
+            camGenerateToolpath: (params) => ipcRenderer.invoke('omni:cam-generate-toolpath', params)
+        },
+        aerospace: {
+            solveNasaRocket: (params) => ipcRenderer.invoke('omni:solve-nasa-rocket', params),
+            solvePropellerThrust: (params) => ipcRenderer.invoke('omni:solve-propeller', params),
+            simulateDrone: (params) => ipcRenderer.invoke('omni:simulate-drone', params)
+        }
+    },
+    stenographer: {
+        processPrompt: (prompt, context) => ipcRenderer.invoke('omni:ai-process-prompt', { prompt, context })
+    }
+});

@@ -11,6 +11,7 @@ const { SurfaceSurfaceIntersectionEngine } = require('./nurbs_trimmed_ssi');
 const { EdgeBlender } = require('./edge_blender');
 const { AssemblyMateSolver, AssemblyComponent } = require('./assembly_mates');
 const { StepTranslator } = require('./step_translator');
+const { ConstraintSolver2D } = require('./constraint_solver_2d');
 
 /**
  * GeometryEngineAdapter: Standard EngineAdapter for Exact CAD Modeling Kernel
@@ -30,6 +31,7 @@ class GeometryEngineAdapter extends EngineAdapter {
         'intersect_nurbs_ssi',
         'apply_edge_blend',
         'solve_assembly_mates',
+        'solve_variational_sketch',
         'export_step'
       ],
       maturity: ValidationMaturity.CORRELATED,
@@ -108,6 +110,45 @@ class GeometryEngineAdapter extends EngineAdapter {
             sizeBytes: Buffer.byteLength(stepContent, 'utf8'),
             modelName: params.modelName || 'Part'
           };
+          break;
+        }
+
+        case 'solve_variational_sketch': {
+          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Solving 2D geometric constraints via Levenberg-Marquardt' }));
+          const solver = new ConstraintSolver2D();
+          if (Array.isArray(params.points)) {
+            for (const p of params.points) {
+              solver.addPoint(p.id, p.x, p.y, p.fixed);
+            }
+          }
+          if (Array.isArray(params.constraints)) {
+            for (const c of params.constraints) {
+              const cp = c.params || {};
+              switch (c.type) {
+                case 'HORIZONTAL':
+                  solver.addHorizontal(cp.p1, cp.p2);
+                  break;
+                case 'VERTICAL':
+                  solver.addVertical(cp.p1, cp.p2);
+                  break;
+                case 'COINCIDENT':
+                  solver.addCoincident(cp.p1, cp.p2);
+                  break;
+                case 'DISTANCE_POINTS':
+                  solver.addDistance(cp.p1, cp.p2, cp.distance);
+                  break;
+                case 'FIXED':
+                  solver.addFixed(cp.p, cp.x, cp.y);
+                  break;
+                default:
+                  solver.addConstraint(c.type, cp);
+                  break;
+              }
+            }
+          }
+          const maxIter = params.maxIterations || 50;
+          const tol = params.tolerance || 1e-6;
+          outputData = solver.solve(maxIter, tol);
           break;
         }
 

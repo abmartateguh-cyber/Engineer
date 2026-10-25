@@ -9,6 +9,7 @@ const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 const { BlockDiagramGraph, StateSpaceEngine } = require('../dynamic_simulink/block_graph');
 const { ModelPredictiveController } = require('../dynamic_simulink/model_predictive_control');
 const { FmiMasterEngine, FmuSlave } = require('../cosim/fmi_master_engine');
+const { ExtendedKalmanFilter } = require('../dynamic_simulink/extended_kalman_filter');
 
 /**
  * ControlsEngineAdapter: Standard EngineAdapter for Dynamic Controls, Simscape DAE, and FMI Co-Simulation
@@ -27,7 +28,8 @@ class ControlsEngineAdapter extends EngineAdapter {
         'simulate_block_diagram',
         'solve_state_space',
         'fmi_cosimulation',
-        'solve_mpc'
+        'solve_mpc',
+        'estimate_ekf'
       ],
       maturity: ValidationMaturity.CORRELATED,
       native: false
@@ -185,6 +187,52 @@ class ControlsEngineAdapter extends EngineAdapter {
             optimalSequence: sol.optimalSequence,
             converged: sol.qpConverged,
             cost: sol.cost
+          };
+          break;
+        }
+
+        case 'estimate_ekf': {
+          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Initializing 10-state quaternion Extended Kalman Filter' }));
+          const ekf = new ExtendedKalmanFilter();
+          if (params.initialState && Array.isArray(params.initialState)) {
+            for (let i = 0; i < Math.min(10, params.initialState.length); i++) {
+              ekf.x[i] = params.initialState[i];
+            }
+          }
+
+          const steps = Array.isArray(params.steps) ? params.steps : [{ dt: params.dt || 0.01, gyro: params.gyro, accel: params.accel }];
+          const trajectory = [];
+
+          for (let i = 0; i < steps.length; i++) {
+            const s = steps[i];
+            ekf.predict(s.gyro || [0, 0, 0], s.accel || [0, 0, -9.80665], s.dt || 0.01);
+            if (s.baroAlt !== undefined) {
+              ekf.updateBarometer(s.baroAlt);
+            }
+            if (s.gpsPos && Array.isArray(s.gpsPos)) {
+              ekf.updateGPSPosition(s.gpsPos);
+            }
+            if (params.recordTrajectory) {
+              const euler = ekf.getEulerAngles();
+              trajectory.push({
+                position: [ekf.x[0], ekf.x[1], ekf.x[2]],
+                velocity: [ekf.x[3], ekf.x[4], ekf.x[5]],
+                quaternion: [ekf.x[6], ekf.x[7], ekf.x[8], ekf.x[9]],
+                eulerDeg: euler
+              });
+            }
+          }
+
+          const finalEuler = ekf.getEulerAngles();
+          outputData = {
+            finalState: {
+              position: [ekf.x[0], ekf.x[1], ekf.x[2]],
+              velocity: [ekf.x[3], ekf.x[4], ekf.x[5]],
+              quaternion: [ekf.x[6], ekf.x[7], ekf.x[8], ekf.x[9]],
+              eulerDeg: finalEuler
+            },
+            stepsProcessed: steps.length,
+            trajectory: params.recordTrajectory ? trajectory : undefined
           };
           break;
         }

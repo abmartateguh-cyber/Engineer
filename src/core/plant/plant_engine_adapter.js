@@ -9,6 +9,7 @@ const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 const { PengRobinsonEOS } = require('./peng_robinson_eos');
 const { NaphtaliSandholmColumnSolver } = require('./naphtali_sandholm_mesh');
 const { TransientWaterHammerSolver } = require('./transient_water_hammer');
+const { VLEPhaseEnvelopeEngine } = require('./vle_envelope');
 
 /**
  * PlantEngineAdapter: Standard EngineAdapter for Chemical Process Thermodynamics, VLE Flash, Distillation, and Water Hammer Hydraulics
@@ -27,7 +28,8 @@ class PlantEngineAdapter extends EngineAdapter {
         'solve_vle_flash',
         'calculate_nrtl_activity',
         'solve_distillation_mesh',
-        'calculate_water_hammer'
+        'calculate_water_hammer',
+        'generate_vle_envelope'
       ],
       maturity: ValidationMaturity.CORRELATED,
       native: false
@@ -142,6 +144,39 @@ class PlantEngineAdapter extends EngineAdapter {
             joukowskySurgeHeadM: surge.surgeHeadM,
             mocSolution: moc
           };
+          break;
+        }
+
+        case 'generate_vle_envelope': {
+          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Calculating multicomponent VLE P-T envelope' }));
+          const composition = params.composition || { methane: 0.7, ethane: 0.2, propane: 0.1 };
+          const pMinBar = Number(params.pMinBar || 1.0);
+          const pMaxBar = Number(params.pMaxBar || 50.0);
+          const points = Number(params.points || 20);
+          const componentProperties = params.componentProperties || {
+            methane: {
+              criticalTemperatureK: 190.56,
+              criticalPressurePa: 45.99e5,
+              molecularWeightKgPerMol: 0.01604,
+              acentricFactor: 0.0115,
+              provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
+            },
+            ethane: {
+              criticalTemperatureK: 305.32,
+              criticalPressurePa: 48.72e5,
+              molecularWeightKgPerMol: 0.03007,
+              acentricFactor: 0.0995,
+              provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
+            },
+            propane: {
+              criticalTemperatureK: 369.83,
+              criticalPressurePa: 42.48e5,
+              molecularWeightKgPerMol: 0.04410,
+              acentricFactor: 0.1523,
+              provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
+            }
+          };
+          outputData = VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, pMinBar, pMaxBar, points, componentProperties);
           break;
         }
 
