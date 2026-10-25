@@ -1,9 +1,14 @@
 /**
  * OmniEng Universal Engineering Archive (.omni) & Command History Journal
  *
- * Provides single-file container packaging for CAD, CAE, EDA, GNC, and Plant data
- * using native zlib compression, binary magic headers, integrity checksums,
- * and non-linear undo/redo command journaling.
+ * Implements:
+ * - v1 Legacy single-file container (MAGIC: OMNIENG\x01)
+ * - v2 Content-addressed atomic archive (MAGIC: OMNIENG\x02)
+ * - Atomic saves with fsync and safe rename
+ * - Crash recovery journal & automatic recovery
+ * - v1 to v2 migration
+ * - Non-linear undo/redo CommandHistoryJournal
+ * - AES-256-GCM encrypted vault
  */
 
 'use strict';
@@ -12,28 +17,26 @@ const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
+const { ProjectManifestV2 } = require('../contracts/ProjectManifestV2');
+const { ArtifactRef, RetentionPolicy } = require('../contracts/ArtifactRef');
 
-const MAGIC_BYTES = Buffer.from('OMNIENG\x01', 'binary'); // 8-byte magic header
+const MAGIC_BYTES_V1 = Buffer.from('OMNIENG\x01', 'binary'); // 8-byte magic header v1
+const MAGIC_BYTES_V2 = Buffer.from('OMNIENG\x02', 'binary'); // 8-byte magic header v2
+const MAGIC_BYTES = MAGIC_BYTES_V1; // Compatibility default
 const VAULT_MAGIC_BYTES = Buffer.from('OMNIVAUL', 'utf8'); // 8-byte encrypted vault header
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION_V1 = 1;
+const CURRENT_SCHEMA_VERSION_V2 = '2.0.0';
 
-// Resource limits for malformed archive structures and oversized sections.
+// Resource limits
 const MAX_ARCHIVE_SECTION_COUNT = 4096;
-const MAX_ARCHIVE_SIZE_BYTES = 512 * 1024 * 1024; // 512 MiB archive and aggregate expanded-content ceiling
-const MAX_UNCOMPRESSED_SECTION_SIZE = 500 * 1024 * 1024; // 500 MB ceiling
-const MAX_EXPANSION_RATIO = 50; // 50:1 maximum compression expansion ratio
+const MAX_ARCHIVE_SIZE_BYTES = 512 * 1024 * 1024; // 512 MiB
+const MAX_UNCOMPRESSED_SECTION_SIZE = 500 * 1024 * 1024; // 500 MB
+const MAX_EXPANSION_RATIO = 50;
 
 /**
- * Simple standard 32-bit CRC implementation for archive data integrity
+ * Standard 32-bit CRC implementation for archive data integrity
  */
-function calculateCRC32(buffer) {
-  let crc = 0 ^ -1;
-  for (let i = 0; i < buffer.length; i++) {
-    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buffer[i]) & 0xff];
-  }
-  return (crc ^ -1) >>> 0;
-}
-
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
   let c = i;
@@ -43,13 +46,52 @@ for (let i = 0; i < 256; i++) {
   CRC_TABLE[i] = c >>> 0;
 }
 
+function calculateCRC32(buffer) {
+  let crc = 0 ^ -1;
+  for (let i = 0; i < buffer.length; i++) {
+    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buffer[i]) & 0xff];
+  }
+  return (crc ^ -1) >>> 0;
+}
+
 /**
- * OmniArchive: Single-File Container (.omni)
+ * Performs atomic file write: temp file -> fsync -> rename with optional backup.
+ * @param {string} filePath
+ * @param {Buffer} buffer
+ * @param {boolean} [createBackup=true]
+ */
+function saveAtomicSync(filePath, buffer, createBackup = true) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const tempPath = `${filePath}.tmp.${process.pid}.${crypto.randomUUID()}`;
+  const fd = fs.openSync(tempPath, 'w');
+  try {
+    fs.writeSync(fd, buffer, 0, buffer.length, 0);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  // Backup existing file if requested
+  if (createBackup && fs.existsSync(filePath)) {
+    try {
+      fs.copyFileSync(filePath, `${filePath}.bak`);
+    } catch (_) {}
+  }
+
+  fs.renameSync(tempPath, filePath);
+}
+
+/**
+ * OmniArchive (v1) Single-File Container
  */
 class OmniArchive {
   constructor(metadata = {}) {
     this.manifest = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
+      schemaVersion: CURRENT_SCHEMA_VERSION_V1,
       projectName: metadata.projectName || 'Untitled Project',
       engineeringDomain: metadata.engineeringDomain || 'universal',
       author: metadata.author || 'OmniEng Engineer',
@@ -121,13 +163,11 @@ class OmniArchive {
       return entry.parsedCache;
     }
 
-    // Verify CRC before decompression
     const checkCrc = calculateCRC32(entry.compressed);
     if (checkCrc !== entry.crc) {
       throw new Error(`CRC32 mismatch on section '${name}': data corruption detected!`);
     }
 
-    // Security Gate: Decompression Bomb Guard (CWE-400)
     if (entry.rawLength > MAX_UNCOMPRESSED_SECTION_SIZE) {
       throw new Error(
         `Security Violation: Section '${name}' uncompressed size (${entry.rawLength} bytes) exceeds maximum ceiling (${MAX_UNCOMPRESSED_SECTION_SIZE} bytes)`
@@ -169,27 +209,13 @@ class OmniArchive {
     return Array.from(this.sections.keys());
   }
 
-  /**
-   * Serialize entire archive into binary Buffer
-   */
   saveToBuffer() {
-    // Binary format:
-    // [8 bytes MAGIC: OMNIENG\x01]
-    // [4 bytes uint32: section count]
-    // Repeating section entries:
-    //   [2 bytes uint16: name length]
-    //   [N bytes utf8: section name]
-    //   [4 bytes uint32: raw uncompressed length]
-    //   [4 bytes uint32: compressed length]
-    //   [4 bytes uint32: crc32]
-    //   [M bytes: compressed payload]
-
     if (this.sections.size > MAX_ARCHIVE_SECTION_COUNT) {
       throw new Error(`Archive exceeds the maximum section count of ${MAX_ARCHIVE_SECTION_COUNT}`);
     }
 
     const header = Buffer.alloc(12);
-    MAGIC_BYTES.copy(header, 0);
+    MAGIC_BYTES_V1.copy(header, 0);
     header.writeUInt32BE(this.sections.size, 8);
 
     const chunks = [header];
@@ -225,9 +251,6 @@ class OmniArchive {
     return Buffer.concat(chunks);
   }
 
-  /**
-   * Load and unpack an OmniArchive from a binary Buffer
-   */
   static loadFromBuffer(buffer) {
     if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
       throw new Error('Invalid archive: buffer is too small');
@@ -236,16 +259,20 @@ class OmniArchive {
       throw new Error(`Archive exceeds the maximum serialized size of ${MAX_ARCHIVE_SIZE_BYTES}`);
     }
 
-    // Verify magic bytes
-    if (!buffer.subarray(0, 8).equals(MAGIC_BYTES)) {
-      throw new Error("Invalid archive format: missing 'OMNIENG\x01' magic header");
+    // Check v2 magic header
+    if (buffer.subarray(0, 8).equals(MAGIC_BYTES_V2)) {
+      return OmniArchiveV2.loadFromBuffer(buffer);
+    }
+
+    // Verify v1 magic header
+    if (!buffer.subarray(0, 8).equals(MAGIC_BYTES_V1)) {
+      throw new Error("Invalid archive format: missing 'OMNIENG\x01' or 'OMNIENG\x02' magic header");
     }
 
     const sectionCount = buffer.readUInt32BE(8);
     if (sectionCount > MAX_ARCHIVE_SECTION_COUNT) {
       throw new Error(`Malformed archive: section count exceeds maximum ${MAX_ARCHIVE_SECTION_COUNT}`);
     }
-    // Every section needs at least a 2-byte name length and 12-byte metadata.
     if (sectionCount > Math.floor((buffer.length - 12) / 14)) {
       throw new Error('Malformed archive: section count exceeds the available data');
     }
@@ -296,7 +323,6 @@ class OmniArchive {
       const compressed = buffer.subarray(offset, offset + compLength);
       offset += compLength;
 
-      // Verify CRC
       const checkCrc = calculateCRC32(compressed);
       if (checkCrc !== crc) {
         throw new Error(`Data corruption in archive section '${name}': CRC checksum failure`);
@@ -314,12 +340,11 @@ class OmniArchive {
       throw new Error('Malformed archive: unexpected trailing bytes');
     }
 
-    // Refresh manifest
-    const manifest = archive.getSection('manifest', true);
+    const manifest = archive.getSection('manifest', true) || archive.getSection('manifest.json', true);
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
       throw new Error('Malformed archive: required project manifest is missing or invalid');
     }
-    if (manifest.schemaVersion !== CURRENT_SCHEMA_VERSION) {
+    if (manifest.schemaVersion !== CURRENT_SCHEMA_VERSION_V1 && manifest.schemaVersion !== CURRENT_SCHEMA_VERSION_V2) {
       throw new Error(`Unsupported archive schema version: ${manifest.schemaVersion}`);
     }
     archive.manifest = manifest;
@@ -328,12 +353,8 @@ class OmniArchive {
   }
 
   saveToFile(filePath) {
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
     const buf = this.saveToBuffer();
-    fs.writeFileSync(filePath, buf);
+    saveAtomicSync(filePath, buf, true);
     return { filePath, sizeBytes: buf.length, sectionCount: this.sections.size };
   }
 
@@ -369,12 +390,6 @@ class OmniArchive {
     }
   }
 
-  /**
-   * Encrypts the entire archive using AES-256-GCM with PBKDF2 key derivation.
-   * Directly protects confidential CAD IP from disk extraction (CWE-311).
-   * @param {string} password
-   * @returns {Buffer} Encrypted binary container
-   */
   saveToEncryptedBuffer(password) {
     if (!password || typeof password !== 'string' || password.length < 4) {
       throw new Error('Encryption Error: Password must be at least 4 characters long');
@@ -383,12 +398,6 @@ class OmniArchive {
     return OmniVaultAES256.encrypt(plaintext, password);
   }
 
-  /**
-   * Decrypts and restores an OmniArchive from an AES-256-GCM encrypted buffer.
-   * @param {Buffer} encryptedBuffer
-   * @param {string} password
-   * @returns {OmniArchive}
-   */
   static loadFromEncryptedBuffer(encryptedBuffer, password) {
     if (!password || typeof password !== 'string') {
       throw new Error('Decryption Error: Password must be provided');
@@ -399,54 +408,280 @@ class OmniArchive {
 }
 
 /**
- * Password-derived AES-256-GCM encryption helper for session snapshots.
- * Uses authenticated symmetric encryption with random salt,
- * 100,000 PBKDF2 iterations, 96-bit IV, and 128-bit authentication tag.
+ * OmniArchiveV2: Production content-addressed engineering archive (.omni v2)
+ *
+ * Implements:
+ * - Versioned manifest (schemaVersion: '2.0.0')
+ * - Content-addressed blobs (SHA-256)
+ * - Atomic saves with temp file, fsync, and atomic rename
+ * - Crash recovery journal
+ * - Full v1 -> v2 migration
  */
-class OmniVaultAES256 {
-  static encrypt(plaintextBuffer, password) {
-    const salt = crypto.randomBytes(16);
-    const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
-    const iv = crypto.randomBytes(12);
+class OmniArchiveV2 {
+  /**
+   * @param {object} [metadata={}]
+   * @param {ProjectManifestV2} [metadata.manifest]
+   */
+  constructor(metadata = {}) {
+    if (metadata.manifest instanceof ProjectManifestV2) {
+      this.manifest = metadata.manifest;
+    } else {
+      this.manifest = new ProjectManifestV2({
+        name: metadata.projectName || 'Untitled Project',
+        activeUnits: metadata.activeUnits || 'SI_MM'
+      });
+    }
 
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    const ciphertext = Buffer.concat([cipher.update(plaintextBuffer), cipher.final()]);
-    const tag = cipher.getAuthTag();
-
-    // Format: [8B VAULT_MAGIC] [16B salt] [12B iv] [16B tag] [N bytes ciphertext]
-    const header = Buffer.alloc(8 + 16 + 12 + 16);
-    VAULT_MAGIC_BYTES.copy(header, 0);
-    salt.copy(header, 8);
-    iv.copy(header, 24);
-    tag.copy(header, 36);
-
-    return Buffer.concat([header, ciphertext]);
+    this.blobs = new Map(); // [sha256] -> Buffer
+    this.journal = new CommandJournal();
+    this.results = []; // JobResult summaries
+    this.signatures = [];
   }
 
-  static decrypt(encryptedBuffer, password) {
-    if (encryptedBuffer.length < 52) {
-      throw new Error('Corrupt encrypted vault: payload shorter than cryptographic header');
+  /**
+   * Adds content-addressed blob to archive.
+   * @param {Buffer|string|object} content
+   * @param {object} [options={}]
+   * @returns {ArtifactRef}
+   */
+  addBlob(content, options = {}) {
+    let buf;
+    if (Buffer.isBuffer(content)) buf = content;
+    else if (typeof content === 'string') buf = Buffer.from(content, 'utf8');
+    else buf = Buffer.from(JSON.stringify(content), 'utf8');
+
+    const artifactRef = ArtifactRef.fromContent(buf, {
+      mimeType: options.mimeType || 'application/octet-stream',
+      name: options.name || '',
+      retention: options.retention || RetentionPolicy.PERSISTENT
+    });
+
+    this.blobs.set(artifactRef.hash, buf);
+
+    // Update manifest blobs table
+    const updatedBlobs = { ...this.manifest.blobs, [artifactRef.hash]: artifactRef.toJSON() };
+    this.manifest = this.manifest.withIncrementedRevision({ blobs: updatedBlobs });
+    return artifactRef;
+  }
+
+  /**
+   * Retrieves blob content by SHA-256 hash.
+   * @param {string} hash
+   * @param {boolean} [asJson=false]
+   * @returns {Buffer|object|string|null}
+   */
+  getBlob(hash, asJson = false) {
+    const norm = String(hash).toLowerCase();
+    const buf = this.blobs.get(norm);
+    if (!buf) return null;
+    if (asJson) {
+      try {
+        return JSON.parse(buf.toString('utf8'));
+      } catch (_) {
+        return buf.toString('utf8');
+      }
+    }
+    return buf;
+  }
+
+  hasBlob(hash) {
+    return this.blobs.has(String(hash).toLowerCase());
+  }
+
+  listBlobs() {
+    return Array.from(this.blobs.keys());
+  }
+
+  /**
+   * Records a JobResult in the project record.
+   * @param {import('../contracts/JobResult').JobResult} jobResult
+   */
+  recordResult(jobResult) {
+    this.results.push(jobResult.toJSON());
+    this.manifest = this.manifest.withIncrementedRevision({ results: this.results });
+  }
+
+  /**
+   * Serializes v2 archive into binary Buffer.
+   * Format:
+   * [8B MAGIC: OMNIENG\x02]
+   * [4B uint32: total section count]
+   * Section 0: 'manifest.json'
+   * Section 1: 'journal.json'
+   * Section 2: 'results.json'
+   * Section 3..N: 'blobs/<sha256>'
+   * @returns {Buffer}
+   */
+  saveToBuffer() {
+    const archive = new OmniArchive({ projectName: this.manifest.name });
+    archive.sections.clear();
+
+    // 1. Manifest
+    archive.addSection('manifest.json', this.manifest.toJSON());
+
+    // 2. Journal
+    archive.addSection('journal.json', this.journal.export());
+
+    // 3. Results
+    archive.addSection('results.json', this.results);
+
+    // 4. Blobs
+    for (const [hash, buf] of this.blobs.entries()) {
+      archive.addSection(`blobs/${hash}`, buf);
     }
 
-    const magic = encryptedBuffer.subarray(0, 8);
-    if (!magic.equals(VAULT_MAGIC_BYTES)) {
-      throw new Error('Invalid vault header: not an OmniEng AES-256 encrypted container');
+    // Generate v1 container then replace magic bytes with v2
+    const v1Buf = archive.saveToBuffer();
+    const v2Buf = Buffer.from(v1Buf);
+    MAGIC_BYTES_V2.copy(v2Buf, 0);
+    return v2Buf;
+  }
+
+  /**
+   * Unpacks v2 archive from Buffer.
+   * @param {Buffer} buffer
+   * @returns {OmniArchiveV2}
+   */
+  static loadFromBuffer(buffer) {
+    if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Invalid archive: buffer is too small');
+    }
+    if (!buffer.subarray(0, 8).equals(MAGIC_BYTES_V2)) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, "Missing 'OMNIENG\x02' magic header for v2 archive");
     }
 
-    const salt = encryptedBuffer.subarray(8, 24);
-    const iv = encryptedBuffer.subarray(24, 36);
-    const tag = encryptedBuffer.subarray(36, 52);
-    const ciphertext = encryptedBuffer.subarray(52);
+    // Convert magic to v1 temporarily to unpack sections using safe unpacker
+    const tempBuf = Buffer.from(buffer);
+    MAGIC_BYTES_V1.copy(tempBuf, 0);
 
-    const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(tag);
-
-    try {
-      return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    } catch (err) {
-      throw new Error('Decryption Failed: Invalid password or corrupted authentication tag (HMAC mismatch)');
+    const underlying = OmniArchive.loadFromBuffer(tempBuf);
+    const manifestJson = underlying.getSection('manifest.json', true);
+    if (!manifestJson || manifestJson.schemaVersion !== CURRENT_SCHEMA_VERSION_V2) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Invalid v2 archive: missing schemaVersion 2.0.0 manifest');
     }
+
+    const v2 = new OmniArchiveV2({ manifest: ProjectManifestV2.fromJSON(manifestJson) });
+
+    // Journal
+    if (underlying.hasSection('journal.json')) {
+      const journalData = underlying.getSection('journal.json', true);
+      v2.journal.import(journalData);
+    }
+
+    // Results
+    if (underlying.hasSection('results.json')) {
+      v2.results = underlying.getSection('results.json', true) || [];
+    }
+
+    // Blobs
+    for (const name of underlying.listSections()) {
+      if (name.startsWith('blobs/')) {
+        const hash = name.slice(6);
+        const blobBuf = underlying.getSection(name, false);
+        v2.blobs.set(hash, blobBuf);
+      }
+    }
+
+    return v2;
+  }
+
+  /**
+   * Saves archive atomically with fsync and rename.
+   * @param {string} filePath
+   * @returns {{ filePath: string, sizeBytes: number, blobCount: number }}
+   */
+  saveToFile(filePath) {
+    const buf = this.saveToBuffer();
+    saveAtomicSync(filePath, buf, true);
+
+    // Clean up recovery journal upon acknowledged atomic save
+    const recoveryPath = `${filePath}.recovery.journal`;
+    if (fs.existsSync(recoveryPath)) {
+      try {
+        fs.unlinkSync(recoveryPath);
+      } catch (_) {}
+    }
+
+    return { filePath, sizeBytes: buf.length, blobCount: this.blobs.size };
+  }
+
+  /**
+   * Loads v2 archive from file.
+   * @param {string} filePath
+   * @returns {OmniArchiveV2}
+   */
+  static loadFromFile(filePath) {
+    if (!fs.existsSync(filePath)) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, `Archive file not found: ${filePath}`);
+    }
+    const buf = fs.readFileSync(filePath);
+    if (buf.subarray(0, 8).equals(MAGIC_BYTES_V1)) {
+      // Automatic transparent migration from v1
+      const v1 = OmniArchive.loadFromBuffer(buf);
+      return OmniArchiveV2.fromV1(v1);
+    }
+    return OmniArchiveV2.loadFromBuffer(buf);
+  }
+
+  /**
+   * Appends an acknowledged command to the disk recovery journal before mutation.
+   * Allows atomic recovery after unexpected power loss or process kill.
+   * @param {string} projectFilePath
+   * @param {object} commandEntry
+   */
+  static recordAcknowledgedCommandSync(projectFilePath, commandEntry) {
+    const recoveryPath = `${projectFilePath}.recovery.journal`;
+    const line = JSON.stringify({ ...commandEntry, loggedAt: new Date().toISOString() }) + '\n';
+    fs.appendFileSync(recoveryPath, line, 'utf8');
+  }
+
+  /**
+   * Inspects and recovers uncommitted commands from recovery journal after crash.
+   * @param {string} projectFilePath
+   * @returns {{ recoveredCount: number, commands: object[] }}
+   */
+  static recoverFromCrash(projectFilePath) {
+    const recoveryPath = `${projectFilePath}.recovery.journal`;
+    if (!fs.existsSync(recoveryPath)) {
+      return { recoveredCount: 0, commands: [] };
+    }
+
+    const raw = fs.readFileSync(recoveryPath, 'utf8');
+    const lines = raw.trim().split('\n').filter(Boolean);
+    const commands = [];
+    for (const l of lines) {
+      try {
+        commands.push(JSON.parse(l));
+      } catch (_) {}
+    }
+    return { recoveredCount: commands.length, commands };
+  }
+
+  /**
+   * Migrates a v1 OmniArchive instance to v2 format.
+   * @param {OmniArchive} v1Archive
+   * @returns {OmniArchiveV2}
+   */
+  static fromV1(v1Archive) {
+    if (!(v1Archive instanceof OmniArchive)) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'fromV1 requires an OmniArchive instance');
+    }
+
+    const v1Manifest = v1Archive.getSection('manifest', true) || {};
+    const v2Manifest = new ProjectManifestV2({
+      name: v1Manifest.projectName || 'Migrated v1 Project',
+      activeUnits: v1Manifest.unitsSystem === 'US_CUSTOMARY' ? 'US_CUSTOMARY' : 'SI_MM'
+    });
+
+    const v2 = new OmniArchiveV2({ manifest: v2Manifest });
+
+    for (const secName of v1Archive.listSections()) {
+      if (secName === 'manifest') continue;
+      const content = v1Archive.getSection(secName, false);
+      v2.addBlob(content, { name: secName, mimeType: 'application/octet-stream' });
+    }
+
+    return v2;
   }
 }
 
@@ -473,7 +708,6 @@ class CommandJournal {
       author
     };
 
-    // If we undo and then execute, truncate future branch (standard non-linear branch point)
     if (this.currentIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.currentIndex + 1);
     }
@@ -542,12 +776,65 @@ class CommandJournal {
   }
 }
 
+/**
+ * Password-derived AES-256-GCM encryption helper.
+ */
+class OmniVaultAES256 {
+  static encrypt(plaintextBuffer, password) {
+    const salt = crypto.randomBytes(16);
+    const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+    const iv = crypto.randomBytes(12);
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const ciphertext = Buffer.concat([cipher.update(plaintextBuffer), cipher.final()]);
+    const tag = cipher.getAuthTag();
+
+    const header = Buffer.alloc(8 + 16 + 12 + 16);
+    VAULT_MAGIC_BYTES.copy(header, 0);
+    salt.copy(header, 8);
+    iv.copy(header, 24);
+    tag.copy(header, 36);
+
+    return Buffer.concat([header, ciphertext]);
+  }
+
+  static decrypt(encryptedBuffer, password) {
+    if (encryptedBuffer.length < 52) {
+      throw new Error('Corrupt encrypted vault: payload shorter than cryptographic header');
+    }
+
+    const magic = encryptedBuffer.subarray(0, 8);
+    if (!magic.equals(VAULT_MAGIC_BYTES)) {
+      throw new Error('Invalid vault header: not an OmniEng AES-256 encrypted container');
+    }
+
+    const salt = encryptedBuffer.subarray(8, 24);
+    const iv = encryptedBuffer.subarray(24, 36);
+    const tag = encryptedBuffer.subarray(36, 52);
+    const ciphertext = encryptedBuffer.subarray(52);
+
+    const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+
+    try {
+      return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    } catch (err) {
+      throw new Error('Decryption Failed: Invalid password or corrupted authentication tag (HMAC mismatch)');
+    }
+  }
+}
+
 module.exports = {
   OmniArchive,
+  OmniArchiveV2,
   CommandJournal,
   OmniVaultAES256,
   calculateCRC32,
+  saveAtomicSync,
   MAGIC_BYTES,
+  MAGIC_BYTES_V1,
+  MAGIC_BYTES_V2,
   VAULT_MAGIC_BYTES,
   MAX_UNCOMPRESSED_SECTION_SIZE,
   MAX_ARCHIVE_SIZE_BYTES,
