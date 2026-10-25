@@ -34,7 +34,9 @@ class ProjectManifestV2 {
     results = [],
     signatures = [],
     createdAt,
-    updatedAt
+    updatedAt,
+    author = 'OmniEng_Engineer',
+    engineeringDomain = 'universal'
   }) {
     if (schemaVersion !== '2.0.0') {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, `ProjectManifestV2 requires schemaVersion "2.0.0", received "${schemaVersion}"`);
@@ -43,6 +45,8 @@ class ProjectManifestV2 {
     this._schemaVersion = '2.0.0';
     this._projectId = projectId && typeof projectId === 'string' ? projectId : crypto.randomUUID();
     this._name = String(name || 'Untitled Project');
+    this._author = String(author || 'OmniEng_Engineer');
+    this._engineeringDomain = String(engineeringDomain || 'universal');
     this._revision = Number.isInteger(revision) && revision >= 1 ? revision : 1;
     this._activeUnits = String(activeUnits || 'SI_MM');
     this._domainModels = Object.freeze(JSON.parse(JSON.stringify(domainModels || {})));
@@ -58,6 +62,9 @@ class ProjectManifestV2 {
   get schemaVersion() { return this._schemaVersion; }
   get projectId() { return this._projectId; }
   get name() { return this._name; }
+  get projectName() { return this._name; }
+  get author() { return this._author; }
+  get engineeringDomain() { return this._engineeringDomain; }
   get revision() { return this._revision; }
   get activeUnits() { return this._activeUnits; }
   get domainModels() { return this._domainModels; }
@@ -66,7 +73,9 @@ class ProjectManifestV2 {
   get results() { return this._results; }
   get signatures() { return this._signatures; }
   get createdAt() { return this._createdAt; }
+  get created() { return this._createdAt; }
   get updatedAt() { return this._updatedAt; }
+  get updated() { return this._updatedAt; }
 
   /**
    * Clones manifest with an incremented revision and updated timestamp.
@@ -87,6 +96,8 @@ class ProjectManifestV2 {
       schemaVersion: this._schemaVersion,
       projectId: this._projectId,
       name: this._name,
+      author: this._author,
+      engineeringDomain: this._engineeringDomain,
       revision: this._revision,
       activeUnits: this._activeUnits,
       domainModels: this._domainModels,

@@ -1,8 +1,8 @@
 'use strict';
 
-const { readdirSync, statSync } = require('fs');
+const { readdirSync, statSync, readFileSync } = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const vm = require('vm');
 
 const roots = ['main.js', 'preload.js', 'src', 'test', 'scripts'];
 const ignoredDirectories = new Set(['node_modules', 'vendor', 'public', 'dist']);
@@ -29,32 +29,16 @@ function collect(entry) {
 for (const root of roots) collect(root);
 
 const failures = [];
-let nextFile = 0;
 
-function checkFile(file) {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--check', file], { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    child.stderr.setEncoding('utf8').on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.on('error', (error) => resolve({ file, error: error.message }));
-    child.on('close', (code) => resolve(code === 0 ? null : { file, error: stderr || `node --check exited ${code}` }));
-  });
-}
-
-async function worker() {
-  while (nextFile < files.length) {
-    const file = files[nextFile++];
-    const failure = await checkFile(file);
-    if (failure) failures.push(failure);
+for (const file of files) {
+  try {
+    const code = readFileSync(file, 'utf8');
+    new vm.Script(code, { filename: file });
+  } catch (err) {
+    failures.push({ file, error: err.stack || err.message });
   }
 }
 
-(async () => {
-  const workers = Array.from({ length: Math.min(6, files.length) }, () => worker());
-  await Promise.all(workers);
-  for (const failure of failures) process.stderr.write(`${failure.file}\n${failure.error}\n`);
-  console.log(`Syntax check: ${files.length - failures.length}/${files.length} JavaScript files parsed.`);
-  if (failures.length > 0) process.exitCode = 1;
-})();
+for (const failure of failures) process.stderr.write(`${failure.file}\n${failure.error}\n`);
+console.log(`Syntax check: ${files.length - failures.length}/${files.length} JavaScript files parsed.`);
+if (failures.length > 0) process.exitCode = 1;

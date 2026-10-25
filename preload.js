@@ -104,6 +104,16 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   selfHealDesign: (currentDesign, safetyFactor) =>
     ipcRenderer.invoke('omni:self-heal-design', { currentDesign, safetyFactor }),
 
+  // Phase 1 Project Lifecycle, Atomic Persistence & Undo/Redo
+  newProject: (params) => ipcRenderer.invoke('omni:new-project', params),
+  saveProject: (params) => ipcRenderer.invoke('omni:save-project', params),
+  openProject: (params) => ipcRenderer.invoke('omni:open-project', params),
+  undoProjectCommand: () => ipcRenderer.invoke('omni:undo'),
+  redoProjectCommand: () => ipcRenderer.invoke('omni:redo'),
+  getProjectHistory: () => ipcRenderer.invoke('omni:get-project-history'),
+  recordProjectCommand: (params) => ipcRenderer.invoke('omni:record-project-command', params),
+  getProjectSummary: () => ipcRenderer.invoke('omni:get-project-summary'),
+
   // Phase 2 CAD Kernel & Modeling Parity APIs
   evaluateNurbs: (params) => ipcRenderer.invoke('omni:evaluate-nurbs', params),
   intersectBasicNurbs: (params) => ipcRenderer.invoke('omni:intersect-basic-nurbs-ssi', params),

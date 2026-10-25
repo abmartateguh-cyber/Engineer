@@ -2995,6 +2995,108 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // --- Phase 1 Project Lifecycle, Atomic Persistence & Undo/Redo ---
+  function updateProjectHistoryUI(summary) {
+    const btnUndoElem = document.getElementById('ribbon-btn-undo');
+    const btnRedoElem = document.getElementById('ribbon-btn-redo');
+    if (btnUndoElem) {
+      btnUndoElem.disabled = !summary?.canUndo;
+      btnUndoElem.title = summary?.canUndo ? 'Undo last change (Ctrl+Z)' : 'Nothing to undo';
+      btnUndoElem.setAttribute('aria-label', btnUndoElem.title);
+    }
+    if (btnRedoElem) {
+      btnRedoElem.disabled = !summary?.canRedo;
+      btnRedoElem.title = summary?.canRedo ? 'Redo change (Ctrl+Y)' : 'Nothing to redo';
+      btnRedoElem.setAttribute('aria-label', btnRedoElem.title);
+    }
+  }
+  window.updateProjectHistoryUI = updateProjectHistoryUI;
+
+  const btnNewProject = document.getElementById('ribbon-btn-new-project');
+  if (btnNewProject) {
+    btnNewProject.addEventListener('click', async () => {
+      try {
+        const res = await window.omni?.newProject?.({
+          projectName: 'Untitled_Project',
+          engineeringDomain: state.currentStudio || 'universal'
+        });
+        if (res?.success) {
+          updateProjectHistoryUI(res.project);
+          addAiMessage(`[Project Storage] Initialized fresh project session: ${res.project.projectName}`);
+        }
+      } catch (err) {
+        console.error('Failed to create new project:', err);
+      }
+    });
+  }
+
+  const btnSaveProject = document.getElementById('ribbon-btn-save-project');
+  if (btnSaveProject) {
+    btnSaveProject.addEventListener('click', async () => {
+      try {
+        const res = await window.omni?.saveProject?.();
+        if (res?.success) {
+          addAiMessage(`[Project Storage] Saved project revision ${res.revision} to: ${res.filePath}`);
+        } else if (res?.cancelled) {
+          // User cancelled file dialog
+        } else if (res?.error) {
+          addAiMessage(`[Project Storage Error] ${res.error.message}`);
+        }
+      } catch (err) {
+        console.error('Failed to save project:', err);
+      }
+    });
+  }
+
+  const btnOpenProject = document.getElementById('ribbon-btn-open-project');
+  if (btnOpenProject) {
+    btnOpenProject.addEventListener('click', async () => {
+      try {
+        const res = await window.omni?.openProject?.();
+        if (res?.success && res.project) {
+          updateProjectHistoryUI(res.project);
+          addAiMessage(`[Project Storage] Opened project: ${res.project.projectName} (Revision ${res.project.revision}, ${res.project.blobCount} artifacts)`);
+        } else if (res?.cancelled) {
+          // User cancelled file dialog
+        } else if (res?.error) {
+          addAiMessage(`[Project Storage Error] ${res.error.message}`);
+        }
+      } catch (err) {
+        console.error('Failed to open project:', err);
+      }
+    });
+  }
+
+  const btnUndo = document.getElementById('ribbon-btn-undo');
+  if (btnUndo) {
+    btnUndo.addEventListener('click', async () => {
+      try {
+        const res = await window.omni?.undoProjectCommand?.();
+        if (res?.success) {
+          updateProjectHistoryUI(res);
+          addAiMessage(`[Undo] Undone: ${res.undoneEntry?.description || res.undoneEntry?.actionType || 'command'}`);
+        }
+      } catch (err) {
+        console.error('Undo failed:', err);
+      }
+    });
+  }
+
+  const btnRedo = document.getElementById('ribbon-btn-redo');
+  if (btnRedo) {
+    btnRedo.addEventListener('click', async () => {
+      try {
+        const res = await window.omni?.redoProjectCommand?.();
+        if (res?.success) {
+          updateProjectHistoryUI(res);
+          addAiMessage(`[Redo] Redone: ${res.redoneEntry?.description || res.redoneEntry?.actionType || 'command'}`);
+        }
+      } catch (err) {
+        console.error('Redo failed:', err);
+      }
+    });
+  }
+
   // --- Universal Usability & Phase 1 Guided Design Wizards ---
   const modalWizards = document.getElementById('modal-design-wizards');
   const btnOpenWizards = document.getElementById('ribbon-btn-wizards');
@@ -5858,9 +5960,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       toggleAiDock();
     });
     km.onAction('ACTION_SAVE_PROJECT', () => {
-      addAiMessage(
-        '[Project Storage] Save and recovery are not available in this build. Export an encrypted session snapshot from the command palette to retain current parameters.'
-      );
+      document.getElementById('ribbon-btn-save-project')?.click();
     });
     km.onAction('ACTION_VIEW_FRONT', () => {
       document.getElementById('ribbon-cam-front')?.click();

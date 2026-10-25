@@ -7,6 +7,7 @@ const JobStatus = Object.freeze({
   PENDING: 'PENDING',
   RUNNING: 'RUNNING',
   COMPLETED: 'COMPLETED',
+  SUCCEEDED: 'COMPLETED',
   FAILED: 'FAILED',
   CANCELLED: 'CANCELLED',
   TIMED_OUT: 'TIMED_OUT'
@@ -31,20 +32,28 @@ class JobResult {
    * @param {string} [params.validationMaturity=ValidationMaturity.EXPERIMENTAL] - Validation maturity
    * @param {OmniError|object|null} [params.error=null] - Failure error if status is FAILED/TIMED_OUT
    */
-  constructor({
-    jobId,
-    status = JobStatus.COMPLETED,
-    output = {},
-    resultArtifactHashes = [],
-    residualHistory = [],
-    warnings = [],
-    timing = {},
-    peakMemoryBytes = 0,
-    backendVersions = {},
-    inputArtifactHashes = [],
-    validationMaturity = ValidationMaturity.EXPERIMENTAL,
-    error = null
-  }) {
+  constructor(params = {}) {
+    const {
+      jobId,
+      status = JobStatus.COMPLETED,
+      output,
+      outputData,
+      resultArtifactHashes = [],
+      residualHistory,
+      convergenceHistory,
+      warnings = [],
+      timing = {},
+      executionDurationMs,
+      peakMemoryBytes,
+      peakMemoryMb,
+      backendVersions = {},
+      backendName,
+      backendVersion,
+      inputArtifactHashes = [],
+      validationMaturity = ValidationMaturity.EXPERIMENTAL,
+      error = null
+    } = params;
+
     if (!jobId || typeof jobId !== 'string') {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, 'JobResult requires a jobId string');
     }
@@ -52,21 +61,39 @@ class JobResult {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, `Invalid JobStatus: "${status}"`);
     }
 
+    const resolvedOutput = output !== undefined ? output : (outputData !== undefined ? outputData : {});
+    const resolvedResiduals = residualHistory !== undefined ? residualHistory : (convergenceHistory !== undefined ? convergenceHistory : []);
+    const resolvedRunMs = executionDurationMs !== undefined ? Number(executionDurationMs) : Number(timing.runMs || 0);
+    const resolvedQueuedMs = Number(timing.queuedMs || 0);
+    const resolvedTotalMs = Number(timing.totalMs) || (resolvedQueuedMs + resolvedRunMs);
+
+    let resolvedPeakMem = 0;
+    if (Number.isInteger(peakMemoryBytes) && peakMemoryBytes >= 0) {
+      resolvedPeakMem = peakMemoryBytes;
+    } else if (typeof peakMemoryMb === 'number' && peakMemoryMb >= 0) {
+      resolvedPeakMem = Math.round(peakMemoryMb * 1024 * 1024);
+    }
+
+    const resolvedBackendVersions = { ...backendVersions };
+    if (backendName && backendVersion) {
+      resolvedBackendVersions[backendName] = backendVersion;
+    }
+
     this._jobId = jobId;
     this._status = status;
-    this._output = Object.freeze(JSON.parse(JSON.stringify(output || {})));
+    this._output = Object.freeze(JSON.parse(JSON.stringify(resolvedOutput || {})));
     this._resultArtifactHashes = Object.freeze([...(resultArtifactHashes || [])].map((h) => String(h).toLowerCase()));
-    this._residualHistory = Object.freeze([...(residualHistory || [])].map((r) => Object.freeze({ ...r })));
+    this._residualHistory = Object.freeze([...(resolvedResiduals || [])].map((r) => Object.freeze({ ...r })));
     this._warnings = Object.freeze([...(warnings || [])].map(String));
 
     this._timing = Object.freeze({
-      queuedMs: Math.max(0, Number(timing.queuedMs) || 0),
-      runMs: Math.max(0, Number(timing.runMs) || 0),
-      totalMs: Math.max(0, Number(timing.totalMs) || (Number(timing.queuedMs || 0) + Number(timing.runMs || 0)))
+      queuedMs: Math.max(0, resolvedQueuedMs),
+      runMs: Math.max(0, resolvedRunMs),
+      totalMs: Math.max(0, resolvedTotalMs)
     });
 
-    this._peakMemoryBytes = Number.isInteger(peakMemoryBytes) && peakMemoryBytes >= 0 ? peakMemoryBytes : 0;
-    this._backendVersions = Object.freeze({ ...backendVersions });
+    this._peakMemoryBytes = resolvedPeakMem;
+    this._backendVersions = Object.freeze(resolvedBackendVersions);
     this._inputArtifactHashes = Object.freeze([...(inputArtifactHashes || [])].map((h) => String(h).toLowerCase()));
     this._validationMaturity = Object.values(ValidationMaturity).includes(validationMaturity)
       ? validationMaturity
@@ -80,8 +107,10 @@ class JobResult {
   get jobId() { return this._jobId; }
   get status() { return this._status; }
   get output() { return this._output; }
+  get outputData() { return this._output; }
   get resultArtifactHashes() { return this._resultArtifactHashes; }
   get residualHistory() { return this._residualHistory; }
+  get convergenceHistory() { return this._residualHistory; }
   get warnings() { return this._warnings; }
   get timing() { return this._timing; }
   get peakMemoryBytes() { return this._peakMemoryBytes; }

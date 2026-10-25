@@ -26,8 +26,10 @@ class ApprovalRecord {
     proposalId,
     decision,
     userId = 'engineer',
+    approvedBy,
     modifiedArgs = null,
     comment = '',
+    reason = '',
     appliedOverrides = {}
   }) {
     if (!proposalId || typeof proposalId !== 'string') {
@@ -39,9 +41,9 @@ class ApprovalRecord {
 
     this._proposalId = proposalId;
     this._decision = decision;
-    this._userId = String(userId || 'engineer');
+    this._userId = String(approvedBy || userId || 'engineer');
     this._modifiedArgs = modifiedArgs && typeof modifiedArgs === 'object' ? Object.freeze({ ...modifiedArgs }) : null;
-    this._comment = String(comment || '');
+    this._comment = String(reason || comment || '');
     this._appliedOverrides = Object.freeze({ ...appliedOverrides });
     this._decidedAt = new Date().toISOString();
     Object.freeze(this);
@@ -50,10 +52,13 @@ class ApprovalRecord {
   get proposalId() { return this._proposalId; }
   get decision() { return this._decision; }
   get userId() { return this._userId; }
+  get approvedBy() { return this._userId; }
   get modifiedArgs() { return this._modifiedArgs; }
   get comment() { return this._comment; }
+  get reason() { return this._comment; }
   get appliedOverrides() { return this._appliedOverrides; }
   get decidedAt() { return this._decidedAt; }
+  get timestamp() { return this._decidedAt; }
 
   isApproved() {
     return this._decision === ApprovalDecision.APPROVED || this._decision === ApprovalDecision.MODIFIED;

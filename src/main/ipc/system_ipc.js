@@ -9,12 +9,23 @@ const os = require('os');
 const { defineHandler } = require('./define_handler');
 const { IPCValidator } = require('../../core/security/ipc_validator');
 const { OmniVaultAES256, OmniArchive } = require('../../core/storage/omni_archive');
+const { activeProjectManager } = require('../../core/storage/project_manager');
 const { ASMESectionVIIIDiv2Analyzer } = require('../../core/compliance/asme_section_viii_div2');
 const { AuditReportGenerator } = require('../../core/reporting/audit_report');
 const { COMMUNITY_SAMPLES } = require('../../samples/community_samples');
 const { accelerator } = require('../../core/math/native_accelerator_interface');
 const { getComputeHost } = require('../compute_host');
 const { listFeatureMaturity } = require('../../core/maturity/feature_maturity');
+
+let electronDialog = null;
+try {
+  const electron = require('electron');
+  if (typeof electron === 'object' && electron !== null) {
+    electronDialog = electron.dialog;
+  }
+} catch {
+  electronDialog = null;
+}
 
 const MAX_ENCRYPTED_SESSION_BYTES = 16 * 1024 * 1024;
 const MAX_ENCRYPTED_SESSION_BASE64_LENGTH = Math.ceil(MAX_ENCRYPTED_SESSION_BYTES / 3) * 4;
@@ -296,6 +307,203 @@ function registerSystemIpc(deps = {}) {
     },
     async (event, archiveBytes) => loadOmniArchiveFromBuffer(archiveBytes),
     { domain: 'system', description: 'Parse supplied bounded .omni bytes and verify archive integrity' }
+  );
+
+  // 9a. New Project
+  defineHandler(
+    'omni:new-project',
+    {
+      type: 'object',
+      optional: true,
+      properties: {
+        projectName: { type: 'string', maxLength: 200, optional: true },
+        engineeringDomain: { type: 'string', maxLength: 100, optional: true },
+        author: { type: 'string', maxLength: 100, optional: true }
+      }
+    },
+    async (event, params = {}) => {
+      const summary = activeProjectManager.initializeNewProject(params || {});
+      return { success: true, project: summary };
+    },
+    { domain: 'system', description: 'Initialize a new OmniEng engineering project session' }
+  );
+
+  // 9b. Save Project (.omni v2 atomic save with fsync and backup)
+  defineHandler(
+    'omni:save-project',
+    {
+      type: 'object',
+      optional: true,
+      properties: {
+        filePath: { type: 'string', maxLength: 1000, optional: true },
+        projectName: { type: 'string', maxLength: 200, optional: true }
+      }
+    },
+    async (event, params = {}) => {
+      let targetPath = params?.filePath;
+      if (!targetPath && electronDialog && typeof electronDialog.showSaveDialog === 'function') {
+        const res = await electronDialog.showSaveDialog({
+          title: 'Save OmniEng Project',
+          defaultPath: `${activeProjectManager.archive?.manifest?.projectName || 'Project'}.omni`,
+          filters: [
+            { name: 'OmniEng Project (.omni)', extensions: ['omni'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        if (res.canceled || !res.filePath) {
+          return { success: false, cancelled: true };
+        }
+        targetPath = res.filePath;
+      }
+      if (!targetPath) {
+        targetPath = activeProjectManager.currentFilePath;
+      }
+      if (!targetPath) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'No target file path provided or selected' } };
+      }
+      try {
+        const saveRes = activeProjectManager.saveProject(targetPath);
+        return { success: true, ...saveRes };
+      } catch (err) {
+        return { success: false, error: { code: 'IO_ERROR', message: err.message } };
+      }
+    },
+    { domain: 'system', description: 'Save current project atomically to .omni v2 container with fsync and backup' }
+  );
+
+  // 9c. Open Project (.omni container load from file path or buffer)
+  defineHandler(
+    'omni:open-project',
+    {
+      type: 'object',
+      optional: true,
+      properties: {
+        filePath: { type: 'string', maxLength: 1000, optional: true }
+      }
+    },
+    async (event, params = {}) => {
+      let source = params?.filePath;
+      if (!source && electronDialog && typeof electronDialog.showOpenDialog === 'function') {
+        const res = await electronDialog.showOpenDialog({
+          title: 'Open OmniEng Project',
+          filters: [
+            { name: 'OmniEng Project (.omni)', extensions: ['omni'] },
+            { name: 'All Files', extensions: ['*'] }
+          ],
+          properties: ['openFile']
+        });
+        if (res.canceled || !res.filePaths || res.filePaths.length === 0) {
+          return { success: false, cancelled: true };
+        }
+        source = res.filePaths[0];
+      }
+      if (!source) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'No file path provided or selected' } };
+      }
+      try {
+        const summary = activeProjectManager.openProject(source);
+        return { success: true, project: summary };
+      } catch (err) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: err.message } };
+      }
+    },
+    { domain: 'system', description: 'Open and deserialize an existing .omni project container' }
+  );
+
+  // 9d. Undo Command
+  defineHandler(
+    'omni:undo',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => {
+      const res = activeProjectManager.undo();
+      if (!res) {
+        return { success: false, canUndo: false, canRedo: activeProjectManager.archive?.journal.canRedo() || false };
+      }
+      return { success: true, ...res };
+    },
+    { domain: 'system', description: 'Undo the last executed command from the project journal' }
+  );
+
+  // 9e. Redo Command
+  defineHandler(
+    'omni:redo',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => {
+      const res = activeProjectManager.redo();
+      if (!res) {
+        return { success: false, canRedo: false, canUndo: activeProjectManager.archive?.journal.canUndo() || false };
+      }
+      return { success: true, ...res };
+    },
+    { domain: 'system', description: 'Redo the previously undone command from the project journal' }
+  );
+
+  // 9f. Get Project History
+  defineHandler(
+    'omni:get-project-history',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => {
+      return {
+        success: true,
+        history: activeProjectManager.getHistory(),
+        canUndo: activeProjectManager.archive?.journal.canUndo() || false,
+        canRedo: activeProjectManager.archive?.journal.canRedo() || false
+      };
+    },
+    { domain: 'system', description: 'Retrieve non-linear revision history and branching tree' }
+  );
+
+  // 9g. Record Project Command
+  defineHandler(
+    'omni:record-project-command',
+    {
+      type: 'object',
+      required: ['actionType', 'forwardPatch', 'reversePatch'],
+      properties: {
+        actionType: { type: 'string', maxLength: 100 },
+        forwardPatch: { type: 'object' },
+        reversePatch: { type: 'object' },
+        description: { type: 'string', maxLength: 500, optional: true },
+        author: { type: 'string', maxLength: 100, optional: true }
+      }
+    },
+    async (event, params) => {
+      try {
+        const entry = activeProjectManager.recordCommand(
+          params.actionType,
+          params.forwardPatch,
+          params.reversePatch,
+          params.description,
+          params.author
+        );
+        return { success: true, entry, summary: activeProjectManager.getSummary() };
+      } catch (err) {
+        return { success: false, error: { code: 'INTERNAL', message: err.message } };
+      }
+    },
+    { domain: 'system', description: 'Record a state mutation command into the persistent project journal' }
+  );
+
+  // 9h. Get Project Summary
+  defineHandler(
+    'omni:get-project-summary',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => {
+      return { success: true, project: activeProjectManager.getSummary() };
+    },
+    { domain: 'system', description: 'Get manifest summary, blob counts, and revision metadata of active project' }
   );
 
   // 10. Run Guided Design Wizard
@@ -813,5 +1021,6 @@ module.exports = {
   registerSystemIpc,
   loadOmniArchiveFromBuffer,
   getStructuralRemediationUnavailableResult,
-  ASME_STRESS_SCREEN_SCHEMA
+  ASME_STRESS_SCREEN_SCHEMA,
+  activeProjectManager
 };

@@ -427,7 +427,9 @@ class OmniArchiveV2 {
       this.manifest = metadata.manifest;
     } else {
       this.manifest = new ProjectManifestV2({
-        name: metadata.projectName || 'Untitled Project',
+        name: metadata.projectName || metadata.name || 'Untitled Project',
+        author: metadata.author || 'OmniEng_Engineer',
+        engineeringDomain: metadata.engineeringDomain || 'universal',
         activeUnits: metadata.activeUnits || 'SI_MM'
       });
     }
@@ -436,6 +438,16 @@ class OmniArchiveV2 {
     this.journal = new CommandJournal();
     this.results = []; // JobResult summaries
     this.signatures = [];
+  }
+
+  /**
+   * Increments archive manifest revision.
+   * @param {object} [changes]
+   * @returns {number} New revision
+   */
+  bumpRevision(changes = {}) {
+    this.manifest = this.manifest.withIncrementedRevision(changes);
+    return this.manifest.revision;
   }
 
   /**
@@ -603,6 +615,15 @@ class OmniArchiveV2 {
     }
 
     return { filePath, sizeBytes: buf.length, blobCount: this.blobs.size };
+  }
+
+  /**
+   * Alias for saveToFile.
+   * @param {string} filePath
+   * @returns {{ filePath: string, sizeBytes: number, blobCount: number }}
+   */
+  saveAtomicSync(filePath) {
+    return this.saveToFile(filePath);
   }
 
   /**

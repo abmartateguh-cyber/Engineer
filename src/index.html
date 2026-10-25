@@ -277,14 +277,41 @@
 
       <div class="toolbar-divider"></div>
 
-      <!-- Undo / Redo & Wizards -->
-      <div class="toolbar-group" role="group" aria-label="History">
+      <!-- Project & History -->
+      <div class="toolbar-group" role="group" aria-label="Project and History">
+        <button
+          class="btn icon-btn ribbon-btn"
+          id="ribbon-btn-new-project"
+          data-studio-cat="common"
+          title="New Project"
+          aria-label="New Project"
+        >
+          <span class="icon-slot" data-omni-icon="plus"></span>
+        </button>
+        <button
+          class="btn icon-btn ribbon-btn"
+          id="ribbon-btn-open-project"
+          data-studio-cat="common"
+          title="Open Project (.omni)"
+          aria-label="Open Project"
+        >
+          <span class="icon-slot" data-omni-icon="step"></span>
+        </button>
+        <button
+          class="btn icon-btn ribbon-btn"
+          id="ribbon-btn-save-project"
+          data-studio-cat="common"
+          title="Save Project (Ctrl+S)"
+          aria-label="Save Project"
+        >
+          <span class="icon-slot" data-omni-icon="archive"></span>
+        </button>
         <button
           class="btn icon-btn ribbon-btn"
           id="ribbon-btn-undo"
           data-studio-cat="common"
-          title="Undo unavailable: project command history is not connected"
-          aria-label="Undo unavailable: project command history is not connected"
+          title="Undo last change (Ctrl+Z)"
+          aria-label="Undo last change"
           disabled
         >
           <span class="icon-slot" data-omni-icon="undo"></span>
@@ -293,8 +320,8 @@
           class="btn icon-btn ribbon-btn"
           id="ribbon-btn-redo"
           data-studio-cat="common"
-          title="Redo unavailable: project command history is not connected"
-          aria-label="Redo unavailable: project command history is not connected"
+          title="Redo change (Ctrl+Y)"
+          aria-label="Redo change"
           disabled
         >
           <span class="icon-slot" data-omni-icon="redo"></span>
