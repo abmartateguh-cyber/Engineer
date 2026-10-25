@@ -14,6 +14,8 @@ const { ApprovalRecord, ApprovalDecision } = require('./ApprovalRecord');
 const { StenographerClient } = require('./StenographerClient');
 const { ProjectManifestV2 } = require('./ProjectManifestV2');
 
+const { EngineRegistry, defaultEngineRegistry } = require('./engine_registry');
+
 module.exports = {
   OmniError,
   OmniErrorCode,
@@ -38,5 +40,7 @@ module.exports = {
   ApprovalRecord,
   ApprovalDecision,
   StenographerClient,
-  ProjectManifestV2
+  ProjectManifestV2,
+  EngineRegistry,
+  defaultEngineRegistry
 };
