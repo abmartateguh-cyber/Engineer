@@ -39,6 +39,7 @@ This document describes observed repository behavior. It is not a safety assessm
 
 - IPC sender checks allow only the main frame for the local `src/index.html` entry point. Payload checks remain project-specific, and packaged Electron sender rejection has not been validated.
 - The renderer content security policy still allows inline scripts and styles. Packaging is not signed or notarized.
+- Electron 45.0.0 requires macOS 13+ (Ventura or later) when running the graphical GUI application bundle because Chromium links Apple's `SMAppService` framework class. On macOS 12 (Monterey) or earlier, the GUI app aborts on launch with `Symbol not found: (_OBJC_CLASS_$_SMAppService)`. The headless solver daemon, compute host, and all numerical and test suites run cleanly on Node 22/24.
 - A legacy PKCS#11 module path remains as a fail-closed compatibility stub. Hardware signing is unavailable unless a provider is injected; the software signing fixture exists only under tests and is not a hardware token or validated cryptographic module.
 - Authorization decisions are unavailable without an authenticated identity provider. The legacy IAM helper is not an enterprise access-control service.
 - Dependency license and provenance review is incomplete. See the lockfile-derived SBOM and `docs/third_party_notices.md`.
