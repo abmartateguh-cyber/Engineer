@@ -1,10 +1,10 @@
 /**
  * OmniEng Exact NURBS (Non-Uniform Rational B-Splines) & SSI Engine
- * Industrial Parity: Siemens NX / CATIA B-Rep Geometry Kernel
+ * Experimental implementation: Siemens NX / CATIA B-Rep Geometry Kernel
  * Standards: Cox-de Boor Basis, Arbitrary Degree p Curve & Surface Evaluation,
  *            Exact Partial Derivatives & Normals, and Quadtree-Newton SSI Intersection.
  *
- * 100% In-House Proprietary Math - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { Vector3 } = require('../math/linear_algebra');

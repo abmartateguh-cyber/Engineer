@@ -1,9 +1,6 @@
 /**
- * OmniEng IEEE 1800 SystemVerilog Synthesis & Liberty (.lib) Technology Mapping Engine
- * Implements SystemVerilog AST elaboration (always_ff, always_comb, generate, parameters),
- * And-Inverter Graph (AIG) logic minimization, and standard cell library technology mapping.
- * 
- * 100% Proprietary In-House Implementation - Zero External Dependencies.
+ * Experimental SystemVerilog declaration inspection and standalone AIG operations.
+ * This module does not elaborate RTL expressions, synthesize a netlist, or map cells.
  */
 
 class AIGNode {
@@ -77,236 +74,85 @@ class AndInverterGraph {
   }
 }
 
-/**
- * Standard Cell Liberty (.lib) Library Specification (SkyWater SKY130 / TSMC style)
- */
-const LIBERTY_LIBRARY = {
-  INVX1: {
-    type: 'INV',
-    inputs: ['A'],
-    outputs: ['Y'],
-    areaUm2: 1.38,
-    delayNs: 0.035,
-    leakageNw: 0.12,
-    capacitancePf: 0.003
-  },
-  NAND2X1: {
-    type: 'NAND2',
-    inputs: ['A', 'B'],
-    outputs: ['Y'],
-    areaUm2: 2.07,
-    delayNs: 0.052,
-    leakageNw: 0.18,
-    capacitancePf: 0.004
-  },
-  NOR2X1: {
-    type: 'NOR2',
-    inputs: ['A', 'B'],
-    outputs: ['Y'],
-    areaUm2: 2.07,
-    delayNs: 0.058,
-    leakageNw: 0.19,
-    capacitancePf: 0.004
-  },
-  AND2X1: {
-    type: 'AND2',
-    inputs: ['A', 'B'],
-    outputs: ['Y'],
-    areaUm2: 2.76,
-    delayNs: 0.075,
-    leakageNw: 0.24,
-    capacitancePf: 0.005
-  },
-  OR2X1: {
-    type: 'OR2',
-    inputs: ['A', 'B'],
-    outputs: ['Y'],
-    areaUm2: 2.76,
-    delayNs: 0.078,
-    leakageNw: 0.25,
-    capacitancePf: 0.005
-  },
-  XOR2X1: {
-    type: 'XOR2',
-    inputs: ['A', 'B'],
-    outputs: ['Y'],
-    areaUm2: 4.14,
-    delayNs: 0.115,
-    leakageNw: 0.35,
-    capacitancePf: 0.007
-  },
-  MUX2X1: {
-    type: 'MUX2',
-    inputs: ['D0', 'D1', 'S'],
-    outputs: ['Y'],
-    areaUm2: 4.83,
-    delayNs: 0.125,
-    leakageNw: 0.42,
-    capacitancePf: 0.008
-  },
-  DFFRX1: {
-    type: 'DFF',
-    inputs: ['D', 'CLK', 'RESET_B'],
-    outputs: ['Q', 'QN'],
-    areaUm2: 8.28,
-    delayNs: 0.145,
-    setupTimeNs: 0.065,
-    holdTimeNs: 0.020,
-    leakageNw: 0.75,
-    capacitancePf: 0.012
-  }
-};
+const UNAVAILABLE_LIBRARY = Object.freeze({
+  available: false,
+  status: 'unavailable',
+  cells: Object.freeze({})
+});
 
 class SystemVerilogSynthesizer {
-  constructor(customLib = null) {
-    this.lib = customLib || LIBERTY_LIBRARY;
+  constructor() {
+    this.lib = UNAVAILABLE_LIBRARY;
     this.aig = new AndInverterGraph();
   }
 
   /**
-   * Parses and elaborates IEEE 1800 SystemVerilog RTL code
-   * Supports: module, parameter, input/output logic [W-1:0], always_ff, always_comb, assign
+   * Inspects a limited subset of declarations in SystemVerilog source.
+   * Expression elaboration and technology mapping are unavailable.
    */
   synthesize(svSourceCode) {
-    const moduleMatch = svSourceCode.match(/module\s+([a-zA-Z0-9_]+)/);
-    const moduleName = moduleMatch ? moduleMatch[1] : 'unnamed_module';
+    if (typeof svSourceCode !== 'string') {
+      throw new TypeError('SystemVerilog source must be a string.');
+    }
+    const source = svSourceCode.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const moduleMatch = source.match(/\bmodule\s+([a-zA-Z0-9_]+)/);
+    const moduleName = moduleMatch ? moduleMatch[1] : null;
+    if (!moduleName) throw new TypeError('A SystemVerilog module declaration is required.');
 
     // Parse parameters
     const params = new Map();
     const paramRegex = /parameter\s+([a-zA-Z0-9_]+)\s*=\s*([0-9]+)/g;
     let pMatch;
-    while ((pMatch = paramRegex.exec(svSourceCode)) !== null) {
+    while ((pMatch = paramRegex.exec(source)) !== null) {
       params.set(pMatch[1], parseInt(pMatch[2], 10));
     }
-
-    // Default width parameter if present
-    const width = params.get('WIDTH') || params.get('DATA_WIDTH') || 4;
 
     // Detect primary inputs and outputs
     const inputs = [];
     const outputs = [];
-    const registers = [];
 
-    const portLines = svSourceCode.split(';');
+    const portLines = source.split(';');
     for (const line of portLines) {
       const clean = line.trim();
       if (clean.includes('input')) {
         const match = clean.match(/input\s+(?:logic\s+)?(?:\[.*?\]\s*)?([a-zA-Z0-9_,\s]+)/);
         if (match) {
-          const names = match[1].split(',').map(s => s.trim());
+          const names = match[1].split(',').map((s) => s.trim());
           inputs.push(...names);
         }
       } else if (clean.includes('output')) {
         const match = clean.match(/output\s+(?:logic\s+)?(?:\[.*?\]\s*)?([a-zA-Z0-9_,\s]+)/);
         if (match) {
-          const names = match[1].split(',').map(s => s.trim());
+          const names = match[1].split(',').map((s) => s.trim());
           outputs.push(...names);
         }
       }
     }
 
-    // Detect sequential registers (always_ff @(posedge clk ...))
-    const isSequential = svSourceCode.includes('always_ff') || svSourceCode.includes('posedge clk');
-    if (isSequential) {
-      registers.push({
-        name: 'reg_state',
-        bits: width,
-        hasReset: svSourceCode.includes('rst') || svSourceCode.includes('reset')
-      });
-    }
-
-    // Construct AIG for the module
-    const aig = new AndInverterGraph();
-    for (const inp of inputs) {
-      aig.addPrimaryInput(inp);
-    }
-
-    // Synthesize combinational operations (e.g. adder, multiplexer, logic gates)
-    let andGateCount = 0;
-    let orGateCount = 0;
-    let xorGateCount = 0;
-    let invGateCount = 0;
-
-    // Bit-level elaboration
-    for (let b = 0; b < width; b++) {
-      const inA = aig.addPrimaryInput(`a_${b}`);
-      const inB = aig.addPrimaryInput(`b_${b}`);
-
-      // Generate 1-bit full adder / logic unit
-      const sumXor = aig.addXor(inA, false, inB, false);
-      const carryAnd = aig.addAnd(inA, false, inB, false);
-
-      aig.setPrimaryOutput(`sum_${b}`, sumXor.node || sumXor, sumXor.inv || false);
-      andGateCount += 2;
-      orGateCount += 1;
-      xorGateCount += 2;
-      invGateCount += 1;
-    }
-
-    // Technology Mapping to Standard Cell Library
-    const mappedCells = [];
-    let totalAreaUm2 = 0.0;
-    let totalLeakageNw = 0.0;
-    let criticalPathDelayNs = 0.0;
-
-    // Map logic gates to Liberty cells
-    for (let i = 0; i < andGateCount; i++) {
-      mappedCells.push({ cell: 'AND2X1', ...this.lib.AND2X1 });
-      totalAreaUm2 += this.lib.AND2X1.areaUm2;
-      totalLeakageNw += this.lib.AND2X1.leakageNw;
-    }
-    for (let i = 0; i < orGateCount; i++) {
-      mappedCells.push({ cell: 'OR2X1', ...this.lib.OR2X1 });
-      totalAreaUm2 += this.lib.OR2X1.areaUm2;
-      totalLeakageNw += this.lib.OR2X1.leakageNw;
-    }
-    for (let i = 0; i < xorGateCount; i++) {
-      mappedCells.push({ cell: 'XOR2X1', ...this.lib.XOR2X1 });
-      totalAreaUm2 += this.lib.XOR2X1.areaUm2;
-      totalLeakageNw += this.lib.XOR2X1.leakageNw;
-    }
-    for (let i = 0; i < invGateCount; i++) {
-      mappedCells.push({ cell: 'INVX1', ...this.lib.INVX1 });
-      totalAreaUm2 += this.lib.INVX1.areaUm2;
-      totalLeakageNw += this.lib.INVX1.leakageNw;
-    }
-
-    // Map sequential flip-flops
-    if (isSequential) {
-      for (let i = 0; i < width; i++) {
-        mappedCells.push({ cell: 'DFFRX1', ...this.lib.DFFRX1 });
-        totalAreaUm2 += this.lib.DFFRX1.areaUm2;
-        totalLeakageNw += this.lib.DFFRX1.leakageNw;
-      }
-      criticalPathDelayNs += this.lib.DFFRX1.delayNs + this.lib.DFFRX1.setupTimeNs;
-    }
-
-    // Critical path depth: 2 * XOR delay + 1 * AND delay
-    criticalPathDelayNs += 2 * this.lib.XOR2X1.delayNs + this.lib.AND2X1.delayNs;
-    const maxClockFreqMhz = 1000.0 / criticalPathDelayNs;
-
+    // Report only the presence of sequential syntax; this is not AST elaboration.
+    const isSequential = source.includes('always_ff') || source.includes('posedge clk');
     return {
       moduleName,
-      standard: 'IEEE 1800-2017 SystemVerilog',
+      analysisStatus: 'experimental-partial',
       parameters: Object.fromEntries(params),
       ports: {
         inputs,
         outputs
       },
+      sequentialSyntaxDetected: isSequential,
       aigMetrics: {
-        nodeCount: aig.nodes.length,
-        primaryInputs: aig.inputs.size,
-        primaryOutputs: aig.outputs.size
+        status: 'unavailable',
+        reason: 'RTL expressions are not elaborated into an AIG.'
       },
       technologyMapping: {
-        targetLibrary: 'SkyWater 130nm / TSMC 28nm Liberty (.lib)',
-        cellCount: mappedCells.length,
-        totalAreaUm2: Math.round(totalAreaUm2 * 100) / 100,
-        totalLeakageNw: Math.round(totalLeakageNw * 100) / 100,
-        criticalPathDelayNs: Math.round(criticalPathDelayNs * 1000) / 1000,
-        maxClockFrequencyMhz: Math.round(maxClockFreqMhz * 10) / 10
+        status: 'unavailable',
+        targetLibrary: null,
+        reason: 'RTL synthesis and Liberty technology mapping are not implemented.'
       },
-      registers
+      registers: {
+        status: 'unavailable',
+        reason: 'Sequential declarations are not elaborated into register records.'
+      }
     };
   }
 }
@@ -314,7 +160,8 @@ class SystemVerilogSynthesizer {
 module.exports = {
   AIGNode,
   AndInverterGraph,
-  LIBERTY_LIBRARY,
+  // Legacy export names remain as explicit unavailable sentinels for API compatibility.
+  LIBERTY_LIBRARY: UNAVAILABLE_LIBRARY,
   SystemVerilogSynthesizer,
   // IPC and testing aliases
   SystemVerilogElaborator: {
@@ -322,11 +169,10 @@ module.exports = {
   },
   AIGGraph: AndInverterGraph,
   TechnologyMapper: {
-    mapToLiberty: (aig, lib) => ({
-      gateCount: aig.nodes ? aig.nodes.length : 1,
-      cellCount: aig.nodes ? aig.nodes.length : 1,
-      totalAreaUm2: 12.5
+    mapToLiberty: () => ({
+      status: 'unavailable',
+      reason: 'Liberty cell mapping is not implemented.'
     })
   },
-  SKY130_STANDARD_CELLS: LIBERTY_LIBRARY
+  SKY130_STANDARD_CELLS: UNAVAILABLE_LIBRARY
 };

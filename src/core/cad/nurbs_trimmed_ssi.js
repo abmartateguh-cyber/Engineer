@@ -1,14 +1,14 @@
 /**
  * OmniEng Trimmed NURBS Surface-to-Surface Intersection (SSI) Engine
  * 
- * Provides industrial-grade Surface-Surface Intersection (SSI) and p-curve trimming
+ * Provides experimental Surface-Surface Intersection (SSI) and p-curve trimming
  * algorithms matching Parasolid / ACIS / CATIA geometric modeling kernels:
  * 1. Hierarchical Oriented Bounding Box (OBB) & AABB subdivision for intersection candidate isolation.
  * 2. Marching Newton-Raphson orthogonal tracing for transversal intersection curve generation.
  * 3. 2D Parameter-space p-curves (u(t), v(t)) structuring outer boundary loops and inner hole loops.
  * 4. Surface trimming and boundary representation evaluation.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

@@ -1,7 +1,7 @@
 /**
  * OmniEng Non-Sequential Optical Ray Tracer with Fresnel Splitting & Ghost Analysis
  * 
- * Provides illumination and stray light ray tracing matching Zemax OpticStudio / LightTools:
+ * Experimental non-sequential ray interaction example:
  * 1. Non-sequential ray-object interactions (rays can hit surfaces in any arbitrary physical order).
  * 2. Energy conservation via Fresnel power splitting:
  *    - Transmitted ray energy T = 1 - R.
@@ -9,7 +9,7 @@
  * 3. Total Internal Reflection (TIR) detection.
  * 4. Ghost reflection and stray light irradiance accumulation on detector planes.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent optical validation or comparison to a production ray tracer is established.
  */
 
 'use strict';

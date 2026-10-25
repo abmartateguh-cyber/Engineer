@@ -1,186 +1,288 @@
 /**
- * OmniEng Gerber RS-274X & Excellon NC Drill Photoplotter Exporter
- * Standard: Ucamco Gerber File Format Specification (Rev 2023.03)
- * Industrial Parity: Altium Designer / Cadence Allegro / KiCad manufacturing export.
+ * Experimental Gerber RS-274X and Excellon exporter.
+ * Manufacturing compatibility has not been independently verified.
  */
 
+'use strict';
+
 class GerberExporter {
-  /**
-   * Formats a millimeter coordinate into standard Gerber 2.5 integer format (X0000000).
-   */
   static formatCoord(valMm) {
-    const valScaled = Math.round(valMm * 100000);
-    const sign = valScaled < 0 ? '-' : '';
-    const absVal = Math.abs(valScaled);
-    return `${sign}${absVal.toString().padStart(7, '0')}`;
+    if (!Number.isFinite(valMm) || Math.abs(valMm) >= 1000) {
+      throw new TypeError('Gerber coordinates must be finite and have magnitude below 1000 mm.');
+    }
+    const scaled = Math.round(valMm * 100000);
+    const sign = scaled < 0 ? '-' : '';
+    return `${sign}${Math.abs(scaled).toString().padStart(8, '0')}`;
   }
 
-  /**
-   * Generates standard Gerber RS-274X header statements.
-   */
-  static getGerberHeader(layerName = 'Top_Copper') {
-    const timestamp = new Date().toISOString();
+  static getGerberHeader(layerName) {
+    if (typeof layerName !== 'string' || layerName.trim() === '') {
+      throw new TypeError('A non-empty Gerber layer name is required.');
+    }
     return [
       `G04 Layer: ${layerName}*`,
-      `G04 Created by OmniEng EDA Photoplotter Engine*`,
-      `G04 Generation Date: ${timestamp}*`,
-      '%FSLAX25Y25*%',
+      'G04 Created by OmniEng experimental EDA exporter*',
+      '%FSLAX35Y35*%',
       '%MOMM*%',
       '%IPPOS*%',
       '%LPD*%'
     ];
   }
 
-  /**
-   * Generates Top Copper Layer (.GTL) Gerber file.
-   * @param {Object} pcbLayout Layout containing tracks, vias, and SMD pads
-   */
-  static exportTopCopper(pcbLayout = {}) {
-    const lines = this.getGerberHeader('Top_Copper_GTL');
-
-    // Standard Aperture Table
-    lines.push('%ADD10C,0.2500*%');  // D10: 0.25mm trace width
-    lines.push('%ADD11C,0.5000*%');  // D11: 0.50mm power trace width
-    lines.push('%ADD12C,1.6000*%');  // D12: 1.60mm circular via pad
-    lines.push('%ADD13R,2.0000X1.2000*%'); // D13: 2.0x1.2mm SMD pad
-
-    const tracks = pcbLayout.tracks || [
-      { x1: 5.0, y1: 10.0, x2: 25.0, y2: 10.0, width: 0.25 },
-      { x1: 25.0, y1: 10.0, x2: 35.0, y2: 20.0, width: 0.25 },
-      { x1: 35.0, y1: 20.0, x2: 60.0, y2: 20.0, width: 0.50 }
-    ];
-
-    const pads = pcbLayout.pads || [
-      { x: 5.0, y: 10.0, type: 'CIRCULAR', diameter: 1.6 },
-      { x: 60.0, y: 20.0, type: 'RECTANGULAR', width: 2.0, height: 1.2 }
-    ];
-
-    // Plot Traces (G01 linear interpolation)
-    lines.push('D10*'); // Select 0.25mm aperture
-    lines.push('G01*');
-
-    for (const t of tracks) {
-      if (t.width > 0.35) lines.push('D11*');
-      else lines.push('D10*');
-
-      const x1 = this.formatCoord(t.x1);
-      const y1 = this.formatCoord(t.y1);
-      const x2 = this.formatCoord(t.x2);
-      const y2 = this.formatCoord(t.y2);
-
-      lines.push(`X${x1}Y${y1}D02*`); // Move to start
-      lines.push(`X${x2}Y${y2}D01*`); // Draw to end
+  static requireLayoutRecord(layout) {
+    if (!layout || typeof layout !== 'object' || Array.isArray(layout)) {
+      throw new TypeError('An explicit PCB layout object is required.');
     }
-
-    // Flash Pads (D03)
-    for (const p of pads) {
-      if (p.type === 'RECTANGULAR') lines.push('D13*');
-      else lines.push('D12*');
-
-      const xp = this.formatCoord(p.x);
-      const yp = this.formatCoord(p.y);
-      lines.push(`X${xp}Y${yp}D03*`); // Flash pad
-    }
-
-    lines.push('M02*'); // End of plot
-    return lines.join('\n');
+    return layout;
   }
 
-  /**
-   * Generates Top Solder Mask Layer (.GTS) Gerber file.
-   */
-  static exportSolderMask(pcbLayout = {}) {
-    const lines = this.getGerberHeader('Top_Solder_Mask_GTS');
-    lines.push('%ADD20C,1.8000*%'); // D20: 1.8mm mask opening for circular pad
-    lines.push('%ADD21R,2.2000X1.4000*%'); // D21: 2.2x1.4mm mask opening for SMD
+  static requireArray(layout, name) {
+    if (!Object.hasOwn(layout, name) || !Array.isArray(layout[name])) {
+      throw new TypeError(`An explicit ${name} array is required.`);
+    }
+    if (layout[name].length > 10000) throw new RangeError(`${name} may contain at most 10,000 records.`);
+    return layout[name];
+  }
 
-    const pads = pcbLayout.pads || [
-      { x: 5.0, y: 10.0, type: 'CIRCULAR' },
-      { x: 60.0, y: 20.0, type: 'RECTANGULAR' }
-    ];
+  static requireTraceArray(layout) {
+    if (Object.hasOwn(layout, 'traces')) return this.requireArray(layout, 'traces');
+    if (Object.hasOwn(layout, 'tracks')) return this.requireArray(layout, 'tracks');
+    throw new TypeError('An explicit traces array is required.');
+  }
 
-    for (const p of pads) {
-      if (p.type === 'RECTANGULAR') lines.push('D21*');
-      else lines.push('D20*');
+  static requireCoordinate(record, key, label) {
+    if (!record || !Number.isFinite(record[key])) {
+      throw new TypeError(`${label} requires a finite ${key} coordinate in millimeters.`);
+    }
+    return record[key];
+  }
 
-      const xp = this.formatCoord(p.x);
-      const yp = this.formatCoord(p.y);
-      lines.push(`X${xp}Y${yp}D03*`);
+  static positive(value, label) {
+    if (!Number.isFinite(value) || value <= 0) throw new TypeError(`${label} must be a positive millimeter value.`);
+    return value;
+  }
+
+  static normalizeAperture(shape, label) {
+    if (!shape || typeof shape !== 'object' || Array.isArray(shape)) {
+      throw new TypeError(`${label} must be an object.`);
+    }
+    const kind = String(shape.shape ?? shape.type ?? '').toUpperCase();
+    if (['CIRCLE', 'CIRCULAR', 'ROUND'].includes(kind)) {
+      const diameter = shape.diameterMm ?? shape.diameter ?? shape.widthMm ?? shape.width;
+      return { kind: 'C', width: this.positive(diameter, `${label} diameter`), height: diameter };
+    }
+    if (['RECT', 'RECTANGLE', 'RECTANGULAR'].includes(kind)) {
+      return {
+        kind: 'R',
+        width: this.positive(shape.widthMm ?? shape.width, `${label} width`),
+        height: this.positive(shape.heightMm ?? shape.height, `${label} height`)
+      };
+    }
+    throw new TypeError(`${label} shape must be CIRCLE or RECT.`);
+  }
+
+  static registerAperture(registry, shape) {
+    const key = `${shape.kind}:${shape.width}:${shape.height}`;
+    if (registry.has(key)) return registry.get(key).code;
+    const code = 10 + registry.size;
+    const width = shape.width.toFixed(6);
+    const definition =
+      shape.kind === 'C' ? `%ADD${code}C,${width}*%` : `%ADD${code}R,${width}X${shape.height.toFixed(6)}*%`;
+    registry.set(key, { code, definition });
+    return code;
+  }
+
+  static apertureDefinitions(registry) {
+    return [...registry.values()].map((aperture) => aperture.definition);
+  }
+
+  static exportTopCopper(layout) {
+    this.requireLayoutRecord(layout);
+    const traces = this.requireTraceArray(layout);
+    const pads = this.requireArray(layout, 'pads');
+    const vias = this.requireArray(layout, 'vias');
+    if (traces.length + pads.length + vias.length === 0) {
+      throw new TypeError('At least one caller-supplied trace, pad, or via is required.');
     }
 
+    const registry = new Map();
+    const normalizedTraces = traces.map((trace) => {
+      if (!trace || typeof trace !== 'object' || Array.isArray(trace))
+        throw new TypeError('Each trace must be an object.');
+      const width = this.positive(trace.widthMm ?? trace.width, 'Trace width');
+      const code = this.registerAperture(registry, { kind: 'C', width, height: width });
+      return {
+        code,
+        x1: this.formatCoord(this.requireCoordinate(trace, 'x1', 'Trace')),
+        y1: this.formatCoord(this.requireCoordinate(trace, 'y1', 'Trace')),
+        x2: this.formatCoord(this.requireCoordinate(trace, 'x2', 'Trace')),
+        y2: this.formatCoord(this.requireCoordinate(trace, 'y2', 'Trace'))
+      };
+    });
+    const normalizedPads = pads.map((pad) => {
+      const code = this.registerAperture(registry, this.normalizeAperture(pad, 'Copper pad'));
+      return {
+        code,
+        x: this.formatCoord(this.requireCoordinate(pad, 'x', 'Copper pad')),
+        y: this.formatCoord(this.requireCoordinate(pad, 'y', 'Copper pad'))
+      };
+    });
+    const normalizedVias = vias.map((via) => {
+      if (!via || typeof via !== 'object' || Array.isArray(via)) throw new TypeError('Each via must be an object.');
+      const diameter = this.positive(via.outerDiameterMm ?? via.diameterMm, 'Via outer diameter');
+      const code = this.registerAperture(registry, { kind: 'C', width: diameter, height: diameter });
+      return {
+        code,
+        x: this.formatCoord(this.requireCoordinate(via, 'x', 'Via')),
+        y: this.formatCoord(this.requireCoordinate(via, 'y', 'Via'))
+      };
+    });
+
+    const lines = [...this.getGerberHeader('Top_Copper_GTL'), ...this.apertureDefinitions(registry), 'G01*'];
+    for (const trace of normalizedTraces) {
+      lines.push(`D${trace.code}*`, `X${trace.x1}Y${trace.y1}D02*`, `X${trace.x2}Y${trace.y2}D01*`);
+    }
+    for (const pad of normalizedPads) lines.push(`D${pad.code}*`, `X${pad.x}Y${pad.y}D03*`);
+    for (const via of normalizedVias) lines.push(`D${via.code}*`, `X${via.x}Y${via.y}D03*`);
     lines.push('M02*');
     return lines.join('\n');
   }
 
-  /**
-   * Generates Excellon NC Drill File (.NC).
-   */
-  static exportNCDrill(pcbLayout = {}) {
-    const lines = [
-      'M48',
-      '; OmniEng Excellon NC Drill Exporter',
-      'METRIC,TZ',
-      'T01C0.400', // Tool 1: 0.4mm via hole
-      'T02C1.000', // Tool 2: 1.0mm pin hole
-      '%'
-    ];
-
-    const holes = pcbLayout.holes || [
-      { x: 5.0, y: 10.0, tool: 'T01' },
-      { x: 25.0, y: 10.0, tool: 'T01' },
-      { x: 60.0, y: 20.0, tool: 'T02' }
-    ];
-
-    let currentTool = '';
-    for (const h of holes) {
-      if (h.tool !== currentTool) {
-        currentTool = h.tool || 'T01';
-        lines.push(currentTool);
-      }
-      const x = (h.x * 1000).toFixed(0).padStart(6, '0');
-      const y = (h.y * 1000).toFixed(0).padStart(6, '0');
-      lines.push(`X${x}Y${y}`);
-    }
-
-    lines.push('M30'); // End of drill program
+  static exportSolderMask(layout) {
+    this.requireLayoutRecord(layout);
+    const openings = this.requireArray(layout, 'solderMaskOpenings');
+    const registry = new Map();
+    const normalized = openings.map((opening) => {
+      const code = this.registerAperture(registry, this.normalizeAperture(opening, 'Solder-mask opening'));
+      return {
+        code,
+        x: this.formatCoord(this.requireCoordinate(opening, 'x', 'Solder-mask opening')),
+        y: this.formatCoord(this.requireCoordinate(opening, 'y', 'Solder-mask opening'))
+      };
+    });
+    const lines = [...this.getGerberHeader('Top_Solder_Mask_GTS'), ...this.apertureDefinitions(registry)];
+    for (const opening of normalized) lines.push(`D${opening.code}*`, `X${opening.x}Y${opening.y}D03*`);
+    lines.push('M02*');
     return lines.join('\n');
   }
 
-  /**
-   * Bundles all manufacturing layers into a complete package.
-   */
-  static generateManufacturingPackage(pcbLayout = {}) {
-    const pkg = {
-      topCopper_GTL: this.exportTopCopper(pcbLayout),
-      solderMask_GTS: this.exportSolderMask(pcbLayout),
-      ncDrill_NC: this.exportNCDrill(pcbLayout)
+  static exportNCDrill(layout) {
+    this.requireLayoutRecord(layout);
+    const holes = this.requireArray(layout, 'holes');
+    const diameters = [...new Set(holes.map((hole) => hole?.diameterMm ?? hole?.drillMm))].sort((a, b) => a - b);
+    if (diameters.some((diameter) => !Number.isFinite(diameter) || diameter <= 0)) {
+      throw new TypeError('Each drill hole requires a positive diameterMm value.');
+    }
+    if (diameters.length > 99) throw new RangeError('At most 99 distinct drill diameters are supported.');
+    const toolForDiameter = new Map(
+      diameters.map((diameter, index) => [diameter, `T${String(index + 1).padStart(2, '0')}`])
+    );
+    const normalized = holes.map((hole) => {
+      if (!hole || typeof hole !== 'object' || Array.isArray(hole))
+        throw new TypeError('Each drill hole must be an object.');
+      const diameter = hole.diameterMm ?? hole.drillMm;
+      return {
+        tool: toolForDiameter.get(diameter),
+        x: (this.requireCoordinate(hole, 'x', 'Drill hole') * 1000).toFixed(0).padStart(6, '0'),
+        y: (this.requireCoordinate(hole, 'y', 'Drill hole') * 1000).toFixed(0).padStart(6, '0')
+      };
+    });
+    const lines = ['M48', '; OmniEng experimental Excellon drill export', 'METRIC,TZ', 'FMAT,2'];
+    diameters.forEach((diameter, index) => lines.push(`T${String(index + 1).padStart(2, '0')}C${diameter.toFixed(3)}`));
+    lines.push('%');
+    let currentTool;
+    for (const hole of normalized) {
+      if (hole.tool !== currentTool) {
+        currentTool = hole.tool;
+        lines.push(currentTool);
+      }
+      lines.push(`X${hole.x}Y${hole.y}`);
+    }
+    lines.push('M30');
+    return lines.join('\n');
+  }
+
+  static exportBoardOutline(layout) {
+    this.requireLayoutRecord(layout);
+    const outline = layout.boardOutline;
+    if (!outline || typeof outline !== 'object' || Array.isArray(outline)) {
+      throw new TypeError('An explicit boardOutline object is required.');
+    }
+    const width = this.positive(outline.outlineWidthMm, 'Board outline width');
+    let points = outline.points;
+    if (!Array.isArray(points)) {
+      const bounds = [outline.xMin, outline.yMin, outline.xMax, outline.yMax];
+      if (!bounds.every(Number.isFinite) || outline.xMax <= outline.xMin || outline.yMax <= outline.yMin) {
+        throw new TypeError('boardOutline requires points or finite increasing xMin/yMin/xMax/yMax bounds.');
+      }
+      points = [
+        { x: outline.xMin, y: outline.yMin },
+        { x: outline.xMax, y: outline.yMin },
+        { x: outline.xMax, y: outline.yMax },
+        { x: outline.xMin, y: outline.yMax }
+      ];
+    }
+    if (points.length < 3) throw new TypeError('boardOutline.points requires at least three vertices.');
+    const normalized = points.map((point) => ({
+      x: this.formatCoord(this.requireCoordinate(point, 'x', 'Board outline vertex')),
+      y: this.formatCoord(this.requireCoordinate(point, 'y', 'Board outline vertex'))
+    }));
+    const lines = [
+      ...this.getGerberHeader('Board_Outline_GKO'),
+      `%ADD10C,${width.toFixed(6)}*%`,
+      'D10*',
+      'G01*',
+      `X${normalized[0].x}Y${normalized[0].y}D02*`
+    ];
+    for (let index = 1; index < normalized.length; index++) {
+      lines.push(`X${normalized[index].x}Y${normalized[index].y}D01*`);
+    }
+    lines.push(`X${normalized[0].x}Y${normalized[0].y}D01*`, 'M02*');
+    return lines.join('\n');
+  }
+
+  static generateManufacturingPackage(layout) {
+    this.requireLayoutRecord(layout);
+    this.requireTraceArray(layout);
+    for (const key of ['pads', 'vias', 'solderMaskOpenings', 'holes']) this.requireArray(layout, key);
+    const files = {
+      'TopCopper.gtl': this.exportTopCopper(layout),
+      'SolderMask.gts': this.exportSolderMask(layout),
+      'Drill.drl': this.exportNCDrill(layout),
+      'BoardOutline.gko': this.exportBoardOutline(layout)
     };
-    pkg.topCopper = pkg.topCopper_GTL;
-    pkg.solderMaskTop = pkg.solderMask_GTS;
-    pkg.solderMask = pkg.solderMask_GTS;
-    pkg.drill = pkg.ncDrill_NC;
-    pkg.drillFile = pkg.ncDrill_NC;
-    pkg['TopCopper.gtl'] = pkg.topCopper_GTL;
-    pkg['SolderMask.gts'] = pkg.solderMask_GTS;
-    pkg['Drill.drl'] = pkg.ncDrill_NC;
-    pkg['BoardOutline.gko'] = pkg.topCopper_GTL;
-    return pkg;
+    return {
+      files,
+      topCopper_GTL: files['TopCopper.gtl'],
+      solderMask_GTS: files['SolderMask.gts'],
+      ncDrill_NC: files['Drill.drl'],
+      boardOutline_GKO: files['BoardOutline.gko'],
+      topCopper: files['TopCopper.gtl'],
+      solderMaskTop: files['SolderMask.gts'],
+      solderMask: files['SolderMask.gts'],
+      drill: files['Drill.drl'],
+      drillFile: files['Drill.drl'],
+      'TopCopper.gtl': files['TopCopper.gtl'],
+      'SolderMask.gts': files['SolderMask.gts'],
+      'Drill.drl': files['Drill.drl'],
+      'BoardOutline.gko': files['BoardOutline.gko']
+    };
   }
 
-  static exportPackage(pcbLayout = {}) {
-    return this.generateManufacturingPackage(pcbLayout);
+  static exportPackage(layout) {
+    return this.generateManufacturingPackage(layout);
   }
 
-  static generatePackage(pcbLayout = {}) {
-    return this.generateManufacturingPackage(pcbLayout);
+  static generatePackage(layout) {
+    return this.generateManufacturingPackage(layout);
   }
 
-  exportPackage(pcbLayout = {}) {
-    return GerberExporter.generateManufacturingPackage(pcbLayout);
+  exportPackage(layout) {
+    return GerberExporter.generateManufacturingPackage(layout);
   }
 
-  generateManufacturingPackage(pcbLayout = {}) {
-    return GerberExporter.generateManufacturingPackage(pcbLayout);
+  generateManufacturingPackage(layout) {
+    return GerberExporter.generateManufacturingPackage(layout);
   }
 }
 

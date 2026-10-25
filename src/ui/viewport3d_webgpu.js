@@ -1,14 +1,7 @@
 /**
- * OmniEng 5,000,000+ Polygon High-Capacity Viewport Engine (WebGPU / WebGL2 Instancing)
- * 
- * Provides production-scale graphics parity with Siemens NX / Dassault CATIA:
- * 1. WebGPU pipeline detection with high-performance WebGL2 instancing fallback.
- * 2. Instanced mesh rendering capable of rendering 100,000+ parts and 5,000,000+ polygons at 60 FPS.
- * 3. Class-A NURBS surface Zebra Striping reflection shader for G1/G2 continuity inspection.
- * 4. Hierarchical GPU Frustum Culling and Level-of-Detail (LOD) streaming.
- * 5. Interactive multi-axis cutting planes with real-time cap section generation.
- * 
- * 100% In-House Proprietary Implementation - Zero External Cloud Dependencies.
+ * Experimental viewport helpers for adapter availability, instancing descriptors,
+ * and composite bounds. This class does not render geometry or provide measured
+ * performance, surface-quality inspection, frustum culling, or section caps.
  */
 
 'use strict';
@@ -17,25 +10,26 @@ class HighCapacityWebGPUViewport {
   /**
    * @param {Object} options
    * @param {string} [options.canvasId='main-canvas']
-   * @param {number} [options.maxPolygons=5000000]
+   * @param {number|null} [options.maxPolygons] Unenforced legacy capacity hint
    */
   constructor(options = {}) {
     this.canvasId = options.canvasId || 'main-canvas';
-    this.maxPolygons = options.maxPolygons || 5000000;
+    this.maxPolygons = options.maxPolygons ?? null;
+    this.maxPolygonsEnforced = false;
     this.isWebGPUSupported = false;
-    this.activeBackend = 'WebGL2'; // 'WebGPU' or 'WebGL2'
+    this.activeBackend = 'not-connected';
     this.instancedMeshes = new Map();
     this.zebraStripingEnabled = false;
     this.zebraStripeFrequency = 30.0;
-    this.frustumCullingEnabled = true;
-    this.fpsCounter = 60.0;
-    this.renderedPolygonsCount = 0;
+    this.frustumCullingEnabled = false;
+    this.fpsCounter = null;
+    this.descriptorPolygonCount = 0;
 
     this.checkGPUCapabilities();
   }
 
   /**
-   * Detects WebGPU hardware acceleration in Electron / Chromium runtime
+   * Checks for a browser WebGPU adapter. This does not attach a rendering backend.
    * @returns {Promise<boolean>}
    */
   async checkGPUCapabilities() {
@@ -44,7 +38,6 @@ class HighCapacityWebGPUViewport {
         const adapter = await navigator.gpu.requestAdapter();
         if (adapter) {
           this.isWebGPUSupported = true;
-          this.activeBackend = 'WebGPU';
           return true;
         }
       } catch (err) {
@@ -52,12 +45,11 @@ class HighCapacityWebGPUViewport {
       }
     }
     this.isWebGPUSupported = false;
-    this.activeBackend = 'WebGL2';
     return false;
   }
 
   /**
-   * Builds an instanced buffer mesh representing thousands of identical parts (e.g. bolts, pipes, IC pins)
+   * Creates an instancing data descriptor for repeated geometry; this does not render it.
    * @param {string} partId
    * @param {Object} baseGeometryData - { vertices, normals, indices }
    * @param {Array<Object>} instanceTransforms - Array of { x, y, z, rotX, rotY, rotZ, scale }
@@ -84,21 +76,24 @@ class HighCapacityWebGPUViewport {
     }
 
     const instancedMesh = {
+      kind: 'instance-data-descriptor',
+      rendered: false,
       partId,
       instanceCount,
       totalPolygons,
+      polygonCountBasis: 'base-geometry triangle count multiplied by instance count',
       transformMatrices,
-      visibleInstancesCount: instanceCount,
+      visibleInstancesCount: null,
       bounds: this.calculateCompositeBounds(instanceTransforms)
     };
 
     this.instancedMeshes.set(partId, instancedMesh);
-    this.renderedPolygonsCount += totalPolygons;
+    this.descriptorPolygonCount += totalPolygons;
     return instancedMesh;
   }
 
   /**
-   * Generates zebra-striping reflection shader parameters for Class-A CAD surface curvature verification
+   * Returns example zebra-stripe shader parameters; no mesh or surface quality is analyzed.
    * @param {boolean} enable
    * @param {number} [stripeFrequency=30.0]
    * @returns {Object} Shader uniforms
@@ -116,21 +111,22 @@ class HighCapacityWebGPUViewport {
   }
 
   /**
-   * Executes hierarchical frustum culling against the camera view-projection matrix
+   * Compatibility stub for frustum-culling requests; no culling is performed.
    * @param {Array<number>} frustumPlanes - 6 planes [nx, ny, nz, d]
-   * @returns {number} Number of culled/retained instances
+   * @returns {Object} Unavailable status and requested instance count
    */
   performFrustumCulling(frustumPlanes) {
-    let culledInstances = 0;
-    let visibleInstances = 0;
-
-    for (const mesh of this.instancedMeshes.values()) {
-      // In production GPU pipeline, this is handled via Compute Shader
-      mesh.visibleInstancesCount = mesh.instanceCount;
-      visibleInstances += mesh.visibleInstancesCount;
-    }
-
-    return { visibleInstances, culledInstances };
+    void frustumPlanes;
+    const requestedInstanceCount = [...this.instancedMeshes.values()]
+      .reduce((count, mesh) => count + mesh.instanceCount, 0);
+    return {
+      status: 'UNAVAILABLE',
+      performed: false,
+      reason: 'Frustum culling is not implemented by this experimental descriptor helper.',
+      requestedInstanceCount,
+      visibleInstances: null,
+      culledInstances: null
+    };
   }
 
   calculateCompositeBounds(transforms) {
@@ -152,14 +148,21 @@ class HighCapacityWebGPUViewport {
     };
   }
 
+  get renderedPolygonsCount() {
+    return null;
+  }
+
   getTelemetry() {
     return {
       activeBackend: this.activeBackend,
       isWebGPUSupported: this.isWebGPUSupported,
       instancedMeshCount: this.instancedMeshes.size,
-      renderedPolygonsCount: this.renderedPolygonsCount,
+      renderedPolygonsCount: null,
+      descriptorPolygonCount: this.descriptorPolygonCount,
+      maxPolygonsEnforced: this.maxPolygonsEnforced,
       zebraStriping: this.zebraStripingEnabled,
-      fps: this.fpsCounter
+      fps: this.fpsCounter,
+      status: 'EXPERIMENTAL_TELEMETRY_UNAVAILABLE'
     };
   }
 }

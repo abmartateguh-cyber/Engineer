@@ -1,13 +1,11 @@
 /**
- * OmniEng Optical Manufacturing Tolerancing & Yield Compensator
+ * OmniEng Experimental Optical Tolerance Sample Sweep
  * 
- * Performs Monte Carlo tolerancing of fabrication and assembly perturbations
- * (radius, thickness, decenter, tilt, index, Abbe number) with automated
- * focus/airspace compensator adjustment to predict volume production yield.
+ * Samples simplified radius, thickness, and index perturbations and reports the
+ * fraction of synthetic samples below a supplied spot-radius threshold. This is
+ * not a manufacturing-yield estimate or an independently validated optical model.
  * 
- * Parity standard: Zemax OpticStudio Tolerancing / CODE V TOR.
- * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class TolerancingYieldCompensator {
@@ -109,14 +107,15 @@ class TolerancingYieldCompensator {
   }
 
   /**
-   * Executes Monte Carlo tolerancing with active compensator focus adjustment.
+   * Compatibility method name retained for an experimental tolerance sample sweep.
+   * The returned fraction is not a manufacturing-yield estimate.
    * 
    * @param {Object} nominalSystem - Nominal baseline optical design
    * @param {Array<Object>} toleranceDefs - Defined tolerances per surface
    * @param {Object} options
    * @param {number} [options.targetRmsSpotUm=25.0] - Target threshold for yield (microns)
    * @param {number} [options.maxCompensatorTravelMm=0.5] - Max allowable refocus motion
-   * @returns {Object} Yield statistical analysis
+   * @returns {Object} Experimental sample statistics
    */
   runMonteCarloYield(nominalSystem, toleranceDefs = [], options = {}) {
     const trials = options.trials || this.trials;
@@ -173,22 +172,23 @@ class TolerancingYieldCompensator {
     const p95_RmsMm = trialResults[Math.floor(trials * 0.95)].compensatedRmsMm;
     const p99_RmsMm = trialResults[Math.floor(trials * 0.99)].compensatedRmsMm;
 
-    const yieldPercent = (passedCount / trials) * 100.0;
+    const samplePassPercent = (passedCount / trials) * 100.0;
 
     return {
       totalTrials: trials,
       nominalRmsSpotMm: nominalEval.rmsSpotRadius,
       nominalRmsSpotUm: nominalEval.rmsSpotRadius * 1000.0,
       targetRmsSpotUm: options.targetRmsSpotUm || 25.0,
-      yieldPercent,
-      passedCount,
+      validationLevel: 'experimental',
+      interpretation: 'Synthetic sample pass fraction only; not production yield or independent optical validation.',
+      samplePassPercent,
+      thresholdPassCount: passedCount,
       percentilesUm: {
         p50: p50_RmsMm * 1000.0,
         p90: p90_RmsMm * 1000.0,
         p95: p95_RmsMm * 1000.0,
         p99: p99_RmsMm * 1000.0
       },
-      meetsIndustrialYieldTarget: yieldPercent >= 90.0,
       trials: trialResults.slice(0, 20) // Preview top 20
     };
   }

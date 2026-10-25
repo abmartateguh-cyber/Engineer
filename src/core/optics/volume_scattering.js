@@ -1,12 +1,12 @@
 /**
  * OmniEng Henyey-Greenstein Volume Scattering & Bulk Absorption Engine
  * 
- * Provides volumetric participating media ray simulation matching Zemax / LightTools:
+ * Experimental volumetric scattering and absorption example:
  * 1. Henyey-Greenstein phase function for forward (g > 0) and backward (g < 0) scattering.
  * 2. Monte Carlo path length sampling using mean free path: s = -ln(xi) / mu_ext.
  * 3. Beer-Lambert bulk absorption: I(s) = I0 * exp(-alpha * s).
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent optical validation or comparison to a production ray tracer is established.
  */
 
 'use strict';

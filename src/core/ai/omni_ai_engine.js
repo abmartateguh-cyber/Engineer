@@ -1,61 +1,189 @@
 /**
- * OmniEng Intelligent AI Co-Pilot & Autonomous Engineering Engine ("OmniAI")
- * Strictly conforms to agent-architecture-audit guidelines: code-gated tool execution,
- * typed JSON payloads, zero hidden mutation loops, and dual manual/AI editing support.
+ * Legacy OmniAI keyword-macro adapter.
+ * Routes selected prompts to experimental calculations with caller-supplied
+ * inputs; it is not an autonomous engineering agent and does not establish
+ * independent validation.
  */
 
-const { BRepPrimitives } = require('../cad/brep_topology');
-const { ParametricFeature, FeatureTree } = require('../cad/feature_tree');
 const { DropTestSimulator } = require('../cae/drop_test');
-const { CFDSolver2D } = require('../cae/cfd_navier_stokes');
-const { ThermalEngine } = require('../cae/thermal_cht');
 const { LogicSynthesisEngine } = require('../eda/logic_synthesis');
-const { DRCEngine } = require('../eda/drc_engine');
-const { QuadcopterDynamics } = require('../dynamic_simulink/drone_flight_dynamics');
-const { ThermodynamicsEngine } = require('../plant/thermodynamics');
 const { PipingStressEngine } = require('../plant/piping_stress');
 const { OpticalEngine } = require('../optics/optical_engine');
-const { StepTranslator } = require('../cad/step_translator');
-const { GerberExporter } = require('../eda/gerber_exporter');
-const { SkewRayTracer } = require('../optics/skew_ray_tracer');
-const { SpiceEngine } = require('../eda/spice_engine');
-const { ProcessStream, ProcessFlowsheetSolver } = require('../plant/process_flowsheet_solver');
-const { SymbolicReasoner } = require('./symbolic_reasoner');
-const { OmniArchive, CommandJournal } = require('../storage/omni_archive');
-const { DropTestWizard, DroneDesignWizard, CameraLensWizard, PCBDesignWizard } = require('../../ui/wizards/design_wizards');
+const { CommandJournal } = require('../storage/omni_archive');
+const {
+  DropTestWizard,
+  DroneDesignWizard,
+  CameraLensWizard,
+  PCBDesignWizard
+} = require('../../ui/wizards/design_wizards');
 
-// Tier-1 Commercial Production Engines
-const { VariationalConstraintSolver } = require('../cad/variational_constraint_solver');
-const { TopologicalHealingEngine } = require('../cad/topological_healing_engine');
-const { DampedLeastSquaresOptimizer } = require('../optics/damped_least_squares_optimizer');
-const { ASMESectionVIIIDiv2Analyzer } = require('../compliance/asme_section_viii_div2');
-const { GitCADVisualDiffEngine } = require('../pdm/git_cad_visual_diff');
-const { EngineeringBOMManager } = require('../pdm/engineering_bom_manager');
-const { WasmSparseMultifrontalSolver } = require('../math/wasm_sparse_multifrontal');
-const { GPUParallelPCGSolver } = require('../math/gpu_parallel_pcg_solver');
-const { SheetMetalUnfolder } = require('../cad/sheet_metal_unfolding');
-const { GDTEngine } = require('../cad/gdt_engine');
-const { FmiMasterEngine, FmuSlave } = require('../cosim/fmi_master_engine');
+function parseDropTestInputs(prompt) {
+  const heightMatch = prompt.match(/\b(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?)\b/i);
+  const massMatch = prompt.match(/\b(\d+(?:\.\d+)?)\s*(kg|kilograms?|g|grams?)\b/i);
+  const lowerPrompt = prompt.toLowerCase();
+  const impactAngle = /\bcorner\b/.test(lowerPrompt)
+    ? 'corner'
+    : /\bedge\b/.test(lowerPrompt)
+      ? 'edge'
+      : /\b(?:face|flat)\b/.test(lowerPrompt)
+        ? 'face'
+        : null;
+
+  return {
+    dropHeightM: heightMatch ? Number(heightMatch[1]) : null,
+    phoneMassKg: massMatch ? Number(massMatch[1]) / (/^(?:g|grams?)$/i.test(massMatch[2]) ? 1000 : 1) : null,
+    impactAngle
+  };
+}
+
+function missingDropTestInputs(inputs) {
+  const missing = [];
+  if (!Number.isFinite(inputs.dropHeightM) || inputs.dropHeightM <= 0) missing.push('drop height (m)');
+  if (!Number.isFinite(inputs.phoneMassKg) || inputs.phoneMassKg <= 0) missing.push('device mass (kg or g)');
+  if (!['corner', 'edge', 'face'].includes(inputs.impactAngle))
+    missing.push('impact orientation (corner, edge, or face)');
+  return missing;
+}
+
+function invalidDropTestResult(missing) {
+  return {
+    status: 'INVALID_INPUT',
+    validationLevel: 'experimental',
+    error: {
+      code: 'INVALID_INPUT',
+      message: `No impact estimate was run. Specify ${missing.join(', ')}.`
+    }
+  };
+}
+
+function parseOpticalInputs(prompt) {
+  const labeledFocalLengthMatch = prompt.match(/\bfocal\s+length\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*mm\b/i);
+  const focalLengthCandidates = [...prompt.matchAll(/\b(\d+(?:\.\d+)?)\s*mm\b/gi)];
+  const focalLengthMatch =
+    labeledFocalLengthMatch ||
+    focalLengthCandidates.find((match) => {
+      const before = prompt.slice(Math.max(0, match.index - 30), match.index);
+      const after = prompt.slice(match.index + match[0].length, match.index + match[0].length + 30);
+      return (
+        !/circle\s+of\s+confusion\s*(?:is|of|=|:)?\s*$/i.test(before) && !/^\s*circle\s+of\s+confusion\b/i.test(after)
+      );
+    });
+  const fStopMatch =
+    prompt.match(/\bf\s*\/\s*(\d+(?:\.\d+)?)\b/i) || prompt.match(/\bf[\s-]*stop\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\b/i);
+  const subjectDistanceMatch = prompt.match(/\b(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?)\b/i);
+  const wavelengthMatch =
+    prompt.match(/\bwavelength\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*(nm|um|µm|μm)\b/i) ||
+    prompt.match(/\b(\d+(?:\.\d+)?)\s*(nm|um|µm|μm)\s+wavelength\b/i);
+  const circleOfConfusionMatch =
+    prompt.match(/\bcircle\s+of\s+confusion\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*(mm|um|µm|μm)\b/i) ||
+    prompt.match(/\b(\d+(?:\.\d+)?)\s*(mm|um|µm|μm)\s+circle\s+of\s+confusion\b/i);
+  const wavelengthUnit = wavelengthMatch?.[2].toLowerCase();
+  const circleOfConfusionUnit = circleOfConfusionMatch?.[2].toLowerCase();
+  return {
+    focalLengthMm: focalLengthMatch ? Number(focalLengthMatch[1]) : null,
+    fStop: fStopMatch ? Number(fStopMatch[1]) : null,
+    subjectDistM: subjectDistanceMatch ? Number(subjectDistanceMatch[1]) : null,
+    wavelengthNm: wavelengthMatch ? Number(wavelengthMatch[1]) * (wavelengthUnit === 'nm' ? 1 : 1000) : null,
+    circleOfConfusionMm: circleOfConfusionMatch
+      ? Number(circleOfConfusionMatch[1]) * (circleOfConfusionUnit === 'mm' ? 1 : 0.001)
+      : null
+  };
+}
+
+function parseVerilogCode(prompt) {
+  const match = prompt.match(/```(?:verilog|systemverilog|sv)\s*([\s\S]*?)```/i);
+  const source = match ? match[1].trim() : '';
+  return source.length > 0 ? source : null;
+}
+
+function missingOpticalInputs(inputs) {
+  const missing = [];
+  if (!Number.isFinite(inputs.focalLengthMm) || inputs.focalLengthMm <= 0) missing.push('focal length (mm)');
+  if (!Number.isFinite(inputs.fStop) || inputs.fStop <= 0) missing.push('f-number (for example f/2.8)');
+  if (!Number.isFinite(inputs.subjectDistM) || inputs.subjectDistM <= 0) missing.push('subject distance (m)');
+  if (!Number.isFinite(inputs.wavelengthNm) || inputs.wavelengthNm <= 0) missing.push('wavelength (nm or µm)');
+  if (!Number.isFinite(inputs.circleOfConfusionMm) || inputs.circleOfConfusionMm <= 0) {
+    missing.push('circle of confusion (mm or µm)');
+  }
+  return missing;
+}
+
+function parsePcbWizardInputs(prompt) {
+  const layerMatch =
+    prompt.match(/\b(\d+)\s*[- ]?layers?\b/i) || prompt.match(/\blayer\s*count\s*(?:of|=|:)?\s*(\d+)\b/i);
+  const impedanceMatch =
+    prompt.match(/\b(?:target\s+)?impedance\s*(?:of|at|=|:)?\s*(\d+(?:\.\d+)?)\s*(?:ohms?\b|Ω)/i) ||
+    prompt.match(/\b(\d+(?:\.\d+)?)\s*(?:ohms?\b|Ω)/i);
+  const dielectricMatch =
+    prompt.match(
+      /\b(?:dielectric|substrate)(?:\s+(?:height|thickness))?\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*(mm|um|µm|μm)\b/i
+    ) || prompt.match(/\b(\d+(?:\.\d+)?)\s*(mm|um|µm|μm)\s*(?:dielectric|substrate)\b/i);
+  const erMatch = prompt.match(/\b(?:er|relative permittivity|dielectric constant)\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\b/i);
+  const copperMatch =
+    prompt.match(/\bcopper(?:\s+thickness)?\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*(mm|um|µm|μm)\b/i) ||
+    prompt.match(/\b(\d+(?:\.\d+)?)\s*(mm|um|µm|μm)\s+copper(?:\s+thickness)?\b/i);
+  const toMm = (match) => {
+    if (!match) return null;
+    const value = Number(match[1]);
+    return /^mm$/i.test(match[2]) ? value : value / 1000;
+  };
+  return {
+    layerCount: layerMatch ? Number(layerMatch[1]) : null,
+    dielectricHeightMm: toMm(dielectricMatch),
+    targetImpedanceOhm: impedanceMatch ? Number(impedanceMatch[1]) : null,
+    er: erMatch ? Number(erMatch[1]) : null,
+    copperThicknessMm: toMm(copperMatch)
+  };
+}
+
+function missingPcbWizardInputs(inputs) {
+  const missing = [];
+  if (!Number.isInteger(inputs.layerCount) || inputs.layerCount < 1) missing.push('layer count');
+  if (!Number.isFinite(inputs.dielectricHeightMm) || inputs.dielectricHeightMm <= 0)
+    missing.push('dielectric height (mm)');
+  if (!Number.isFinite(inputs.targetImpedanceOhm) || inputs.targetImpedanceOhm <= 0)
+    missing.push('target impedance (ohm)');
+  if (!Number.isFinite(inputs.er) || inputs.er <= 0) missing.push('relative permittivity (er)');
+  if (!Number.isFinite(inputs.copperThicknessMm) || inputs.copperThicknessMm <= 0)
+    missing.push('copper thickness (mm)');
+  return missing;
+}
+
+function invalidRequiredInputs(missing) {
+  return {
+    status: 'INVALID_INPUT',
+    validationLevel: 'experimental',
+    error: {
+      code: 'INVALID_INPUT',
+      message: `No estimate was run. Specify ${missing.join(', ')}.`
+    }
+  };
+}
 
 // Code-Gated Tool Catalog (Model Context Protocol typed schema)
 const OMNI_TOOLS = [
   {
     name: 'design_camera_lens_optics',
-    description: 'Design and simulate 50mm f/1.4 multi-element camera lens optics with internal 3D cutaway inspection, Schott glass materials, and paraxial ray tracing',
+    description:
+      'Run experimental scalar optics estimates from explicit focal length, f-number, subject distance, wavelength, and circle of confusion; no sourced prescription or independently validated optical result is established',
     parameters: {
       type: 'object',
       properties: {
-        focalLengthMm: { type: 'number', default: 50.0 },
-        fStop: { type: 'number', default: 1.4 },
-        subjectDistM: { type: 'number', default: 2.0 },
-        showRays: { type: 'boolean', default: true },
-        cutawayAngle: { type: 'number', default: 1.5708 }
-      }
+        focalLengthMm: { type: 'number', exclusiveMinimum: 0 },
+        fStop: { type: 'number', exclusiveMinimum: 0 },
+        subjectDistM: { type: 'number', exclusiveMinimum: 0 },
+        wavelengthNm: { type: 'number', exclusiveMinimum: 0 },
+        circleOfConfusionMm: { type: 'number', exclusiveMinimum: 0 },
+        showRays: { type: 'boolean' },
+        cutawayAngle: { type: 'number' }
+      },
+      required: ['focalLengthMm', 'fStop', 'subjectDistM', 'wavelengthNm', 'circleOfConfusionMm']
     }
   },
   {
     name: 'create_cad_geometry',
-    description: 'Create a parametric 3D B-Rep CAD geometry (box, cylinder, sphere, or custom feature)',
+    description:
+      'Create an experimental primitive from explicit dimensions; solid validity and manufacturability are not assessed',
     parameters: {
       type: 'object',
       properties: {
@@ -63,36 +191,36 @@ const OMNI_TOOLS = [
         name: { type: 'string' },
         dimensions: { type: 'object' }
       },
-      required: ['type']
+      required: ['type', 'dimensions']
     }
   },
   {
     name: 'run_phone_drop_test',
-    description: 'Execute explicit dynamic smartphone drop test onto concrete floor',
+    description:
+      'Run an experimental handset impact example using explicit drop height (m), device mass (kg), and impact orientation; it is not independently validated',
     parameters: {
       type: 'object',
       properties: {
-        dropHeight: { type: 'number', default: 1.5 },
-        phoneMass: { type: 'number', default: 0.205 },
-        impactAngle: { type: 'string', enum: ['corner', 'edge', 'face'] }
-      }
+        dropHeight: { type: 'number', description: 'Drop height in meters' },
+        phoneMass: { type: 'number', description: 'Device mass in kilograms' },
+        impactAngle: { type: 'string', enum: ['corner', 'edge', 'face'], description: 'Impact orientation' }
+      },
+      required: ['dropHeight', 'phoneMass', 'impactAngle']
     }
   },
   {
     name: 'simulate_mobile_thermal',
-    description: 'Simulate smartphone conjugate heat transfer (SoC gaming & 4K video thermal dissipation)',
+    description:
+      'Return thermal-analysis availability; no reviewed handset model or material-property set is configured',
     parameters: {
       type: 'object',
-      properties: {
-        socPowerWatts: { type: 'number', default: 8.5 },
-        hasVaporChamber: { type: 'boolean', default: true },
-        chassisMaterial: { type: 'string', enum: ['Aluminum', 'Titanium'] }
-      }
+      properties: {}
     }
   },
   {
     name: 'synthesize_verilog_chip',
-    description: 'Synthesize Verilog RTL into gate-level netlist and verify static timing closure',
+    description:
+      'Run an experimental RTL estimate on explicitly supplied Verilog source; no target library or physical timing analysis is included',
     parameters: {
       type: 'object',
       properties: {
@@ -103,304 +231,313 @@ const OMNI_TOOLS = [
   },
   {
     name: 'run_calibre_drc_check',
-    description: 'Run physical verification DRC checks on 2D nanometer IC layout polygons',
+    description: 'Unavailable through the legacy macro without caller layout geometry and an approved rule deck',
     parameters: {
       type: 'object',
-      properties: {
-        minWidth: { type: 'number', default: 50 },
-        minSpacing: { type: 'number', default: 45 }
-      }
+      properties: {}
     }
   },
   {
     name: 'simulate_drone_flight',
-    description: 'Simulate 6-DOF closed-loop autonomous drone flight with wind gust disturbance',
-    parameters: {
-      type: 'object',
-      properties: {
-        targetAltitude: { type: 'number', default: 10.0 },
-        windGustSpeed: { type: 'number', default: 3.0 }
-      }
-    }
+    description: 'Unavailable: no independently reviewed drone flight model or reference data are configured',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'calculate_asme_piping_stress',
-    description: 'Evaluate ASME B31.3 piping stress and thermal expansion loop flexibility',
+    description:
+      'Run an experimental piping estimate from explicit user-supplied values; no material catalog, code allowable, or compliance decision is provided',
     parameters: {
       type: 'object',
       properties: {
-        pipeSpec: { type: 'string', default: '8_SCH40' },
-        operatingTempC: { type: 'number', default: 220.0 },
-        hasExpansionLoop: { type: 'boolean', default: true }
-      }
+        pipeOuterDiameterMm: { type: 'number', description: 'Pipe outside diameter in mm' },
+        nominalWallThicknessMm: { type: 'number', description: 'Nominal wall thickness in mm' },
+        youngsModulusGPa: { type: 'number', description: 'User-supplied Young modulus in GPa' },
+        thermalExpansionPerK: { type: 'number', description: 'User-supplied thermal expansion coefficient per K' },
+        designPressureBar: { type: 'number', description: 'Pressure input in bar' },
+        operatingTempC: { type: 'number', description: 'Operating temperature in degrees Celsius' },
+        ambientTempC: { type: 'number', description: 'Ambient temperature in degrees Celsius' },
+        straightLengthM: { type: 'number', description: 'Straight pipe length in m' },
+        hasExpansionLoop: { type: 'boolean' },
+        corrosionAllowanceMm: { type: 'number', description: 'Corrosion allowance in mm' },
+        loopHeightM: { type: 'number', description: 'Expansion loop height in m' },
+        elbowCenterlineRadiusM: { type: 'number', description: 'Elbow centerline radius in m' }
+      },
+      required: [
+        'pipeOuterDiameterMm',
+        'nominalWallThicknessMm',
+        'youngsModulusGPa',
+        'thermalExpansionPerK',
+        'designPressureBar',
+        'operatingTempC',
+        'ambientTempC',
+        'straightLengthM',
+        'hasExpansionLoop',
+        'corrosionAllowanceMm',
+        'loopHeightM',
+        'elbowCenterlineRadiusM'
+      ]
     }
   },
   {
     name: 'run_hysys_flash_distillation',
-    description: 'Run Peng-Robinson VLE flash and atmospheric crude distillation simulation',
+    description: 'Unavailable: no sourced assay and validated distillation model are configured',
     parameters: {
       type: 'object',
-      properties: {
-        feedBPD: { type: 'number', default: 50000 },
-        trayCount: { type: 'number', default: 30 }
-      }
+      properties: {}
     }
   },
   {
     name: 'solve_skew_optics',
-    description: 'Run Zemax/Code V parity skew ray tracing, spot diagram calculation, and MTF curves',
-    parameters: {
-      type: 'object',
-      properties: {
-        fStop: { type: 'number', default: 1.4 },
-        entrancePupilRadius: { type: 'number', default: 10.0 }
-      }
-    }
+    description: 'Unavailable through the legacy macro without a caller-supplied optical prescription and ray set',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'solve_spice_circuit',
-    description: 'Solve non-linear analog circuit transient response via SPICE Modified Nodal Analysis (MNA)',
-    parameters: {
-      type: 'object',
-      properties: {
-        rOhms: { type: 'number', default: 1000 },
-        cFarads: { type: 'number', default: 1e-6 }
-      }
-    }
+    description: 'Unavailable through the legacy macro without a caller-supplied circuit and analysis controls',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'solve_flowsheet',
-    description: 'Solve Aspen HYSYS cyclic process flowsheet with Wegstein recycle tear acceleration',
+    description: 'Unavailable: the legacy macro route has no validated user-provided flowsheet schema',
     parameters: {
       type: 'object',
-      properties: {
-        temperatureC: { type: 'number', default: -20.0 },
-        pressureBar: { type: 'number', default: 18.0 }
-      }
+      properties: {}
     }
   },
   {
     name: 'export_step',
-    description: 'Export 3D CAD B-Rep solid to ISO 10303-21 STEP AP214 format',
+    description:
+      'Unavailable through the legacy macro without caller-supplied geometry; schema conformance and CAD interoperability are unverified',
     parameters: {
       type: 'object',
-      properties: {
-        width: { type: 'number', default: 40 },
-        height: { type: 'number', default: 60 },
-        depth: { type: 'number', default: 20 }
-      }
+      properties: {}
     }
   },
   {
     name: 'export_gerber',
-    description: 'Export PCB layout to RS-274X Gerber fabrication archive',
+    description: 'Unavailable through the legacy macro without caller-supplied PCB layout data',
     parameters: {
       type: 'object',
-      properties: {
-        layer: { type: 'string', default: 'TopCopper' }
-      }
+      properties: {}
     }
   },
   {
     name: 'run_design_wizard',
-    description: 'Launch guided intent-driven engineering wizard (drop test, drone, camera lens, or PCB)',
+    description:
+      'Open an experimental workflow only after required caller inputs are supplied; results are not approved designs',
     parameters: {
       type: 'object',
       properties: {
         wizardType: { type: 'string', enum: ['drop_test', 'drone', 'camera_lens', 'pcb'] },
         inputs: { type: 'object' }
       },
-      required: ['wizardType']
+      required: ['wizardType', 'inputs']
     }
   },
   {
     name: 'self_heal_design',
-    description: 'Autonomous multi-physics self-healing optimizer to repair structural yielding or parameter violations',
-    parameters: {
-      type: 'object',
-      properties: {
-        currentDesign: { type: 'object' },
-        safetyFactor: { type: 'number', default: 1.5 }
-      }
-    }
+    description:
+      'Unavailable: structural remediation has no independent validation or approval workflow; no design edits are proposed',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'package_omni_archive',
-    description: 'Create single-file .omni engineering archive container packaging CAD, FEA, EDA, and history',
+    description:
+      'Export supplied session sections in a .omni container; this does not create a complete project archive or establish round-trip validity',
     parameters: {
       type: 'object',
-      properties: {
-        projectName: { type: 'string', default: 'OmniEng_Project' },
-        sections: { type: 'object' }
-      }
+      properties: {}
     }
   },
   {
     name: 'solve_variational_sketch',
-    description: 'Solve 2D variational geometric sketch constraints (distance, horizontal, vertical, tangency, parallel) using Newton-Raphson SVD',
+    description: 'Run an experimental 2D constraint calculation on caller-supplied points, constraints, and controls',
     parameters: {
       type: 'object',
       properties: {
         points: { type: 'array' },
-        constraints: { type: 'array' }
-      }
+        constraints: { type: 'array' },
+        controls: { type: 'object' }
+      },
+      required: ['points', 'constraints', 'controls']
     }
   },
   {
     name: 'heal_cad_geometry',
-    description: 'Auto-heal dirty or non-manifold STEP CAD solids by stitching micro-gaps and collapsing degenerate sliver faces',
+    description: 'Unavailable through the legacy macro without caller-supplied geometry and healing controls',
     parameters: {
       type: 'object',
-      properties: {
-        dirtyModel: { type: 'object' }
-      }
+      properties: {}
     }
   },
   {
     name: 'optimize_optical_dls',
-    description: 'Optimize optical lens system using Damped Least Squares (Levenberg-Marquardt) merit function optimization',
+    description:
+      'Run an experimental optimizer on a caller-supplied optical system, variables, merit operands, and controls',
     parameters: {
       type: 'object',
       properties: {
-        variables: { type: 'array' }
-      }
+        system: { type: 'object' },
+        variables: { type: 'array' },
+        operands: { type: 'array' },
+        options: { type: 'object' }
+      },
+      required: ['system', 'variables', 'operands', 'options']
     }
   },
   {
     name: 'evaluate_asme_section_viii',
-    description: 'Perform ASME Boiler & Pressure Vessel Code Section VIII Division 2 stress linearization (Pm, Pb, Q) along a Stress Classification Line (SCL)',
+    description:
+      'Unavailable through the prompt macro without caller stress-line data and review limits; no ASME Section VIII assessment is made',
     parameters: {
       type: 'object',
       properties: {
         sclPoints: { type: 'array' },
-        wallThicknessMm: { type: 'number', default: 25.0 }
-      }
+        wallThicknessMm: { type: 'number' },
+        reviewLimits: { type: 'object' }
+      },
+      required: ['sclPoints', 'wallThicknessMm', 'reviewLimits']
     }
   },
   {
     name: 'diff_3d_cad_models',
-    description: 'Perform visual and topological B-Rep diffing between two CAD model revisions, computing added, removed, and modified face metrics',
+    description:
+      'Compare caller-supplied model revisions using an experimental centroid heuristic; no B-Rep, volume, or structural comparison is performed',
     parameters: {
       type: 'object',
       properties: {
         modelA: { type: 'object' },
         modelB: { type: 'object' }
-      }
+      },
+      required: ['modelA', 'modelB']
     }
   },
   {
     name: 'rollup_ebom_costs',
-    description: 'Roll up hierarchical Engineering Bill of Materials (eBOM) for mass, procurement cost, and single-level hardware fastener consolidation',
+    description:
+      'Aggregate a fully specified caller-supplied assembly hierarchy; mass, cost, material, and supplier data are not independently reviewed',
     parameters: {
       type: 'object',
+      required: ['rootAssembly'],
+      additionalProperties: false,
       properties: {
-        items: { type: 'array' }
+        rootAssembly: { type: 'object' }
       }
     }
   },
   {
     name: 'unfold_sheet_metal',
-    description: 'Unfold 3D sheet metal flanges into a 2D flat developed blank per DIN 6935 neutral axis K-factor bend deduction',
+    description:
+      'Calculate experimental bend allowance from caller-supplied thickness, radius, angle, K-factor, and flange lengths; standards conformance and manufacturing suitability are not assessed',
     parameters: {
       type: 'object',
       properties: {
-        thicknessMm: { type: 'number', default: 2.0 },
-        bendRadiusMm: { type: 'number', default: 3.0 },
-        angleDeg: { type: 'number', default: 90.0 }
-      }
+        thicknessMm: { type: 'number' },
+        bendRadiusMm: { type: 'number' },
+        angleDeg: { type: 'number' },
+        kFactor: { type: 'number' },
+        flangeLength1Mm: { type: 'number' },
+        flangeLength2Mm: { type: 'number' }
+      },
+      required: ['thicknessMm', 'bendRadiusMm', 'angleDeg', 'kFactor', 'flangeLength1Mm', 'flangeLength2Mm']
     }
   },
   {
     name: 'inspect_gdt_tolerance',
-    description: 'Inspect ASME Y14.5-2018 GD&T feature control frames, evaluating true position at MMC with bonus tolerance',
+    description:
+      'Unavailable through the prompt macro without caller datum, measurement, and tolerance inputs; no standards conformance decision is made',
     parameters: {
       type: 'object',
       properties: {
-        actualDia: { type: 'number', default: 10.3 },
-        actualX: { type: 'number', default: 50.1 },
-        actualY: { type: 'number', default: 25.05 }
-      }
+        basicX: { type: 'number' },
+        basicY: { type: 'number' },
+        actualX: { type: 'number' },
+        actualY: { type: 'number' },
+        nominalDia: { type: 'number' },
+        actualDia: { type: 'number' },
+        mmcDia: { type: 'number' },
+        specifiedTolerance: { type: 'number' }
+      },
+      required: ['basicX', 'basicY', 'actualX', 'actualY', 'nominalDia', 'actualDia', 'mmcDia', 'specifiedTolerance']
     }
   },
   {
     name: 'solve_sparse_multifrontal',
-    description: 'Direct sparse symmetric positive definite matrix solver with AMD ordering scaling to 100k+ unknowns',
-    parameters: {
-      type: 'object',
-      properties: {
-        N: { type: 'number', default: 100 }
-      }
-    }
+    description:
+      'Unavailable through the legacy macro without a caller-supplied sparse matrix, right-hand side, and controls',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'solve_gpu_parallel_pcg',
-    description: 'Parallel Preconditioned Conjugate Gradient (PCG) solver with Jacobi diagonal preconditioning on CSR sparse matrices',
-    parameters: {
-      type: 'object',
-      properties: {
-        N: { type: 'number', default: 100 }
-      }
-    }
+    description:
+      'Unavailable through the legacy macro without a caller-supplied sparse matrix, right-hand side, and controls',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'run_fmi_cosimulation',
-    description: 'Orchestrate multi-domain cross-engine FMI 3.0 Co-Simulation master across coupled FMU model units',
-    parameters: {
-      type: 'object',
-      properties: {
-        totalTimeSec: { type: 'number', default: 1.0 }
-      }
-    }
+    description: 'Unavailable through the legacy macro without caller-supplied FMUs, connections, and controls',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'analyze_power_grid_ir_drop',
-    description: 'Analyze on-chip PDN multi-layer power distribution grid static and transient IR drop with electromigration MTTF',
+    description:
+      'Unavailable through the legacy macro without caller-supplied grid geometry, electrical inputs, and solver controls; foundry signoff is not established',
     parameters: {
       type: 'object',
-      properties: {
-        vdd: { type: 'number', default: 1.2 },
-        gridRows: { type: 'number', default: 32 },
-        gridCols: { type: 'number', default: 32 }
-      }
+      properties: {}
     }
   },
   {
     name: 'certify_tool_qualification',
-    description: 'Execute DO-178C / DO-330 TQL-4 and ISO 26262 TCL1 tool qualification test suite with cryptographic SHA-256 seal',
+    description:
+      'Unavailable: DO-330 and ISO 26262 tool qualification are not implemented; test diagnostics are not qualification evidence',
     parameters: {
       type: 'object',
-      properties: {
-        standard: { type: 'string', default: 'DO-178C_DAL_A' }
-      }
+      properties: {}
     }
   },
   {
     name: 'export_gdsii_stream',
-    description: 'Export VLSI integrated circuit physical layout to binary GDSII Stream format',
-    parameters: {
-      type: 'object',
-      properties: {
-        libraryName: { type: 'string', default: 'OMNIENG_CHIP' }
-      }
-    }
+    description: 'Unavailable through the legacy macro without caller-supplied layout geometry and export controls',
+    parameters: { type: 'object', properties: {} }
   },
   {
     name: 'schedule_multirate_simulation',
-    description: 'Execute deterministic multi-rate cyclic executive scheduler for mixed-period discrete control tasks',
-    parameters: {
-      type: 'object',
-      properties: {
-        baseRateHz: { type: 'number', default: 1000 }
-      }
-    }
+    description:
+      'Unavailable through the legacy macro without caller-supplied components, task rates, and scheduler controls',
+    parameters: { type: 'object', properties: {} }
   }
 ];
+
+for (const tool of OMNI_TOOLS) {
+  tool.description = `Experimental legacy macro route; no independent validation is established. ${tool.description}`;
+}
+
+function summarizeMacroInputs(value) {
+  if (value === null || value === undefined) return 'none';
+  const serialized = JSON.stringify(value);
+  if (serialized.length <= 400) return serialized;
+  return `${serialized.slice(0, 397)}...`;
+}
+
+function markLegacyMacroUnavailable(actionPlan, toolName, message, modalToOpen = null) {
+  actionPlan.matchedTool = toolName;
+  actionPlan.toolInput = {};
+  actionPlan.inputOrigin = 'none';
+  actionPlan.result = {
+    success: false,
+    status: 'UNAVAILABLE',
+    validationLevel: 'experimental',
+    error: { code: 'UNSUPPORTED', message }
+  };
+  actionPlan.assistantMessage = `No calculation was run. ${message}`;
+  if (modalToOpen) actionPlan.modalToOpen = modalToOpen;
+}
 
 class OmniAIEngine {
   constructor() {
     this.history = [];
     this.tools = OMNI_TOOLS;
-    this.symbolicReasoner = new SymbolicReasoner();
     this.journal = new CommandJournal();
     this.wizards = {
       dropTest: new DropTestWizard(),
@@ -411,12 +548,21 @@ class OmniAIEngine {
   }
 
   /**
-   * Fast intent classifier and modal router for Tier-1 commercial command dispatch
+   * Fast intent classifier for the legacy keyword macro adapter
    * @param {string} prompt
    * @returns {{matchedTool: string, modalToOpen: string|null}}
    */
   parseUserIntent(prompt) {
     const p = (prompt || '').toLowerCase();
+    if (
+      p.includes('self-heal') ||
+      p.includes('auto-heal') ||
+      p.includes('remediate') ||
+      p.includes('fix stress') ||
+      p.includes('thicken')
+    ) {
+      return { matchedTool: 'self_heal_design', modalToOpen: null };
+    }
     if (p.includes('heal') || p.includes('watertight') || p.includes('micro-gap') || p.includes('sliver')) {
       return { matchedTool: 'topological_healing', modalToOpen: 'modal-topological-healer' };
     }
@@ -426,7 +572,13 @@ class OmniAIEngine {
     if (p.includes('diff') || p.includes('reva') || p.includes('revb') || p.includes('cad diff')) {
       return { matchedTool: 'git_cad_visual_diff', modalToOpen: 'modal-cad-diff' };
     }
-    if (p.includes('ebom') || p.includes('procurement') || p.includes('bill of materials') || p.includes('consolidate screws') || p.includes('cost rollup')) {
+    if (
+      p.includes('ebom') ||
+      p.includes('procurement') ||
+      p.includes('bill of materials') ||
+      p.includes('consolidate screws') ||
+      p.includes('cost rollup')
+    ) {
       return { matchedTool: 'engineering_bom_rollup', modalToOpen: 'modal-ebom-manager' };
     }
     const plan = this.processPrompt(prompt);
@@ -437,7 +589,8 @@ class OmniAIEngine {
   }
 
   /**
-   * Process natural language query from user and route to code-gated tool execution
+   * Process a natural language prompt using explicitly supplied values only.
+   * This legacy adapter does not parse or validate complete project engineering data.
    * @param {string} prompt User natural language request
    * @param {Object} currentContext Current active studio, model parameters, and selected entities
    */
@@ -449,604 +602,570 @@ class OmniAIEngine {
       toolInput: null,
       result: null,
       assistantMessage: '',
+      executionMode: 'legacy-keyword-macro',
+      validationLevel: 'experimental',
       suggestedManualEdits: []
     };
 
     // Intent routing using code-gated evaluation
-    if (p.includes('wizard') || p.includes('guide')) {
+    if (
+      p.includes('self-heal') ||
+      p.includes('auto-heal') ||
+      p.includes('remediate') ||
+      p.includes('fix stress') ||
+      p.includes('thicken')
+    ) {
+      actionPlan.matchedTool = 'self_heal_design';
+      actionPlan.inputOrigin = 'none';
+      actionPlan.result = {
+        success: false,
+        available: false,
+        status: 'unavailable',
+        validationLevel: 'experimental',
+        error: {
+          code: 'UNSUPPORTED',
+          message: 'Structural remediation is unavailable pending independent validation and an approval workflow.'
+        }
+      };
+      actionPlan.assistantMessage =
+        'No structural inputs were assumed, no calculation ran, and no design edits were proposed.';
+    } else if (p.includes('wizard') || p.includes('guide')) {
       actionPlan.matchedTool = 'run_design_wizard';
       if (p.includes('drone') || p.includes('uav')) {
-        actionPlan.toolInput = { wizardType: 'drone', inputs: { payloadKg: 0.25, propellerDiameterInches: 5.0 } };
-        actionPlan.result = this.wizards.drone.runWizard(actionPlan.toolInput.inputs);
-        actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        actionPlan.toolInput = { wizardType: 'drone' };
+        actionPlan.result = {
+          status: 'UNAVAILABLE',
+          validationLevel: 'experimental',
+          error: {
+            code: 'UNSUPPORTED',
+            message: 'No independently reviewed drone sizing model or reference data are configured.'
+          }
+        };
+        actionPlan.assistantMessage =
+          'No drone sizing estimate was run. No independently reviewed model or reference data are configured.';
       } else if (p.includes('lens') || p.includes('optics') || p.includes('camera')) {
-        actionPlan.toolInput = { wizardType: 'camera_lens', inputs: { focalLengthMm: 50.0, fStop: 1.4 } };
-        actionPlan.result = this.wizards.lens.runWizard(actionPlan.toolInput.inputs);
-        actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        const lensInputs = parseOpticalInputs(prompt);
+        const missing = missingOpticalInputs(lensInputs);
+        if (missing.length) {
+          actionPlan.toolInput = { wizardType: 'camera_lens', inputs: {} };
+          actionPlan.inputOrigin = 'none';
+          actionPlan.result = invalidRequiredInputs(missing);
+          actionPlan.assistantMessage = actionPlan.result.error.message;
+        } else {
+          actionPlan.toolInput = { wizardType: 'camera_lens', inputs: lensInputs };
+          actionPlan.inputOrigin = 'user-prompt';
+          actionPlan.result = this.wizards.lens.runWizard(lensInputs);
+          actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        }
       } else if (p.includes('pcb') || p.includes('circuit') || p.includes('board')) {
-        actionPlan.toolInput = { wizardType: 'pcb', inputs: { layerCount: 4, targetImpedanceOhm: 50.0 } };
-        actionPlan.result = this.wizards.pcb.runWizard(actionPlan.toolInput.inputs);
-        actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        const pcbInputs = parsePcbWizardInputs(prompt);
+        const missing = missingPcbWizardInputs(pcbInputs);
+        if (missing.length) {
+          actionPlan.toolInput = { wizardType: 'pcb', inputs: {} };
+          actionPlan.inputOrigin = 'none';
+          actionPlan.result = invalidRequiredInputs(missing);
+          actionPlan.assistantMessage = actionPlan.result.error.message;
+        } else {
+          actionPlan.toolInput = { wizardType: 'pcb', inputs: pcbInputs };
+          actionPlan.inputOrigin = 'user-prompt';
+          actionPlan.result = this.wizards.pcb.runWizard(pcbInputs);
+          actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        }
       } else {
-        actionPlan.toolInput = { wizardType: 'drop_test', inputs: { dropHeightM: 1.5, wallThicknessMm: 1.0 } };
-        actionPlan.result = this.wizards.dropTest.runWizard(actionPlan.toolInput.inputs);
-        actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        const dropInputs = parseDropTestInputs(prompt);
+        const missing = missingDropTestInputs(dropInputs);
+        if (missing.length) {
+          actionPlan.toolInput = {};
+          actionPlan.inputOrigin = 'none';
+          actionPlan.result = invalidDropTestResult(missing);
+          actionPlan.assistantMessage = actionPlan.result.error.message;
+        } else {
+          actionPlan.toolInput = { wizardType: 'drop_test', inputs: dropInputs };
+          actionPlan.inputOrigin = 'user-prompt';
+          actionPlan.result = this.wizards.dropTest.runWizard(dropInputs);
+          actionPlan.assistantMessage = actionPlan.result.plainSummary;
+        }
       }
-
-    } else if (p.includes('asme viii') || p.includes('section viii') || p.includes('div 2') || p.includes('scl') || p.includes('linearization') || p.includes('membrane stress') || (p.includes('asme') && p.includes('pressure vessel'))) {
-      actionPlan.matchedTool = 'evaluate_asme_section_viii';
-      const analyzer = new ASMESectionVIIIDiv2Analyzer({
-        designPressureMpa: 10.0,
-        designTemperatureC: 150.0,
-        material: 'SA-516 Grade 70',
-        allowableStressS: 138.0
-      });
-      const sclPoints = [
-        { x: -12.5, stressMpa: 110.0 },
-        { x: 0.0, stressMpa: 90.0 },
-        { x: 12.5, stressMpa: 80.0 }
-      ];
-      const sclRes = analyzer.linearizeStressClassificationLine(sclPoints, 25.0);
-      actionPlan.toolInput = { sclPoints, wallThicknessMm: 25.0 };
-      actionPlan.result = sclRes;
-      actionPlan.modalToOpen = 'modal-asme-report';
-      actionPlan.assistantMessage = `ASME Section VIII Div 2 Part 5 Design-by-Analysis certified: Membrane stress Pm = ${sclRes.membraneStressPm.toFixed(2)} MPa (Limit: ${sclRes.limits.allowable_S} MPa, Margin: +${((sclRes.safetyFactors.membrane - 1) * 100).toFixed(1)}%), Bending Pb = ${sclRes.bendingStressPb.toFixed(2)} MPa. Overall status: ${sclRes.evaluation.overallConforms ? 'CONFORMS / SAFE' : 'NON-CONFORMANT'}.`;
-
-    } else if (p.includes('heal') || p.includes('dirty cad') || p.includes('sliver') || p.includes('micro-gap') || p.includes('stitch') || p.includes('watertight')) {
-      actionPlan.matchedTool = 'heal_cad_geometry';
-      const healer = new TopologicalHealingEngine({ tolerance: 0.05 });
-      const dirtyModel = {
-        vertices: [
-          { id: 'v1', x: 0, y: 0, z: 0 },
-          { id: 'v2', x: 0.02, y: 0.01, z: 0 },
-          { id: 'v3', x: 10, y: 0, z: 0 },
-          { id: 'v4', x: 10, y: 10, z: 0 },
-          { id: 'v5', x: 0, y: 10, z: 0 }
-        ],
-        faces: [
-          { id: 'f1', vertexIds: ['v1', 'v3', 'v4', 'v5'] },
-          { id: 'f_sliver', vertexIds: ['v1', 'v2', 'v3'] }
-        ]
-      };
-      const healRes = healer.healSolid(dirtyModel, { tolerance: 0.05 });
-      actionPlan.toolInput = { dirtyModel };
-      actionPlan.result = healRes;
-      actionPlan.modalToOpen = 'modal-topological-healer';
-      actionPlan.assistantMessage = `Topological CAD Healing Engine repaired solid B-Rep: Stitched ${healRes.stitchedVerticesCount} micro-gap vertices (<0.05mm) and collapsed ${healRes.collapsedSliverCount} degenerate sliver faces. Solid is 100% watertight (Manifold: true).`;
-
-    } else if (p.includes('sketch') || p.includes('variational') || p.includes('d-cubed') || p.includes('geometric constraint')) {
-      actionPlan.matchedTool = 'solve_variational_sketch';
-      const solver = new VariationalConstraintSolver();
-      solver.addPoint('P1', 0, 0, true);
-      solver.addPoint('P2', 38, 2, false);
-      solver.addPoint('P3', 2, 28, false);
-      solver.addConstraint({ type: 'HORIZONTAL', point1: 'P1', point2: 'P2' });
-      solver.addConstraint({ type: 'VERTICAL', point1: 'P1', point2: 'P3' });
-      solver.addConstraint({ type: 'DISTANCE', point1: 'P1', point2: 'P2', value: 40.0 });
-      solver.addConstraint({ type: 'DISTANCE', point1: 'P1', point2: 'P3', value: 30.0 });
-      const sol = solver.solve();
-      actionPlan.toolInput = { pointCount: 3, constraintCount: 4 };
-      actionPlan.result = sol;
-      actionPlan.modalToOpen = 'modal-variational-sketcher';
-      actionPlan.assistantMessage = `D-Cubed Parity 2D Variational Geometric Constraint Solver converged in ${sol.iterations} iterations (residual: ${sol.residualNorm.toExponential(4)}). Degree-of-Freedom status: ${sol.converged ? 'Well-Constrained' : 'Under-Constrained'}. Coordinates snapped to exact dimensional equations.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'P2 Width', key: 'sketchWidth', value: 40.0, unit: 'mm' },
-        { label: 'P3 Height', key: 'sketchHeight', value: 30.0, unit: 'mm' }
-      ];
-
-    } else if (p.includes('cad diff') || p.includes('visual diff') || p.includes('diff cad') || p.includes('compare revision') || p.includes('model diff')) {
-      actionPlan.matchedTool = 'diff_3d_cad_models';
-      const diffEngine = new GitCADVisualDiffEngine();
-      const modelA = { faces: [{ id: 'f1', area: 10, normal: [0, 0, 1] }, { id: 'f2', area: 15, normal: [1, 0, 0] }] };
-      const modelB = { faces: [{ id: 'f1', area: 10, normal: [0, 0, 1] }, { id: 'f3', area: 12, normal: [0, 1, 0] }] };
-      const diffRes = diffEngine.compareRevisions(modelA, modelB);
-      actionPlan.toolInput = { revA: 'REV_A', revB: 'REV_B' };
-      actionPlan.result = diffRes;
-      actionPlan.modalToOpen = 'modal-cad-diff';
-      actionPlan.assistantMessage = `3D CAD Visual B-Rep Diff complete: Found ${diffRes.summary.addedCount} Added face (green), ${diffRes.summary.removedCount} Removed face (red), and ${diffRes.summary.unchangedCount} Unchanged faces. Maximum wall-thickness delta: ${diffRes.maxThicknessReductionMm.toFixed(2)} mm.`;
-
-    } else if (p.includes('ebom') || p.includes('bill of materials') || p.includes('cost rollup') || p.includes('consolidate hardware') || p.includes('hardware consolidation')) {
+    } else if (
+      p.includes('asme viii') ||
+      p.includes('section viii') ||
+      p.includes('div 2') ||
+      p.includes('scl') ||
+      p.includes('linearization') ||
+      p.includes('membrane stress') ||
+      (p.includes('asme') && p.includes('pressure vessel'))
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'evaluate_asme_section_viii',
+        'The legacy prompt route has no caller-supplied stress classification line or review limits. Use the experimental stress screen with explicit data; this does not provide an ASME assessment.',
+        'modal-asme-report'
+      );
+    } else if (
+      p.includes('heal') ||
+      p.includes('dirty cad') ||
+      p.includes('sliver') ||
+      p.includes('micro-gap') ||
+      p.includes('stitch') ||
+      p.includes('watertight')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'heal_cad_geometry',
+        'No caller-supplied geometry or healing tolerance was provided. The topology engine remains available through its explicit-input interface; solid validity is not established.',
+        'modal-topological-healer'
+      );
+    } else if (
+      p.includes('sketch') ||
+      p.includes('variational') ||
+      p.includes('d-cubed') ||
+      p.includes('geometric constraint')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_variational_sketch',
+        'No caller-supplied sketch points, constraints, or solver controls were provided. The legacy macro does not create a sample sketch.',
+        'modal-variational-sketcher'
+      );
+    } else if (
+      p.includes('cad diff') ||
+      p.includes('visual diff') ||
+      p.includes('diff cad') ||
+      p.includes('revision') ||
+      p.includes('model diff')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'diff_3d_cad_models',
+        'Two caller-supplied model revisions are required. The legacy macro does not synthesize comparison models.',
+        'modal-cad-diff'
+      );
+    } else if (
+      p.includes('ebom') ||
+      p.includes('bill of materials') ||
+      p.includes('cost rollup') ||
+      p.includes('consolidate hardware') ||
+      p.includes('hardware consolidation')
+    ) {
       actionPlan.matchedTool = 'rollup_ebom_costs';
-      const bom = new EngineeringBOMManager();
-      const root = {
-        partNumber: 'UAV-001',
-        name: 'Hexacopter Surveillance Drone',
-        children: [
-          { partNumber: 'FRM-01', name: 'Carbon Fiber Quad Frame', quantity: 1, unitCostUsd: 120.0, unitMassKg: 0.65 },
-          { partNumber: 'MTR-01', name: '2212 920KV BLDC Motors', quantity: 4, unitCostUsd: 22.0, unitMassKg: 0.055 },
-          { partNumber: 'FST-M3-8', name: 'M3x8 Titanium Fastener', quantity: 24, unitCostUsd: 0.35, unitMassKg: 0.001 }
-        ]
+      actionPlan.toolInput = {};
+      actionPlan.result = {
+        success: false,
+        status: 'unavailable',
+        validationLevel: 'experimental',
+        error: { code: 'UNSUPPORTED', message: 'This prompt route has no caller-supplied assembly hierarchy.' }
       };
-      bom.setRootAssembly(root);
-      const rolledUp = bom.computeRollUp();
-      const csv = bom.exportToCSV();
-      actionPlan.toolInput = { rootPart: 'UAV-001' };
-      actionPlan.result = { rolledUp, csv };
       actionPlan.modalToOpen = 'modal-ebom-manager';
-      actionPlan.assistantMessage = `Engineering BOM Hierarchical Roll-Up complete: Total Assembly Mass: ${rolledUp.totalMassKg.toFixed(2)} kg, Total Procurement Cost: $${rolledUp.totalCostUsd.toFixed(2)}. Single-level hardware consolidation identified 24 M3x8 Titanium Fasteners. CSV export generated.`;
-
-    } else if (p.includes('dls') || p.includes('levenberg-marquardt') || p.includes('merit function') || p.includes('optical optimizer') || p.includes('zemax opt')) {
+      actionPlan.assistantMessage =
+        'No BOM calculation was run from this prompt because no hierarchy was supplied. Paste caller-supplied JSON into the eBOM panel and run it; no preset parts or properties are inserted.';
+    } else if (
+      p.includes('dls') ||
+      p.includes('levenberg-marquardt') ||
+      p.includes('merit function') ||
+      p.includes('optical optimizer') ||
+      p.includes('zemax opt')
+    ) {
       actionPlan.matchedTool = 'optimize_optical_dls';
-      const optimizer = new DampedLeastSquaresOptimizer();
-      const system = {
-        entrancePupilRadius: 10.0,
-        targetEfl: 50.0,
-        surfaces: [
-          { radius: 50.0, thickness: 5.0, refractiveIndex: 1.5168 },
-          { radius: -80.0, thickness: 48.0, refractiveIndex: 1.0 },
-          { radius: 0.0, thickness: 0.0, refractiveIndex: 1.0 }
-        ]
+      actionPlan.toolInput = {};
+      actionPlan.result = {
+        success: false,
+        status: 'unavailable',
+        validationLevel: 'experimental',
+        error: {
+          code: 'INVALID_INPUT',
+          message:
+            'No caller-supplied optical system, merit operands, variable bounds, or optimizer controls were provided.'
+        }
       };
-      const variables = [{ surfaceIndex: 0, param: 'radius', min: 20.0, max: 100.0 }];
-      const optRes = optimizer.optimize(system, variables, []);
-      actionPlan.toolInput = { variables };
-      actionPlan.result = optRes;
       actionPlan.modalToOpen = 'modal-dls-optimizer';
-      actionPlan.assistantMessage = `Damped Least Squares (DLS) Optical Optimizer: Converged across ${optRes.iterations || 8} Levenberg-Marquardt iterations. Initial merit: ${optRes.initialMerit ? optRes.initialMerit.toFixed(3) : '253.952'}, Final merit: ${optRes.finalMerit ? optRes.finalMerit.toFixed(3) : '250.000'} (+${optRes.improvementPercent ? optRes.improvementPercent.toFixed(1) : '1.6'}% improvement). Aberration residual minimized.`;
-
-    } else if (p.includes('sheet metal') || p.includes('k-factor') || p.includes('flat blank') || p.includes('bend deduction') || p.includes('unfold')) {
-      actionPlan.matchedTool = 'unfold_sheet_metal';
-      const unfolder = new SheetMetalUnfolder({ defaultKFactor: 0.44 });
-      const flat = unfolder.unfoldFlange(2.0, 3.0, 90.0, 50.0, 50.0);
-      actionPlan.toolInput = { thicknessMm: 2.0, bendRadiusMm: 3.0, angleDeg: 90.0 };
-      actionPlan.result = flat;
-      actionPlan.assistantMessage = `DIN 6935 Sheet Metal Unfolder: Neutral axis K-factor = 0.440. Bend Allowance (BA) = ${flat.bendAllowanceMm.toFixed(2)} mm, Bend Deduction (BD) = ${flat.bendDeductionMm.toFixed(2)} mm. Developed 2D flat blank length: ${flat.totalDevelopedLengthMm.toFixed(2)} mm.`;
-
-    } else if (p.includes('gdt') || p.includes('gd&t') || p.includes('true position') || p.includes('bonus tolerance') || p.includes('mmc') || p.includes('y14.5')) {
-      actionPlan.matchedTool = 'inspect_gdt_tolerance';
-      const gdtRes = GDTEngine.evaluateTruePosition({
-        basicX: 50.0, basicY: 25.0,
-        actualX: 50.1, actualY: 25.05,
-        nominalDia: 10.0, actualDia: 10.3,
-        mmcDia: 10.0,
-        specifiedTolerance: 0.5
-      });
-      actionPlan.toolInput = { basicX: 50.0, basicY: 25.0, toleranceMm: 0.5 };
-      actionPlan.result = gdtRes;
-      actionPlan.assistantMessage = `ASME Y14.5-2018 GD&T Feature Control Frame evaluated: Position error diameter = ${gdtRes.positionErrorDiaMm.toFixed(4)} mm. Bonus tolerance at MMC = ${gdtRes.bonusToleranceMm.toFixed(4)} mm (Total Allowable: ${gdtRes.totalAllowableToleranceMm.toFixed(4)} mm). Verdict: ${gdtRes.conforms ? 'CONFORMS' : 'OUT_OF_TOLERANCE'}.`;
-
-    } else if (p.includes('sparse multifrontal') || p.includes('cholesky 100k') || p.includes('direct sparse') || p.includes('amd ordering')) {
-      actionPlan.matchedTool = 'solve_sparse_multifrontal';
-      const solver = new WasmSparseMultifrontalSolver(50);
-      for (let i = 0; i < 50; i++) {
-        solver.addEntry(i, i, 2.0);
-        if (i + 1 < 50) { solver.addEntry(i, i + 1, -1.0); solver.addEntry(i + 1, i, -1.0); }
-      }
-      const fact = solver.factorize();
-      const sol = solver.solve(new Float64Array(50).fill(1.0));
-      actionPlan.toolInput = { N: 50 };
-      actionPlan.result = { fact, sol };
-      actionPlan.assistantMessage = `Direct Sparse Multifrontal Cholesky Solver (LEAF AMD ordering): Factored and solved symmetric positive definite system (N=50). nnz(L) = ${fact.nnzL}, Fill ratio = ${fact.fillRatio.toFixed(1)}x, Relative residual = ${sol.relativeResidual.toExponential(3)}. Out-of-core scaling validated to 100k unknowns.`;
-
-    } else if (p.includes('parallel pcg') || p.includes('gpu pcg') || p.includes('csr spmv') || p.includes('jacobi pcg')) {
-      actionPlan.matchedTool = 'solve_gpu_parallel_pcg';
-      const solver = new GPUParallelPCGSolver({ maxIterations: 500, tolerance: 1e-6 });
-      const N = 50;
-      const rowPtr = new Int32Array(N + 1);
-      const colIndices = [];
-      const values = [];
-      for (let i = 0; i < N; i++) {
-        rowPtr[i] = colIndices.length;
-        if (i > 0) { colIndices.push(i - 1); values.push(-1.0); }
-        colIndices.push(i); values.push(2.0);
-        if (i < N - 1) { colIndices.push(i + 1); values.push(-1.0); }
-      }
-      rowPtr[N] = colIndices.length;
-      const csr = { N, nnz: values.length, rowPtr, colIndices: new Int32Array(colIndices), values: new Float64Array(values) };
-      const pcgRes = solver.solve(csr, new Float64Array(N).fill(1.0));
-      actionPlan.toolInput = { N: 50 };
-      actionPlan.result = pcgRes;
-      actionPlan.assistantMessage = `Parallel PCG Solver with Jacobi Preconditioning: Converged in ${pcgRes.iterations} iterations. Final relative residual: ${pcgRes.relativeResidual.toExponential(3)}, Throughput: ${pcgRes.throughputGFlops} GFlop/s (${pcgRes.hardwareAcceleration}).`;
-
+      actionPlan.assistantMessage =
+        'No optical calculation was run. Supply an optical system, merit operands, variable bounds, and optimizer controls in the DLS panel; results remain experimental.';
+    } else if (
+      p.includes('sheet metal') ||
+      p.includes('k-factor') ||
+      p.includes('flat blank') ||
+      p.includes('bend deduction') ||
+      p.includes('unfold')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'unfold_sheet_metal',
+        'The legacy macro needs explicit thickness, bend radius, bend angle, K-factor, and flange geometry. No example dimensions were inserted.'
+      );
+    } else if (
+      p.includes('gdt') ||
+      p.includes('gd&t') ||
+      p.includes('true position') ||
+      p.includes('bonus tolerance') ||
+      p.includes('mmc') ||
+      p.includes('y14.5')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'inspect_gdt_tolerance',
+        'No caller-supplied datum frame, measured geometry, feature-control frame, or tolerance was provided. No tolerance result or standards interpretation was generated.'
+      );
+    } else if (
+      p.includes('sparse multifrontal') ||
+      p.includes('cholesky 100k') ||
+      p.includes('direct sparse') ||
+      p.includes('amd ordering')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_sparse_multifrontal',
+        'A caller-supplied sparse matrix and right-hand side are required. The macro does not generate a matrix or imply scale performance.'
+      );
+    } else if (
+      p.includes('parallel pcg') ||
+      p.includes('gpu pcg') ||
+      p.includes('csr spmv') ||
+      p.includes('jacobi pcg')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_gpu_parallel_pcg',
+        'A caller-supplied sparse matrix, right-hand side, and solver controls are required. The macro does not create a test matrix or claim GPU acceleration.'
+      );
     } else if (p.includes('fmi') || p.includes('fmu') || p.includes('co-simulation') || p.includes('cosim master')) {
-      actionPlan.matchedTool = 'run_fmi_cosimulation';
-      const master = new FmiMasterEngine({ stepSizeSec: 0.001, totalTimeSec: 0.1 });
-      const slave1 = new FmuSlave({ instanceName: 'Controller', variables: [{ vr: 1, initial: 10.0, causality: 'output' }] });
-      const slave2 = new FmuSlave({ instanceName: 'Actuator', variables: [{ vr: 2, initial: 0.0, causality: 'input' }] });
-      master.addSlave(slave1);
-      master.addSlave(slave2);
-      master.addConnection(slave1, 1, slave2, 2);
-      const fmiRes = master.simulate();
-      actionPlan.toolInput = { totalTimeSec: 0.1 };
-      actionPlan.result = fmiRes;
-      actionPlan.assistantMessage = `FMI 3.0 Cross-Domain Co-Simulation Master: Successfully coupled Controller and Actuator FMUs across ${fmiRes.totalSteps} communication steps. Converged with 0 algebraic rollback steps.`;
-
-    } else if (p.includes('self-heal') || p.includes('auto-heal') || p.includes('remediate') || p.includes('fix stress') || p.includes('thicken')) {
-      actionPlan.matchedTool = 'self_heal_design';
-      const currentDesign = {
-        wallThicknessMm: 0.8,
-        loadN: 250.0,
-        lengthMm: 140.0,
-        widthMm: 70.0,
-        yieldStrengthMPa: 503.0, // Al7075-T6
-        youngsModulusGPa: 70.0
-      };
-      actionPlan.toolInput = { currentDesign, safetyFactor: 1.5 };
-      actionPlan.result = this.symbolicReasoner.selfHealStructuralYield(currentDesign, 1.5);
-      actionPlan.assistantMessage = `OmniAI Autonomous Self-Healing: ${actionPlan.result.remediationText}`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Wall Thickness', key: 'wallThickness', value: actionPlan.result.recommendedThicknessMm, unit: 'mm' }
-      ];
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'run_fmi_cosimulation',
+        'No caller-supplied FMUs, connection map, or communication-step settings were provided. This route does not simulate bundled controller and actuator placeholders.'
+      );
     } else if (p.includes('archive') || p.includes('.omni') || p.includes('package project')) {
-      actionPlan.matchedTool = 'package_omni_archive';
-      const archive = new OmniArchive({ projectName: 'OmniEng_Demonstrator', engineeringDomain: 'multiphysics' });
-      archive.addSection('geometry', { name: 'Main_Assembly', solids: 4 });
-      archive.addSection('simulation', { type: 'drop_test', status: 'PASSED' });
-      const buffer = archive.saveToBuffer();
-      actionPlan.toolInput = { projectName: 'OmniEng_Demonstrator' };
-      actionPlan.result = { sizeBytes: buffer.length, sectionCount: archive.listSections().length, sections: archive.listSections() };
-      actionPlan.assistantMessage = `Packaged single-file .omni engineering container (${buffer.length} bytes, ${archive.listSections().length} sections: ${archive.listSections().join(', ')}). Ready for lossless sharing and air-gapped storage.`;
-
-    } else if (p.includes('lens') || p.includes('optics') || p.includes('camera') || p.includes('aperture') || p.includes('f-stop') || p.includes('cutaway') || p.includes('inside')) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'package_omni_archive',
+        'The legacy macro cannot package the active project or retrieve caller-supplied artifact sections. No demonstrator archive was created.'
+      );
+    } else if (
+      p.includes('lens') ||
+      p.includes('optics') ||
+      p.includes('camera') ||
+      p.includes('aperture') ||
+      p.includes('f-stop') ||
+      p.includes('cutaway') ||
+      p.includes('inside')
+    ) {
       actionPlan.matchedTool = 'design_camera_lens_optics';
-      const fStop = (p.includes('f/1.4') || p.includes('1.4')) ? 1.4
-                  : (p.includes('f/2.8') || p.includes('2.8')) ? 2.8
-                  : (p.includes('f/5.6') || p.includes('5.6')) ? 5.6
-                  : (p.includes('f/4') || /\bf\/?4(\.0)?\b/.test(p)) ? 4.0
-                  : (p.includes('f/2') || /\bf\/?2(\.0)?\b/.test(p)) ? 2.0
-                  : (p.includes('f/8') || /\bf\/?8(\.0)?\b/.test(p)) ? 8.0
-                  : (p.includes('f/11') || p.includes('11')) ? 11.0
-                  : (p.includes('f/16') || p.includes('16')) ? 16.0
-                  : 1.4;
-      const dist = p.includes('5m') ? 5.0 : (p.includes('1m') ? 1.0 : 2.0);
-      const cutAngle = p.includes('half') ? Math.PI : (p.includes('closed') ? 0 : Math.PI / 2);
-      actionPlan.toolInput = { focalLengthMm: 50.0, fStop, subjectDistM: dist, showRays: true, cutawayAngle: cutAngle };
-      actionPlan.result = OpticalEngine.solveOpticalMetrics(50.0, fStop, dist);
-
-      actionPlan.assistantMessage = `Designed 50mm f/${fStop} Aspherical Multi-Element Camera Lens with 8 elements in 6 groups (Schott N-BK7 Crown, N-SF11 Flint & CaF2 Fluorite). Numerical Aperture: ${actionPlan.result.numericalAperture}, Airy Disk: ${actionPlan.result.diffractionAiryDiskDiameter_um} µm, Hyperfocal: ${actionPlan.result.hyperfocalDistance_m} m, DoF: ${actionPlan.result.depthOfField_m} m, MTF50 Limit: ${actionPlan.result.mtf50ResolutionLimit_lp_per_mm} lp/mm. 3D internal cutaway showing mechanical focus helicoids, 9-blade iris diaphragm, VCM actuator, and ray cone loaded.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'f-Stop Aperture', key: 'lensFStop', value: fStop, unit: 'f/' },
-        { label: 'Cutaway Angle', key: 'lensCutawayDeg', value: Math.round(cutAngle * 180 / Math.PI), unit: '°' },
-        { label: 'Subject Distance', key: 'lensSubjectDist', value: dist, unit: 'm' },
-        { label: 'Light Ray Cone', key: 'lensShowRays', value: true, unit: 'bool' }
-      ];
-
+      const viewOptions = {};
+      if (p.includes('half')) viewOptions.cutawayAngle = Math.PI;
+      else if (p.includes('closed')) viewOptions.cutawayAngle = 0;
+      if (p.includes('ray tracing') || p.includes('show rays')) viewOptions.showRays = true;
+      else if (p.includes('without rays') || p.includes('hide rays')) viewOptions.showRays = false;
+      const lensInputs = parseOpticalInputs(prompt);
+      const missing = missingOpticalInputs(lensInputs);
+      actionPlan.suggestedManualEdits = [];
+      if (missing.length) {
+        actionPlan.toolInput = {};
+        actionPlan.inputOrigin = 'none';
+        actionPlan.result = invalidRequiredInputs(missing);
+        actionPlan.assistantMessage = actionPlan.result.error.message;
+      } else {
+        actionPlan.toolInput = { ...lensInputs, ...viewOptions };
+        actionPlan.inputOrigin = 'user-prompt';
+        actionPlan.result = OpticalEngine.solveOpticalMetrics(
+          lensInputs.focalLengthMm,
+          lensInputs.fStop,
+          lensInputs.subjectDistM,
+          lensInputs.wavelengthNm,
+          lensInputs.circleOfConfusionMm
+        );
+        actionPlan.assistantMessage = `Experimental scalar optics estimates for ${lensInputs.focalLengthMm} mm at f/${lensInputs.fStop}, focused at ${lensInputs.subjectDistM} m and using ${lensInputs.wavelengthNm} nm wavelength and ${lensInputs.circleOfConfusionMm} mm circle of confusion: numerical aperture ${actionPlan.result.numericalAperture}, diffraction diameter ${actionPlan.result.diffractionAiryDiskDiameter_um} µm, hyperfocal estimate ${actionPlan.result.hyperfocalDistance_m} m, and depth-of-field estimate ${actionPlan.result.depthOfField_m} m. No prescription ray trace or independently validated image-quality result was calculated.`;
+        actionPlan.suggestedManualEdits = [
+          { label: 'f-Stop Aperture', key: 'lensFStop', value: lensInputs.fStop, unit: 'f/' },
+          { label: 'Subject Distance', key: 'lensSubjectDist', value: lensInputs.subjectDistM, unit: 'm' },
+          ...(Object.hasOwn(viewOptions, 'cutawayAngle')
+            ? [
+                {
+                  label: 'Cutaway Angle',
+                  key: 'lensCutawayDeg',
+                  value: Math.round((viewOptions.cutawayAngle * 180) / Math.PI),
+                  unit: '°'
+                }
+              ]
+            : []),
+          ...(Object.hasOwn(viewOptions, 'showRays')
+            ? [{ label: 'Light Ray Cone', key: 'lensShowRays', value: viewOptions.showRays, unit: 'bool' }]
+            : [])
+        ];
+      }
     } else if (p.includes('drop') || p.includes('impact') || p.includes('fall')) {
       actionPlan.matchedTool = 'run_phone_drop_test';
-      const height = p.includes('2m') ? 2.0 : (p.includes('1m') ? 1.0 : 1.5);
-      const angle = p.includes('face') ? 'face' : (p.includes('edge') ? 'edge' : 'corner');
-      actionPlan.toolInput = { dropHeight: height, impactAngle: angle };
-      actionPlan.result = DropTestSimulator.runSimulation(actionPlan.toolInput);
-
-      actionPlan.assistantMessage = `Ran 1.5m explicit drop test on phone. Peak impact deceleration was ${actionPlan.result.peakDeceleration_G} G. Result: ${actionPlan.result.status}. Maximum glass stress is ${actionPlan.result.peakScreenStress_MPa} MPa.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Drop Height', key: 'dropHeight', value: height, unit: 'm' },
-        { label: 'Impact Angle', key: 'impactAngle', value: angle, unit: '' }
-      ];
-
+      const dropInputs = parseDropTestInputs(prompt);
+      const missing = missingDropTestInputs(dropInputs);
+      actionPlan.suggestedManualEdits = [];
+      if (missing.length) {
+        actionPlan.toolInput = {};
+        actionPlan.inputOrigin = 'none';
+        actionPlan.result = invalidDropTestResult(missing);
+        actionPlan.assistantMessage = actionPlan.result.error.message;
+      } else {
+        actionPlan.toolInput = {
+          dropHeight: dropInputs.dropHeightM,
+          phoneMass: dropInputs.phoneMassKg,
+          impactAngle: dropInputs.impactAngle
+        };
+        actionPlan.inputOrigin = 'user-prompt';
+        actionPlan.result = DropTestSimulator.runSimulation(actionPlan.toolInput);
+        actionPlan.assistantMessage = `Experimental ${dropInputs.dropHeightM} m handset impact example for a device mass of ${dropInputs.phoneMassKg} kg (${dropInputs.impactAngle} orientation) returned illustrative estimates: peak deceleration ${actionPlan.result.peakDeceleration_G} G and screen stress ${actionPlan.result.peakScreenStress_MPa} MPa. No device-specific material model or independent validation is available.`;
+        actionPlan.suggestedManualEdits = [
+          { label: 'Drop Height', key: 'dropHeight', value: dropInputs.dropHeightM, unit: 'm' },
+          { label: 'Device Mass', key: 'phoneMassKg', value: dropInputs.phoneMassKg, unit: 'kg' },
+          { label: 'Impact Angle', key: 'impactAngle', value: dropInputs.impactAngle, unit: '' }
+        ];
+      }
     } else if (p.includes('thermal') || p.includes('heat') || p.includes('vapor') || p.includes('icepak')) {
-      actionPlan.matchedTool = 'simulate_mobile_thermal';
-      const hasVC = !p.includes('no vapor') && !p.includes('without vapor');
-      const mat = p.includes('titanium') ? 'Titanium' : 'Aluminum';
-      actionPlan.toolInput = { socPowerWatts: 8.5, hasVaporChamber: hasVC, chassisMaterial: mat };
-      actionPlan.result = ThermalEngine.simulateSmartphoneThermal(actionPlan.toolInput);
-
-      actionPlan.assistantMessage = `Completed conjugate heat transfer simulation. Max SoC temperature: ${actionPlan.result.maxSocTempC}°C, Max Battery temperature: ${actionPlan.result.maxBatteryTempC}°C. Status: ${actionPlan.result.verdict}.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Vapor Chamber Enabled', key: 'hasVaporChamber', value: hasVC, unit: 'bool' },
-        { label: 'Chassis Material', key: 'chassisMaterial', value: mat, unit: '' }
-      ];
-
-    } else if (p.includes('verilog') || p.includes('synthesize') || p.includes('rtl') || p.includes('chip') || p.includes('gate')) {
-      actionPlan.matchedTool = 'synthesize_verilog_chip';
-      const sampleVerilog = `module alu_core (\n  input clk, input a, input b,\n  output reg y\n);\n  always @(posedge clk) begin\n    y <= a & b;\n  end\nendmodule`;
-      actionPlan.toolInput = { verilogCode: sampleVerilog };
-      actionPlan.result = LogicSynthesisEngine.synthesize(sampleVerilog);
-
-      actionPlan.assistantMessage = `Synthesized Verilog module "${actionPlan.result.moduleName}". Total standard cell count: ${actionPlan.result.gateCount}, Area: ${actionPlan.result.totalArea_um2} µm², Timing Slack: ${actionPlan.result.timingSlack_ps} ps (Fmax: ${actionPlan.result.maxFrequency_MHz} MHz). ${actionPlan.result.verdict}.`;
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'simulate_mobile_thermal',
+        'No caller-supplied thermal geometry, material properties, boundary conditions, or solver controls were provided.'
+      );
+    } else if (
+      p.includes('verilog') ||
+      p.includes('synthesize') ||
+      p.includes('rtl') ||
+      p.includes('chip') ||
+      p.includes('gate')
+    ) {
+      const verilogCode = parseVerilogCode(prompt);
+      if (!verilogCode) {
+        markLegacyMacroUnavailable(
+          actionPlan,
+          'synthesize_verilog_chip',
+          'Supply Verilog source in a fenced ```verilog``` block. No sample RTL was inserted.'
+        );
+      } else {
+        actionPlan.matchedTool = 'synthesize_verilog_chip';
+        actionPlan.toolInput = { verilogCode };
+        actionPlan.inputOrigin = 'user-prompt';
+        actionPlan.result = LogicSynthesisEngine.synthesize(verilogCode);
+        actionPlan.assistantMessage = `Experimental RTL estimate for "${actionPlan.result.moduleName}": ${actionPlan.result.gateCount} toy gates, illustrative area ${actionPlan.result.totalArea_um2} µm², simplified slack estimate ${actionPlan.result.timingSlack_ps} ps, and frequency estimate ${actionPlan.result.maxFrequency_MHz} MHz. No target library or physical timing analysis is used.`;
+      }
     } else if (p.includes('drc') || p.includes('calibre') || p.includes('layout') || p.includes('spacing')) {
-      actionPlan.matchedTool = 'run_calibre_drc_check';
-      const testShapes = [
-        { id: 'M1_A', layer: 'Metal1', x: 100, y: 100, w: 60, h: 200 },
-        { id: 'M1_B', layer: 'Metal1', x: 180, y: 100, w: 60, h: 200 }
-      ];
-      actionPlan.toolInput = { minWidth: 50, minSpacing: 45 };
-      actionPlan.result = DRCEngine.runDRC(testShapes, actionPlan.toolInput);
-
-      actionPlan.assistantMessage = `Calibre DRC check completed on ${actionPlan.result.totalShapesChecked} layout polygons. ${actionPlan.result.violationCount} violations found. Status: ${actionPlan.result.verdict}.`;
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'run_calibre_drc_check',
+        'No caller-supplied layout geometry or approved foundry rule deck is available through this legacy macro.'
+      );
     } else if (p.includes('drone') || p.includes('fly') || p.includes('altitude') || p.includes('autopilot')) {
-      actionPlan.matchedTool = 'simulate_drone_flight';
-      const alt = p.includes('20m') ? 20.0 : (p.includes('5m') ? 5.0 : 10.0);
-      actionPlan.toolInput = { targetAltitude: alt, windGustSpeed: 3.0 };
-      actionPlan.result = QuadcopterDynamics.simulateFlightMission(actionPlan.toolInput);
-
-      actionPlan.assistantMessage = `Simulated 6-DOF closed-loop drone flight to ${alt}m altitude under 3.0 m/s wind. Settling time: ${actionPlan.result.settlingTime_s}s, Overshoot: ${actionPlan.result.overshootPercent}%. ${actionPlan.result.stabilityVerdict}.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Target Altitude', key: 'targetAltitude', value: alt, unit: 'm' }
-      ];
-
-    } else if (p.includes('pipe') || p.includes('piping') || p.includes('asme') || p.includes('caesar') || p.includes('stress')) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'simulate_drone_flight',
+        'No independently reviewed drone flight model or reference data are configured.'
+      );
+    } else if (
+      p.includes('pipe') ||
+      p.includes('piping') ||
+      p.includes('asme') ||
+      p.includes('caesar') ||
+      p.includes('stress')
+    ) {
       actionPlan.matchedTool = 'calculate_asme_piping_stress';
-      const hasLoop = !p.includes('no loop');
-      actionPlan.toolInput = { pipeSpec: '8_SCH40', operatingTempC: 220.0, hasExpansionLoop: hasLoop };
+      const pipingInputs = {};
+      const temperatureMatch = p.match(/(-?\d+(?:\.\d+)?)\s*°?\s*c\b/i);
+      if (temperatureMatch) pipingInputs.operatingTempC = Number(temperatureMatch[1]);
+      if (/\b(?:no|without) (?:an? )?(?:expansion )?loop\b/.test(p)) pipingInputs.hasExpansionLoop = false;
+      else if (/\b(?:with|include) (?:an? )?(?:expansion )?loop\b/.test(p)) pipingInputs.hasExpansionLoop = true;
+      actionPlan.toolInput = pipingInputs;
       actionPlan.result = PipingStressEngine.evaluateASMEB313(actionPlan.toolInput);
 
-      actionPlan.assistantMessage = `Evaluated ASME B31.3 piping stress at 220°C. Expansion stress: ${actionPlan.result.expansionStress_SE_MPa} MPa (Allowable: ${actionPlan.result.allowableStress_SA_MPa} MPa, Stress Ratio: ${actionPlan.result.stressRatio}). ${actionPlan.result.status}.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Expansion Loop Enabled', key: 'hasExpansionLoop', value: hasLoop, unit: 'bool' }
-      ];
-
+      actionPlan.assistantMessage = actionPlan.result.success
+        ? `Experimental piping estimate returned ${actionPlan.result.hoopStress_MPa} MPa hoop stress and ${actionPlan.result.expansionStress_MPa} MPa thermal response. Inputs are unverified and this is not an ASME code calculation or compliance decision.`
+        : `Piping estimate not run. ${actionPlan.result.error}`;
+      if (typeof pipingInputs.hasExpansionLoop === 'boolean') {
+        actionPlan.suggestedManualEdits = [
+          {
+            label: 'Expansion Loop Enabled',
+            key: 'hasExpansionLoop',
+            value: pipingInputs.hasExpansionLoop,
+            unit: 'bool'
+          }
+        ];
+      }
     } else if (p.includes('hysys') || p.includes('distillation') || p.includes('crude') || p.includes('refinery')) {
-      actionPlan.matchedTool = 'run_hysys_flash_distillation';
-      actionPlan.toolInput = { feedBPD: 50000, trayCount: 30 };
-      actionPlan.result = ThermodynamicsEngine.simulateDistillationColumn(50000, 30, 2.5);
-
-      actionPlan.assistantMessage = `Aspen HYSYS distillation column converged for 50,000 BPD crude feed. Production yields: Naphtha: ${actionPlan.result.products.lightNaphtha_BPD} BPD, Diesel: ${actionPlan.result.products.dieselFuel_BPD} BPD, Bottoms: ${actionPlan.result.products.heavyResidue_BPD} BPD. Condenser Duty: ${actionPlan.result.thermalDuties.condenserDuty_MW} MW.`;
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'run_hysys_flash_distillation',
+        'No sourced feed assay or validated distillation model is configured. No product yields or duties were calculated.'
+      );
     } else if (p.includes('spot') || p.includes('mtf') || p.includes('aberration') || p.includes('skew')) {
-      actionPlan.matchedTool = 'solve_skew_optics';
-      const fStop = p.includes('2.8') ? 2.8 : (p.includes('1.4') ? 1.4 : 1.4);
-      const epRadius = 10.0;
-      const surfaces = OpticalEngine.getOpticalSurfaces();
-      const bundle = SkewRayTracer.generateEntrancePupilRayGrid(epRadius, 0.5875618, 3, 8);
-      const traced = SkewRayTracer.traceRayBundle(surfaces, bundle, 75.0);
-      const spotData = SkewRayTracer.computeSpotDiagram(traced, 75.0);
-      const mtfData = SkewRayTracer.computeMTFCurve(spotData.rmsRadiusMm, fStop, 120);
-      actionPlan.toolInput = { fStop, entrancePupilRadius: epRadius };
-      actionPlan.result = { spotData, mtfData };
-
-      actionPlan.assistantMessage = `Executed 3D vector skew ray tracing & diffraction analysis at f/${fStop}. RMS Spot Radius: ${(spotData.rmsRadiusMm * 1000).toFixed(1)} µm, MTF50 Tangential: ${mtfData.mtf50TangentialLpMm} lp/mm, Sagittal: ${mtfData.mtf50SagittalLpMm} lp/mm. Diffraction cutoff: ${mtfData.cutoffFreqLpMm} lp/mm. Status: Diffraction-Limited Parity.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'f-Stop Aperture', key: 'lensFStop', value: fStop, unit: 'f/' },
-        { label: 'Cutaway Angle', key: 'lensCutawayDeg', value: 90, unit: '°' }
-      ];
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_skew_optics',
+        'No caller-supplied optical prescription, wavelength, field points, or ray set was provided.'
+      );
     } else if (p.includes('spice') || p.includes('oscilloscope') || p.includes('transient') || p.includes('waveform')) {
-      actionPlan.matchedTool = 'solve_spice_circuit';
-      const spice = new SpiceEngine();
-      spice.addVoltageSource('V1', 'in', '0', 5.0);
-      spice.addResistor('R1', 'in', 'out', 1000.0);
-      spice.addCapacitor('C1', 'out', '0', 1e-6);
-      const trans = spice.runTransient(0.006, 0.00005);
-      actionPlan.toolInput = { rOhms: 1000, cFarads: 1e-6 };
-      actionPlan.result = trans;
-
-      actionPlan.assistantMessage = `Solved non-linear analog circuit transient response via SPICE Modified Nodal Analysis (MNA). Time constant τ = 1.00 ms, 10%-90% Rise Time = 2.20 ms, Cutoff Frequency = 159.2 Hz. Peak voltage: 4.99 V across 121 time steps.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Filter Resistor', key: 'rOhms', value: 1000, unit: 'Ω' },
-        { label: 'Filter Capacitor', key: 'cFarads', value: 1e-6, unit: 'F' }
-      ];
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_spice_circuit',
+        'No caller-supplied circuit and transient-analysis controls were provided. No RC example was generated.'
+      );
     } else if (p.includes('flowsheet') || p.includes('pfd') || p.includes('recycle') || p.includes('wegstein')) {
-      actionPlan.matchedTool = 'solve_flowsheet';
-      const flowsheet = new ProcessFlowsheetSolver();
-      const feed = new ProcessStream('S1', {
-        temperatureC: 25.0,
-        pressureBar: 20.0,
-        molarFlowKmolHr: 100.0,
-        composition: { Methane: 0.7, Ethane: 0.2, Propane: 0.1 }
-      });
-      flowsheet.addStream(feed);
-      flowsheet.addMixer('MIX1', ['S1', 'S_RECYCLE'], 'S2');
-      flowsheet.addFlashDrum('FLASH1', 'S2', 'S_VAPOR', 'S_LIQ', { temperatureC: -20.0, pressureBar: 18.0 });
-      flowsheet.addSplitter('SPLIT1', 'S_LIQ', 'S_PRODUCT', 'S_RECYCLE', { splitRatio: 0.7 });
-      const sol = flowsheet.solveWithWegstein(50, 1e-4);
-      actionPlan.toolInput = { feedFlow: 100.0, flashTemp: -20.0 };
-      actionPlan.result = sol;
-
-      actionPlan.assistantMessage = `Aspen HYSYS cyclic process flowsheet converged in ${sol.iterations} Wegstein iterations. Overall material balance error: ${(sol.recycleErrorKmolHr || 0.00006).toFixed(6)} kmol/hr. Sales gas vapor: 98.73 kmol/hr, Liquid NGL condensate: 1.27 kmol/hr.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Separator Temperature', key: 'flashTemp', value: -20.0, unit: '°C' },
-        { label: 'Feed Pressure', key: 'feedPressure', value: 20.0, unit: 'bar' }
-      ];
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_flowsheet',
+        'The legacy macro has no validated user-provided flowsheet schema or thermodynamic models. No convergence or material-balance result was produced.'
+      );
     } else if (p.includes('step') || p.includes('iso 10303') || p.includes('brep export')) {
-      actionPlan.matchedTool = 'export_step';
-      const box = BRepPrimitives.createBox(40, 60, 20, 'OmniEng_Solid');
-      const stepText = StepTranslator.exportSTEP(box);
-      actionPlan.toolInput = { width: 40, height: 60, depth: 20 };
-      actionPlan.result = { stepText, length: stepText.length };
-
-      actionPlan.assistantMessage = `Generated standard ISO 10303-21 STEP AP214 exchange structure with CLOSED_SHELL, ADVANCED_FACE, and CARTESIAN_POINT entities (${(stepText.length / 1024).toFixed(1)} KB). Ready for SolidWorks/Siemens NX import.`;
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'export_step',
+        'No caller-supplied geometry was provided. The legacy macro does not create a bundled box.'
+      );
     } else if (p.includes('gerber') || p.includes('rs-274x') || p.includes('pcb export')) {
-      actionPlan.matchedTool = 'export_gerber';
-      const pkg = GerberExporter.generatePackage([
-        { net: 'CLK', x1: 10, y1: 10, x2: 40, y2: 10, widthMm: 0.25 }
-      ], [
-        { net: 'CLK', x: 10, y: 10, shape: 'round', widthMm: 1.5, heightMm: 1.5, holeMm: 0.8 }
-      ], [], { xMin: 0, yMin: 0, xMax: 100, yMax: 80 });
-      actionPlan.toolInput = { layer: 'TopCopper' };
-      actionPlan.result = pkg;
-
-      actionPlan.assistantMessage = `Generated RS-274X Extended Gerber package: TopCopper.gtl, SolderMask.gts, Drill.drl, BoardOutline.gko with standard aperture macro declarations (%ADD10C...). Ready for JLCPCB/Eurocircuits fabrication.`;
-
-    } else if (p.includes('sketch') || p.includes('variational') || p.includes('d-cubed') || p.includes('geometric constraint')) {
-      actionPlan.matchedTool = 'solve_variational_sketch';
-      const solver = new VariationalConstraintSolver();
-      solver.addPoint('P1', 0, 0, true);
-      solver.addPoint('P2', 38, 2, false);
-      solver.addPoint('P3', 2, 28, false);
-      solver.addConstraint({ type: 'HORIZONTAL', point1: 'P1', point2: 'P2' });
-      solver.addConstraint({ type: 'VERTICAL', point1: 'P1', point2: 'P3' });
-      solver.addConstraint({ type: 'DISTANCE', point1: 'P1', point2: 'P2', value: 40.0 });
-      solver.addConstraint({ type: 'DISTANCE', point1: 'P1', point2: 'P3', value: 30.0 });
-      const sol = solver.solve();
-      actionPlan.toolInput = { pointCount: 3, constraintCount: 4 };
-      actionPlan.result = sol;
-      actionPlan.modalToOpen = 'modal-variational-sketcher';
-      actionPlan.assistantMessage = `D-Cubed Parity 2D Variational Geometric Constraint Solver converged in ${sol.iterations} iterations (residual: ${sol.residualNorm.toExponential(4)}). Degree-of-Freedom status: ${sol.converged ? 'Well-Constrained' : 'Under-Constrained'}. Coordinates snapped to exact dimensional equations.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'P2 Width', key: 'sketchWidth', value: 40.0, unit: 'mm' },
-        { label: 'P3 Height', key: 'sketchHeight', value: 30.0, unit: 'mm' }
-      ];
-
-    } else if (p.includes('heal') || p.includes('dirty cad') || p.includes('sliver') || p.includes('micro-gap') || p.includes('stitch') || p.includes('watertight')) {
-      actionPlan.matchedTool = 'heal_cad_geometry';
-      const healer = new TopologicalHealingEngine({ tolerance: 0.05 });
-      const dirtyModel = {
-        vertices: [
-          { id: 'v1', x: 0, y: 0, z: 0 },
-          { id: 'v2', x: 0.02, y: 0.01, z: 0 },
-          { id: 'v3', x: 10, y: 0, z: 0 },
-          { id: 'v4', x: 10, y: 10, z: 0 },
-          { id: 'v5', x: 0, y: 10, z: 0 }
-        ],
-        faces: [
-          { id: 'f1', vertexIds: ['v1', 'v3', 'v4', 'v5'] },
-          { id: 'f_sliver', vertexIds: ['v1', 'v2', 'v3'] }
-        ]
-      };
-      const healRes = healer.healSolid(dirtyModel, { tolerance: 0.05 });
-      actionPlan.toolInput = { dirtyModel };
-      actionPlan.result = healRes;
-      actionPlan.modalToOpen = 'modal-topological-healer';
-      actionPlan.assistantMessage = `Topological CAD Healing Engine repaired solid B-Rep: Stitched ${healRes.stitchedVerticesCount} micro-gap vertices (<0.05mm) and collapsed ${healRes.collapsedSliverCount} degenerate sliver faces. Solid is 100% watertight (Manifold: true).`;
-
-    } else if (p.includes('dls') || p.includes('levenberg-marquardt') || p.includes('merit function') || p.includes('optical optimizer') || p.includes('zemax opt')) {
-      actionPlan.matchedTool = 'optimize_optical_dls';
-      const optimizer = new DampedLeastSquaresOptimizer();
-      const system = {
-        entrancePupilRadius: 10.0,
-        targetEfl: 50.0,
-        surfaces: [
-          { radius: 50.0, thickness: 5.0, refractiveIndex: 1.5168 },
-          { radius: -80.0, thickness: 48.0, refractiveIndex: 1.0 },
-          { radius: 0.0, thickness: 0.0, refractiveIndex: 1.0 }
-        ]
-      };
-      const variables = [{ surfaceIndex: 0, param: 'radius', min: 20.0, max: 100.0 }];
-      const optRes = optimizer.optimize(system, variables, []);
-      actionPlan.toolInput = { variables };
-      actionPlan.result = optRes;
-      actionPlan.modalToOpen = 'modal-dls-optimizer';
-      actionPlan.assistantMessage = `Damped Least Squares (DLS) Optical Optimizer: Converged across ${optRes.iterations || 8} Levenberg-Marquardt iterations. Initial merit: ${optRes.initialMerit ? optRes.initialMerit.toFixed(3) : '253.952'}, Final merit: ${optRes.finalMerit ? optRes.finalMerit.toFixed(3) : '250.000'} (+${optRes.improvementPercent ? optRes.improvementPercent.toFixed(1) : '1.6'}% improvement). Aberration residual minimized.`;
-
-    } else if (p.includes('asme viii') || p.includes('section viii') || p.includes('div 2') || p.includes('scl') || p.includes('linearization') || p.includes('membrane stress') || (p.includes('asme') && p.includes('pressure vessel'))) {
-      actionPlan.matchedTool = 'evaluate_asme_section_viii';
-      const analyzer = new ASMESectionVIIIDiv2Analyzer({
-        designPressureMpa: 10.0,
-        designTemperatureC: 150.0,
-        material: 'SA-516 Grade 70',
-        allowableStressS: 138.0
-      });
-      const sclPoints = [
-        { x: -12.5, stressMpa: 110.0 },
-        { x: 0.0, stressMpa: 90.0 },
-        { x: 12.5, stressMpa: 80.0 }
-      ];
-      const sclRes = analyzer.linearizeStressClassificationLine(sclPoints, 25.0);
-      actionPlan.toolInput = { sclPoints, wallThicknessMm: 25.0 };
-      actionPlan.result = sclRes;
-      actionPlan.modalToOpen = 'modal-asme-report';
-      actionPlan.assistantMessage = `ASME Section VIII Div 2 Part 5 Design-by-Analysis certified: Membrane stress Pm = ${sclRes.membraneStressPm.toFixed(2)} MPa (Limit: ${sclRes.limits.allowable_S} MPa, Margin: +${((sclRes.safetyFactors.membrane - 1) * 100).toFixed(1)}%), Bending Pb = ${sclRes.bendingStressPb.toFixed(2)} MPa. Overall status: ${sclRes.evaluation.overallConforms ? 'CONFORMS / SAFE' : 'NON-CONFORMANT'}.`;
-
-    } else if (p.includes('cad diff') || p.includes('visual diff') || p.includes('diff cad') || p.includes('compare revision') || p.includes('model diff')) {
-      actionPlan.matchedTool = 'diff_3d_cad_models';
-      const diffEngine = new GitCADVisualDiffEngine();
-      const modelA = { faces: [{ id: 'f1', area: 10, normal: [0, 0, 1] }, { id: 'f2', area: 15, normal: [1, 0, 0] }] };
-      const modelB = { faces: [{ id: 'f1', area: 10, normal: [0, 0, 1] }, { id: 'f3', area: 12, normal: [0, 1, 0] }] };
-      const diffRes = diffEngine.compareRevisions(modelA, modelB);
-      actionPlan.toolInput = { revA: 'REV_A', revB: 'REV_B' };
-      actionPlan.result = diffRes;
-      actionPlan.modalToOpen = 'modal-cad-diff';
-      actionPlan.assistantMessage = `3D CAD Visual B-Rep Diff complete: Found ${diffRes.summary.addedCount} Added face (green), ${diffRes.summary.removedCount} Removed face (red), and ${diffRes.summary.unchangedCount} Unchanged faces. Maximum wall-thickness delta: ${diffRes.maxThicknessReductionMm.toFixed(2)} mm.`;
-
-    } else if (p.includes('ebom') || p.includes('bill of materials') || p.includes('cost rollup') || p.includes('consolidate hardware') || p.includes('hardware consolidation')) {
-      actionPlan.matchedTool = 'rollup_ebom_costs';
-      const bom = new EngineeringBOMManager();
-      const root = {
-        partNumber: 'UAV-001',
-        name: 'Hexacopter Surveillance Drone',
-        children: [
-          { partNumber: 'FRM-01', name: 'Carbon Fiber Quad Frame', quantity: 1, unitCostUsd: 120.0, unitMassKg: 0.65 },
-          { partNumber: 'MTR-01', name: '2212 920KV BLDC Motors', quantity: 4, unitCostUsd: 22.0, unitMassKg: 0.055 },
-          { partNumber: 'FST-M3-8', name: 'M3x8 Titanium Fastener', quantity: 24, unitCostUsd: 0.35, unitMassKg: 0.001 }
-        ]
-      };
-      bom.setRootAssembly(root);
-      const rolledUp = bom.computeRollUp();
-      const csv = bom.exportToCSV();
-      actionPlan.toolInput = { rootPart: 'UAV-001' };
-      actionPlan.result = { rolledUp, csv };
-      actionPlan.modalToOpen = 'modal-ebom-manager';
-      actionPlan.assistantMessage = `Engineering BOM Hierarchical Roll-Up complete: Total Assembly Mass: ${rolledUp.totalMassKg.toFixed(2)} kg, Total Procurement Cost: $${rolledUp.totalCostUsd.toFixed(2)}. Single-level hardware consolidation identified 24 M3x8 Titanium Fasteners. CSV export generated.`;
-
-    } else if (p.includes('sheet metal') || p.includes('k-factor') || p.includes('flat blank') || p.includes('bend deduction') || p.includes('unfold')) {
-      actionPlan.matchedTool = 'unfold_sheet_metal';
-      const unfolder = new SheetMetalUnfolder({ defaultKFactor: 0.44 });
-      const flat = unfolder.unfoldFlange(2.0, 3.0, 90.0, 50.0, 50.0);
-      actionPlan.toolInput = { thicknessMm: 2.0, bendRadiusMm: 3.0, angleDeg: 90.0 };
-      actionPlan.result = flat;
-      actionPlan.assistantMessage = `DIN 6935 Sheet Metal Unfolder: Neutral axis K-factor = 0.440. Bend Allowance (BA) = ${flat.bendAllowanceMm.toFixed(2)} mm, Bend Deduction (BD) = ${flat.bendDeductionMm.toFixed(2)} mm. Developed 2D flat blank length: ${flat.totalDevelopedLengthMm.toFixed(2)} mm.`;
-
-    } else if (p.includes('gdt') || p.includes('gd&t') || p.includes('true position') || p.includes('bonus tolerance') || p.includes('mmc') || p.includes('y14.5')) {
-      actionPlan.matchedTool = 'inspect_gdt_tolerance';
-      const gdtRes = GDTEngine.evaluateTruePosition({
-        basicX: 50.0, basicY: 25.0,
-        actualX: 50.1, actualY: 25.05,
-        nominalDia: 10.0, actualDia: 10.3,
-        mmcDia: 10.0,
-        specifiedTolerance: 0.5
-      });
-      actionPlan.toolInput = { basicX: 50.0, basicY: 25.0, toleranceMm: 0.5 };
-      actionPlan.result = gdtRes;
-      actionPlan.assistantMessage = `ASME Y14.5-2018 GD&T Feature Control Frame evaluated: Position error diameter = ${gdtRes.positionErrorDiaMm.toFixed(4)} mm. Bonus tolerance at MMC = ${gdtRes.bonusToleranceMm.toFixed(4)} mm (Total Allowable: ${gdtRes.totalAllowableToleranceMm.toFixed(4)} mm). Verdict: ${gdtRes.conforms ? 'CONFORMS' : 'OUT_OF_TOLERANCE'}.`;
-
-    } else if (p.includes('sparse multifrontal') || p.includes('cholesky 100k') || p.includes('direct sparse') || p.includes('amd ordering')) {
-      actionPlan.matchedTool = 'solve_sparse_multifrontal';
-      const solver = new WasmSparseMultifrontalSolver(50);
-      for (let i = 0; i < 50; i++) {
-        solver.addEntry(i, i, 2.0);
-        if (i + 1 < 50) { solver.addEntry(i, i + 1, -1.0); solver.addEntry(i + 1, i, -1.0); }
-      }
-      const fact = solver.factorize();
-      const sol = solver.solve(new Float64Array(50).fill(1.0));
-      actionPlan.toolInput = { N: 50 };
-      actionPlan.result = { fact, sol };
-      actionPlan.assistantMessage = `Direct Sparse Multifrontal Cholesky Solver (LEAF AMD ordering): Factored and solved symmetric positive definite system (N=50). nnz(L) = ${fact.nnzL}, Fill ratio = ${fact.fillRatio.toFixed(1)}x, Relative residual = ${sol.relativeResidual.toExponential(3)}. Out-of-core scaling validated to 100k unknowns.`;
-
-    } else if (p.includes('parallel pcg') || p.includes('gpu pcg') || p.includes('csr spmv') || p.includes('jacobi pcg')) {
-      actionPlan.matchedTool = 'solve_gpu_parallel_pcg';
-      const solver = new GPUParallelPCGSolver({ maxIterations: 500, tolerance: 1e-6 });
-      const N = 50;
-      const rowPtr = new Int32Array(N + 1);
-      const colIndices = [];
-      const values = [];
-      for (let i = 0; i < N; i++) {
-        rowPtr[i] = colIndices.length;
-        if (i > 0) { colIndices.push(i - 1); values.push(-1.0); }
-        colIndices.push(i); values.push(2.0);
-        if (i < N - 1) { colIndices.push(i + 1); values.push(-1.0); }
-      }
-      rowPtr[N] = colIndices.length;
-      const csr = { N, nnz: values.length, rowPtr, colIndices: new Int32Array(colIndices), values: new Float64Array(values) };
-      const pcgRes = solver.solve(csr, new Float64Array(N).fill(1.0));
-      actionPlan.toolInput = { N: 50 };
-      actionPlan.result = pcgRes;
-      actionPlan.assistantMessage = `Parallel PCG Solver with Jacobi Preconditioning: Converged in ${pcgRes.iterations} iterations. Final relative residual: ${pcgRes.relativeResidual.toExponential(3)}, Throughput: ${pcgRes.throughputGFlops} GFlop/s (${pcgRes.hardwareAcceleration}).`;
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'export_gerber',
+        'No caller-supplied PCB layout, nets, apertures, or bounds were provided. No manufacturing files were generated.'
+      );
+    } else if (
+      p.includes('sketch') ||
+      p.includes('variational') ||
+      p.includes('d-cubed') ||
+      p.includes('geometric constraint')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_variational_sketch',
+        'No caller-supplied sketch points, constraints, or solver controls were provided.'
+      );
+    } else if (
+      p.includes('heal') ||
+      p.includes('dirty cad') ||
+      p.includes('sliver') ||
+      p.includes('micro-gap') ||
+      p.includes('stitch') ||
+      p.includes('watertight')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'heal_cad_geometry',
+        'No caller-supplied geometry or healing tolerance was provided.'
+      );
+    } else if (
+      p.includes('dls') ||
+      p.includes('levenberg-marquardt') ||
+      p.includes('merit function') ||
+      p.includes('optical optimizer') ||
+      p.includes('zemax opt')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'optimize_optical_dls',
+        'No caller-supplied optical system, merit operands, variable bounds, or optimizer controls were provided.',
+        'modal-dls-optimizer'
+      );
+    } else if (
+      p.includes('asme viii') ||
+      p.includes('section viii') ||
+      p.includes('div 2') ||
+      p.includes('scl') ||
+      p.includes('linearization') ||
+      p.includes('membrane stress') ||
+      (p.includes('asme') && p.includes('pressure vessel'))
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'evaluate_asme_section_viii',
+        'No caller-supplied stress classification line or review limits were provided.',
+        'modal-asme-report'
+      );
+    } else if (
+      p.includes('cad diff') ||
+      p.includes('visual diff') ||
+      p.includes('diff cad') ||
+      p.includes('revision') ||
+      p.includes('model diff')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'diff_3d_cad_models',
+        'Two caller-supplied model revisions are required. No comparison models were synthesized.',
+        'modal-cad-diff'
+      );
+    } else if (
+      p.includes('ebom') ||
+      p.includes('bill of materials') ||
+      p.includes('cost rollup') ||
+      p.includes('consolidate hardware') ||
+      p.includes('hardware consolidation')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'rollup_ebom_costs',
+        'This prompt route has no caller-supplied assembly hierarchy.',
+        'modal-ebom-manager'
+      );
+    } else if (
+      p.includes('sheet metal') ||
+      p.includes('k-factor') ||
+      p.includes('flat blank') ||
+      p.includes('bend deduction') ||
+      p.includes('unfold')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'unfold_sheet_metal',
+        'Explicit thickness, radius, angle, K-factor, and flange geometry are required.'
+      );
+    } else if (
+      p.includes('gdt') ||
+      p.includes('gd&t') ||
+      p.includes('true position') ||
+      p.includes('bonus tolerance') ||
+      p.includes('mmc') ||
+      p.includes('y14.5')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'inspect_gdt_tolerance',
+        'No caller-supplied datum frame, measured geometry, feature-control frame, or tolerance was provided.'
+      );
+    } else if (
+      p.includes('sparse multifrontal') ||
+      p.includes('cholesky 100k') ||
+      p.includes('direct sparse') ||
+      p.includes('amd ordering')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_sparse_multifrontal',
+        'A caller-supplied sparse matrix and right-hand side are required.'
+      );
+    } else if (
+      p.includes('parallel pcg') ||
+      p.includes('gpu pcg') ||
+      p.includes('csr spmv') ||
+      p.includes('jacobi pcg')
+    ) {
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'solve_gpu_parallel_pcg',
+        'A caller-supplied sparse matrix, right-hand side, and solver controls are required.'
+      );
     } else if (p.includes('fmi') || p.includes('fmu') || p.includes('co-simulation') || p.includes('cosim master')) {
-      actionPlan.matchedTool = 'run_fmi_cosimulation';
-      const master = new FmiMasterEngine({ stepSizeSec: 0.001, totalTimeSec: 0.1 });
-      const slave1 = new FmuSlave({ instanceName: 'Controller', variables: [{ vr: 1, initial: 10.0, causality: 'output' }] });
-      const slave2 = new FmuSlave({ instanceName: 'Actuator', variables: [{ vr: 2, initial: 0.0, causality: 'input' }] });
-      master.addSlave(slave1);
-      master.addSlave(slave2);
-      master.addConnection(slave1, 1, slave2, 2);
-      const fmiRes = master.simulate();
-      actionPlan.toolInput = { totalTimeSec: 0.1 };
-      actionPlan.result = fmiRes;
-      actionPlan.assistantMessage = `FMI 3.0 Cross-Domain Co-Simulation Master: Successfully coupled Controller and Actuator FMUs across ${fmiRes.totalSteps} communication steps. Converged with 0 algebraic rollback steps.`;
-
+      markLegacyMacroUnavailable(
+        actionPlan,
+        'run_fmi_cosimulation',
+        'Caller-supplied FMUs, connections, and communication-step settings are required.'
+      );
     } else {
-      // Default: CAD Geometry creation / manipulation
-      actionPlan.matchedTool = 'create_cad_geometry';
-      actionPlan.toolInput = { type: 'cylinder', name: 'Lens_Barrel', dimensions: { radius: 15, height: 40 } };
-      actionPlan.result = BRepPrimitives.createCylinder(15, 40, 24, 'Lens_Barrel');
-
-      actionPlan.assistantMessage = `Generated parametric CAD solid "${actionPlan.toolInput.name}" with B-Rep volume of ${actionPlan.result.computeVolume().toFixed(1)} mm³. You can edit its radius and height manually in the Inspector panel.`;
-      actionPlan.suggestedManualEdits = [
-        { label: 'Radius', key: 'radius', value: 15, unit: 'mm' },
-        { label: 'Height', key: 'height', value: 40, unit: 'mm' }
-      ];
+      actionPlan.assistantMessage =
+        'The legacy keyword macro did not match a supported route. No geometry or engineering calculation was created.';
     }
 
+    const hasAppliedInputs = Boolean(actionPlan.toolInput && Object.keys(actionPlan.toolInput).length > 0);
+    actionPlan.inputOrigin = actionPlan.inputOrigin || (hasAppliedInputs ? 'user-prompt' : 'none');
+    actionPlan.assistantMessage = [
+      'Experimental legacy macro; not independently validated and not a result for the active project.',
+      hasAppliedInputs ? `Inputs used: ${summarizeMacroInputs(actionPlan.toolInput)}.` : 'No inputs were applied.',
+      actionPlan.assistantMessage
+    ].join(' ');
+
     // Register into non-linear undo/redo CommandJournal
-    if (this.journal) {
+    if (this.journal && actionPlan.matchedTool) {
       this.journal.execute(
         actionPlan.matchedTool || 'AI_ACTION',
         actionPlan.toolInput || {},

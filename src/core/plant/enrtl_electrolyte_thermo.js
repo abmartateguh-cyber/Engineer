@@ -6,9 +6,9 @@
  * with short-range eNRTL energy parameters. Specifically models acid gas scrubbing
  * of CO2 in aqueous Monoethanolamine (MEA) solvent systems.
  * 
- * Parity standard: Aspen Properties eNRTL / ProMax Amine Treating.
+ * Unverified comparison target: Aspen Properties eNRTL / ProMax Amine Treating.
  * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class ElectrolyteNRTLModel {

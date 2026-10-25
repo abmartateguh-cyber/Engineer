@@ -1,24 +1,23 @@
 /**
- * OmniEng Phase 9 Verification Suite:
- * PKCS#11 / FIPS 140-3 Hardware Security Module, Enterprise IAM (RBAC/ABAC/ITAR),
- * and CycloneDX / SPDX Software Bill of Materials (SBOM) Generation
+ * Legacy security helper smoke checks:
+ * test-only signing fixture, unenforced policy examples, and runtime SBOM unavailability.
  */
 
 'use strict';
 
 const assert = require('assert');
-const { PKCS11HardwareToken, CKR, CKU } = require('../src/core/security/pkcs11_smartcard');
+const { PKCS11HardwareToken, CKR, CKU } = require('./support/pkcs11_smartcard_simulator');
 const { EnterpriseIAM, ACTIONS, CLEARANCE_LEVELS } = require('../src/core/security/enterprise_iam');
 const { ToolQualificationKit } = require('../src/core/compliance/tool_qualification_kit');
 
 console.log('================================================================');
-console.log('   RUNNING PHASE 9: PLM COLLABORATION & HARDWARE SECURITY      ');
+console.log('   LEGACY SECURITY FIXTURE AND POLICY EXAMPLE CHECKS            ');
 console.log('================================================================\n');
 
 // -----------------------------------------------------------------------------
-// Test 1: OASIS PKCS#11 v3.0 / FIPS 140-3 Hardware Cryptographic Token
+// Test 1: In-process signing fixture (not a PKCS#11 provider or validated module)
 // -----------------------------------------------------------------------------
-console.log('[P9-1] PKCS#11 & FIPS 140-3 Hardware Security Token...');
+console.log('[P9-1] In-process software signing test fixture...');
 const hsm = new PKCS11HardwareToken({ userPin: '789123', maxPinAttempts: 3 });
 
 assert(hsm.C_Initialize() === CKR.CKR_OK, 'HSM C_Initialize must succeed');
@@ -51,15 +50,23 @@ const sTamper = tamperHsm.C_OpenSession(0).hSession;
 tamperHsm.C_Login(sTamper, CKU.CKU_USER, 'BAD1');
 const lockRes = tamperHsm.C_Login(sTamper, CKU.CKU_USER, 'BAD2');
 assert(lockRes === CKR.CKR_PIN_LOCKED, 'Second bad attempt must trigger lockout');
-assert(tamperHsm.isZeroized === true, 'FIPS 140-3 Level 4 zeroization must wipe key store');
+assert(tamperHsm.isZeroized === true, 'Test fixture clears its ephemeral in-memory key store after lockout');
 assert(tamperHsm.keyStore.size === 0, 'Keys must be wiped after lockout');
 
-console.log(`  ✓ [P9-1] PKCS#11 FIPS 140-3 HSM: ECDSA P-384 signature verified, anti-tamper zeroization lockout confirmed`);
+console.log('  ✓ [P9-1] Ephemeral software test signature verified and test key store cleared after lockout');
 
 // -----------------------------------------------------------------------------
-// Test 2: Enterprise RBAC & ABAC Multi-User Authorization (ITAR & Clearances)
+// Test 2: Caller-supplied local policy examples; no identity or access is enforced.
 // -----------------------------------------------------------------------------
-console.log('\n[P9-2] Enterprise RBAC & ABAC Multi-User Authorization Engine...');
+console.log('\n[P9-2] Unenforced caller-supplied role and attribute examples...');
+
+function assertNotAuthorizationExample(result) {
+  assert.strictEqual(result.status, 'example-only');
+  assert.strictEqual(result.validationLevel, 'experimental');
+  assert.strictEqual(result.identityVerified, false);
+  assert.strictEqual(result.enforced, false);
+  assert.strictEqual(result.auditRecordPersisted, false);
+}
 
 // User 1: Chief Engineer, Top Secret, ITAR Certified
 const chiefEng = {
@@ -95,51 +102,45 @@ const civilProp = {
   isITAR: false
 };
 
-// Test A: Chief Engineer approves ECO on ITAR Hypersonic Wing -> GRANTED
+// Test A: Local example rule accepts the supplied attribute values.
 const resA = EnterpriseIAM.canApproveECO(chiefEng, itarWing);
-assert(resA.granted === true, 'Chief Engineer must be granted ECO approval on assigned ITAR project');
+assert(resA.granted === true, 'Local example rule accepts the supplied ECO attributes');
+assertNotAuthorizationExample(resA);
 
-// Test B: Stress Analyst tries to approve ECO on Civil Propeller -> DENIED (RBAC: StressAnalyst cannot approve ECOs)
+// Test B: The local role example returns false for this supplied combination.
 const resB = EnterpriseIAM.canApproveECO(stressAnalyst, civilProp);
-assert(resB.granted === false && resB.reason.includes('RBAC'), 'Stress analyst cannot approve ECOs');
+assert(resB.granted === false && resB.reason.includes('RBAC'), 'Local role example returns its configured result');
+assertNotAuthorizationExample(resB);
 
-// Test C: Stress Analyst tries to read ITAR Hypersonic Wing -> DENIED (ABAC: Clearance + ITAR + Project)
+// Test C: The local classification example returns false for these supplied attributes.
 const resC = EnterpriseIAM.evaluateAccess({
   user: stressAnalyst,
   action: ACTIONS.READ,
   resource: itarWing
 });
-assert(resC.granted === false, 'Junior analyst must be denied access to ITAR Top Secret project');
+assert(resC.granted === false, 'Local example rule returns false for the supplied classification attributes');
+assertNotAuthorizationExample(resC);
 
-// Test D: Stress Analyst modifies Civil Propeller -> GRANTED
+// Test D: Local example rule accepts the supplied project and action attributes.
 const resD = EnterpriseIAM.evaluateAccess({
   user: stressAnalyst,
   action: ACTIONS.MODIFY_CAD,
   resource: civilProp
 });
-assert(resD.granted === true, 'Stress analyst can modify assigned unclassified civil drone CAD');
+assert(resD.granted === true, 'Local example rule accepts the supplied modification attributes');
+assertNotAuthorizationExample(resD);
 
-console.log('  ✓ [P9-2] Enterprise IAM: Role boundaries, classification hierarchy, and ITAR compliance strictly enforced');
+console.log('  ✓ [P9-2] Local policy examples returned decisions marked unverified and unenforced');
 
 // -----------------------------------------------------------------------------
-// Test 3: CycloneDX v1.5 & SPDX v2.3 Software Bill of Materials (SBOM)
+// Test 3: Runtime SBOM generation remains unsupported.
 // -----------------------------------------------------------------------------
-console.log('\n[P9-3] CycloneDX v1.5 & SPDX v2.3 SBOM Regulatory Generator...');
+console.log('\n[P9-3] Runtime SBOM generation availability...');
 const qualKit = new ToolQualificationKit();
+assert.throws(() => qualKit.generateCycloneDX_SBOM(), /Runtime SBOM generation is unavailable/);
+assert.throws(() => qualKit.generateSPDX_SBOM(), /Runtime SBOM generation is unavailable/);
 
-const cdx = qualKit.generateCycloneDX_SBOM();
-assert(cdx.bomFormat === 'CycloneDX', 'Must format as CycloneDX');
-assert(cdx.specVersion === '1.5', 'CycloneDX spec version 1.5');
-assert(cdx.components.length >= 9, 'Must list all core engineering modules');
-assert(cdx.components.every(c => c.hashes && c.hashes[0].alg === 'SHA-256'), 'All components must have SHA-256 integrity hashes');
-assert(cdx.vulnerabilities.length === 0, 'Clean zero-vulnerability record');
-
-const spdx = qualKit.generateSPDX_SBOM();
-assert(spdx.spdxVersion === 'SPDX-2.3', 'SPDX spec version 2.3');
-assert(spdx.packages.length >= 9, 'SPDX packages must reflect components');
-assert(spdx.packages[0].checksums[0].algorithm === 'SHA256', 'SPDX SHA256 checksums');
-
-console.log(`  ✓ [P9-3] SBOM Generator: CycloneDX v1.5 & SPDX v2.3 generated with ${cdx.components.length} verified packages`);
+console.log('  ✓ [P9-3] Runtime SBOM reports fail closed; reviewed build SBOMs are generated separately');
 
 // -----------------------------------------------------------------------------
 // Test 4: Phase 9 Security, PKCS#11 & IAM IPC Channel Registration & Integration
@@ -153,7 +154,7 @@ assert(isChannelRegistered('omni:pkcs11-verify-signature'), 'Must register omni:
 assert(isChannelRegistered('omni:iam-evaluate-access'), 'Must register omni:iam-evaluate-access');
 assert(isChannelRegistered('omni:generate-sbom'), 'Must register omni:generate-sbom');
 
-console.log('  ✓ [P9-4] All 4 Phase 9 Security & IAM IPC Channels Registered & Schema-Validated');
+console.log('  ✓ [P9-4] All 4 Phase 9 Security & IAM IPC Channels Registered');
 
 console.log('\n================================================================');
 console.log('   ALL 4 PHASE 9 TESTS PASSED SUCCESSFULLY!                    ');

@@ -1,9 +1,7 @@
 /**
- * OmniEng Immutable Audit Ledger
- * 
- * Provides cryptographically chained, tamper-evident audit logging for aerospace (DO-178C DAL-A),
- * automotive (ISO 26262 ASIL-D), and nuclear/ASME compliance signoffs.
- * Each entry is linked to its predecessor via SHA-256 merkle hash chaining.
+ * Experimental in-memory hash-chain diagnostic.
+ * The mutable JavaScript array is not immutable, durable, identity-bound, or suitable as
+ * a regulated audit record or compliance signoff.
  */
 
 'use strict';
@@ -37,7 +35,7 @@ class ImmutableAuditLedger {
   }
 
   /**
-   * Records an engineering or regulatory action into the immutable ledger.
+   * Adds an entry to the current in-memory hash chain.
    * @param {string} author 
    * @param {string} actionType 
    * @param {Object} details 
@@ -106,11 +104,14 @@ class ImmutableAuditLedger {
   }
 
   /**
-   * Generates a regulatory compliance dossier summary
+   * Generates an experimental hash-chain diagnostic summary.
    */
   generateDossierReport() {
     const integrity = this.verifyChainIntegrity();
     return {
+      validationLevel: 'experimental',
+      persistent: false,
+      complianceEvidence: false,
       chainLength: this.chain.length,
       genesisHash: this.genesisHash,
       latestHash: this.chain[this.chain.length - 1].entryHash,

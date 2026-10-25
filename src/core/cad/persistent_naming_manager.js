@@ -1,13 +1,14 @@
 /**
  * OmniEng Persistent Topological Naming Engine
  * 
- * Solves the classical parametric CAD "topological naming problem" matching Siemens NX / CATIA:
+ * Experimental attempt to track topological entities across feature changes:
  * 1. Semantic geometric fingerprinting for faces, edges, and vertices based on history ancestry.
  * 2. Stable naming graphs surviving upstream sketch alterations, extrusions, cuts, and patterns.
  * 3. Topological mutation tracking mapping parent entities to split, merged, or modified children.
  * 4. Automatic downstream feature re-attachment for fillets, chamfers, and assembly mates.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Naming stability has not been benchmarked against independently prepared edit sequences or
+ * compared with commercial CAD systems.
  */
 
 'use strict';
@@ -136,4 +137,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.PersistentNamingManager = PersistentNamingManager;
 }
-

@@ -3,7 +3,7 @@
  * Implements even/odd polynomial aspheres, Newton-Raphson ray intersection, 2x2 characteristic
  * matrix thin-film coatings, multi-field ray fans, and Monte Carlo manufacturing tolerancing.
  * 
- * 100% Proprietary In-House Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { Vector3 } = require('../math/linear_algebra');
@@ -15,8 +15,8 @@ class AsphericSurface {
     this.conic = options.conic !== undefined ? options.conic : 0.0; // k (0 = sphere)
     this.semiDiameter = options.semiDiameter || 15.0; // mm (clear aperture radius)
     this.thickness = options.thickness || 5.0; // mm to next surface
-    this.material = options.material || 'N-BK7';
-    this.refractiveIndex = options.refractiveIndex || 1.5168; // nd at 587.6nm
+    this.material = options.material ?? null;
+    this.refractiveIndex = options.refractiveIndex ?? null;
 
     // Even polynomial aspheric coefficients: alpha_4, alpha_6, alpha_8, alpha_10, alpha_12
     this.coefficients = Object.assign({
@@ -163,13 +163,13 @@ class AsphericSurface {
  * Characteristic Matrix (2x2 transfer matrix) for arbitrary N-layer dielectric stacks
  */
 class ThinFilmMultilayerCoating {
-  constructor(nameOrSubstrate = 'Broadband Anti-Reflective (BBAR)', substrateIndex = 1.5168) {
+  constructor(nameOrSubstrate = 'Thin-Film Coating', substrateIndex) {
     if (typeof nameOrSubstrate === 'number') {
       this.name = 'Thin-Film Coating';
       this.substrateIndex = nameOrSubstrate;
     } else {
       this.name = nameOrSubstrate;
-      this.substrateIndex = substrateIndex;
+      this.substrateIndex = Number.isFinite(substrateIndex) && substrateIndex > 0 ? substrateIndex : null;
     }
     this.layers = []; // [{ material: 'MgF2', index: 1.38, thicknessNm: 105.0 }, ...]
   }
@@ -183,11 +183,11 @@ class ThinFilmMultilayerCoating {
     return this;
   }
 
-  computeReflectanceTransmittance(wavelengthNm = 550.0, thetaDeg = 0.0, nSubstrate, nIncident = 1.0) {
+  computeReflectanceTransmittance(wavelengthNm, thetaDeg, nSubstrate, nIncident) {
     return this.evaluateCoating(wavelengthNm, thetaDeg, nSubstrate, nIncident);
   }
 
-  evaluate(wavelengthNm = 550.0, thetaDeg = 0.0, nSubstrate, nIncident = 1.0) {
+  evaluate(wavelengthNm, thetaDeg, nSubstrate, nIncident) {
     return this.evaluateCoating(wavelengthNm, thetaDeg, nSubstrate, nIncident);
   }
 
@@ -198,8 +198,12 @@ class ThinFilmMultilayerCoating {
    * @param {number} nSubstrate Refractive index of substrate (e.g. 1.52 for crown glass)
    * @param {number} nIncident Refractive index of incident medium (1.0 for air)
    */
-  evaluateCoating(wavelengthNm = 550.0, thetaDeg = 0.0, nSubstrate, nIncident = 1.0) {
-    nSubstrate = nSubstrate !== undefined ? nSubstrate : (this.substrateIndex || 1.5168);
+  evaluateCoating(wavelengthNm, thetaDeg, nSubstrate = this.substrateIndex, nIncident) {
+    if (![wavelengthNm, thetaDeg, nSubstrate, nIncident].every(Number.isFinite)
+      || wavelengthNm <= 0 || nSubstrate <= 0 || nIncident <= 0
+      || thetaDeg < 0 || thetaDeg >= 90) {
+      throw new TypeError('Thin-film evaluation requires explicit wavelength, angle, incident index, and substrate index.');
+    }
     const theta0Rad = (thetaDeg * Math.PI) / 180.0;
     const lambdaM = wavelengthNm * 1e-9;
 
@@ -372,28 +376,56 @@ class MultiFieldRayFanAnalyzer {
  * Monte Carlo Optical Manufacturing Tolerancing
  */
 class MonteCarloOpticalTolerancing {
+  /**
+   * @param {Array<Object>} surfaces
+   * @param {Object} toleranceSpec
+   * @param {number} [toleranceSpec.seed] - Optional unsigned 32-bit seed for repeatable samples
+   */
   constructor(surfaces = [], toleranceSpec = {}) {
+    const options = toleranceSpec && typeof toleranceSpec === 'object' ? toleranceSpec : {};
+    const { seed, ...configuredTolerances } = options;
+    if (seed !== undefined && (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff)) {
+      throw new RangeError('seed must be an unsigned 32-bit integer.');
+    }
+
     this.surfaces = surfaces;
+    this.seed = seed === undefined ? null : seed;
+    this.randomState = this.seed;
     this.toleranceSpec = Object.assign({
       radiusPercent: 0.2,       // +/- 0.2% radius tolerance
       thicknessMm: 0.05,        // +/- 50 um center thickness
       indexDelta: 0.0005,       // +/- 0.0005 nd index variation
       decenterMm: 0.02,         // +/- 20 um element decenter
       tiltMrad: 0.5             // +/- 0.5 mrad surface tilt
-    }, toleranceSpec);
+    }, configuredTolerances);
+  }
+
+  _random() {
+    if (this.seed === null) return Math.random();
+
+    this.randomState = (this.randomState + 0x6d2b79f5) >>> 0;
+    let value = this.randomState;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   }
 
   runTrials(numTrials = 100) {
+    if (!Number.isSafeInteger(numTrials) || numTrials <= 0) {
+      throw new RangeError('numTrials must be a positive safe integer.');
+    }
+
+    if (this.seed !== null) this.randomState = this.seed;
     const trials = [];
 
     for (let t = 0; t < numTrials; t++) {
       let perturbedRmsSpot = 12.0; // Baseline 12 um spot
       for (const surf of this.surfaces) {
-        // Gaussian perturbation
-        const rPerturb = (Math.random() - 0.5) * 2.0 * (surf.radius * this.toleranceSpec.radiusPercent * 0.01);
-        const tPerturb = (Math.random() - 0.5) * 2.0 * this.toleranceSpec.thicknessMm;
-        const nPerturb = (Math.random() - 0.5) * 2.0 * this.toleranceSpec.indexDelta;
-        const dPerturb = (Math.random() - 0.5) * 2.0 * this.toleranceSpec.decenterMm;
+        // Uniform perturbation within each configured tolerance bound.
+        const rPerturb = (this._random() - 0.5) * 2.0 * (surf.radius * this.toleranceSpec.radiusPercent * 0.01);
+        const tPerturb = (this._random() - 0.5) * 2.0 * this.toleranceSpec.thicknessMm;
+        const nPerturb = (this._random() - 0.5) * 2.0 * this.toleranceSpec.indexDelta;
+        const dPerturb = (this._random() - 0.5) * 2.0 * this.toleranceSpec.decenterMm;
 
         perturbedRmsSpot += Math.abs(rPerturb) * 0.15 + Math.abs(tPerturb) * 40.0 + Math.abs(nPerturb) * 2000.0 + Math.abs(dPerturb) * 80.0;
       }
@@ -411,6 +443,9 @@ class MonteCarloOpticalTolerancing {
 
     return {
       numTrials,
+      seed: this.seed,
+      reproducible: this.seed !== null,
+      randomAlgorithm: this.seed === null ? 'Math.random (seed unavailable)' : 'mulberry32-v1',
       nominalRmsSpotUm: 12.0,
       meanRmsSpotUm: meanSpot,
       p95RmsSpotUm: p95Spot,

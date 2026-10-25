@@ -1,8 +1,8 @@
 /**
  * OmniEng 10-Node Quadratic Tetrahedral Element (TET10) Engine
  * 
- * Commercial FEA Standard: Eliminates artificial volumetric shear locking
- * in bending-dominated structural mechanics (NAFEMS LE1 / LE10 Parity).
+ * Experimental quadratic tetrahedral formulation. No independent element validation or
+ * NAFEMS comparison is included.
  * 
  * Shape Functions:
  *   Corner nodes (i=0..3):     N_i  = (2*L_i - 1) * L_i
@@ -17,7 +17,7 @@
  *   alpha = 0.5854101966249685, beta = 0.1381966011250105
  *   Weights: w_g = 0.25 * Volume
  * 
- * 100% In-House Proprietary Formulation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

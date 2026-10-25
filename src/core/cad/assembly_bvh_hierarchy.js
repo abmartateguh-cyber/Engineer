@@ -6,7 +6,7 @@
  * 2. O(log N) interference fit detection and part collision queries.
  * 3. Hierarchical sub-assembly kinematic traversal.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

@@ -1,11 +1,11 @@
 /**
  * OmniEng Edge Blender: Rolling-Ball Fillet & Chamfer Generation Engine
- * Industrial Parity: Siemens NX / CATIA B-Rep Edge Blending & Chamfering
+ * Experimental implementation: Siemens NX / CATIA B-Rep Edge Blending & Chamfering
  *
  * Implements spherical envelope rolling-ball offset fillets, variable radius blends,
  * and asymmetric planar chamfers on 3D B-Rep solids and meshes.
  *
- * 100% In-House Algorithmic Geometry - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { Vector3 } = require('../math/linear_algebra');

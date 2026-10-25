@@ -1,13 +1,14 @@
 /**
- * OmniEng MIL-STD-810H Random Vibration (PSD) & Harmonic Response Engine
+ * OmniEng Experimental Random Vibration (PSD) & Harmonic Response Example
  * 
- * Provides aerospace launch & transport vibration qualification matching ANSYS / Nastran:
+ * Illustrates random-vibration and harmonic-response calculations:
  * 1. Modal Superposition Harmonic Response for base sinusoidal excitation.
  * 2. Power Spectral Density (PSD, g^2/Hz) integration across octave bands (20 Hz - 2000 Hz).
  * 3. Miles Equation & Gaussian 3-Sigma peak acceleration / stress evaluation.
  * 4. Rayleigh distribution cumulative damage fatigue cycle counting.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * This is not a MIL-STD-810H qualification workflow. No independent validation or comparison
+ * to a production solver is established.
  */
 
 'use strict';

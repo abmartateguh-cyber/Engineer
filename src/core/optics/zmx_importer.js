@@ -9,9 +9,9 @@
  * 
  * Seamlessly integrates into OmniEng Optical Engine, Sellmeier dispersion, and DLS optimizer.
  * 
- * Parity standard: Ansys Zemax OpticStudio / Synopsys CODE V.
+ * Unverified comparison target: Ansys Zemax OpticStudio / Synopsys CODE V.
  * 
- * 100% In-House Sovereign Implementation. Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -172,12 +172,7 @@ class ZemaxZmxImporter {
       }
     }
 
-    // Default primary wavelength if unspecified: 0.58756 um (d-line)
-    if (system.wavelengths.length === 0) {
-      system.wavelengths.push({ wavelengthUm: 0.58756, weight: 1.0 });
-    }
-
-    // Compute basic first-order optical properties (Paraxial Raytrace Approximation)
+    // Imported surfaces are retained even when material data are unavailable.
     system.metrics = this.evaluateParaxialMetrics(system);
 
     return system;
@@ -186,7 +181,9 @@ class ZemaxZmxImporter {
   /**
    * Evaluates first-order paraxial optics (EFL, Total Track, Aperture Stop).
    */
-  static evaluateParaxialMetrics(system) {
+  static evaluateParaxialMetrics(system, options = {}) {
+    if (!system || !Array.isArray(system.surfaces)) throw new TypeError('A parsed optical system is required.');
+    const materialIndices = options.materialIndices || {};
     let totalTrack = 0.0;
     const surfaces = system.surfaces;
 
@@ -196,23 +193,46 @@ class ZemaxZmxImporter {
       }
     }
 
-    // Simple effective power summation estimate for singlet/doublet
+    const missingMaterialIndices = [...new Set(surfaces
+      .filter((surface) => surface.glass && surface.glass.toUpperCase() !== 'AIR')
+      .filter((surface) => {
+        const value = materialIndices[surface.glass];
+        return !(typeof value === 'number' && Number.isFinite(value) && value > 0);
+      })
+      .map((surface) => surface.glass))];
+    if (missingMaterialIndices.length > 0) {
+      return {
+        status: 'unavailable',
+        surfaceCount: surfaces.length,
+        totalTrackLengthMm: totalTrack,
+        estimatedEflMm: null,
+        fNumberEstimate: null,
+        missingMaterialIndices,
+        reason: 'No source-reviewed refractive index was supplied for one or more imported materials.'
+      };
+    }
+
+    // Experimental thin-surface power sum using caller-supplied material indices.
     let totalPower = 0.0;
     for (const s of surfaces) {
       if (s.glass !== 'AIR' && isFinite(s.radius)) {
-        // Approximate n ~ 1.5168 (N-BK7)
-        const n = 1.5168;
+        const n = materialIndices[s.glass];
         totalPower += (n - 1.0) * s.curvature;
       }
     }
 
-    const estimatedEfl = Math.abs(totalPower) > 1e-6 ? 1.0 / totalPower : 50.0;
+    const estimatedEfl = Math.abs(totalPower) > 1e-12 ? 1.0 / totalPower : null;
+    const apertureDiameter = surfaces[1]?.semiDiameter * 2;
 
     return {
+      status: estimatedEfl === null ? 'unavailable' : 'experimental',
       surfaceCount: surfaces.length,
       totalTrackLengthMm: totalTrack,
-      estimatedEflMm: parseFloat(estimatedEfl.toFixed(2)),
-      fNumberEstimate: parseFloat((estimatedEfl / ((surfaces[1]?.semiDiameter || 10) * 2)).toFixed(2))
+      estimatedEflMm: estimatedEfl === null ? null : Number(estimatedEfl.toFixed(2)),
+      fNumberEstimate: estimatedEfl === null || !Number.isFinite(apertureDiameter) || apertureDiameter <= 0
+        ? null
+        : Number((estimatedEfl / apertureDiameter).toFixed(2)),
+      warnings: ['Thin-surface power sum is experimental and is not an independently validated ray trace.']
     };
   }
 }

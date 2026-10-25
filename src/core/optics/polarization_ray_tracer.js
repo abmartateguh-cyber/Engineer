@@ -1,6 +1,6 @@
 /**
  * OmniEng Polarization Ray Tracer & Birefringent Crystal Engine
- * Parity: Zemax OpticStudio Polarization Analysis / CODE V Polarized Ray Trace.
+ * Experimental workflow: Zemax OpticStudio Polarization Analysis / CODE V Polarized Ray Trace.
  *
  * Implements:
  * 1. 2D Complex Jones Vector representation: E = [Ex * e^(i*delta_x), Ey * e^(i*delta_y)]

@@ -1,6 +1,6 @@
 /**
  * OmniEng Optical Inspector UI
- * Standard: ISO 10110 Optical Drawing / Zemax OpticStudio / Code V Parity
+ * Experimental optical layout and inspection example; no drawing-standard assessment is performed.
  * Renders:
  * 1. Sequential surface prescription table
  * 2. 2D Spot Diagram canvas with centroid, RMS radius circle, and Airy disk
@@ -13,7 +13,98 @@ class OpticalInspectorUI {
     this.currentSpotData = null;
     this.currentMTFData = null;
     this.currentSurfaces = [];
-    this.currentAperture = 1.4;
+    this.currentAperture = null;
+    this.currentWavelengthNm = null;
+    this.currentMaxFrequencyLpMm = null;
+    this.inputRequest = null;
+  }
+
+  setInputRequest(request) {
+    this.inputRequest = {
+      surfaces: Array.isArray(request?.surfaces) ? request.surfaces : [],
+      entrancePupilRadiusMm: request?.entrancePupilRadiusMm,
+      wavelengthUm: request?.wavelengthUm,
+      numRings: request?.numRings,
+      raysPerRing: request?.raysPerRing,
+      fieldAngleDeg: request?.fieldAngleDeg,
+      sensorZMm: request?.sensorZMm,
+      fStop: request?.fStop,
+      maxFrequencyLpMm: request?.maxFrequencyLpMm
+    };
+  }
+
+  readInputRequest() {
+    const surfacesText = document.getElementById('optical-surfaces-input')?.value || '';
+    let surfaces;
+    try {
+      surfaces = JSON.parse(surfacesText);
+    } catch {
+      throw new Error('Enter the optical surfaces as valid JSON.');
+    }
+    if (!Array.isArray(surfaces) || surfaces.length < 2) {
+      throw new Error('Enter a JSON array with at least two optical surfaces.');
+    }
+
+    const readNumber = (id, label, integer = false) => {
+      const rawValue = document.getElementById(id)?.value;
+      const value = rawValue === '' || rawValue === undefined ? NaN : Number(rawValue);
+      if (!Number.isFinite(value) || (integer && !Number.isInteger(value))) {
+        throw new Error(`Enter a valid ${integer ? 'whole-number ' : ''}${label}.`);
+      }
+      return value;
+    };
+
+    return {
+      surfaces,
+      entrancePupilRadiusMm: readNumber('optical-pupil-radius', 'entrance pupil radius'),
+      wavelengthUm: readNumber('optical-wavelength', 'wavelength'),
+      numRings: readNumber('optical-ring-count', 'ring count', true),
+      raysPerRing: readNumber('optical-rays-per-ring', 'rays per ring', true),
+      fieldAngleDeg: readNumber('optical-field-angle', 'field angle'),
+      sensorZMm: readNumber('optical-sensor-position', 'sensor position'),
+      fStop: readNumber('optical-f-number', 'f-number'),
+      maxFrequencyLpMm: readNumber('optical-max-frequency', 'maximum spatial frequency')
+    };
+  }
+
+  _escapeHtml(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  _renderInputForm() {
+    const input = this.inputRequest || {};
+    const surfaces = this._escapeHtml(input.surfaces?.length ? JSON.stringify(input.surfaces, null, 2) : '');
+    const numberInput = (id, label, key, min = undefined, step = 'any') => {
+      const minAttr = min === undefined ? '' : ` min="${min}"`;
+      const value = input[key] === undefined ? '' : this._escapeHtml(input[key]);
+      return `<label style="font-size: 11px; color: var(--text-muted);">${label}<input id="${id}" type="number" step="${step}"${minAttr} value="${value}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; background:#030712; color:var(--fg-1); border:1px solid var(--border-color); border-radius:6px; padding:7px;" /></label>`;
+    };
+
+    return `
+      <section aria-label="Optical prescription inputs" style="background:#060911; border:1px solid var(--border-color); border-radius:6px; padding:12px;">
+        <div style="font-size:12px; font-weight:600; margin-bottom:6px; color:var(--accent-cyan);">Caller-Supplied Optical System</div>
+        <p style="font-size:10px; color:var(--text-muted); line-height:1.5; margin:0 0 10px;">Enter your own sequential surfaces and trace settings. No prescription is preloaded. Surfaces require radius, zVertex, clearRadius, nIncident, nTransmitted, conic, and four asphericCoeffs values. Lengths use mm; wavelength uses µm; field angle uses degrees.</p>
+        <details style="font-size:10px; color:var(--text-muted); margin-bottom:10px;">
+          <summary style="cursor:pointer;">Surface input fields</summary>
+          <p style="line-height:1.5;">Paste a JSON array of surface objects. Each object must provide <code>radius</code>, <code>zVertex</code>, <code>clearRadius</code>, <code>nIncident</code>, <code>nTransmitted</code>, <code>conic</code>, and <code>asphericCoeffs</code> as a four-number array. Use radius 0 for a plane surface.</p>
+        </details>
+        <label style="display:block; font-size:11px; color:var(--text-muted);">Surface array JSON<textarea id="optical-surfaces-input" rows="7" spellcheck="false" aria-label="Optical surface array JSON" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; background:#030712; color:var(--fg-1); border:1px solid var(--border-color); border-radius:6px; padding:8px; font:11px monospace; resize:vertical;">${surfaces}</textarea></label>
+        <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; margin-top:9px;">
+          ${numberInput('optical-pupil-radius', 'Entrance pupil radius (mm)', 'entrancePupilRadiusMm', Number.MIN_VALUE)}
+          ${numberInput('optical-wavelength', 'Wavelength (µm)', 'wavelengthUm', Number.MIN_VALUE)}
+          ${numberInput('optical-ring-count', 'Pupil rings (1–20)', 'numRings', 1, '1')}
+          ${numberInput('optical-rays-per-ring', 'Rays per ring (1–64)', 'raysPerRing', 1, '1')}
+          ${numberInput('optical-field-angle', 'Field angle (degrees)', 'fieldAngleDeg')}
+          ${numberInput('optical-sensor-position', 'Sensor position (mm)', 'sensorZMm')}
+          ${numberInput('optical-f-number', 'F-number', 'fStop', Number.MIN_VALUE)}
+          ${numberInput('optical-max-frequency', 'Max frequency (lp/mm)', 'maxFrequencyLpMm', Number.MIN_VALUE)}
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+          <button class="btn-primary" id="btn-run-optical-inspection" style="margin:0; padding:6px 14px; font-size:11px; width:auto;">Trace supplied system</button>
+        </div>
+        <div id="optical-run-status" class="sample-status" role="status" style="margin-top:8px;"></div>
+      </section>
+    `;
   }
 
   /**
@@ -22,40 +113,56 @@ class OpticalInspectorUI {
    */
   render(data) {
     if (!this.container) return;
+    if (!data || data.success !== true || !data.spotData || !data.mtfData || !Array.isArray(data.surfaces)) {
+      const message = String(
+        data?.error?.message || 'No optical prescription is loaded. Supply explicit surface data to run the experimental ray trace.'
+      ).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      this.container.innerHTML = `
+        <div class="optical-inspector-layout" style="display:flex; flex-direction:column; gap:14px; color:var(--text-main);">
+          ${this._renderInputForm()}
+          <div class="sample-status" role="status"><strong>Experimental optical analysis unavailable</strong><p>${message}</p><p>Spot size and MTF appear after a supplied system is traced. No independent optical validation is available.</p></div>
+        </div>
+      `;
+      return;
+    }
+
     this.currentSurfaces = data.surfaces || [];
     this.currentSpotData = data.spotData || null;
     this.currentMTFData = data.mtfData || null;
-    this.currentAperture = data.aperture || 1.4;
+    this.currentAperture = Number.isFinite(data.aperture) ? data.aperture : null;
+    this.currentWavelengthNm = Number.isFinite(data.wavelengthNm) ? data.wavelengthNm : null;
+    this.currentMaxFrequencyLpMm = Number.isFinite(data.maxFrequencyLpMm) ? data.maxFrequencyLpMm : null;
 
     this.container.innerHTML = `
       <div class="optical-inspector-layout" style="display: flex; flex-direction: column; gap: 14px; color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        ${this._renderInputForm()}
         <!-- Header summary metrics -->
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
           <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Working Aperture</div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);">f/${this.currentAperture.toFixed(1)}</div>
-            <div style="font-size: 10px; color: var(--text-muted);">50mm Double Gauss</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);">${this.currentAperture === null ? 'Unavailable' : `f/${this.currentAperture.toFixed(1)}`}</div>
+            <div style="font-size: 10px; color: var(--text-muted);">Supplied surface system</div>
           </div>
           <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">RMS Spot Radius</div>
             <div style="font-size: 16px; font-weight: 700; color: #a78bfa;">
-              ${this.currentSpotData ? (this.currentSpotData.rmsRadiusMm * 1000).toFixed(1) + ' µm' : '11.6 µm'}
+              ${Number.isFinite(this.currentSpotData.rmsRadiusMm) ? (this.currentSpotData.rmsRadiusMm * 1000).toFixed(1) + ' µm' : 'Unavailable'}
             </div>
-            <div style="font-size: 10px; color: var(--text-muted);">Geo: ${this.currentSpotData ? (this.currentSpotData.geoRadiusMm * 1000).toFixed(1) + ' µm' : '24.2 µm'}</div>
+            <div style="font-size: 10px; color: var(--text-muted);">Geo: ${Number.isFinite(this.currentSpotData.geoRadiusMm) ? (this.currentSpotData.geoRadiusMm * 1000).toFixed(1) + ' µm' : 'Unavailable'}</div>
           </div>
           <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">MTF50 Resolution</div>
+            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">MTF50 Frequency Estimate</div>
             <div style="font-size: 16px; font-weight: 700; color: #34d399;">
-              ${this.currentMTFData && this.currentMTFData.mtf50TangentialLpMm ? this.currentMTFData.mtf50TangentialLpMm + ' lp/mm' : '48.5 lp/mm'}
+              ${Number.isFinite(this.currentMTFData.mtf50TangentialLpMm) ? this.currentMTFData.mtf50TangentialLpMm + ' lp/mm' : 'Unavailable'}
             </div>
-            <div style="font-size: 10px; color: var(--text-muted);">Sagittal: ${this.currentMTFData && this.currentMTFData.mtf50SagittalLpMm ? this.currentMTFData.mtf50SagittalLpMm + ' lp/mm' : '62.0 lp/mm'}</div>
+            <div style="font-size: 10px; color: var(--text-muted);">Sagittal: ${Number.isFinite(this.currentMTFData.mtf50SagittalLpMm) ? this.currentMTFData.mtf50SagittalLpMm + ' lp/mm' : 'Unavailable'}</div>
           </div>
           <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Diffraction Limit</div>
             <div style="font-size: 16px; font-weight: 700; color: #fbbf24;">
-              ${this.currentMTFData && this.currentMTFData.cutoffFreqLpMm ? this.currentMTFData.cutoffFreqLpMm + ' lp/mm' : '1300 lp/mm'}
+              ${Number.isFinite(this.currentMTFData.cutoffFreqLpMm) ? this.currentMTFData.cutoffFreqLpMm + ' lp/mm' : 'Unavailable'}
             </div>
-            <div style="font-size: 10px; color: var(--text-muted);">λ = 550 nm (e-line)</div>
+            <div style="font-size: 10px; color: var(--text-muted);">λ = ${this.currentWavelengthNm === null ? 'Unavailable' : `${this.currentWavelengthNm} nm`}</div>
           </div>
         </div>
 
@@ -69,8 +176,8 @@ class OpticalInspectorUI {
             </div>
             <canvas id="canvas-spot-diagram" width="380" height="260" style="width: 100%; height: 260px; background: #03050a; border-radius: 4px; display: block;"></canvas>
             <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--text-muted);">
-              <span><span style="display:inline-block; width:8px; height:8px; background:#00e5ff; border-radius:50%; margin-right:4px;"></span>Rays (${this.currentSpotData ? this.currentSpotData.count : 49})</span>
-              <span><span style="display:inline-block; width:8px; height:8px; border:1px dashed #fbbf24; border-radius:50%; margin-right:4px;"></span>Airy Disk (r = 0.94 µm)</span>
+              <span><span style="display:inline-block; width:8px; height:8px; background:#00e5ff; border-radius:50%; margin-right:4px;"></span>Rays (${Number.isFinite(this.currentSpotData.count) ? this.currentSpotData.count : 'Unavailable'})</span>
+              <span><span style="display:inline-block; width:8px; height:8px; border:1px dashed #fbbf24; border-radius:50%; margin-right:4px;"></span>Airy Disk: ${this.currentAperture !== null && this.currentWavelengthNm !== null ? `${(1.22 * this.currentWavelengthNm * 1e-3 * this.currentAperture).toFixed(2)} µm` : 'Unavailable'}</span>
               <span><span style="display:inline-block; width:8px; height:8px; border:1px solid #a78bfa; border-radius:50%; margin-right:4px;"></span>RMS Radius</span>
             </div>
           </div>
@@ -78,8 +185,8 @@ class OpticalInspectorUI {
           <!-- MTF Curve Pane -->
           <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 12px; font-weight: 600; color: #a78bfa; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="mtfCurve"></span> Modulation Transfer Function (MTF)</span>
-              <span style="font-size: 10px; color: var(--text-dim);">Spatial Freq: 0 - 120 lp/mm</span>
+              <span style="font-size: 12px; font-weight: 600; color: #a78bfa; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="mtfCurve"></span> Experimental MTF Estimate</span>
+              <span style="font-size: 10px; color: var(--text-dim);">Spatial Freq: ${this.currentMaxFrequencyLpMm === null ? 'Unavailable' : `0 - ${this.currentMaxFrequencyLpMm} lp/mm`}</span>
             </div>
             <canvas id="canvas-mtf-curve" width="380" height="260" style="width: 100%; height: 260px; background: #03050a; border-radius: 4px; display: block;"></canvas>
             <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--text-muted);">
@@ -90,10 +197,10 @@ class OpticalInspectorUI {
           </div>
         </div>
 
-        <!-- Bottom row: ISO 10110 Sequential Prescription Table -->
+        <!-- Illustrative optical prescription table -->
         <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
           <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px;">
-            <span class="icon-slot" data-omni-icon="lensElement"></span> Optical Surface Prescription (Zemax Lens Data Editor Parity)
+            <span class="icon-slot" data-omni-icon="lensElement"></span> User-Supplied Optical Surface Table — Experimental
           </div>
           <div style="max-height: 180px; overflow-y: auto;">
             <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
@@ -113,8 +220,9 @@ class OpticalInspectorUI {
                 ${this._renderPrescriptionRows()}
               </tbody>
             </table>
-          </div>
-        </div>
+      </div>
+      <div class="sample-status" role="status">${(Array.isArray(data.warnings) && data.warnings.length > 0 ? data.warnings : ['Experimental results; independent optical validation is unavailable.']).map((warning) => String(warning).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br>')}</div>
+      </div>
       </div>
     `;
 
@@ -133,17 +241,17 @@ class OpticalInspectorUI {
     }
 
     return this.currentSurfaces.map((s, idx) => {
-      const radius = s.radius !== undefined ? (s.radius === 0 ? 'Infinity (Flat)' : s.radius.toFixed(2)) : 'Infinity';
-      const thick = s.thickness !== undefined ? s.thickness.toFixed(2) : '0.00';
-      const glass = s.glassKey || 'Air';
-      const nd = s.nTransmitted ? s.nTransmitted.toFixed(4) : (glass === 'Air' ? '1.0000' : '1.5168');
-      const vd = s.abbeNumber ? s.abbeNumber.toFixed(2) : '-';
-      const clearDia = s.clearRadius ? (s.clearRadius * 2).toFixed(1) : (s.clearAperture ? s.clearAperture.toFixed(1) : '36.0');
+      const radius = Number.isFinite(s.radius) ? (s.radius === 0 ? 'Flat' : s.radius.toFixed(2)) : 'Unavailable';
+      const thick = Number.isFinite(s.thickness) ? s.thickness.toFixed(2) : '—';
+      const glass = 'User-supplied';
+      const nd = Number.isFinite(s.nTransmitted) ? s.nTransmitted.toFixed(4) : 'Unavailable';
+      const vd = '—';
+      const clearDia = Number.isFinite(s.clearRadius) ? (s.clearRadius * 2).toFixed(1) : 'Unavailable';
 
       return `
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-main);">
           <td style="padding: 5px 8px; font-weight: 600; color: var(--accent-cyan);">${idx + 1}</td>
-          <td style="padding: 5px 8px;">${s.elementName || s.name || s.id}</td>
+          <td style="padding: 5px 8px;">Surface ${idx + 1}</td>
           <td style="padding: 5px 8px; font-family: monospace;">${radius}</td>
           <td style="padding: 5px 8px; font-family: monospace;">${thick}</td>
           <td style="padding: 5px 8px; color: #a78bfa;">${glass}</td>
@@ -187,25 +295,26 @@ class OpticalInspectorUI {
       ctx.fillText(`${rUm}µm`, cX + rUm * scale + 2, cY - 2);
     }
 
-    // Airy Disk circle: r_Airy = 1.22 * lambda * fNumber
-    // For lambda = 0.55 um, f/1.4 -> r_Airy = 1.22 * 0.55 * 1.4 = 0.94 um
-    const airyRadiusUm = 1.22 * 0.55 * this.currentAperture;
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    ctx.arc(cX, cY, Math.max(3, airyRadiusUm * scale), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
     // RMS Spot Circle
-    const rmsRadiusMm = this.currentSpotData ? this.currentSpotData.rmsRadiusMm : 0.0116;
-    const rmsRadiusUm = rmsRadiusMm * 1000;
-    ctx.strokeStyle = '#a78bfa';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cX, cY, rmsRadiusUm * scale, 0, Math.PI * 2);
-    ctx.stroke();
+    if (Number.isFinite(this.currentWavelengthNm) && Number.isFinite(this.currentAperture)) {
+      const airyRadiusUm = 1.22 * (this.currentWavelengthNm / 1000) * this.currentAperture;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(cX, cY, Math.max(3, airyRadiusUm * scale), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (this.currentSpotData && Number.isFinite(this.currentSpotData.rmsRadiusMm)) {
+      const rmsRadiusUm = this.currentSpotData.rmsRadiusMm * 1000;
+      ctx.strokeStyle = '#a78bfa';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cX, cY, rmsRadiusUm * scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // Plot ray intersection points
     const spots = (this.currentSpotData && this.currentSpotData.spots) ? this.currentSpotData.spots : [];
@@ -220,17 +329,6 @@ class OpticalInspectorUI {
         const py = cY - (pt.y - centY) * 1000 * scale;
         ctx.beginPath();
         ctx.arc(px, py, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else {
-      ctx.fillStyle = '#00e5ff';
-      const samplePoints = [
-        [0, 0], [4, 2], [-4, -3], [2, -5], [-3, 4], [8, -6], [-7, 7],
-        [10, 2], [-9, -4], [3, 9], [-4, -8], [12, -8], [-11, 9]
-      ];
-      for (const [sx, sy] of samplePoints) {
-        ctx.beginPath();
-        ctx.arc(cX + sx * scale, cY + sy * scale, 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -270,7 +368,19 @@ class OpticalInspectorUI {
       ctx.fillText(m.toFixed(1), 8, y + 3);
     }
 
-    const maxFreq = 120;
+    const freqs = this.currentMTFData?.frequencies;
+    const tang = this.currentMTFData?.tangentialMTF;
+    const sagi = this.currentMTFData?.sagittalMTF;
+    const diff = this.currentMTFData?.diffractionLimitMTF;
+    if (!Array.isArray(freqs) || !Array.isArray(tang) || !Array.isArray(sagi) || !Array.isArray(diff) ||
+        freqs.length === 0 || tang.length !== freqs.length || sagi.length !== freqs.length || diff.length !== freqs.length) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('No calculated MTF data', padL + 8, padT + 18);
+      return;
+    }
+
+    const maxFreq = Math.max(...freqs);
     for (let f = 0; f <= maxFreq; f += 30) {
       const x = padL + (f / maxFreq) * plotW;
       ctx.beginPath();
@@ -281,11 +391,6 @@ class OpticalInspectorUI {
       ctx.font = '8px monospace';
       ctx.fillText(f.toString(), x - 6, h - 8);
     }
-
-    const freqs = (this.currentMTFData && this.currentMTFData.frequencies) ? this.currentMTFData.frequencies : [0, 15, 30, 45, 60, 75, 90, 105, 120];
-    const tang = (this.currentMTFData && this.currentMTFData.tangentialMTF) ? this.currentMTFData.tangentialMTF : [1.0, 0.88, 0.72, 0.54, 0.38, 0.26, 0.17, 0.10, 0.06];
-    const sagi = (this.currentMTFData && this.currentMTFData.sagittalMTF) ? this.currentMTFData.sagittalMTF : [1.0, 0.92, 0.81, 0.67, 0.52, 0.39, 0.28, 0.19, 0.12];
-    const diff = (this.currentMTFData && this.currentMTFData.diffractionLimitMTF) ? this.currentMTFData.diffractionLimitMTF : [1.0, 0.98, 0.96, 0.94, 0.92, 0.89, 0.87, 0.85, 0.83];
 
     const plotCurve = (values, color, lineWidth = 2, isDashed = false) => {
       ctx.strokeStyle = color;

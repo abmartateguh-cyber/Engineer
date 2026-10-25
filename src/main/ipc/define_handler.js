@@ -1,20 +1,20 @@
 /**
- * OmniEng Industrial IPC Handler & Schema Validation Engine
+ * OmniEng IPC Handler Registration and Request Validation Helpers
  * 
- * Provides centralized, 100% schema-validated IPC endpoint registration:
- * - CWE-1321: Recursive Prototype Pollution stripping on all payloads
- * - CWE-20: Finite number validation (NaN/Infinity rejection)
- * - CWE-22: Path traversal guards
- * - CWE-400: Payload size & memory exhaustion limits
- * - Strict schema matching and audit logging
+ * Provides centralized IPC endpoint registration and request checks where schemas are defined:
+ * Applies route-defined schema checks, payload sanitation/size limits, and trusted-renderer
+ * main-frame authorization. This does not establish full contract coverage.
  */
 
 'use strict';
 
-const { ipcMain } = require('electron');
+const path = require('path');
+const { fileURLToPath } = require('url');
+const { app, ipcMain } = require('electron');
 const { IPCValidator } = require('../../core/security/ipc_validator');
+const { getFeatureMaturity } = require('../../core/maturity/feature_maturity');
 
-// Registry of all validated channels across all domains
+// Registry of registered channels across all domains
 const channelRegistry = new Map();
 
 /**
@@ -57,6 +57,9 @@ function validateSchema(val, schema, path = 'payload') {
       if (typeof val !== 'number' || !Number.isFinite(val)) {
         throw new Error(`IPC Schema Validation Error: Field at '${path}' must be a finite number (got ${val})`);
       }
+      if (schema.integer && !Number.isInteger(val)) {
+        throw new Error(`IPC Schema Validation Error: Number at '${path}' must be an integer`);
+      }
       if (schema.min !== undefined && val < schema.min) {
         throw new Error(`IPC Schema Validation Error: Number at '${path}' (${val}) < min (${schema.min})`);
       }
@@ -69,6 +72,9 @@ function validateSchema(val, schema, path = 'payload') {
       }
       if (schema.maxLength !== undefined && val.length > schema.maxLength) {
         throw new Error(`IPC Schema Validation Error: String at '${path}' exceeds maxLength ${schema.maxLength}`);
+      }
+      if (schema.enum && !schema.enum.includes(val)) {
+        throw new Error(`IPC Schema Validation Error: String at '${path}' must be one of ${schema.enum.join(', ')}`);
       }
     } else if (schema.type === 'boolean') {
       if (typeof val !== 'boolean') {
@@ -95,6 +101,12 @@ function validateSchema(val, schema, path = 'payload') {
 
       // Validate properties
       if (schema.properties) {
+        if (schema.additionalProperties === false) {
+          const unexpected = Object.keys(val).filter(property => !Object.hasOwn(schema.properties, property));
+          if (unexpected.length > 0) {
+            throw new Error(`IPC Schema Validation Error: Unexpected object properties at '${path}': ${unexpected.join(', ')}`);
+          }
+        }
         for (const [propKey, propSchema] of Object.entries(schema.properties)) {
           if (val[propKey] !== undefined) {
             validateSchema(val[propKey], propSchema, `${path}.${propKey}`);
@@ -108,7 +120,70 @@ function validateSchema(val, schema, path = 'payload') {
 }
 
 /**
- * Defines and registers an Electron IPC handler with full schema validation and sanitization.
+ * Only the main frame for the local application entry point may call privileged IPC.
+ * @param {Object} event Electron invoke event
+ * @param {string} trustedEntryPath Absolute path to src/index.html
+ * @returns {boolean}
+ */
+function isTrustedIpcSender(event, trustedEntryPath) {
+  const sender = event?.sender;
+  const senderFrame = event?.senderFrame;
+  if (!sender || !senderFrame || typeof sender.isDestroyed !== 'function') return false;
+
+  try {
+    const mainFrame = sender.mainFrame;
+    if (
+      sender.isDestroyed() ||
+      !mainFrame ||
+      !Number.isInteger(senderFrame.frameTreeNodeId) ||
+      senderFrame.frameTreeNodeId !== mainFrame.frameTreeNodeId
+    ) {
+      return false;
+    }
+
+    const frameUrl = new URL(senderFrame.url);
+    if (frameUrl.protocol !== 'file:' || frameUrl.host !== '' || frameUrl.search !== '') return false;
+
+    const framePath = path.resolve(fileURLToPath(frameUrl));
+    const expectedPath = path.resolve(trustedEntryPath);
+    return path.relative(expectedPath, framePath) === '';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Builds the guarded handler registered with ipcMain and exposes the same path for focused tests.
+ * @param {string} channel IPC channel name
+ * @param {Object} schema Validation schema descriptor
+ * @param {Function} handler Implementation function
+ * @param {Function} [getTrustedEntryPath] Provider for the trusted renderer entry point
+ * @returns {Function}
+ */
+function createIpcHandler(channel, schema, handler, getTrustedEntryPath = () => path.join(app.getAppPath(), 'src', 'index.html')) {
+  return async (event, rawPayload) => {
+    try {
+      if (!isTrustedIpcSender(event, getTrustedEntryPath())) {
+        throw new Error(`Security Violation: IPC channel '${channel}' rejected an untrusted sender frame`);
+      }
+
+      // 1. Prototype Pollution Stripping (CWE-1321)
+      const sanitized = IPCValidator.sanitize(rawPayload);
+
+      // 2. Schema Validation (CWE-20, CWE-400)
+      validateSchema(sanitized, schema, channel);
+
+      // 3. Execute Handler
+      return await handler(event, sanitized);
+    } catch (err) {
+      console.error(`[OmniEng IPC] Handler error on channel '${channel}':`, err.message);
+      throw err;
+    }
+  };
+}
+
+/**
+ * Defines and registers an Electron IPC handler with route-defined checks and sanitation helpers.
  * 
  * @param {string} channel IPC channel name (e.g., 'omni:solve-drop-test')
  * @param {Object} schema Validation schema descriptor
@@ -134,6 +209,7 @@ function defineHandler(channel, schema, handler, options = {}) {
     channel,
     domain: options.domain || 'system',
     description: options.description || '',
+    maturity: getFeatureMaturity(options.domain || 'system'),
     registeredAt: new Date().toISOString(),
     schema
   };
@@ -141,23 +217,8 @@ function defineHandler(channel, schema, handler, options = {}) {
 
   // Wrap with security filter and register with Electron ipcMain
   if (ipcMain && typeof ipcMain.handle === 'function') {
-    ipcMain.handle(channel, async (event, rawPayload) => {
-    try {
-      // 1. Prototype Pollution Stripping (CWE-1321)
-      const sanitized = IPCValidator.sanitize(rawPayload);
-
-      // 2. Schema Validation (CWE-20, CWE-400)
-      validateSchema(sanitized, schema, channel);
-
-      // 3. Execute Handler
-      const result = await handler(event, sanitized);
-      return result;
-    } catch (err) {
-      console.error(`[IPC Security Gateway] Error on channel '${channel}':`, err.message);
-      throw err;
-    }
-  });
-}
+    ipcMain.handle(channel, createIpcHandler(channel, schema, handler));
+  }
 
   return metadata;
 }
@@ -182,6 +243,8 @@ function isChannelRegistered(channel) {
 module.exports = {
   defineHandler,
   validateSchema,
+  isTrustedIpcSender,
+  createIpcHandler,
   getRegisteredChannels,
   isChannelRegistered,
   channelRegistry

@@ -1,6 +1,6 @@
 /**
- * OmniEng Phase 5 Verification Suite:
- * Viewport 3D Transformation Gizmos, In-Viewport Sketcher & Complete UI Button Audit
+ * OmniEng Phase 5 Experimental UI Smoke Checks:
+ * Viewport 3D Gizmos, In-Viewport Sketcher & Static UI Button Reference Scan
  */
 
 'use strict';
@@ -12,7 +12,7 @@ const { ViewportGizmos } = require('../src/ui/viewport_gizmos');
 const { SketcherCanvas3D } = require('../src/ui/sketcher_canvas_3d');
 
 console.log('================================================================');
-console.log('   RUNNING PHASE 5: VIEWPORT GIZMOS, SKETCHER & UI BUTTON AUDIT ');
+console.log('   RUNNING PHASE 5: EXPERIMENTAL VIEWPORT AND UI SMOKE CHECKS ');
 console.log('================================================================\n');
 
 // -----------------------------------------------------------------------------
@@ -91,7 +91,9 @@ assert.strictEqual(committedRect.corners.length, 4);
 const graph = sketcher.exportConstraintGraph();
 assert(Object.keys(graph.points).length >= 5, 'Should export all unique sketched vertices');
 assert(graph.constraints.length >= 5, 'Should export all inferred H/V constraints');
-console.log(`  ✓ [P5-2] SketcherCanvas3D: Ray-to-plane projection, H/V constraint inference, ${graph.entityCount} entities, ${graph.constraints.length} constraints exported`);
+console.log(
+  `  ✓ [P5-2] SketcherCanvas3D: Ray-to-plane projection, H/V constraint inference, ${graph.entityCount} entities, ${graph.constraints.length} constraints exported`
+);
 
 // -----------------------------------------------------------------------------
 // Test 3: Comprehensive UI Button Wiring & Layout Consistency Audit
@@ -99,6 +101,23 @@ console.log(`  ✓ [P5-2] SketcherCanvas3D: Ray-to-plane projection, H/V constra
 console.log('\n[P5-3] Comprehensive UI Button & Control Audit (src/index.html & src/ui/app.js)...');
 const htmlContent = fs.readFileSync(path.join(__dirname, '../src/index.html'), 'utf8');
 const appJsContent = fs.readFileSync(path.join(__dirname, '../src/ui/app.js'), 'utf8');
+const blockDiagramSource = fs.readFileSync(path.join(__dirname, '../src/ui/block_diagram_ui.js'), 'utf8');
+
+assert.doesNotMatch(blockDiagramSource, /Real-Time Telemetry Scope|High-Refresh Virtual Oscilloscope/);
+assert.match(blockDiagramSource, /this\.blocks = \[\]/);
+assert.match(blockDiagramSource, /No solver result is loaded/);
+assert.match(blockDiagramSource, /continuous scope playback is unavailable[\s\S]*returned solver samples/i);
+assert.match(appJsContent, /ZMX Parser \(UI Input Unavailable\)/);
+assert.doesNotMatch(appJsContent, /filename:\s*['"]Doublet_35mm\.zmx['"]/);
+for (const [id, action] of [
+  ['ribbon-btn-undo', 'Undo'],
+  ['ribbon-btn-redo', 'Redo']
+]) {
+  const tag = htmlContent.match(new RegExp(`<button\\b[^>]*\\bid=["']${id}["'][^>]*>`));
+  assert(tag && /\sdisabled(?:\s|>|=)/.test(tag[0]), `${action} control stays disabled without project history`);
+  assert(tag[0].includes(`${action} unavailable: project command history is not connected`));
+}
+assert.doesNotMatch(appJsContent, /Command Journal: (?:Reverted|Redone) action/);
 
 // Extract all button IDs from index.html
 const btnRegex = /<button[^>]*id=["']([^"']+)["'][^>]*>/g;
@@ -110,40 +129,64 @@ while ((match = btnRegex.exec(htmlContent)) !== null) {
 
 assert(allHtmlButtonIds.length >= 90, 'Must have at least 90 identified interactive buttons in HTML');
 
-// Check that every button ID is either directly referenced in app.js or handled via class delegation
+// Check that every button ID is referenced by app code, delegated, or handled by native HTML behavior.
 const unhandledButtonIds = [];
 for (const id of allHtmlButtonIds) {
-  const isDirectlyReferenced = appJsContent.includes(`'${id}'`) || appJsContent.includes(`"${id}"`) || appJsContent.includes(id);
-  const isHandledByDelegation = (id.startsWith('hud-btn-') && appJsContent.includes('hud-btn')) ||
-                                (id.startsWith('btn-view-') && appJsContent.includes('v-mode-btn')) ||
-                                (id.startsWith('ribbon-cam-') && appJsContent.includes('ribbon-cam'));
+  const isDirectlyReferenced =
+    appJsContent.includes(`'${id}'`) || appJsContent.includes(`"${id}"`) || appJsContent.includes(id);
+  const isHandledByDelegation =
+    (id.startsWith('hud-btn-') && appJsContent.includes('hud-btn')) ||
+    (id.startsWith('btn-view-') && appJsContent.includes('v-mode-btn')) ||
+    (id.startsWith('ribbon-cam-') && appJsContent.includes('ribbon-cam'));
+  const buttonTag = htmlContent.match(new RegExp(`<button\\b[^>]*\\bid=["']${id}["'][^>]*>`));
+  const isHandledNatively = Boolean(buttonTag && /\b(?:popovertarget|commandfor)=/.test(buttonTag[0]));
 
-  if (!isDirectlyReferenced && !isHandledByDelegation) {
+  if (!isDirectlyReferenced && !isHandledByDelegation && !isHandledNatively) {
     unhandledButtonIds.push(id);
   }
 }
 
-assert.strictEqual(unhandledButtonIds.length, 0, `All buttons must be wired! Unhandled buttons: ${unhandledButtonIds.join(', ')}`);
+assert.strictEqual(
+  unhandledButtonIds.length,
+  0,
+  `All buttons must be wired! Unhandled buttons: ${unhandledButtonIds.join(', ')}`
+);
 
 // Studio tab switching buttons audit
-const studioBtnMatches = htmlContent.match(/class=["'][^"']*studio-btn[^"']*["'][^>]*data-studio=["']([^"']+)["']/g) || [];
-assert(studioBtnMatches.length >= 6, 'Must have all 6 industry studio buttons (consumer, eda, aerospace, oilgas, simulink, universal_cad)');
-assert(appJsContent.includes('dataset.studio') || appJsContent.includes('studio-btn'), 'Studio tab switching must be wired in app.js');
+const studioBtnMatches =
+  htmlContent.match(/class=["'][^"']*studio-btn[^"']*["'][^>]*data-studio=["']([^"']+)["']/g) || [];
+assert(
+  studioBtnMatches.length >= 6,
+  'Must have all 6 industry studio buttons (consumer, eda, aerospace, oilgas, simulink, universal_cad)'
+);
+assert(
+  appJsContent.includes('dataset.studio') || appJsContent.includes('studio-btn'),
+  'Studio tab switching must be wired in app.js'
+);
 
-console.log(`  ✓ [P5-3] Button Audit Passed: 100% of ${allHtmlButtonIds.length} UI buttons and 6 studio mode switchers verified wired`);
+console.log(
+  `  ✓ [P5-3] Static scan found ${allHtmlButtonIds.length} button IDs and 6 studio mode switchers; button behavior is not verified here`
+);
 
 // -----------------------------------------------------------------------------
 // Test 4: WCAG 2.2 Level AA Accessibility & Keyboard Navigation Verification
 // -----------------------------------------------------------------------------
 console.log('\n[P5-4] WCAG 2.2 Level AA Accessibility Audit (Focus, Target Size, ARIA)...');
 const mainCssContent = fs.readFileSync(path.join(__dirname, '../src/styles/main.css'), 'utf8');
+const componentCssContent = fs.readFileSync(path.join(__dirname, '../src/styles/components.css'), 'utf8');
 
 // SC 2.4.11 / 2.4.13: Focus Appearance (Visible outline for keyboard navigation)
-assert(mainCssContent.includes(':focus-visible'), 'CSS must define universal :focus-visible rules for keyboard navigation');
+assert(
+  mainCssContent.includes(':focus-visible'),
+  'CSS must define universal :focus-visible rules for keyboard navigation'
+);
 assert(mainCssContent.includes('outline:'), 'CSS must provide explicit high-contrast focus outline');
 
 // SC 2.5.8: Minimum Target Size (24x24 px)
-assert(mainCssContent.includes('min-height: 24px'), 'Interactive buttons must enforce 24x24 px minimum touch/pointer target size');
+assert(
+  mainCssContent.includes('min-height: 24px'),
+  'Interactive buttons must enforce 24x24 px minimum touch/pointer target size'
+);
 assert(mainCssContent.includes('min-width: 24px'), 'Interactive buttons must enforce 24x24 px minimum width');
 
 // SC 2.3.3: Reduced Motion Support
@@ -154,18 +197,24 @@ assert(mainCssContent.includes('.sr-only'), 'CSS must provide .sr-only utility c
 assert(htmlContent.includes('role="tablist"'), 'HTML must declare role="tablist" for studio switcher');
 assert(htmlContent.includes('role="tab"'), 'Studio buttons must declare role="tab"');
 assert(htmlContent.includes('role="toolbar"'), 'Ribbon toolbar must declare role="toolbar"');
-assert(htmlContent.includes('aria-label="Engineering Domain Studios"'), 'Studio switcher must have descriptive aria-label');
+assert(
+  htmlContent.includes('aria-label="Engineering Domain Studios"'),
+  'Studio switcher must have descriptive aria-label'
+);
 
 // WAI-ARIA Keyboard Navigation in app.js
-assert(appJsContent.includes('ArrowRight') && appJsContent.includes('ArrowLeft'), 'app.js must support WAI-ARIA tablist arrow key navigation');
+assert(
+  appJsContent.includes('ArrowRight') && appJsContent.includes('ArrowLeft'),
+  'app.js must support WAI-ARIA tablist arrow key navigation'
+);
 assert(appJsContent.includes('aria-selected'), 'app.js must synchronize aria-selected attribute on tab change');
 
-console.log('  ✓ [P5-4] Accessibility Audit Passed: WCAG 2.2 AA (Visible Focus, 24x24px Targets, ARIA tablist/toolbar, Arrow Key Nav) 100% Verified');
+console.log('  ✓ [P5-4] Basic accessibility markup smoke checks passed; no WCAG conformance claim is made');
 
 // -----------------------------------------------------------------------------
 // Test 5: Interactive 2D Schematic Component Graph (Drag, Add, Delete, 10-unit Snap)
 // -----------------------------------------------------------------------------
-console.log('\n[P5-5] Interactive 2D Schematic Layout & Component Graph (Altium PCB / TSMC IC / P&ID)...');
+console.log('\n[P5-5] Experimental 2D Schematic Layout & Component Geometry...');
 const { SchematicLayoutUI } = require('../src/ui/schematic_layout_ui');
 
 // Setup minimal headless mock DOM environment for 2D Canvas
@@ -207,13 +256,35 @@ global.window = {
 
 const schemUI = new SchematicLayoutUI('mock-canvas');
 schemUI.setMode('eda');
-assert.strictEqual(schemUI.edaCells.length, 5, 'Must initialize with 5 standard CMOS library cells');
+assert.strictEqual(schemUI.edaCells.length, 5, 'Must initialize with 5 synthetic logic-cell geometry examples');
+assert(
+  schemUI.edaCells.every((cell) => cell.delay === null && cell.area === null),
+  'Synthetic cells must not carry fabricated PDK timing or area data'
+);
+assert(
+  schemUI.pcbComponents.every((component) => component.net === 'not configured' && component.val === 'not configured'),
+  'Synthetic PCB geometry must not carry fabricated component specifications'
+);
+assert(
+  schemUI.pidStreams.every(
+    (stream) =>
+      stream.temp === 'not configured' && stream.press === 'not configured' && stream.flow === 'not configured'
+  ),
+  'Illustrative process streams must not carry fabricated operating conditions'
+);
+const schematicSource = fs.readFileSync(path.join(__dirname, '../src/ui/schematic_layout_ui.js'), 'utf8');
+assert.doesNotMatch(schematicSource, /Apple|Qualcomm|TSMC|LP8756|DDR5|100W|GAA-FET|Foundry Rule Error/);
+assert.match(schematicSource, /canvas units \| no PDK scale/);
 
 // Test adding a component
-const addedCell = schemUI.addComponent('NOR3_X1');
+const addedCell = schemUI.addComponent('LogicCell_User_Example');
 assert(addedCell && addedCell.data, 'addComponent must create a new cell');
 assert.strictEqual(schemUI.edaCells.length, 6, 'Cell array must expand to 6');
-assert.strictEqual(schemUI.selectedEntity.data.name, 'NOR3_X1', 'Newly added component must be selected');
+assert.strictEqual(
+  schemUI.selectedEntity.data.name,
+  'LogicCell_User_Example',
+  'Newly added component must be selected'
+);
 
 // Test modifying entity parameters (Two-way Property Grid update)
 schemUI.updateSelectedEntity({
@@ -241,12 +312,14 @@ schemUI.updateSelectedEntity({ net: 'VOUT_1V8', val: '1.8V 500mA' });
 assert.strictEqual(schemUI.selectedEntity.data.net, 'VOUT_1V8');
 schemUI.deleteSelected();
 
-console.log('  ✓ [P5-5] 2D Schematic Component Graph: Add, update parameters, 10-unit snap, delete verified across IC & PCB modes');
+console.log(
+  '  ✓ [P5-5] 2D Schematic Component Graph: Add, update parameters, 10-unit snap, delete verified across IC & PCB modes'
+);
 
 // -----------------------------------------------------------------------------
 // Test 6: Truth-First Two-Way Object Property Grid & In-Viewport Tooling
 // -----------------------------------------------------------------------------
-console.log('\n[P5-6] Object Property Grid & Direct Modeling Tooling (Anatomy Craft Parity)...');
+console.log('\n[P5-6] Object Property Grid & Direct Modeling Tooling (Anatomy Craft Experimental workflow)...');
 
 // Verify dual-tab inspector structure in HTML
 assert(htmlContent.includes('id="tab-btn-properties"'), 'HTML must declare #tab-btn-properties tab');
@@ -265,10 +338,10 @@ assert(htmlContent.includes('id="btn-tool-delete"'), 'Toolbar must declare #btn-
 assert(mainCssContent.includes('.property-grid-empty'), 'CSS must define .property-grid-empty');
 assert(mainCssContent.includes('.prop-section'), 'CSS must define .prop-section');
 assert(mainCssContent.includes('.prop-input-group'), 'CSS must define .prop-input-group');
-assert(mainCssContent.includes('.v-tool-btn'), 'CSS must define .v-tool-btn');
+assert(componentCssContent.includes('.v-tool-btn'), 'Component CSS must define .v-tool-btn');
 
-console.log('  ✓ [P5-6] Two-Way Object Property Grid & In-Viewport Tooling: 100% verified with Anatomy-grade direct manipulation');
+console.log('  ✓ [P5-6] Object property grid and in-viewport tooling smoke checks passed');
 
 console.log('\n================================================================');
-console.log('   ALL 6 PHASE 5 TESTS PASSED SUCCESSFULLY!                    ');
+console.log('   ALL 6 PHASE 5 SMOKE-CHECK GROUPS PASSED                     ');
 console.log('================================================================\n');

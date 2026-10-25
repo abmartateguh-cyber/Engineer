@@ -1,6 +1,6 @@
 /**
- * OmniEng Navier-Stokes Computational Fluid Dynamics (CFD) Engine (Fluent / STAR-CCM+ Equivalent)
- * Solves 2D/3D incompressible fluid flow, pressure-velocity fields, streamlines, and drone propeller thrust/drag.
+ * Experimental Navier-Stokes computational fluid dynamics (CFD) routines.
+ * No independent validation against production CFD solvers is established.
  */
 
 class CFDSolver2D {
@@ -12,7 +12,7 @@ class CFDSolver2D {
     this.dx = lx / (nx - 1);
     this.dy = ly / (ny - 1);
     this.rho = rho; // kg/m^3 (air)
-    this.mu = mu;   // dynamic viscosity Pa*s
+    this.mu = mu; // dynamic viscosity Pa*s
     this.nu = mu / rho; // kinematic viscosity
 
     // Grid fields: u (x-velocity), v (y-velocity), p (pressure)
@@ -32,8 +32,8 @@ class CFDSolver2D {
 
     for (let i = 0; i < this.nx; i++) {
       for (let j = 0; j < this.ny; j++) {
-        const rx = (i - cx);
-        const ry = (j - cy);
+        const rx = i - cx;
+        const ry = j - cy;
         // Rotate by AoA
         const xRot = rx * Math.cos(-aoaRad) - ry * Math.sin(-aoaRad);
         const yRot = rx * Math.sin(-aoaRad) + ry * Math.cos(-aoaRad);
@@ -41,13 +41,15 @@ class CFDSolver2D {
         if (xRot >= 0 && xRot <= chordLen) {
           const xNorm = xRot / chordLen;
           // NACA 0012 symmetric airfoil thickness formula
-          const yt = 5 * thicknessRatio * (
-            0.2969 * Math.sqrt(xNorm) -
-            0.1260 * xNorm -
-            0.3516 * Math.pow(xNorm, 2) +
-            0.2843 * Math.pow(xNorm, 3) -
-            0.1015 * Math.pow(xNorm, 4)
-          ) * chordLen;
+          const yt =
+            5 *
+            thicknessRatio *
+            (0.2969 * Math.sqrt(xNorm) -
+              0.126 * xNorm -
+              0.3516 * Math.pow(xNorm, 2) +
+              0.2843 * Math.pow(xNorm, 3) -
+              0.1015 * Math.pow(xNorm, 4)) *
+            chordLen;
 
           if (Math.abs(yRot) <= yt) {
             this.obstacle[j][i] = 1;
@@ -78,8 +80,8 @@ class CFDSolver2D {
 
     // Pseudo-transient iteration loop
     for (let step = 0; step < maxSteps; step++) {
-      const u_old = this.u.map(row => new Float64Array(row));
-      const v_old = this.v.map(row => new Float64Array(row));
+      const u_old = this.u.map((row) => new Float64Array(row));
+      const v_old = this.v.map((row) => new Float64Array(row));
 
       // 1. Momentum Advection-Diffusion Step
       for (let j = 1; j < ny - 1; j++) {
@@ -96,10 +98,14 @@ class CFDSolver2D {
           const dv_dy = v_ij > 0 ? (v_ij - v_old[j - 1][i]) / dy : (v_old[j + 1][i] - v_ij) / dy;
 
           // Central diffusion
-          const d2u = nu * ((u_old[j][i + 1] - 2 * u_ij + u_old[j][i - 1]) / (dx * dx) +
-                            (u_old[j + 1][i] - 2 * u_ij + u_old[j - 1][i]) / (dy * dy));
-          const d2v = nu * ((v_old[j][i + 1] - 2 * v_ij + v_old[j][i - 1]) / (dx * dx) +
-                            (v_old[j + 1][i] - 2 * v_ij + v_old[j - 1][i]) / (dy * dy));
+          const d2u =
+            nu *
+            ((u_old[j][i + 1] - 2 * u_ij + u_old[j][i - 1]) / (dx * dx) +
+              (u_old[j + 1][i] - 2 * u_ij + u_old[j - 1][i]) / (dy * dy));
+          const d2v =
+            nu *
+            ((v_old[j][i + 1] - 2 * v_ij + v_old[j][i - 1]) / (dx * dx) +
+              (v_old[j + 1][i] - 2 * v_ij + v_old[j - 1][i]) / (dy * dy));
 
           this.u[j][i] = u_ij + dt * (-u_ij * du_dx - v_ij * du_dy + d2u);
           this.v[j][i] = v_ij + dt * (-u_ij * dv_dx - v_ij * dv_dy + d2v);
@@ -112,15 +118,14 @@ class CFDSolver2D {
           for (let i = 1; i < nx - 1; i++) {
             if (this.obstacle[j][i]) continue;
 
-            const div = (this.u[j][i + 1] - this.u[j][i - 1]) / (2 * dx) +
-                        (this.v[j + 1][i] - this.v[j - 1][i]) / (2 * dy);
+            const div =
+              (this.u[j][i + 1] - this.u[j][i - 1]) / (2 * dx) + (this.v[j + 1][i] - this.v[j - 1][i]) / (2 * dy);
 
-            const p_new = (
+            const p_new =
               ((this.p[j][i + 1] + this.p[j][i - 1]) / (dx * dx) +
-               (this.p[j + 1][i] + this.p[j - 1][i]) / (dy * dy) -
-               (rho / dt) * div) /
-              (2 / (dx * dx) + 2 / (dy * dy))
-            );
+                (this.p[j + 1][i] + this.p[j - 1][i]) / (dy * dy) -
+                (rho / dt) * div) /
+              (2 / (dx * dx) + 2 / (dy * dy));
 
             this.p[j][i] = p_new;
           }
@@ -129,7 +134,7 @@ class CFDSolver2D {
         // Pressure boundary conditions
         for (let j = 0; j < ny; j++) {
           this.p[j][0] = this.p[j][1]; // dp/dx = 0 at inlet
-          this.p[j][nx - 1] = 0;       // p = 0 at outlet
+          this.p[j][nx - 1] = 0; // p = 0 at outlet
         }
       }
 
@@ -181,7 +186,7 @@ class CFDSolver2D {
     }
 
     const qInf = 0.5 * rho * inletVelocity * inletVelocity;
-    const chord = (nx * 0.4) * dx;
+    const chord = nx * 0.4 * dx;
     const cl = liftForce / (qInf * chord);
     const cd = Math.max(0.005, Math.abs(dragForce) / (qInf * chord));
 
@@ -232,36 +237,100 @@ class CFDSolver2D {
   }
 
   /**
-   * Drone Propeller Aerodynamic Performance (MRF Model)
+   * Experimental static propeller coefficient estimate. This is not a CFD solve
+   * and does not supply or validate thrust/torque coefficients.
    */
-  static solvePropellerThrust(rpm = 8000, diameterInches = 5.0, pitchInches = 3.0, rho = 1.225) {
-    const D = diameterInches * 0.0254; // meters
-    const P = pitchInches * 0.0254;   // meters
-    const n = rpm / 60.0;             // rev/second
+  static solvePropellerThrust(input) {
+    const unavailable = {
+      success: false,
+      status: 'unavailable',
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message: 'No sourced propeller performance model or independent reference is configured.'
+      }
+    };
 
-    // Analytical thrust and torque coefficients based on blade-element momentum
-    const J = 0; // static hover condition (advance ratio J = 0)
-    const Ct0 = 0.11 * (P / D);
-    const Cq0 = 0.06 * Math.pow(P / D, 1.3);
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return unavailable;
 
-    const thrust = Ct0 * rho * Math.pow(n, 2) * Math.pow(D, 4); // Newtons
-    const torque = Cq0 * rho * Math.pow(n, 2) * Math.pow(D, 5); // N*m
-    const power = 2 * Math.PI * n * torque;                      // Watts
+    const { rpm, diameterM, airDensityKgM3, thrustCoefficient, torqueCoefficient, coefficientSource } = input;
+    const requiredPositiveValues = { rpm, diameterM, airDensityKgM3, thrustCoefficient, torqueCoefficient };
+    const missing = Object.entries(requiredPositiveValues).filter(([, value]) => !Number.isFinite(value) || value <= 0);
+    if (missing.length > 0 || typeof coefficientSource !== 'string' || !coefficientSource.trim()) {
+      return {
+        success: false,
+        status: 'invalid-input',
+        validationLevel: 'experimental',
+        error: {
+          code: 'INVALID_INPUT',
+          message:
+            missing.length > 0
+              ? `Explicit positive finite propeller inputs are required: ${missing.map(([name]) => name).join(', ')}.`
+              : 'A nonempty coefficientSource label is required.'
+        }
+      };
+    }
+    if (!Number.isSafeInteger(rpm) || coefficientSource.length > 1000) {
+      return {
+        success: false,
+        status: 'invalid-input',
+        validationLevel: 'experimental',
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'rpm must be a positive safe integer and coefficientSource must not exceed 1000 characters.'
+        }
+      };
+    }
 
-    // Figure of Merit (FoM = Ideal Induced Power / Actual Power)
-    const idealPower = Math.pow(thrust, 1.5) / Math.sqrt(2 * rho * Math.PI * Math.pow(D / 2, 2));
-    const figureOfMerit = Math.min(0.85, idealPower / power);
+    const rotationalFrequencyHz = rpm / 60;
+    const thrustN = thrustCoefficient * airDensityKgM3 * rotationalFrequencyHz ** 2 * diameterM ** 4;
+    const torqueNm = torqueCoefficient * airDensityKgM3 * rotationalFrequencyHz ** 2 * diameterM ** 5;
+    const shaftPowerW = 2 * Math.PI * rotationalFrequencyHz * torqueNm;
+    const idealInducedPowerW = thrustN ** 1.5 / Math.sqrt(2 * airDensityKgM3 * Math.PI * (diameterM / 2) ** 2);
+    const figureOfMerit = idealInducedPowerW / shaftPowerW;
+    if (
+      ![rotationalFrequencyHz, thrustN, torqueNm, shaftPowerW, idealInducedPowerW, figureOfMerit].every(Number.isFinite)
+    ) {
+      return {
+        success: false,
+        status: 'numerical-failure',
+        validationLevel: 'experimental',
+        error: { code: 'NUMERICAL_FAILURE', message: 'The supplied inputs exceed the finite numeric range.' }
+      };
+    }
 
     return {
-      rpm,
-      diameter_mm: +(D * 1000).toFixed(1),
-      pitch_mm: +(P * 1000).toFixed(1),
-      thrust_N: +thrust.toFixed(2),
-      thrust_grams: +(thrust * 101.97).toFixed(1),
-      torque_Nm: +torque.toFixed(4),
-      power_Watts: +power.toFixed(1),
-      efficiency_g_per_W: +( (thrust * 101.97) / Math.max(1, power) ).toFixed(2),
-      figureOfMerit: +figureOfMerit.toFixed(3)
+      success: true,
+      status: 'experimental',
+      validationLevel: 'experimental',
+      model: 'static propeller coefficient equations (advance ratio J = 0)',
+      coefficientProvenance: 'Caller-supplied coefficients and source label; not independently verified.',
+      units: {
+        rpm: 'rev/min',
+        diameterM: 'm',
+        airDensityKgM3: 'kg/m^3',
+        thrustCoefficient: 'dimensionless',
+        torqueCoefficient: 'dimensionless',
+        thrustN: 'N',
+        torqueNm: 'N*m',
+        shaftPowerW: 'W',
+        idealInducedPowerW: 'W'
+      },
+      inputs: {
+        rpm,
+        diameterM,
+        airDensityKgM3,
+        thrustCoefficient,
+        torqueCoefficient,
+        coefficientSource: coefficientSource.trim()
+      },
+      advanceRatio: 0,
+      rotationalFrequencyHz,
+      thrustN,
+      torqueNm,
+      shaftPowerW,
+      idealInducedPowerW,
+      figureOfMerit
     };
   }
 }

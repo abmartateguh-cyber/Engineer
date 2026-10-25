@@ -1,6 +1,6 @@
 /**
- * OmniEng Drone 6-DOF Flight Dynamics & Autopilot Engine (Simulink Aerospace Toolkit Equivalent)
- * Implements full 6-DOF quaternion kinematics, aerodynamics, EKF sensor fusion, and cascaded flight control.
+ * Legacy experimental drone flight example.
+ * This simplified model is not exposed through a product route and does not establish flight performance.
  */
 
 const { Vector3, Quaternion } = require('../math/linear_algebra');
@@ -29,7 +29,8 @@ class QuadcopterDynamics {
   }
 
   /**
-   * Run 6-DOF dynamic step simulation with closed-loop autopilot
+   * Run the legacy illustrative dynamics example. The fixed model constants and
+   * control assumptions have not been correlated with a specific vehicle.
    * @param {Object} waypoints Target flight waypoints [{t, z, x, y}]
    * @param {number} totalTime Duration in seconds
    * @param {number} dt Integration step (e.g. 0.005s = 200 Hz loop)
@@ -146,9 +147,13 @@ class QuadcopterDynamics {
 
     return {
       targetAltitude,
-      settlingTime_s: 2.4,
-      overshootPercent: 3.2,
-      stabilityVerdict: 'STABLE (Autopilot Holding Hover Within ±0.05m)',
+      status: 'EXPERIMENTAL_ESTIMATE_ONLY',
+      validationLevel: 'experimental',
+      modelAssumptions: [
+        'Fixed illustrative vehicle mass, inertia, and motor coefficients',
+        'Simplified wind input and cascaded controller',
+        'No independent flight reference or hardware correlation'
+      ],
       flightLog
     };
   }

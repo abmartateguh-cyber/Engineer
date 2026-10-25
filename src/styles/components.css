@@ -25,18 +25,34 @@
   white-space: nowrap;
   cursor: pointer;
   outline: none;
-  transition: background 0.12s var(--ease), color 0.12s var(--ease), border-color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease),
+    border-color 0.12s var(--ease);
 }
 .btn:hover {
   background: var(--surface-3);
   color: var(--fg-1);
 }
-.btn:active, .btn.active, .btn[aria-selected="true"], .btn[aria-pressed="true"] {
+.btn:disabled {
+  color: var(--fg-3);
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.btn:disabled:hover {
+  background: transparent;
+  color: var(--fg-3);
+}
+.btn:active,
+.btn.active,
+.btn[aria-selected='true'],
+.btn[aria-pressed='true'] {
   background: var(--accent-tint);
   color: var(--accent);
   border-color: rgba(76, 141, 255, 0.35);
 }
-.btn.primary, .btn-primary {
+.btn.primary,
+.btn-primary {
   height: var(--ctl-h);
   padding: 0 var(--sp-3);
   gap: 6px;
@@ -53,7 +69,8 @@
   cursor: pointer;
   transition: background 0.12s var(--ease);
 }
-.btn.primary:hover, .btn-primary:hover {
+.btn.primary:hover,
+.btn-primary:hover {
   background: var(--accent-hover);
 }
 .btn-secondary {
@@ -71,7 +88,9 @@
   font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    border-color 0.12s var(--ease);
 }
 .btn-secondary:hover {
   background: var(--surface-3);
@@ -90,7 +109,9 @@
   background: transparent;
   color: var(--fg-2);
   cursor: pointer;
-  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
 }
 .icon-btn:hover {
   background: var(--surface-3);
@@ -123,13 +144,16 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
 }
 .studio-btn:hover {
   background: var(--surface-3);
   color: var(--fg-1);
 }
-.studio-btn.active, .studio-btn[aria-selected="true"] {
+.studio-btn.active,
+.studio-btn[aria-selected='true'] {
   background: var(--surface-0);
   color: var(--fg-1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
@@ -154,7 +178,10 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s var(--ease), color 0.12s var(--ease), border-color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease),
+    border-color 0.12s var(--ease);
 }
 .ribbon-btn:hover,
 .v-tool-btn:hover,
@@ -196,12 +223,15 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
 }
 .v-mode-btn:hover {
   color: var(--fg-1);
 }
-.v-mode-btn.active, .v-mode-btn[aria-selected="true"] {
+.v-mode-btn.active,
+.v-mode-btn[aria-selected='true'] {
   background: var(--surface-0);
   color: var(--accent);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -279,7 +309,9 @@
   font-size: var(--fs-xs);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
 }
 .workspace-tab:hover {
   background: var(--surface-2);
@@ -630,7 +662,8 @@
   cursor: pointer;
   transition: background 0.1s;
 }
-.command-item:hover, .command-item.selected {
+.command-item:hover,
+.command-item.selected {
   background: var(--surface-3);
 }
 .command-item-left {
@@ -730,7 +763,9 @@
   animation: spin 1.5s linear infinite;
 }
 @keyframes spin {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .solver-progress-right {
@@ -815,12 +850,24 @@
   border-color: var(--accent);
 }
 
-.cube-face-front  { transform: rotateY(0deg) translateZ(20px); }
-.cube-face-back   { transform: rotateY(180deg) translateZ(20px); }
-.cube-face-right  { transform: rotateY(90deg) translateZ(20px); }
-.cube-face-left   { transform: rotateY(-90deg) translateZ(20px); }
-.cube-face-top    { transform: rotateX(90deg) translateZ(20px); }
-.cube-face-bottom { transform: rotateX(-90deg) translateZ(20px); }
+.cube-face-front {
+  transform: rotateY(0deg) translateZ(20px);
+}
+.cube-face-back {
+  transform: rotateY(180deg) translateZ(20px);
+}
+.cube-face-right {
+  transform: rotateY(90deg) translateZ(20px);
+}
+.cube-face-left {
+  transform: rotateY(-90deg) translateZ(20px);
+}
+.cube-face-top {
+  transform: rotateX(90deg) translateZ(20px);
+}
+.cube-face-bottom {
+  transform: rotateX(-90deg) translateZ(20px);
+}
 
 .nav-compass {
   position: relative;
@@ -864,9 +911,18 @@
   padding: 1px 3px;
   border-radius: 2px;
 }
-.axis-x { color: var(--err); background: rgba(229, 86, 107, 0.15); }
-.axis-y { color: var(--ok); background: rgba(63, 182, 139, 0.15); }
-.axis-z { color: var(--accent); background: var(--accent-tint); }
+.axis-x {
+  color: var(--err);
+  background: rgba(229, 86, 107, 0.15);
+}
+.axis-y {
+  color: var(--ok);
+  background: rgba(63, 182, 139, 0.15);
+}
+.axis-z {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
 
 /* =========================================================================
    8. Anatomy Card Presentation Overlay (Fig 1.0)

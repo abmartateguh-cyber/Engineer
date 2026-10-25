@@ -8,7 +8,7 @@
  * 4. Mean stress corrections: Morrow, Goodman, and Gerber criteria.
  * 5. Palmgren-Miner linear cumulative damage rule: Damage D = sum(n_i / N_i).
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

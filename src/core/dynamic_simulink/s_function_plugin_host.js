@@ -14,9 +14,9 @@
  *   - mdlDerivatives: evaluates dx_c/dt = h(t, x, u, p) for ODE solvers
  *   - mdlTerminate: resource cleanup
  * 
- * Parity standard: MathWorks Simulink Level-2 C-MEX S-Function & Wasm Host.
+ * Unverified comparison target: MathWorks Simulink Level-2 C-MEX S-Function & Wasm Host.
  * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

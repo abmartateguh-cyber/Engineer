@@ -1,14 +1,30 @@
 /**
- * OmniEng Phase 4 Upgrade Verification Suite: Semiconductor EDA & High-Order Optics Parity
+ * OmniEng Phase 4 Experimental Workflow Smoke Suite: EDA & High-Order Optics
  * Validates:
- * 1. High-Order Aspheric/Freeform Optics, 2x2 Thin-Film Coatings & Tolerancing
- * 2. IEEE 1800 SystemVerilog Synthesis & Liberty (.lib) Technology Mapping
- * 3. Clock Tree Synthesis (CTS), Multi-Layer Maze Routing & BSIM4 Compact Model
+ * 1. Example aspheric optics, thin-film calculations, and tolerancing
+ * 2. Standalone AIG operations and partial SystemVerilog declaration inspection
+ * 3. Experimental clock-tree, maze-routing, and BSIM4 routines
  */
 
-const { AsphericSurface, ThinFilmMultilayerCoating, MultiFieldRayFanAnalyzer, MonteCarloOpticalTolerancing } = require('../src/core/optics/aspheric_freeform_optics');
-const { SystemVerilogSynthesizer, AndInverterGraph } = require('../src/core/eda/system_verilog_synth');
-const { ClockSink, ClockTreeSynthesizer, MazeRouterPathFinder, BSIM4MosfetModel } = require('../src/core/eda/clock_tree_synthesis');
+const {
+  AsphericSurface,
+  ThinFilmMultilayerCoating,
+  MultiFieldRayFanAnalyzer,
+  MonteCarloOpticalTolerancing
+} = require('../src/core/optics/aspheric_freeform_optics');
+const {
+  SystemVerilogSynthesizer,
+  AndInverterGraph,
+  LIBERTY_LIBRARY,
+  SKY130_STANDARD_CELLS,
+  TechnologyMapper
+} = require('../src/core/eda/system_verilog_synth');
+const {
+  ClockSink,
+  ClockTreeSynthesizer,
+  MazeRouterPathFinder,
+  BSIM4MosfetModel
+} = require('../src/core/eda/clock_tree_synthesis');
 const { Vector3 } = require('../src/core/math/linear_algebra');
 
 let testsPassed = 0;
@@ -27,7 +43,7 @@ function assert(condition, message) {
 
 function runPhase4Tests() {
   console.log('================================================================');
-  console.log('   OmniEng Phase 4 EDA & High-Order Optics Parity Suite         ');
+  console.log('   OmniEng Phase 4 EDA & High-Order Optics Experimental Workflow Smoke Suite   ');
   console.log('================================================================\n');
 
   // --- Group 1: High-Order Aspheric Optics & Thin Films ---
@@ -56,11 +72,13 @@ function runPhase4Tests() {
     // Test 1.3: Multilayer Thin-Film Dielectric Coating (2x2 Matrix Method)
     // 4-layer Broadband Anti-Reflective (BBAR) coating: MgF2 / TiO2 stack
     const bbar = new ThinFilmMultilayerCoating('BBAR Anti-Reflective');
-    bbar.addLayer('MgF2', 1.38, 99.6)
-        .addLayer('TiO2', 2.30, 119.56);
+    bbar.addLayer('MgF2', 1.38, 99.6).addLayer('TiO2', 2.3, 119.56);
 
     const coatRes = bbar.evaluateCoating(550.0, 0.0, 1.52, 1.0);
-    assert(coatRes.reflectance < 0.03, `BBAR coating achieves low reflectance at 550nm: ${(coatRes.reflectance * 100).toFixed(2)}% (< 3%)`);
+    assert(
+      coatRes.reflectance < 0.03,
+      `BBAR coating achieves low reflectance at 550nm: ${(coatRes.reflectance * 100).toFixed(2)}% (< 3%)`
+    );
     assert(coatRes.transmittance > 0.97, `BBAR coating transmittance: ${(coatRes.transmittance * 100).toFixed(2)}%`);
 
     // Test 1.4: Multi-field ray fans
@@ -70,14 +88,23 @@ function runPhase4Tests() {
     assert(fans[0].rayFan.length === 9, 'Ray fan contains 9 pupil samples');
 
     // Test 1.5: Monte Carlo manufacturing tolerancing
-    const tolerancing = new MonteCarloOpticalTolerancing([asphere]);
+    const seed = 0x5eedc0de;
+    const tolerancing = new MonteCarloOpticalTolerancing([asphere], { seed });
     const mcResults = tolerancing.runTrials(50);
+    const repeatedResults = new MonteCarloOpticalTolerancing([asphere], { seed }).runTrials(50);
     assert(mcResults.numTrials === 50, 'Monte Carlo tolerancing executed 50 trials');
-    assert(mcResults.meanRmsSpotUm > 0, `Mean RMS spot radius: ${mcResults.meanRmsSpotUm.toFixed(2)} um`);
+    assert(
+      mcResults.meanRmsSpotUm > 0 &&
+        mcResults.seed === seed &&
+        mcResults.reproducible === true &&
+        mcResults.randomAlgorithm === 'mulberry32-v1' &&
+        JSON.stringify(mcResults) === JSON.stringify(repeatedResults),
+      `Seeded Monte Carlo repeat is deterministic; mean RMS spot radius: ${mcResults.meanRmsSpotUm.toFixed(2)} um`
+    );
   }
 
-  // --- Group 2: IEEE 1800 SystemVerilog Synthesis & Liberty Mapping ---
-  console.log('\n2. IEEE 1800 SystemVerilog Synthesis & Liberty (.lib) Mapping:');
+  // --- Group 2: Partial SystemVerilog Inspection and AIG Operations ---
+  console.log('\n2. Partial SystemVerilog Inspection and AIG Operations:');
   {
     // Test 2.1: And-Inverter Graph (AIG) constant folding & idempotency
     const aig = new AndInverterGraph();
@@ -86,7 +113,7 @@ function runPhase4Tests() {
     const andNode = aig.addAnd(inA, false, inA, false); // a AND a = a
     assert(andNode.node.id === inA.id, 'AIG idempotency: a AND a collapses to a');
 
-    // Test 2.2: Full SystemVerilog ALU Synthesis & Technology Mapping
+    // Test 2.2: Partial SystemVerilog declaration inspection
     const svCode = `
       module alu_core #(parameter WIDTH = 8) (
         input logic clk,
@@ -106,10 +133,23 @@ function runPhase4Tests() {
     const synthResult = synth.synthesize(svCode);
     assert(synthResult.moduleName === 'alu_core', 'SystemVerilog module name elaborated correctly');
     assert(synthResult.parameters.WIDTH === 8, 'SystemVerilog parameter WIDTH=8 parsed');
-    assert(synthResult.technologyMapping.cellCount > 0, `Liberty mapping mapped ${synthResult.technologyMapping.cellCount} standard cells`);
-    assert(synthResult.technologyMapping.totalAreaUm2 > 0, `Total silicon area: ${synthResult.technologyMapping.totalAreaUm2} um^2`);
-    assert(synthResult.technologyMapping.criticalPathDelayNs > 0, `Critical path delay: ${synthResult.technologyMapping.criticalPathDelayNs} ns`);
-    assert(synthResult.technologyMapping.maxClockFrequencyMhz > 500, `Max clock frequency: ${synthResult.technologyMapping.maxClockFrequencyMhz} MHz`);
+    assert(
+      synthResult.analysisStatus === 'experimental-partial',
+      'SystemVerilog declaration inspection is labeled experimental'
+    );
+    assert(synthResult.aigMetrics.status === 'unavailable', 'RTL expressions are not reported as an elaborated AIG');
+    assert(synthResult.technologyMapping.status === 'unavailable', 'Unimplemented Liberty mapping reports unavailable');
+    assert(synthResult.technologyMapping.targetLibrary === null, 'No unsupported foundry library is claimed');
+    assert(synthResult.registers.status === 'unavailable', 'No fabricated sequential register is returned');
+    assert(
+      LIBERTY_LIBRARY.available === false && Object.keys(LIBERTY_LIBRARY.cells).length === 0,
+      'Legacy Liberty export contains no fabricated cells'
+    );
+    assert(SKY130_STANDARD_CELLS.available === false, 'Legacy SKY130 export is an unavailable sentinel');
+    assert(
+      TechnologyMapper.mapToLiberty(null, null).status === 'unavailable',
+      'Legacy mapper returns an explicit unavailable result'
+    );
   }
 
   // --- Group 3: Clock Tree Synthesis, Maze Routing & BSIM4 ---
@@ -147,12 +187,15 @@ function runPhase4Tests() {
 
     // Test 3.4: CMOS Inverter Voltage Transfer Characteristic (VTC)
     const vtc = nmos.evaluateInverterVTC(1.2, 20);
-    assert(vtc.switchingThresholdVm > 0.4 && vtc.switchingThresholdVm < 0.8, `Inverter switching threshold Vm = ${vtc.switchingThresholdVm.toFixed(2)} V`);
+    assert(
+      vtc.switchingThresholdVm > 0.4 && vtc.switchingThresholdVm < 0.8,
+      `Inverter switching threshold Vm = ${vtc.switchingThresholdVm.toFixed(2)} V`
+    );
     assert(vtc.noiseMarginHigh > 0, `Noise Margin High NM_H = ${vtc.noiseMarginHigh.toFixed(2)} V`);
   }
 
   console.log('\n================================================================');
-  console.log(`Phase 4 Verification Finished: ${testsPassed} Passed (${testsFailed} Failed)`);
+  console.log(`Phase 4 Smoke Checks Finished: ${testsPassed} Passed (${testsFailed} Failed)`);
   console.log('================================================================\n');
 
   if (testsFailed > 0) {

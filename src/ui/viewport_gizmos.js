@@ -3,7 +3,7 @@
  * Interactive 3D translation arrows, rotation rings, and scaling handles
  * for in-viewport direct modeling and assembly positioning.
  *
- * Parity: Onshape / Fusion 360 / Blender 3D Transform Gizmos.
+ * Experimental workflow: Onshape / Fusion 360 / Blender 3D Transform Gizmos.
  * Zero external dependencies.
  */
 

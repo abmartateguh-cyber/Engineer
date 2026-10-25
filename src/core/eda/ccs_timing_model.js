@@ -1,13 +1,13 @@
 /**
  * OmniEng Composite Current Source (CCS / ECSM) Nanometer Timing Engine
  * 
- * Implements sign-off current-source cell characterization matching Synopsys PrimeTime / Cadence Tempus:
+ * Experimental current-waveform timing calculation example:
  * 1. Time-varying driver output current tables I_driver(t, V_out) capturing non-linear transistor behavior.
  * 2. Non-linear receiver pin capacitance C_in(V) modeling gate voltage-dependent Miller capacitance.
  * 3. Interconnect resistive shielding (Pi-model integration): C_eff * dV/dt = I(t, V).
- * 4. Sub-nanometer delay and slew evaluation with sub-picosecond accuracy for FinFET / GAA logic.
+ * 4. Delay and slew estimates from illustrative model inputs.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No vendor characterization data, independent timing validation, or signoff accuracy is established.
  */
 
 'use strict';
@@ -115,4 +115,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.CCSTimingModel = CCSTimingModel;
 }
-

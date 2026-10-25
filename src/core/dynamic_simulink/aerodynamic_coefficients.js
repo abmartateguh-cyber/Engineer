@@ -1,7 +1,7 @@
 /**
  * OmniEng Aircraft & UAV Aerodynamic Stability Derivative Engine
  * Standard: USAF DATCOM / Etkin Flight Dynamics Stability Derivatives
- * Industrial Parity: NASA JSBSim / MATLAB Aerospace Blockset longitudinal and lateral stability.
+ * Experimental implementation: NASA JSBSim / MATLAB Aerospace Blockset longitudinal and lateral stability.
  */
 
 class AerodynamicCoefficients {

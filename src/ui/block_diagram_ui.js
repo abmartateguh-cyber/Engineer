@@ -1,7 +1,6 @@
 /**
- * OmniEng 2D Dynamic Simulink Block Diagram Canvas & Interactive Wire Editor
- * Supports drag-and-drop block positioning, dynamic bezier wire routing, preset architectures,
- * and high-refresh animated virtual oscilloscope scope displays.
+ * Experimental 2D block-diagram view for caller-supplied dimensionless signal graphs.
+ * The canvas only displays a model and time-series samples returned by the controls engine.
  */
 
 class BlockDiagramUI {
@@ -18,27 +17,9 @@ class BlockDiagramUI {
     this.selectedBlock = null;
     this.lastMouse = { x: 0, y: 0 };
 
-    // Oscilloscope Animation State
-    this.scopeTime = 0.0;
-    this.animFrameId = null;
-
-    // Default System: Drone Flight Altitude Cascaded PID
-    this.blocks = [
-      { id: 'b1', type: 'Step Input', name: 'Altitude Setpoint (12m)', x: 40, y: 150, w: 110, h: 60, params: { finalValue: 12.0, stepTime: 0.5 } },
-      { id: 'b2', type: 'Sum (+ -)', name: 'Error Sum Junction', x: 200, y: 160, w: 45, h: 45, params: {} },
-      { id: 'b3', type: 'PID Controller', name: 'Cascaded Altitude PID', x: 290, y: 145, w: 140, h: 75, params: { Kp: 2.8, Ki: 0.6, Kd: 0.15 } },
-      { id: 'b4', type: 'Actuator / ESC', name: 'Electronic Speed Controller', x: 475, y: 145, w: 130, h: 75, params: { maxRPM: 8500, tau: 0.02 } },
-      { id: 'b5', type: 'Quadcopter Plant', name: '6-DOF Rigid Airframe', x: 650, y: 145, w: 135, h: 75, params: { massKg: 0.85, Izz: 0.005 } },
-      { id: 'b6', type: 'Digital Scope', name: 'Real-Time Telemetry Scope', x: 830, y: 120, w: 200, h: 130, params: { vDiv: 2.0, tDiv: 0.5 } }
-    ];
-
-    this.wires = [
-      { from: 'b1', to: 'b2' },
-      { from: 'b2', to: 'b3' },
-      { from: 'b3', to: 'b4' },
-      { from: 'b4', to: 'b5' },
-      { from: 'b5', to: 'b6' }
-    ];
+    this.blocks = [];
+    this.wires = [];
+    this.simulationResult = null;
 
     this.init();
   }
@@ -54,7 +35,6 @@ class BlockDiagramUI {
       }
     }
     this.setupInteractions();
-    this.startOscilloscopeAnimation();
     this.render();
   }
 
@@ -122,21 +102,25 @@ class BlockDiagramUI {
       this.isPanning = false;
     });
 
-    this.canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+    this.canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
 
-      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-      const newZoom = Math.max(0.4, Math.min(3.0, this.zoom * zoomFactor));
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+        const newZoom = Math.max(0.4, Math.min(3.0, this.zoom * zoomFactor));
 
-      this.pan.x = mouseX - (mouseX - this.pan.x) * (newZoom / this.zoom);
-      this.pan.y = mouseY - (mouseY - this.pan.y) * (newZoom / this.zoom);
-      this.zoom = newZoom;
+        this.pan.x = mouseX - (mouseX - this.pan.x) * (newZoom / this.zoom);
+        this.pan.y = mouseY - (mouseY - this.pan.y) * (newZoom / this.zoom);
+        this.zoom = newZoom;
 
-      this.render();
-    }, { passive: false });
+        this.render();
+      },
+      { passive: false }
+    );
 
     this.canvas.addEventListener('dblclick', () => {
       this.pan = { x: 0, y: 0 };
@@ -146,41 +130,132 @@ class BlockDiagramUI {
     });
   }
 
-  loadPreset(presetName) {
-    if (presetName === 'drone') {
-      this.blocks = [
-        { id: 'b1', type: 'Step Input', name: 'Altitude Setpoint (12m)', x: 40, y: 150, w: 110, h: 60, params: { finalValue: 12.0 } },
-        { id: 'b2', type: 'Sum (+ -)', name: 'Error Sum Junction', x: 200, y: 160, w: 45, h: 45, params: {} },
-        { id: 'b3', type: 'PID Controller', name: 'Cascaded Altitude PID', x: 290, y: 145, w: 140, h: 75, params: { Kp: 2.8, Ki: 0.6, Kd: 0.15 } },
-        { id: 'b4', type: 'Actuator / ESC', name: 'Electronic Speed Controller', x: 475, y: 145, w: 130, h: 75, params: { maxRPM: 8500 } },
-        { id: 'b5', type: 'Quadcopter Plant', name: '6-DOF Rigid Airframe', x: 650, y: 145, w: 135, h: 75, params: { massKg: 0.85 } },
-        { id: 'b6', type: 'Digital Scope', name: 'Real-Time Telemetry Scope', x: 830, y: 120, w: 200, h: 130, params: {} }
-      ];
-    } else if (presetName === 'thermal') {
-      this.blocks = [
-        { id: 'b1', type: 'Step Input', name: 'Gaming Workload (8.5W)', x: 40, y: 150, w: 120, h: 60, params: { finalValue: 8.5 } },
-        { id: 'b2', type: 'Sum (+ -)', name: 'Sum Junction', x: 210, y: 160, w: 45, h: 45, params: {} },
-        { id: 'b3', type: 'PID Controller', name: 'PMIC DVFS Thermal Governor', x: 300, y: 145, w: 150, h: 75, params: { Kp: 1.2, Ki: 0.05, Kd: 0.0 } },
-        { id: 'b4', type: 'Thermal Plant', name: 'Vapor Chamber CHT Model', x: 495, y: 145, w: 145, h: 75, params: { Rth: 2.1, Cth: 15.0 } },
-        { id: 'b5', type: 'Digital Scope', name: 'SoC Temperature Scope', x: 685, y: 120, w: 200, h: 130, params: {} }
-      ];
-      this.wires = [
-        { from: 'b1', to: 'b2' },
-        { from: 'b2', to: 'b3' },
-        { from: 'b3', to: 'b4' },
-        { from: 'b4', to: 'b5' }
-      ];
+  loadPreset() {
+    return {
+      success: false,
+      status: 'unavailable',
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message:
+          'Built-in fixed control and thermal examples were withdrawn; no source-reviewed preset model is available.'
+      }
+    };
+  }
+
+  clearModel() {
+    this.blocks = [];
+    this.wires = [];
+    this.simulationResult = null;
+    this.render();
+  }
+
+  loadModel(graphData) {
+    if (!graphData || typeof graphData !== 'object' || Array.isArray(graphData)) {
+      throw new TypeError('A caller-supplied block graph object is required.');
     }
+    if (!Array.isArray(graphData.blocks) || graphData.blocks.length < 1 || graphData.blocks.length > 1000) {
+      throw new TypeError('The graph must contain between 1 and 1,000 blocks.');
+    }
+    if (!Array.isArray(graphData.connections) || graphData.connections.length > 10000) {
+      throw new TypeError('The graph must contain a connections array with at most 10,000 entries.');
+    }
+
+    const supportedTypes = new Set(['source_step', 'source_sine', 'source_constant', 'gain', 'sum', 'pid', 'scope']);
+    const ids = new Set();
+    const blocks = graphData.blocks.map((block, index) => {
+      if (!block || typeof block !== 'object' || Array.isArray(block)) {
+        throw new TypeError(`Block ${index + 1} must be an object.`);
+      }
+      if (typeof block.id !== 'string' || block.id.length < 1 || block.id.length > 128 || ids.has(block.id)) {
+        throw new TypeError(`Block ${index + 1} requires a unique ID of 1 to 128 characters.`);
+      }
+      if (typeof block.type !== 'string' || !supportedTypes.has(block.type)) {
+        throw new TypeError(`Block '${block.id}' has an unsupported type.`);
+      }
+      if (!block.params || typeof block.params !== 'object' || Array.isArray(block.params)) {
+        throw new TypeError(`Block '${block.id}' requires a parameter object.`);
+      }
+      if (block.name !== undefined && (typeof block.name !== 'string' || block.name.length > 160)) {
+        throw new TypeError(`Block '${block.id}' name must be a string of at most 160 characters.`);
+      }
+      if (block.x !== undefined && !Number.isFinite(block.x)) {
+        throw new TypeError(`Block '${block.id}' x position must be finite.`);
+      }
+      if (block.y !== undefined && !Number.isFinite(block.y)) {
+        throw new TypeError(`Block '${block.id}' y position must be finite.`);
+      }
+
+      ids.add(block.id);
+      const isScope = block.type === 'scope';
+      // Missing positions get a deterministic canvas layout only; they do not alter the model.
+      const fallbackX = 50 + (index % 4) * 190;
+      const fallbackY = 100 + Math.floor(index / 4) * 120;
+      return {
+        id: block.id,
+        type: block.type,
+        name: block.name || block.type,
+        x: block.x ?? fallbackX,
+        y: block.y ?? fallbackY,
+        w: isScope ? 200 : 150,
+        h: isScope ? 130 : 75,
+        params: { ...block.params }
+      };
+    });
+
+    const wires = graphData.connections.map((connection, index) => {
+      if (!connection || typeof connection !== 'object' || Array.isArray(connection)) {
+        throw new TypeError(`Connection ${index + 1} must be an object.`);
+      }
+      if (!ids.has(connection.fromBlock) || !ids.has(connection.toBlock)) {
+        throw new TypeError(`Connection ${index + 1} references an unknown block ID.`);
+      }
+      return { from: connection.fromBlock, to: connection.toBlock };
+    });
+
+    this.blocks = blocks;
+    this.wires = wires;
+    this.simulationResult = null;
+    this.render();
+  }
+
+  setSimulationResult(result) {
+    if (
+      result?.units?.time?.unit !== 's' ||
+      result?.units?.time?.dimension !== 'time' ||
+      result?.units?.signal?.unit !== '1' ||
+      result?.units?.signal?.dimension !== 'dimensionless'
+    ) {
+      throw new TypeError('Solver result must declare seconds for time and dimensionless signal units.');
+    }
+    if (!result || !Array.isArray(result.time) || result.time.length < 1 || result.time.length > 1_000_001) {
+      throw new TypeError('Solver result requires between 1 and 1,000,001 time samples.');
+    }
+    if (!result.time.every((time, index) => Number.isFinite(time) && (index === 0 || time > result.time[index - 1]))) {
+      throw new TypeError('Solver time samples must be finite and strictly increasing.');
+    }
+    if (!result.signals || typeof result.signals !== 'object' || Array.isArray(result.signals)) {
+      throw new TypeError('Solver result requires signal histories keyed by block ID.');
+    }
+    for (const [id, values] of Object.entries(result.signals)) {
+      if (!Array.isArray(values) || values.length !== result.time.length || !values.every(Number.isFinite)) {
+        throw new TypeError(`Solver signal '${id}' must contain one finite value per time sample.`);
+      }
+    }
+    this.simulationResult = result;
     this.render();
   }
 
   startOscilloscopeAnimation() {
-    const loop = () => {
-      this.scopeTime += 0.04;
-      this.render();
-      this.animFrameId = requestAnimationFrame(loop);
+    return {
+      success: false,
+      status: 'unavailable',
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message: 'Continuous scope playback is unavailable; the canvas can display returned solver samples.'
+      }
     };
-    this.animFrameId = requestAnimationFrame(loop);
   }
 
   render() {
@@ -217,8 +292,8 @@ class BlockDiagramUI {
     ctx.strokeStyle = '#38bdf8';
 
     for (const wire of this.wires) {
-      const src = this.blocks.find(b => b.id === wire.from);
-      const dst = this.blocks.find(b => b.id === wire.to);
+      const src = this.blocks.find((b) => b.id === wire.from);
+      const dst = this.blocks.find((b) => b.id === wire.to);
       if (src && dst) {
         const x1 = src.x + src.w;
         const y1 = src.y + src.h / 2;
@@ -241,29 +316,7 @@ class BlockDiagramUI {
       }
     }
 
-    // Negative Feedback Loop wire (Plant -> Sum)
-    const plant = this.blocks.find(b => b.type.includes('Plant'));
-    const sum = this.blocks.find(b => b.type.includes('Sum'));
-    if (plant && sum) {
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      const fbStartX = plant.x + plant.w;
-      const fbStartY = plant.y + plant.h * 0.6;
-      ctx.moveTo(fbStartX, fbStartY);
-      ctx.lineTo(fbStartX + 20, fbStartY);
-      ctx.lineTo(fbStartX + 20, plant.y + plant.h + 50);
-      ctx.lineTo(sum.x + sum.w / 2, plant.y + plant.h + 50);
-      ctx.lineTo(sum.x + sum.w / 2, sum.y + sum.h);
-      ctx.stroke();
-
-      // Negative feedback symbol '-'
-      ctx.fillStyle = '#f43f5e';
-      ctx.font = 'bold 14px monospace';
-      ctx.fillText('−', sum.x + sum.w / 2 + 6, sum.y + sum.h + 16);
-    }
-
-    // 3. Draw Functional Simulation Blocks
+    // Draw only caller-supplied visual blocks and returned simulation samples.
     for (const b of this.blocks) {
       const isSelected = this.selectedBlock && this.selectedBlock.id === b.id;
 
@@ -273,7 +326,7 @@ class BlockDiagramUI {
       ctx.shadowOffsetY = 4;
 
       // Block Body Fill
-      ctx.fillStyle = b.type.startsWith('Digital Scope') ? '#070c18' : '#162032';
+      ctx.fillStyle = b.type === 'scope' ? '#070c18' : '#162032';
       ctx.strokeStyle = isSelected ? '#38bdf8' : '#334155';
       ctx.lineWidth = isSelected ? 2.5 : 1.5;
 
@@ -284,7 +337,7 @@ class BlockDiagramUI {
       ctx.shadowColor = 'transparent';
 
       // Top Header Stripe
-      ctx.fillStyle = b.type.includes('PID') ? '#818cf8' : b.type.includes('Scope') ? '#10b981' : '#38bdf8';
+      ctx.fillStyle = b.type === 'pid' ? '#818cf8' : b.type === 'scope' ? '#10b981' : '#38bdf8';
       ctx.fillRect(b.x, b.y, b.w, 4);
 
       // Connection Port Dots (Inputs on left, Outputs on right)
@@ -305,20 +358,23 @@ class BlockDiagramUI {
       ctx.font = '10px system-ui';
       ctx.fillText(b.name, b.x + b.w / 2, b.y + 36);
 
-      // Parameter Readouts
-      ctx.font = 'bold 10px monospace';
+      // Parameter readouts are unitless by this view's explicit signal-graph contract.
+      ctx.font = 'bold 9px monospace';
       ctx.fillStyle = '#38bdf8';
-      if (b.type.includes('PID')) {
-        ctx.fillText(`Kp: ${b.params.Kp}  Ki: ${b.params.Ki}  Kd: ${b.params.Kd}`, b.x + b.w / 2, b.y + 58);
-      } else if (b.type.includes('Step')) {
-        ctx.fillText(`Target: ${b.params.finalValue}m`, b.x + b.w / 2, b.y + 52);
-      } else if (b.type.includes('Actuator')) {
-        ctx.fillText(`Max: ${b.params.maxRPM} RPM`, b.x + b.w / 2, b.y + 56);
-      } else if (b.type.includes('Quadcopter')) {
-        ctx.fillText(`Mass: ${b.params.massKg} kg`, b.x + b.w / 2, b.y + 56);
-      } else if (b.type.includes('Digital Scope')) {
-        // High-Refresh Virtual Oscilloscope CRT View
-        const sx = b.x + 10, sy = b.y + 44, sw = b.w - 20, sh = b.h - 52;
+      const numericParams = Object.entries(b.params)
+        .filter(([, value]) => Number.isFinite(value))
+        .slice(0, 3)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('  ');
+      if (b.type !== 'scope' && numericParams) {
+        ctx.fillText(numericParams, b.x + b.w / 2, b.y + 58);
+      }
+      if (b.type === 'scope') {
+        // Plot only solver samples returned for this caller-supplied scope block.
+        const sx = b.x + 10,
+          sy = b.y + 44,
+          sw = b.w - 20,
+          sh = b.h - 52;
         ctx.fillStyle = '#030712';
         ctx.fillRect(sx, sy, sw, sh);
 
@@ -326,50 +382,51 @@ class BlockDiagramUI {
         ctx.strokeStyle = '#1e293b';
         ctx.lineWidth = 1;
         for (let gx = sx; gx <= sx + sw; gx += sw / 5) {
-          ctx.beginPath(); ctx.moveTo(gx, sy); ctx.lineTo(gx, sy + sh); ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(gx, sy);
+          ctx.lineTo(gx, sy + sh);
+          ctx.stroke();
         }
         for (let gy = sy; gy <= sy + sh; gy += sh / 4) {
-          ctx.beginPath(); ctx.moveTo(sx, gy); ctx.lineTo(sx + sw, gy); ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(sx, gy);
+          ctx.lineTo(sx + sw, gy);
+          ctx.stroke();
         }
 
-        // Live Animated Closed-Loop Step Response Signal Trace
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        const pts = 40;
-        const targetLevel = sy + sh * 0.25;
-
-        // Draw setpoint dashed line
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(sx, targetLevel); ctx.lineTo(sx + sw, targetLevel);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Phosphor Trace with slight decay glow
-        ctx.strokeStyle = '#10b981';
-        ctx.beginPath();
-        for (let i = 0; i < pts; i++) {
-          const px = sx + (i / pts) * sw;
-          const t = (i / pts) * 3.5;
-          // Step response with second-order damped overshoot
-          const damping = Math.exp(-t * 1.4);
-          const response = 1.0 - damping * Math.cos(t * 3.8);
-          // Add slight high-frequency sensor noise & time sweep
-          const noise = Math.sin(t * 18 + this.scopeTime) * 0.03;
-          const py = sy + sh - ((response + noise) * (sh * 0.65));
-
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.stroke();
-
-        // Scope Telemetry HUD
-        ctx.fillStyle = '#10b981';
+        ctx.fillStyle = '#94a3b8';
         ctx.font = '9px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('CH1: 2V/div  T: 0.5s/div  Mp: 8.2%', sx + 4, sy + sh - 4);
+        ctx.textAlign = 'center';
+        const samples = this.simulationResult?.signals?.[b.id];
+        if (Array.isArray(samples) && samples.length > 0) {
+          let minValue = samples[0];
+          let maxValue = samples[0];
+          for (let i = 1; i < samples.length; i++) {
+            minValue = Math.min(minValue, samples[i]);
+            maxValue = Math.max(maxValue, samples[i]);
+          }
+          const range = maxValue - minValue || 1;
+          const stride = Math.max(1, Math.ceil(samples.length / 512));
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          for (let i = 0; i < samples.length; i += stride) {
+            const px = sx + (i / Math.max(1, samples.length - 1)) * sw;
+            const py = sy + sh - ((samples[i] - minValue) / range) * sh;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          if ((samples.length - 1) % stride !== 0 && samples.length > 1) {
+            const last = samples.length - 1;
+            ctx.lineTo(sx + sw, sy + sh - ((samples[last] - minValue) / range) * sh);
+          }
+          ctx.stroke();
+          ctx.fillStyle = '#94a3b8';
+          ctx.textAlign = 'left';
+          ctx.fillText(`Unitless • ${samples.length} returned samples`, sx, sy + sh + 1);
+        } else {
+          ctx.fillText('No solver result is loaded', sx + sw / 2, sy + sh / 2);
+        }
       }
     }
 
@@ -387,10 +444,16 @@ class BlockDiagramUI {
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 11px system-ui';
     ctx.textAlign = 'left';
-    ctx.fillText('Dynamic Simulink Block Diagram Simulator', 24, 32);
+    ctx.fillText('Experimental Block Diagram Canvas', 24, 32);
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px monospace';
-    ctx.fillText('Drag blocks to route wires • Click to inspect • Zoom: ' + (this.zoom * 100).toFixed(0) + '%', 24, 48);
+    const modelStatus =
+      this.blocks.length === 0
+        ? 'No caller-supplied model is loaded'
+        : this.simulationResult
+          ? 'Caller model • experimental result loaded'
+          : 'Caller model loaded • simulation not run';
+    ctx.fillText(`${modelStatus} • Zoom: ${(this.zoom * 100).toFixed(0)}%`, 24, 48);
   }
 }
 

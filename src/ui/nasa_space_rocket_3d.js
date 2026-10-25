@@ -1,11 +1,9 @@
 /**
  * OmniEng 3D Aerospace Visualization
  * ============================================================================
- * NASA Space Launch Vehicle & Rocket Engine 3D Hierarchical Assembly
- * Conforming to:
- *  - NASA Systems Engineering Handbook NASA/SP-2016-6105 Rev 2 (WBS 06.01 - 06.08)
- *  - High-Fidelity B-Rep Geometry & Procedural PBR Anisotropic Shaders
- *  - Full Launch Vehicle Stack & Macro Rocket Engine Deep-Dive Anatomy
+ * Illustrative Launch Vehicle & Rocket Engine 3D Geometry
+ * Synthetic interface demonstration only; no NASA hardware, standards
+ * conformance, or approved aerospace design is represented.
  * ============================================================================
  */
 
@@ -17,9 +15,9 @@ class NasaSpaceRocket3D {
   }
 
   /**
-   * Builds the complete 3D scene graph for the NASA Space Launch Vehicle.
+   * Builds a 3D visualization of an illustrative launch vehicle concept.
    * Supports 'full_stack' and 'engine_macro' modes.
-   * 
+   *
    * @param {string} mode - 'full_stack' | 'engine_macro'
    * @param {THREE.Group} targetGroup - Three.js group to populate
    * @param {Object} context - Optional references (ProceduralHardware, ProceduralPbrMaterials, PhenomenaShaders)
@@ -29,16 +27,18 @@ class NasaSpaceRocket3D {
     const group = targetGroup || new THREE.Group();
     const partsList = [];
 
-    // Helper to register parts with NASA WBS metadata
-    const addPart = (mesh, meta = {}) => {
-      mesh.userData = Object.assign({
-        isNasaEntity: true,
-        wbsId: meta.wbsId || '06.01',
-        entityName: meta.entityName || 'Propulsion Systems',
-        partName: meta.partName || 'Aerospace Component',
-        materialName: meta.materialName || 'Aerospace Alloy',
-        specStandard: meta.specStandard || 'NASA-STD-5001'
-      }, meta);
+    // Keep selectable part metadata generic because the former callouts were unsourced.
+    const addPart = (mesh) => {
+      const componentNumber = partsList.length + 1;
+      mesh.userData = {
+        isSyntheticExample: true,
+        isNasaEntity: false,
+        componentId: `SYNTH-AERO-${componentNumber}`,
+        entityName: 'Synthetic aerospace geometry',
+        partName: `Illustrative component ${componentNumber}`,
+        materialName: 'Illustrative material assignment',
+        specStandard: 'No standards assessment'
+      };
       group.add(mesh);
       partsList.push(mesh.userData);
       return mesh;
@@ -61,60 +61,60 @@ class NasaSpaceRocket3D {
   }
 
   // =========================================================================
-  // 1. FULL ORBITAL LAUNCH VEHICLE STACK (WBS 06.01 - 06.08)
+  // 1. Illustrative Launch Vehicle Geometry
   // =========================================================================
 
   buildFullStackLaunchVehicle(group, addPart, context) {
     const { ProceduralHardware, ProceduralPbrMaterials, PhenomenaShaders } = context;
 
     // Materials Palette
-    const boosterSkinMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc, // High-gloss aerospace white
+    const lightSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc, // Illustrative exterior surface
       metalness: 0.25,
       roughness: 0.25
     });
 
-    const isogridCutawayMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8, // Al-Li cryogenic blue tint
+    const cutawaySurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8, // Illustrative cutaway surface
       metalness: 0.85,
       roughness: 0.35,
       wireframe: false
     });
 
-    const carbonInterstageMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a, // Carbon-fiber dark weave
+    const darkInterstageSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a, // Illustrative dark surface
       metalness: 0.6,
       roughness: 0.4
     });
 
-    const titaniumGridFinMat = new THREE.MeshStandardMaterial({
-      color: 0x64748b, // Forged titanium
+    const mutedMetalSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b, // Illustrative metallic surface
       metalness: 0.95,
       roughness: 0.2
     });
 
-    const goldMliMat = new THREE.MeshStandardMaterial({
-      color: 0xfbbf24, // Thermal MLI gold foil
+    const goldToneSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0xfbbf24, // Illustrative gold surface
       metalness: 0.98,
       roughness: 0.15
     });
 
-    const copperNozzleMat = new THREE.MeshStandardMaterial({
-      color: 0xb45309, // Narloy-Z copper alloy
+    const copperToneSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0xb45309, // Illustrative copper-colored surface
       metalness: 0.95,
       roughness: 0.25,
       side: THREE.DoubleSide
     });
 
-    const niobiumVacMat = new THREE.MeshStandardMaterial({
-      color: 0x334155, // Coated niobium C-103
+    const deepBlueSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x334155, // Illustrative dark metallic surface
       metalness: 0.8,
       roughness: 0.4,
       side: THREE.DoubleSide
     });
 
     // -----------------------------------------------------------------------
-    // A. STAGE 1 BOOSTER CORE (WBS 06.02: Structures)
+    // A. Illustrative lower-stage body
     // -----------------------------------------------------------------------
     const boosterRadius = 14.0;
     const boosterHeight = 110.0;
@@ -122,40 +122,29 @@ class NasaSpaceRocket3D {
 
     // Main Cylindrical Booster Body
     const boosterGeom = new THREE.CylinderGeometry(boosterRadius, boosterRadius, boosterHeight, 48, 8, true);
-    const boosterMesh = new THREE.Mesh(boosterGeom, boosterSkinMat);
+    const boosterMesh = new THREE.Mesh(boosterGeom, lightSurfaceMat);
     boosterMesh.position.set(0, boosterBaseY + boosterHeight / 2, 0);
-    addPart(boosterMesh, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Stage 1 Booster Al-Li 2195 Cryogenic Barrel',
-      materialName: 'Al-Li 2195-T8 Friction-Stir Welded',
-      specStandard: 'NASA SP-8007'
-    });
+    addPart(boosterMesh);
 
-    // Internal Isogrid Cryogenic Tank Section (Exposed Section Cutaway Effect)
-    const tankGeom = new THREE.CylinderGeometry(boosterRadius - 0.6, boosterRadius - 0.6, boosterHeight * 0.75, 36, 12, true);
-    const tankMesh = new THREE.Mesh(tankGeom, isogridCutawayMat);
+    // Illustrative internal lattice tank form (section cutaway)
+    const tankGeom = new THREE.CylinderGeometry(
+      boosterRadius - 0.6,
+      boosterRadius - 0.6,
+      boosterHeight * 0.75,
+      36,
+      12,
+      true
+    );
+    const tankMesh = new THREE.Mesh(tankGeom, cutawaySurfaceMat);
     tankMesh.position.set(0, boosterBaseY + boosterHeight / 2 - 10, 0);
-    addPart(tankMesh, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'CNC Milled Triangular Isogrid Liquid Oxygen Tank',
-      materialName: 'Al-Li 2195 Cryogenic Pressure Hull',
-      specStandard: 'NASA SP-8007 / SP-8032'
-    });
+    addPart(tankMesh);
 
     // Longitudinal Systems Conduit Raceways (Left & Right)
     [-boosterRadius - 0.6, boosterRadius + 0.6].forEach((rx, idx) => {
       const racewayGeom = new THREE.BoxGeometry(1.6, boosterHeight, 1.2);
       const raceway = new THREE.Mesh(racewayGeom, new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.5 }));
       raceway.position.set(rx, boosterBaseY + boosterHeight / 2, 0);
-      addPart(raceway, {
-        wbsId: '06.07',
-        entityName: 'Electrical Power & Data Distribution',
-        partName: `Avionics & Cryo Pressurization Raceway #${idx + 1}`,
-        materialName: 'Extruded Al 6061-T6 Conduit Cover',
-        specStandard: 'MIL-STD-1553B'
-      });
+      addPart(raceway);
     });
 
     // Circumferential Stiffener Bands & Friction Stir Weld Seams
@@ -166,43 +155,40 @@ class NasaSpaceRocket3D {
       );
       weldRing.rotation.x = Math.PI / 2;
       weldRing.position.set(0, wy, 0);
-      addPart(weldRing, {
-        wbsId: '06.02',
-        entityName: 'Structures & Mechanisms',
-        partName: 'Friction Stir Circumferential Girth Weld Bead',
-        materialName: 'Al-Li 2195 Weld Joint',
-        specStandard: 'AWS D17.1'
-      });
+      addPart(weldRing);
     }
 
     // -----------------------------------------------------------------------
-    // B. FOUR TITANIUM GRID FINS (WBS 06.03: GNC)
+    // B. Illustrative exterior lattice forms
     // -----------------------------------------------------------------------
     const gridAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
     gridAngles.forEach((angle, idx) => {
       const finGroup = new THREE.Group();
-      
+
       // Aerodynamic Planar Grid Lattice Frame
       const frameGeom = new THREE.BoxGeometry(7.0, 10.0, 1.2);
-      const frameMesh = new THREE.Mesh(frameGeom, titaniumGridFinMat);
+      const frameMesh = new THREE.Mesh(frameGeom, mutedMetalSurfaceMat);
       frameMesh.position.set(0, 5.0, 0);
       finGroup.add(frameMesh);
 
       // Internal Waffle Grids
       for (let gx = -2.5; gx <= 2.5; gx += 1.25) {
-        const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 9.6, 1.0), titaniumGridFinMat);
+        const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 9.6, 1.0), mutedMetalSurfaceMat);
         vBar.position.set(gx, 5.0, 0);
         finGroup.add(vBar);
       }
       for (let gy = 1.5; gy <= 8.5; gy += 1.75) {
-        const hBar = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 1.0), titaniumGridFinMat);
+        const hBar = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 1.0), mutedMetalSurfaceMat);
         hBar.position.set(0, gy, 0);
         finGroup.add(hBar);
       }
 
       // Hydraulic Rotary Actuator Housing
       const actuatorGeom = new THREE.CylinderGeometry(1.6, 1.8, 4.0, 16);
-      const actuator = new THREE.Mesh(actuatorGeom, new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 }));
+      const actuator = new THREE.Mesh(
+        actuatorGeom,
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+      );
       actuator.rotation.z = Math.PI / 2;
       actuator.position.set(0, 0, 0);
       finGroup.add(actuator);
@@ -210,31 +196,19 @@ class NasaSpaceRocket3D {
       const finR = boosterRadius + 4.5;
       finGroup.position.set(Math.cos(angle) * finR, boosterBaseY + boosterHeight - 8.0, Math.sin(angle) * finR);
       finGroup.rotation.y = -angle + Math.PI / 2;
-      
-      addPart(finGroup, {
-        wbsId: '06.03',
-        entityName: 'Guidance, Navigation & Control (GNC) & Avionics',
-        partName: `Hypersonic Titanium Waffle Grid Fin #${idx + 1}`,
-        materialName: 'Ti-6Al-4V Cast & CNC Milled',
-        specStandard: 'NASA-STD-5001'
-      });
+
+      addPart(finGroup);
     });
 
     // -----------------------------------------------------------------------
-    // C. STAGE 1 BOOSTER 9-ENGINE CLUSTER & THRUST PUCK (WBS 06.01)
+    // C. Illustrative lower-stage engine cluster geometry
     // -----------------------------------------------------------------------
-    const thrustPuck = new THREE.Mesh(
+    const lowerStageSupportPlate = new THREE.Mesh(
       new THREE.CylinderGeometry(boosterRadius - 1.0, boosterRadius + 0.5, 8.0, 32),
       new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.92 })
     );
-    thrustPuck.position.set(0, boosterBaseY - 4.0, 0);
-    addPart(thrustPuck, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Octaweb Thrust Structure & Hold-Down Ring',
-      materialName: 'Inconel 718 Forged Truss',
-      specStandard: 'NASA SP-125'
-    });
+    lowerStageSupportPlate.position.set(0, boosterBaseY - 4.0, 0);
+    addPart(lowerStageSupportPlate);
 
     // 9 Engines: 1 Center Engine + 8 Outer Engines
     const enginePositions = [{ x: 0, z: 0, isCenter: true }];
@@ -250,7 +224,7 @@ class NasaSpaceRocket3D {
 
     enginePositions.forEach((pos, idx) => {
       const eGroup = new THREE.Group();
-      
+
       // Powerhead Gimbal Joint
       const gimbal = new THREE.Mesh(
         new THREE.SphereGeometry(1.6, 16, 16),
@@ -267,11 +241,8 @@ class NasaSpaceRocket3D {
       chamber.position.set(0, -2.5, 0);
       eGroup.add(chamber);
 
-      // Regeneratively Cooled Bell Nozzle
-      const nozzle = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.4, 4.2, 10.0, 32, 4, true),
-        copperNozzleMat
-      );
+      // Illustrative bell-shaped nozzle
+      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 4.2, 10.0, 32, 4, true), copperToneSurfaceMat);
       nozzle.position.set(0, -9.0, 0);
       eGroup.add(nozzle);
 
@@ -287,22 +258,13 @@ class NasaSpaceRocket3D {
       }
 
       eGroup.position.set(pos.x, boosterBaseY - 8.0, pos.z);
-      addPart(eGroup, {
-        wbsId: '06.01',
-        entityName: 'Propulsion Systems',
-        partName: pos.isCenter
-          ? 'Center Gimballed Staged Combustion Engine (Primary TVC)'
-          : `Outer Fixed Staged Combustion Booster Engine #${idx}`,
-        materialName: 'Narloy-Z Milled Copper Liner / Inconel 718 Jacket',
-        specStandard: 'NASA SP-125'
-      });
+      addPart(eGroup);
     });
 
-    // Active Supersonic Exhaust Plume on Center Engine
-    if (PhenomenaShaders && PhenomenaShaders.createSupersonicPlume) {
-      const plume = PhenomenaShaders.createSupersonicPlume({
-        machNumber: 3.5,
-        shockCount: 5,
+    // Decorative plume-like shader effect; no flow calculation is performed.
+    if (PhenomenaShaders && PhenomenaShaders.createIllustrativePlume) {
+      const plume = PhenomenaShaders.createIllustrativePlume({
+        visualFrequency: 5,
         plumeLength: 90,
         coreRadius: 18,
         accentColor: 0x38bdf8
@@ -312,21 +274,15 @@ class NasaSpaceRocket3D {
     }
 
     // -----------------------------------------------------------------------
-    // D. VENTED INTERSTAGE & STAGING PYROTECHNICS (WBS 06.02)
+    // D. Illustrative interstage and separation geometry
     // -----------------------------------------------------------------------
     const interstageY = boosterBaseY + boosterHeight;
     const interstageH = 22.0;
 
     const interstageGeom = new THREE.CylinderGeometry(boosterRadius, boosterRadius, interstageH, 36, 4, true);
-    const interstage = new THREE.Mesh(interstageGeom, carbonInterstageMat);
+    const interstage = new THREE.Mesh(interstageGeom, darkInterstageSurfaceMat);
     interstage.position.set(0, interstageY + interstageH / 2, 0);
-    addPart(interstage, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Carbon-Composite Vented Interstage Frustum',
-      materialName: 'High-Modulus Carbon Fiber / Bismaleimide (BMI)',
-      specStandard: 'NASA-STD-5020'
-    });
+    addPart(interstage);
 
     // Interstage Pyrotechnic Separation Ring & Retro-Rockets
     const pyroRing = new THREE.Mesh(
@@ -335,16 +291,10 @@ class NasaSpaceRocket3D {
     );
     pyroRing.rotation.x = Math.PI / 2;
     pyroRing.position.set(0, interstageY + interstageH, 0);
-    addPart(pyroRing, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Linear Shaped Pyrotechnic Staging Frangible Joint',
-      materialName: 'Mild Detonating Fuse (MDF) / RDX Pyrotechnic Core',
-      specStandard: 'NASA-STD-5009'
-    });
+    addPart(pyroRing);
 
     // -----------------------------------------------------------------------
-    // E. STAGE 2 VACUUM VEHICLE & VACUUM ENGINE (WBS 06.01 & 06.03)
+    // E. Illustrative upper-stage and engine geometry
     // -----------------------------------------------------------------------
     const stage2Y = interstageY + interstageH;
     const stage2H = 45.0;
@@ -352,32 +302,17 @@ class NasaSpaceRocket3D {
     // Stage 2 Tank Body
     const stage2Body = new THREE.Mesh(
       new THREE.CylinderGeometry(boosterRadius, boosterRadius, stage2H, 48, 6, true),
-      boosterSkinMat
+      lightSurfaceMat
     );
     stage2Body.position.set(0, stage2Y + stage2H / 2, 0);
-    addPart(stage2Body, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Stage 2 Vacuum Cryogenic Tank (LOX & LCH4 Tandem)',
-      materialName: 'Al-Li 2195 Common Bulkhead Tank',
-      specStandard: 'NASA SP-8007'
-    });
+    addPart(stage2Body);
 
-    // Stage 2 Vacuum Engine inside Interstage
-    const vacEngine = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.8, 8.5, 18.0, 36, 6, true),
-      niobiumVacMat
-    );
+    // Illustrative upper-stage engine form inside the interstage
+    const vacEngine = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 8.5, 18.0, 36, 6, true), deepBlueSurfaceMat);
     vacEngine.position.set(0, stage2Y - 9.0, 0);
-    addPart(vacEngine, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Stage 2 Vacuum Engine with High-Expansion Niobium Skirt (eps=180)',
-      materialName: 'C-103 Niobium Alloy with Disilicide Oxidation Coating',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(vacEngine);
 
-    // Cold-Gas RCS Thruster Quads (4 locations around Stage 2)
+    // Illustrative upper-stage exterior components
     gridAngles.forEach((ang, idx) => {
       const rcsGroup = new THREE.Group();
       for (let r = 0; r < 4; r++) {
@@ -386,21 +321,19 @@ class NasaSpaceRocket3D {
           new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 })
         );
         noz.rotation.z = (r * Math.PI) / 2;
-        noz.position.set(Math.cos(r * Math.PI / 2) * 0.8, Math.sin(r * Math.PI / 2) * 0.8, 0);
+        noz.position.set(Math.cos((r * Math.PI) / 2) * 0.8, Math.sin((r * Math.PI) / 2) * 0.8, 0);
         rcsGroup.add(noz);
       }
-      rcsGroup.position.set(Math.cos(ang) * (boosterRadius + 0.5), stage2Y + stage2H - 4.0, Math.sin(ang) * (boosterRadius + 0.5));
-      addPart(rcsGroup, {
-        wbsId: '06.03',
-        entityName: 'Guidance, Navigation & Control (GNC) & Avionics',
-        partName: `Reaction Control System (RCS) Cold-Gas Thruster Quad #${idx + 1}`,
-        materialName: 'Inconel 625 Nozzle / Solenoid Pulse Valves',
-        specStandard: 'AIAA S-080'
-      });
+      rcsGroup.position.set(
+        Math.cos(ang) * (boosterRadius + 0.5),
+        stage2Y + stage2H - 4.0,
+        Math.sin(ang) * (boosterRadius + 0.5)
+      );
+      addPart(rcsGroup);
     });
 
     // -----------------------------------------------------------------------
-    // F. PAYLOAD ATTACH FITTING & SATELLITE BUS (WBS 06.06)
+    // F. Illustrative payload interface and bus geometry
     // -----------------------------------------------------------------------
     const payloadY = stage2Y + stage2H;
 
@@ -410,27 +343,12 @@ class NasaSpaceRocket3D {
       new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85 })
     );
     paf.position.set(0, payloadY + 5.0, 0);
-    addPart(paf, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'Payload Attach Fitting (PAF) & Low-Shock Marmon Clampband',
-      materialName: 'High-Modulus Carbon Fiber Conical Adapter',
-      specStandard: 'NASA-STD-7001'
-    });
+    addPart(paf);
 
     // Satellite Bus with Deployed Solar Arrays
-    const satBus = new THREE.Mesh(
-      new THREE.BoxGeometry(7.0, 12.0, 7.0),
-      goldMliMat
-    );
+    const satBus = new THREE.Mesh(new THREE.BoxGeometry(7.0, 12.0, 7.0), goldToneSurfaceMat);
     satBus.position.set(0, payloadY + 16.0, 0);
-    addPart(satBus, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'NASA Deep Space Exploration / Comms Satellite Bus',
-      materialName: 'Multi-Layer Insulation (MLI) / Honeycomb Core',
-      specStandard: 'NASA-STD-7001'
-    });
+    addPart(satBus);
 
     // Solar Panel Arrays (Wings Extended)
     [-12.0, 12.0].forEach((sx, sidx) => {
@@ -439,17 +357,11 @@ class NasaSpaceRocket3D {
         new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.9, roughness: 0.1 })
       );
       solarPanel.position.set(sx + (sidx === 0 ? -2.0 : 2.0), payloadY + 16.0, 0);
-      addPart(solarPanel, {
-        wbsId: '06.06',
-        entityName: 'Payload Accommodations & Mission ECLSS',
-        partName: `Gallium Arsenide Triple-Junction Solar Array Wing #${sidx + 1}`,
-        materialName: 'GaAs Solar Cells / Carbon Fiber Substrate',
-        specStandard: 'AIAA S-111'
-      });
+      addPart(solarPanel);
     });
 
     // -----------------------------------------------------------------------
-    // G. BISECTOR PAYLOAD FAIRING & NOSE CAP (WBS 06.02 & 06.04)
+    // G. Illustrative fairing and nose geometry
     // -----------------------------------------------------------------------
     const fairingH = 38.0;
     const fairingGeom = new THREE.CylinderGeometry(0.5, boosterRadius, fairingH, 48, 12, true);
@@ -462,13 +374,7 @@ class NasaSpaceRocket3D {
     });
     const fairing = new THREE.Mesh(fairingGeom, fairingMat);
     fairing.position.set(0, payloadY + 5.0 + fairingH / 2, 0);
-    addPart(fairing, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Composite Bisector Payload Fairing with Acoustic Blankets',
-      materialName: 'Carbon-Epoxy Facesheets with Aluminum Honeycomb Core',
-      specStandard: 'NASA-STD-5020'
-    });
+    addPart(fairing);
 
     // Aerodynamic Nose Cap & Pitot Static Mast
     const noseMast = new THREE.Mesh(
@@ -476,13 +382,7 @@ class NasaSpaceRocket3D {
       new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95 })
     );
     noseMast.position.set(0, payloadY + 5.0 + fairingH + 4.0, 0);
-    addPart(noseMast, {
-      wbsId: '06.04',
-      entityName: 'Thermal Protection System (TPS) & Aerodynamics',
-      partName: 'Aerodynamic Air-Data Pitot Probe & Lightning Protection Mast',
-      materialName: 'Inconel 600 Aerodynamic Tip',
-      specStandard: 'MIL-HDBK-310'
-    });
+    addPart(noseMast);
   }
 
   // =========================================================================
@@ -493,33 +393,33 @@ class NasaSpaceRocket3D {
     const { ProceduralHardware, ProceduralPbrMaterials, PhenomenaShaders } = context;
 
     // Materials Palette
-    const copperLinerMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // Narloy-Z copper sheen
+    const copperToneLinerMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706, // Illustrative copper-colored surface
       metalness: 0.95,
       roughness: 0.15,
       side: THREE.DoubleSide
     });
 
-    const nickelJacketMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8, // Electroformed Nickel
-      metalness: 0.90,
+    const lightMetalJacketMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8, // Illustrative light-metal appearance
+      metalness: 0.9,
       roughness: 0.25
     });
 
-    const inconelMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b, // Cast Inconel 718
+    const darkMetalSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b, // Illustrative dark metallic surface
       metalness: 0.92,
       roughness: 0.3
     });
 
-    const titaniumMat = new THREE.MeshStandardMaterial({
-      color: 0x64748b, // Machined Ti-6Al-4V
+    const mutedMetalSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b, // Illustrative muted-metal appearance
       metalness: 0.95,
       roughness: 0.18
     });
 
     // -----------------------------------------------------------------------
-    // A. COMBUSTION CHAMBER & REGENERATIVE COOLING NOZZLE (WBS 06.01)
+    // A. Illustrative chamber and nozzle geometry
     // -----------------------------------------------------------------------
     const chamberH = 32.0;
     const throatY = 0.0;
@@ -527,64 +427,34 @@ class NasaSpaceRocket3D {
     // Combustion Chamber Body
     const chamberBody = new THREE.Mesh(
       new THREE.CylinderGeometry(14.0, 9.2, chamberH, 48, 12, false),
-      copperLinerMat
+      copperToneLinerMat
     );
     chamberBody.position.set(0, throatY + chamberH / 2, 0);
-    addPart(chamberBody, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Narloy-Z Milled Channel Combustion Chamber (GRCop-42)',
-      materialName: 'High-Conductivity Copper-Silver Alloy (k=325 W/mK)',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(chamberBody);
 
-    // Bell Nozzle with Milled Coolant Channels Visible on Liner
+    // Illustrative nozzle-like surface geometry
     const nozzleH = 65.0;
     const nozzleGeom = new THREE.CylinderGeometry(9.2, 34.0, nozzleH, 48, 16, true);
-    const nozzleMesh = new THREE.Mesh(nozzleGeom, copperLinerMat);
+    const nozzleMesh = new THREE.Mesh(nozzleGeom, copperToneLinerMat);
     nozzleMesh.position.set(0, throatY - nozzleH / 2, 0);
-    addPart(nozzleMesh, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Regeneratively Cooled Bell Nozzle with 180 Milled Axial Channels',
-      materialName: 'Narloy-Z Liner with Electroformed Structural Nickel Jacket',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(nozzleMesh);
 
     // Circumferential Stiffener Rings (Hatbands)
     for (let ny = throatY - 8.0; ny >= throatY - nozzleH + 5.0; ny -= 10.0) {
-      const radiusAtY = 9.2 + (34.0 - 9.2) * ((-ny) / nozzleH);
-      const hatband = new THREE.Mesh(
-        new THREE.TorusGeometry(radiusAtY + 0.6, 0.65, 8, 36),
-        nickelJacketMat
-      );
+      const radiusAtY = 9.2 + (34.0 - 9.2) * (-ny / nozzleH);
+      const hatband = new THREE.Mesh(new THREE.TorusGeometry(radiusAtY + 0.6, 0.65, 8, 36), lightMetalJacketMat);
       hatband.rotation.x = Math.PI / 2;
       hatband.position.set(0, ny, 0);
-      addPart(hatband, {
-        wbsId: '06.01',
-        entityName: 'Propulsion Systems',
-        partName: 'Nozzle Structural Stiffener Ring (Hatband)',
-        materialName: 'Inconel 718 Hoop Reinforcement',
-        specStandard: 'NASA SP-125'
-      });
+      addPart(hatband);
     }
 
     // -----------------------------------------------------------------------
-    // B. COAXIAL INJECTOR DOME & SPARK TORCH IGNITERS (WBS 06.01)
+    // B. Illustrative injector and ignition-feature geometry
     // -----------------------------------------------------------------------
     const domeY = throatY + chamberH;
-    const injectorDome = new THREE.Mesh(
-      new THREE.CylinderGeometry(15.5, 14.2, 8.0, 36),
-      inconelMat
-    );
+    const injectorDome = new THREE.Mesh(new THREE.CylinderGeometry(15.5, 14.2, 8.0, 36), darkMetalSurfaceMat);
     injectorDome.position.set(0, domeY + 4.0, 0);
-    addPart(injectorDome, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Coaxial Injector Dome & Propellant Distribution Manifold',
-      materialName: 'SX500 Single-Crystal Superalloy',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(injectorDome);
 
     // Array of Coaxial Swirl Injector Elements on Faceplate
     for (let ring = 1; ring <= 3; ring++) {
@@ -592,18 +462,9 @@ class NasaSpaceRocket3D {
       const count = ring * 8;
       for (let i = 0; i < count; i++) {
         const theta = (i * 2 * Math.PI) / count;
-        const elem = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.45, 0.45, 2.2, 12),
-          titaniumMat
-        );
+        const elem = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.2, 12), mutedMetalSurfaceMat);
         elem.position.set(Math.cos(theta) * ringRadius, domeY, Math.sin(theta) * ringRadius);
-        addPart(elem, {
-          wbsId: '06.01',
-          entityName: 'Propulsion Systems',
-          partName: 'Coaxial Swirl Injector Element (Outer CH4 / Inner LOX Post)',
-          materialName: 'Haynes 230 High-Temperature Alloy',
-          specStandard: 'NASA SP-125'
-        });
+        addPart(elem);
       }
     }
 
@@ -613,32 +474,20 @@ class NasaSpaceRocket3D {
       new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.85 })
     );
     asi.position.set(0, domeY + 1.0, 0);
-    addPart(asi, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Dual Augmented Spark Igniter (ASI) Chamber',
-      materialName: 'High-Energy Plasma Discharge Core',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(asi);
 
     // -----------------------------------------------------------------------
-    // C. DUAL-SPOOL HIGH-PRESSURE TURBOPUMPS (WBS 06.01)
+    // C. Illustrative rotating-component housings
     // -----------------------------------------------------------------------
-    
-    // 1. Methane Fuel Turbopump (Left) - 42,000 RPM
+
+    // 1. Illustrative rotating assembly A
     const fuelPumpGroup = new THREE.Group();
-    const fuelPumpCasing = new THREE.Mesh(
-      new THREE.CylinderGeometry(5.5, 6.5, 12.0, 24),
-      inconelMat
-    );
+    const fuelPumpCasing = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 6.5, 12.0, 24), darkMetalSurfaceMat);
     fuelPumpCasing.rotation.z = Math.PI / 2;
     fuelPumpGroup.add(fuelPumpCasing);
 
     // Fuel Impeller (Inside / Visible Cutaway)
-    const fuelImpeller = new THREE.Mesh(
-      new THREE.CylinderGeometry(4.2, 4.8, 2.5, 24),
-      titaniumMat
-    );
+    const fuelImpeller = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.8, 2.5, 24), mutedMetalSurfaceMat);
     fuelImpeller.rotation.z = Math.PI / 2;
     fuelPumpGroup.add(fuelImpeller);
 
@@ -652,66 +501,42 @@ class NasaSpaceRocket3D {
     fuelPumpGroup.add(fuelInducer);
 
     fuelPumpGroup.position.set(-22.0, domeY + 14.0, 4.0);
-    addPart(fuelPumpGroup, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Liquid Methane High-Pressure Turbopump (42,000 RPM, 385 bar)',
-      materialName: 'Ti-5Al-2.5Sn Inducer / Inconel 718 Shrouded Impeller',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(fuelPumpGroup);
 
-    // 2. Liquid Oxygen Turbopump (Right) - 28,000 RPM
+    // 2. Illustrative rotating assembly B
     const oxPumpGroup = new THREE.Group();
-    const oxPumpCasing = new THREE.Mesh(
-      new THREE.CylinderGeometry(6.5, 7.5, 13.0, 24),
-      inconelMat
-    );
+    const oxPumpCasing = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7.5, 13.0, 24), darkMetalSurfaceMat);
     oxPumpCasing.rotation.z = Math.PI / 2;
     oxPumpGroup.add(oxPumpCasing);
 
-    // LOX Impeller
+    // Illustrative rotating component B
     const oxImpeller = new THREE.Mesh(
       new THREE.CylinderGeometry(5.2, 5.8, 3.0, 24),
-      new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.92 }) // LOX Blue Tint
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.92 }) // Illustrative blue surface
     );
     oxImpeller.rotation.z = Math.PI / 2;
     oxPumpGroup.add(oxImpeller);
 
     oxPumpGroup.position.set(22.0, domeY + 14.0, -4.0);
-    addPart(oxPumpGroup, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Liquid Oxygen High-Pressure Turbopump (28,000 RPM, 360 bar)',
-      materialName: 'Monel K-500 Shaft / Inconel 718 Dual Volute Casing',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(oxPumpGroup);
 
     // -----------------------------------------------------------------------
-    // D. GIMBAL RING & DUAL HYDRAULIC TVC ACTUATORS (WBS 06.01 & 06.03)
+    // D. Illustrative movable support geometry
     // -----------------------------------------------------------------------
     const gimbalRingY = domeY + 12.0;
-    const gimbalRing = new THREE.Mesh(
-      new THREE.TorusGeometry(18.0, 2.4, 16, 36),
-      inconelMat
-    );
+    const gimbalRing = new THREE.Mesh(new THREE.TorusGeometry(18.0, 2.4, 16, 36), darkMetalSurfaceMat);
     gimbalRing.rotation.x = Math.PI / 2;
     gimbalRing.position.set(0, gimbalRingY, 0);
-    addPart(gimbalRing, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'High-Load Gimbal Ring Bearing (+/- 8 deg Vectoring)',
-      materialName: 'Maraging 300 High-Strength Steel',
-      specStandard: 'NASA-STD-5001'
-    });
+    addPart(gimbalRing);
 
     // Dual Electro-Hydraulic Linear Actuator Pistons (Pitch & Yaw)
-    [[-14.0, 0], [0, 14.0]].forEach(([ax, az], aidx) => {
+    [
+      [-14.0, 0],
+      [0, 14.0]
+    ].forEach(([ax, az], aidx) => {
       const actGroup = new THREE.Group();
       // Outer Cylinder
-      const cyl = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.6, 1.6, 18.0, 16),
-        titaniumMat
-      );
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 18.0, 16), mutedMetalSurfaceMat);
       cyl.position.set(0, 9.0, 0);
       actGroup.add(cyl);
 
@@ -732,61 +557,46 @@ class NasaSpaceRocket3D {
       }
 
       actGroup.position.set(ax, gimbalRingY - 8.0, az);
-      addPart(actGroup, {
-        wbsId: '06.03',
-        entityName: 'Guidance, Navigation & Control (GNC) & Avionics',
-        partName: `Electro-Hydraulic TVC Linear Actuator Piston #${aidx + 1}`,
-        materialName: '17-4PH Hardened Stainless Steel / AerMet 100 Rod',
-        specStandard: 'NASA-STD-5001'
-      });
+      addPart(actGroup);
     });
 
     // -----------------------------------------------------------------------
-    // E. HELIUM COPV PRESSURIZATION SPHERES & FLANGES (WBS 06.01 & 06.07)
+    // E. Illustrative spherical tanks and connecting geometry
     // -----------------------------------------------------------------------
     [-15.0, 15.0].forEach((hx, hidx) => {
       const copv = new THREE.Mesh(
         new THREE.SphereGeometry(4.5, 24, 24),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7, metalness: 0.3 }) // Carbon fiber weave
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7, metalness: 0.3 }) // Illustrative dark appearance
       );
       copv.position.set(hx, domeY + 28.0, hidx === 0 ? -12.0 : 12.0);
-      addPart(copv, {
-        wbsId: '06.01',
-        entityName: 'Propulsion Systems',
-        partName: `Helium Carbon Overwrapped Pressure Vessel (COPV) #${hidx + 1} (450 bar)`,
-        materialName: 'T1000 Carbon Filament / Seamless Aluminum 6061 Liner',
-        specStandard: 'AIAA S-080'
-      });
+      addPart(copv);
     });
 
-    // Propellant Manifold Flanges & Dial Gauges
+    // Decorative connection and dial shapes with no scale or pressure reading.
     if (ProceduralHardware) {
-      // Oxygen Feed Flange & Gauge
-      const loxFlange = ProceduralHardware.createFlangeAssembly(4.5, 9.0, 3.0, 8);
-      loxFlange.position.set(16.0, domeY + 8.0, 0);
-      loxFlange.rotation.z = Math.PI / 2;
-      group.add(loxFlange);
+      [-16.0, 16.0].forEach((x, index) => {
+        const connection = ProceduralHardware.createFlangeAssembly(4.5, 9.0, 3.0, 8);
+        connection.position.set(x, domeY + 8.0, 0);
+        connection.rotation.z = x > 0 ? Math.PI / 2 : -Math.PI / 2;
+        group.add(connection);
 
-      const loxGauge = ProceduralHardware.createDialGauge(5.0, 0, 500, 360, 'BAR (LOX)');
-      loxGauge.position.set(16.0, domeY + 16.0, 0);
-      group.add(loxGauge);
-
-      // Methane Feed Flange & Gauge
-      const ch4Flange = ProceduralHardware.createFlangeAssembly(4.5, 9.0, 3.0, 8);
-      ch4Flange.position.set(-16.0, domeY + 8.0, 0);
-      ch4Flange.rotation.z = -Math.PI / 2;
-      group.add(ch4Flange);
-
-      const ch4Gauge = ProceduralHardware.createDialGauge(5.0, 0, 500, 385, 'BAR (CH4)');
-      ch4Gauge.position.set(-16.0, domeY + 16.0, 0);
-      group.add(ch4Gauge);
+        const indicator = ProceduralHardware.createDialGauge(5.0, null, null, null, 'Illustrative');
+        indicator.position.set(x, domeY + 16.0, 0);
+        indicator.userData = {
+          ...indicator.userData,
+          isSyntheticExample: true,
+          partName: `Illustrative dial ${index + 1}`,
+          materialName: 'Unspecified illustrative material',
+          readingAvailable: false
+        };
+        group.add(indicator);
+      });
     }
 
-    // Active Supersonic Exhaust Plume on Engine
-    if (PhenomenaShaders && PhenomenaShaders.createSupersonicPlume) {
-      const plume = PhenomenaShaders.createSupersonicPlume({
-        machNumber: 3.6,
-        shockCount: 6,
+    // Decorative plume-like shader effect; no flow calculation is performed.
+    if (PhenomenaShaders && PhenomenaShaders.createIllustrativePlume) {
+      const plume = PhenomenaShaders.createIllustrativePlume({
+        visualFrequency: 6,
         plumeLength: 140,
         coreRadius: 32,
         accentColor: 0x38bdf8
@@ -797,7 +607,7 @@ class NasaSpaceRocket3D {
   }
 
   // =========================================================================
-  // 3. COMPLETE NASA SPACECRAFT INTERIOR (CREW CABIN, ECLSS, AVIONICS, SM)
+  // 3. Illustrative Spacecraft Interior Geometry
   // =========================================================================
 
   buildSpacecraftInterior(group, addPart, context) {
@@ -814,13 +624,13 @@ class NasaSpaceRocket3D {
     });
 
     const isogridFrameMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8, // Al-Li 2195 cryogenic anodized blue
+      color: 0x38bdf8, // Illustrative cutaway surface
       metalness: 0.85,
       roughness: 0.35,
       wireframe: false
     });
 
-    const carbonDeckMat = new THREE.MeshStandardMaterial({
+    const darkDeckSurfaceMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a, // Carbon-composite honeycomb deck
       metalness: 0.7,
       roughness: 0.4
@@ -853,7 +663,7 @@ class NasaSpaceRocket3D {
     });
 
     const waterBladderMat = new THREE.MeshStandardMaterial({
-      color: 0x0ea5e9, // Potable water radiation shield bladder
+      color: 0x0ea5e9, // Illustrative blue surface
       metalness: 0.1,
       roughness: 0.1,
       transparent: true,
@@ -861,127 +671,85 @@ class NasaSpaceRocket3D {
     });
 
     const eclssModuleMat = new THREE.MeshStandardMaterial({
-      color: 0x64748b, // Brushed aerospace aluminum
+      color: 0x64748b, // Illustrative muted-metal appearance
       metalness: 0.88,
       roughness: 0.22
     });
 
-    const titaniumTankMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8, // Ti-6Al-4V Grade 5 propellant tank
+    const containerSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8, // Illustrative container appearance
       metalness: 0.92,
       roughness: 0.25
     });
 
-    const copvCarbonMat = new THREE.MeshStandardMaterial({
-      color: 0x18181b, // Carbon fiber composite overwrapped pressure vessel
+    const darkCompositeAppearanceMat = new THREE.MeshStandardMaterial({
+      color: 0x18181b, // Illustrative dark surface
       metalness: 0.4,
       roughness: 0.65
     });
 
-    const copperNozzleMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // Narloy-Z regeneratively cooled copper nozzle
+    const copperToneSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706, // Illustrative copper-colored surface
       metalness: 0.95,
       roughness: 0.25,
       side: THREE.DoubleSide
     });
 
     // -----------------------------------------------------------------------
-    // A. TRANSLUCENT OUTER PRESSURE HULL & MMOD SHIELD (WBS 06.02)
+    // A. Illustrative outer shell geometry
     // -----------------------------------------------------------------------
     const capsuleBaseR = 21.0;
     const capsuleTopR = 10.0;
     const capsuleH = 34.0;
     const capsuleCenterY = 2.0;
 
-    // Translucent Conical Crew Module Pressure Hull
+    // Translucent illustrative outer shell
     const hullGeom = new THREE.CylinderGeometry(capsuleTopR, capsuleBaseR, capsuleH, 48, 12, true);
     const hullMesh = new THREE.Mesh(hullGeom, translucentHullMat);
     hullMesh.position.set(0, capsuleCenterY, 0);
-    addPart(hullMesh, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Crew Module Translucent Cutaway Pressure Vessel & MMOD Shield',
-      materialName: 'Al-Li 2195 Welded Isogrid with Nextel/Kevlar MMOD Bumper',
-      specStandard: 'NASA-STD-5001'
-    });
+    addPart(hullMesh);
 
     // Avcoat Base Heat Shield & Carrier Structure
     const heatShieldGeom = new THREE.CylinderGeometry(capsuleBaseR, capsuleBaseR + 1.2, 3.5, 48);
-    const heatShield = new THREE.Mesh(heatShieldGeom, new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.85, metalness: 0.1 }));
+    const heatShield = new THREE.Mesh(
+      heatShieldGeom,
+      new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.85, metalness: 0.1 })
+    );
     heatShield.position.set(0, capsuleCenterY - capsuleH / 2 - 1.75, 0);
-    addPart(heatShield, {
-      wbsId: '06.04',
-      entityName: 'Thermal Protection System (TPS) & Aerodynamics',
-      partName: 'Aft Ablative Avcoat Re-entry Heat Shield (>1,200 W/cm2)',
-      materialName: 'Fiberglass Honeycomb Filled with Avcoat 5026-39 Modified Epoxy Novolac',
-      specStandard: 'NASA SP-8032'
-    });
+    addPart(heatShield);
 
     // Internal Triangular Isogrid Stiffener Rings
     [-10.0, 0.0, 10.0].forEach((ry, idx) => {
       const ringR = capsuleBaseR - (idx + 1) * 3.2;
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(ringR, 0.45, 8, 48),
-        isogridFrameMat
-      );
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(ringR, 0.45, 8, 48), isogridFrameMat);
       ring.rotation.x = Math.PI / 2;
       ring.position.set(0, capsuleCenterY + ry, 0);
-      addPart(ring, {
-        wbsId: '06.02',
-        entityName: 'Structures & Mechanisms',
-        partName: `Circumferential Isogrid Rib Frame Ring #${idx + 1}`,
-        materialName: 'Al-Li 2195-T8 CNC Milled Ribbing',
-        specStandard: 'NASA SP-8007'
-      });
+      addPart(ring);
     });
 
     // -----------------------------------------------------------------------
-    // B. TWO-DECK STRUCTURAL ARCHITECTURE & CREW HATCH (WBS 06.02)
+    // B. Illustrative deck and hatch geometry
     // -----------------------------------------------------------------------
     const flightDeckY = capsuleCenterY + 4.0;
     const habitatDeckY = capsuleCenterY - 10.0;
 
     // Upper Flight Deck Floor
-    const flightFloor = new THREE.Mesh(
-      new THREE.CylinderGeometry(15.5, 15.5, 1.2, 36),
-      carbonDeckMat
-    );
+    const flightFloor = new THREE.Mesh(new THREE.CylinderGeometry(15.5, 15.5, 1.2, 36), darkDeckSurfaceMat);
     flightFloor.position.set(0, flightDeckY, 0);
-    addPart(flightFloor, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Upper Flight Deck Carbon-Composite Honeycomb Floor',
-      materialName: 'Carbon Fiber Facesheets with Al Honeycomb Core',
-      specStandard: 'NASA-STD-5020'
-    });
+    addPart(flightFloor);
 
     // Lower Habitation Deck Floor
-    const habFloor = new THREE.Mesh(
-      new THREE.CylinderGeometry(19.2, 19.2, 1.2, 36),
-      carbonDeckMat
-    );
+    const habFloor = new THREE.Mesh(new THREE.CylinderGeometry(19.2, 19.2, 1.2, 36), darkDeckSurfaceMat);
     habFloor.position.set(0, habitatDeckY, 0);
-    addPart(habFloor, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Lower Habitation & ECLSS Equipment Deck Floor',
-      materialName: 'Al-Li 2195 Reinforced Inter-Deck Web Plate',
-      specStandard: 'NASA-STD-5020'
-    });
+    addPart(habFloor);
 
-    // Central Structural Column with Vertical Crew Transit Inter-Deck Hatchway
+    // Illustrative central support and inter-deck opening
     const centralCol = new THREE.Mesh(
       new THREE.CylinderGeometry(2.4, 2.4, capsuleH - 8.0, 24, 4, true),
       isogridFrameMat
     );
     centralCol.position.set(0, capsuleCenterY - 1.0, 0);
-    addPart(centralCol, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Central Structural Tie-Column & Inter-Deck Ladder Way',
-      materialName: 'Extruded Al-Li 2195 Spine with Titanium Fasteners',
-      specStandard: 'NASA-STD-5001'
-    });
+    addPart(centralCol);
 
     // Inter-Deck Ladder Rungs
     for (let lz = habitatDeckY + 2.0; lz < flightDeckY + 8.0; lz += 2.2) {
@@ -995,7 +763,7 @@ class NasaSpaceRocket3D {
     }
 
     // -----------------------------------------------------------------------
-    // C. UPPER FLIGHT DECK: 4x CREW COUCHES & COCKPIT CONSOLES (WBS 06.03 & 06.06)
+    // C. Illustrative upper-deck furniture and console geometry
     // -----------------------------------------------------------------------
     const couchLocations = [
       { name: 'Commander Couch (CDR)', x: -5.8, z: 5.5, angle: 0 },
@@ -1039,13 +807,7 @@ class NasaSpaceRocket3D {
       cGroup.position.set(cLoc.x, flightDeckY + 1.2, cLoc.z);
       cGroup.rotation.y = cLoc.angle;
 
-      addPart(cGroup, {
-        wbsId: '06.06',
-        entityName: 'Payload Accommodations & Mission ECLSS',
-        partName: `Articulating Carbon-Composite Couch #${cIdx + 1} (${cLoc.name})`,
-        materialName: 'Toray T1000 Carbon-Composite with 15g Shock Attenuators',
-        specStandard: 'NASA-STD-3001 Vol 2'
-      });
+      addPart(cGroup);
     });
 
     // Glass Cockpit Main Console with 3x Ruggedized AMLCD Displays
@@ -1057,12 +819,9 @@ class NasaSpaceRocket3D {
     dashBase.rotation.x = Math.PI / 8;
     consoleGroup.add(dashBase);
 
-    // 3 Active Display Screens (CDR, Central GNC, PLT)
+    // Illustrative display panels
     [-5.0, 0, 5.0].forEach((sx, sidx) => {
-      const screen = new THREE.Mesh(
-        new THREE.PlaneGeometry(4.2, 2.8),
-        displayConsoleMat
-      );
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.8), displayConsoleMat);
       screen.rotation.x = Math.PI / 8;
       screen.position.set(sx, 0.2, 1.05);
       consoleGroup.add(screen);
@@ -1079,13 +838,7 @@ class NasaSpaceRocket3D {
     });
 
     consoleGroup.position.set(0, flightDeckY + 6.0, 8.5);
-    addPart(consoleGroup, {
-      wbsId: '06.03',
-      entityName: 'Guidance, Navigation & Control (GNC) & Avionics',
-      partName: 'Glass Cockpit Primary Flight Display (PFD) Console & Hand Controllers',
-      materialName: 'Triple AMLCD Displays (1920x1200) with ARINC 661 Server',
-      specStandard: 'NASA-STD-3001 Vol 2'
-    });
+    addPart(consoleGroup);
 
     // Direct-View Forward Docking Windows & Lateral Ports
     const windowMat = new THREE.MeshStandardMaterial({
@@ -1099,29 +852,29 @@ class NasaSpaceRocket3D {
       const win = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.5, 0.4), windowMat);
       win.rotation.x = -Math.PI / 5;
       win.position.set(wx, flightDeckY + 9.5, 8.8);
-      addPart(win, {
-        wbsId: '06.02',
-        entityName: 'Structures & Mechanisms',
-        partName: `Fused Silica Optical Docking Window #${widx + 1}`,
-        materialName: 'Triple-Pane Fused Silica / Aluminosilicate Pressure Glass',
-        specStandard: 'NASA-STD-5001'
-      });
+      addPart(win);
     });
 
     // -----------------------------------------------------------------------
-    // D. LOWER HABITATION DECK: CREW LIVING, GALLEY & HYGIENE (WBS 06.06)
+    // D. Illustrative lower-deck interior geometry
     // -----------------------------------------------------------------------
 
-    // 4x Private Microgravity Crew Sleep Berths
-    const berthAngles = [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4];
+    // Illustrative cabin furniture
+    const berthAngles = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
     berthAngles.forEach((bAng, bIdx) => {
       const bGroup = new THREE.Group();
       // Sleep Cabin Box
-      const bBox = new THREE.Mesh(new THREE.BoxGeometry(4.2, 8.5, 3.2), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7 }));
+      const bBox = new THREE.Mesh(
+        new THREE.BoxGeometry(4.2, 8.5, 3.2),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7 })
+      );
       bGroup.add(bBox);
 
       // Nomex Sleep Restraint Bag
-      const bag = new THREE.Mesh(new THREE.BoxGeometry(3.2, 7.0, 1.8), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 }));
+      const bag = new THREE.Mesh(
+        new THREE.BoxGeometry(3.2, 7.0, 1.8),
+        new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
+      );
       bag.position.set(0, 0, 0.4);
       bGroup.add(bag);
 
@@ -1129,13 +882,7 @@ class NasaSpaceRocket3D {
       bGroup.position.set(Math.cos(bAng) * bRadius, habitatDeckY + 4.8, Math.sin(bAng) * bRadius);
       bGroup.rotation.y = -bAng + Math.PI / 2;
 
-      addPart(bGroup, {
-        wbsId: '06.06',
-        entityName: 'Payload Accommodations & Mission ECLSS',
-        partName: `Private Acoustic-Damped Sleep Berth #${bIdx + 1} (<48 dBA)`,
-        materialName: 'Acoustic Sound-Dampening Honeycomb with Nomex Restraints',
-        specStandard: 'NASA-STD-3001 Vol 1'
-      });
+      addPart(bGroup);
     });
 
     // Galley Station: Food Rehydration Oven & Dual Hot/Chilled Water Dispensers
@@ -1143,53 +890,59 @@ class NasaSpaceRocket3D {
     const galleyCabinet = new THREE.Mesh(new THREE.BoxGeometry(5.5, 7.5, 3.0), eclssModuleMat);
     galleyGroup.add(galleyCabinet);
 
-    const ovenDoor = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 }));
+    const ovenDoor = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 2.2, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+    );
     ovenDoor.position.set(-1.2, 1.2, 1.55);
     galleyGroup.add(ovenDoor);
 
-    const waterSpigot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.8, 12), new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.95 }));
+    const waterSpigot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, 0.8, 12),
+      new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.95 })
+    );
     waterSpigot.position.set(1.4, 1.2, 1.6);
     galleyGroup.add(waterSpigot);
 
     galleyGroup.position.set(-12.5, habitatDeckY + 4.5, 0);
     galleyGroup.rotation.y = Math.PI / 2;
-    addPart(galleyGroup, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'Galley Nutrition Station (Hot Food Oven & 70C/18C Water Dispenser)',
-      materialName: 'Sealed Al 6061 Enclosure with Stainless Steel Fluid Manifolds',
-      specStandard: 'NASA-STD-3001 Vol 2'
-    });
+    addPart(galleyGroup);
 
-    // Universal Waste Management System (UWMS) Microgravity Vacuum Commode & Hygiene Bay
+    // Illustrative restroom fixture forms
     const uwmsGroup = new THREE.Group();
     const commodeCabinet = new THREE.Mesh(new THREE.BoxGeometry(4.5, 7.5, 3.5), eclssModuleMat);
     uwmsGroup.add(commodeCabinet);
 
-    const commodeSeat = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 1.4, 24), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 }));
+    const commodeSeat = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.2, 1.4, 24),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 })
+    );
     commodeSeat.position.set(0, 0.7, 0.9);
     uwmsGroup.add(commodeSeat);
 
-    const urineFunnel = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.8 }));
+    const urineFunnel = new THREE.Mesh(
+      new THREE.ConeGeometry(0.4, 0.8, 16),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.8 })
+    );
     urineFunnel.position.set(1.3, 1.8, 0.9);
     uwmsGroup.add(urineFunnel);
 
     uwmsGroup.position.set(12.5, habitatDeckY + 4.5, 0);
     uwmsGroup.rotation.y = -Math.PI / 2;
-    addPart(uwmsGroup, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'Universal Waste Management System (UWMS Dual-Airflow Vacuum Commode)',
-      materialName: 'Titanium Fan Separator & Dual HEPA/Charcoal Odor Scrubbers',
-      specStandard: 'NASA-STD-3001 Vol 2'
-    });
+    addPart(uwmsGroup);
 
     // Exercise & Physical Countermeasures Station (ARED-mini & Cycle Ergometer)
     const exerciseGroup = new THREE.Group();
-    const exFrame = new THREE.Mesh(new THREE.BoxGeometry(3.5, 6.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 }));
+    const exFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(3.5, 6.5, 3.5),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+    );
     exerciseGroup.add(exFrame);
 
-    const ergometerFlywheel = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.6, 24), new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.95 }));
+    const ergometerFlywheel = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.4, 0.6, 24),
+      new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.95 })
+    );
     ergometerFlywheel.rotation.z = Math.PI / 2;
     ergometerFlywheel.position.set(0, 1.2, 0);
     exerciseGroup.add(ergometerFlywheel);
@@ -1205,54 +958,33 @@ class NasaSpaceRocket3D {
     }
 
     exerciseGroup.position.set(0, habitatDeckY + 4.5, -12.5);
-    addPart(exerciseGroup, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'ARED-mini Exercise Ergometer with Vibration Isolation (VIS >98% Isolation)',
-      materialName: 'Magnetic Resistance Flywheel with Spring-Damper Suspension',
-      specStandard: 'NASA-STD-3001 Vol 1'
-    });
+    addPart(exerciseGroup);
 
     // Central Radiation Storm Shelter (Solar Particle Event Safe Haven)
     [-4.5, 4.5].forEach((wx, widx) => {
-      const waterBladder = new THREE.Mesh(
-        new THREE.CylinderGeometry(2.4, 2.4, 7.2, 24),
-        waterBladderMat
-      );
+      const waterBladder = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 7.2, 24), waterBladderMat);
       waterBladder.position.set(wx, habitatDeckY + 4.2, 0);
-      addPart(waterBladder, {
-        wbsId: '06.06',
-        entityName: 'Payload Accommodations & Mission ECLSS',
-        partName: `SPE Storm Shelter 250L Potable Water Radiation Shield Tank #${widx + 1}`,
-        materialName: 'Flexible Polyurethane Bladder with Borated Polyethylene Liners',
-        specStandard: 'NASA-STD-3001 Vol 2'
-      });
+      addPart(waterBladder);
     });
 
-    // Crew Medical System (CEMS) & Diagnostic Ultrasound Locker
+    // Illustrative storage and equipment forms
     const medicalLocker = new THREE.Mesh(
       new THREE.BoxGeometry(2.8, 3.8, 2.2),
       new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.6 })
     );
     medicalLocker.position.set(4.5, habitatDeckY + 2.5, -7.5);
-    addPart(medicalLocker, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'Crew Medical System (CEMS Diagnostic Ultrasound, AED & Trauma Kit)',
-      materialName: 'Ruggedized Mil-Spec Enclosure with Parenteral Drug Dispensers',
-      specStandard: 'NASA-STD-3001 Vol 1'
-    });
+    addPart(medicalLocker);
 
     // -----------------------------------------------------------------------
-    // E. LIFE SUPPORT (ECLSS) & AVIONICS COMPUTING EQUIPMENT RACKS (WBS 06.06 & 06.03)
+    // E. Illustrative equipment-rack geometry
     // -----------------------------------------------------------------------
 
-    // Atmosphere Revitalization System (ARS): Dual Solid-Amine CO2 Scrubbers & OGA
+    // Illustrative cabin equipment-rack geometry
     const eclssRack = new THREE.Group();
     const rackCabinet = new THREE.Mesh(new THREE.BoxGeometry(7.0, 7.5, 3.0), eclssModuleMat);
     eclssRack.add(rackCabinet);
 
-    // Dual Amine Thermal Desorption (ATD) Columns
+    // Illustrative cylindrical equipment forms
     [-1.6, 1.6].forEach((cx, cidx) => {
       const col = new THREE.Mesh(
         new THREE.CylinderGeometry(0.8, 0.8, 5.2, 16),
@@ -1262,7 +994,7 @@ class NasaSpaceRocket3D {
       eclssRack.add(col);
     });
 
-    // Sabatier Reactor & Oxygen Generation Assembly (OGA) Canisters
+    // Illustrative equipment-container forms
     const sabatier = new THREE.Mesh(
       new THREE.CylinderGeometry(0.65, 0.65, 4.2, 16),
       new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.85 })
@@ -1272,17 +1004,14 @@ class NasaSpaceRocket3D {
 
     eclssRack.position.set(0, habitatDeckY + 4.5, 12.5);
     eclssRack.rotation.y = Math.PI;
-    addPart(eclssRack, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: 'Atmosphere Revitalization (ARS Dual Solid-Amine CO2 Scrubbers & OGA)',
-      materialName: 'Thermally Regenerable Solid Amine (ATD) with Sabatier Reactor',
-      specStandard: 'NASA-STD-3001 Vol 2'
-    });
+    addPart(eclssRack);
 
-    // Avionics Equipment Bay: Triple Redundant BAE RAD750 Flight Computers & Cold Plates
+    // Illustrative equipment-bay geometry
     const avionicsBay = new THREE.Group();
-    const avionicsRack = new THREE.Mesh(new THREE.BoxGeometry(5.5, 4.5, 2.5), new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 }));
+    const avionicsRack = new THREE.Mesh(
+      new THREE.BoxGeometry(5.5, 4.5, 2.5),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+    );
     avionicsBay.add(avionicsRack);
 
     // 3 Gold-Anodized Rad-Hard Computers (TMR Architecture)
@@ -1293,15 +1022,9 @@ class NasaSpaceRocket3D {
     });
 
     avionicsBay.position.set(-6.5, habitatDeckY + 2.8, -7.5);
-    addPart(avionicsBay, {
-      wbsId: '06.03',
-      entityName: 'Guidance, Navigation & Control (GNC) & Avionics',
-      partName: 'Triple Modular Redundant (TMR) RAD750 Flight Computers & Cold Plates',
-      materialName: 'Radiation-Hardened PowerPC (100 krad TID) with Brazed Liquid Cold Plates',
-      specStandard: 'DO-178C DAL-A / MIL-STD-1553B'
-    });
+    addPart(avionicsBay);
 
-    // 12x Standardized NASA Middeck Science Experiment & Cargo Lockers (MDL)
+    // Illustrative equipment-locker geometry
     const lockerGroup = new THREE.Group();
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 4; c++) {
@@ -1314,64 +1037,40 @@ class NasaSpaceRocket3D {
       }
     }
     lockerGroup.position.set(0, habitatDeckY - 2.5, 7.5);
-    addPart(lockerGroup, {
-      wbsId: '06.06',
-      entityName: 'Payload Accommodations & Mission ECLSS',
-      partName: '12x Standardized NASA Middeck Lockers (MDL 0.057 m3 Science & Cargo)',
-      materialName: 'Precision CNC Al 6061-T6 Lockers with 28VDC/120VDC Powered Links',
-      specStandard: 'NASA-STD-7001'
-    });
+    addPart(lockerGroup);
 
     // -----------------------------------------------------------------------
-    // F. FORWARD DOCKING TUNNEL & xEMU SPACEWALK SUIT STATIONS (WBS 06.02 & 06.06)
+    // F. Illustrative forward tunnel and suit-form geometry
     // -----------------------------------------------------------------------
     const dockingY = capsuleCenterY + capsuleH / 2;
 
-    // NASA Docking System (NDS Block 2 / IDSS) Peripheral Ring & Hatch
+    // Illustrative docking-interface geometry
     const ndsRing = new THREE.Mesh(
       new THREE.CylinderGeometry(5.2, 5.2, 3.0, 36, 1, true),
       new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95, roughness: 0.2 })
     );
     ndsRing.position.set(0, dockingY + 1.5, 0);
-    addPart(ndsRing, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'NASA Docking System (NDS Block 2) Peripheral Soft-Capture Ring (IDSS)',
-      materialName: 'High-Strength Ti-6Al-4V Ring with 12 Structural Hard Latch Hooks',
-      specStandard: 'IDSS / NASA-STD-5001'
-    });
+    addPart(ndsRing);
 
     const hatchDoor = new THREE.Mesh(
       new THREE.CylinderGeometry(4.2, 4.2, 0.6, 32),
       new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85 })
     );
     hatchDoor.position.set(0, dockingY + 0.3, 0);
-    addPart(hatchDoor, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: '0.80m Clear Crew Transfer Pressure Hatch with Equalization Valve',
-      materialName: 'Al-Li 2195 Forged Hatch with Dual Silicone O-Ring Pressure Seals',
-      specStandard: 'NASA-STD-5001'
-    });
+    addPart(hatchDoor);
 
-    // 2x xEMU Spacewalk Spacesuit Servicing & Donning Stations
+    // Illustrative equipment forms
     [-4.5, 4.5].forEach((sx, sidx) => {
       const suit = new THREE.Mesh(
         new THREE.CylinderGeometry(1.2, 1.4, 5.5, 16),
-        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }) // Orthofabric suit white
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }) // Illustrative light surface
       );
       suit.position.set(sx, flightDeckY + 4.5, -6.5);
-      addPart(suit, {
-        wbsId: '06.06',
-        entityName: 'Payload Accommodations & Mission ECLSS',
-        partName: `Exploration Extravehicular Mobility Unit (xEMU) Spacesuit Station #${sidx + 1}`,
-        materialName: 'Multi-Layer Orthofabric Suit with 200-bar O2 Recharge Umbilical',
-        specStandard: 'NASA-STD-3001 Vol 1'
-      });
+      addPart(suit);
     });
 
     // -----------------------------------------------------------------------
-    // G. AFT SERVICE MODULE: PROPULSION, TANKS & ULTRA-FLEX ARRAYS (WBS 06.01 & 06.07)
+    // G. Illustrative rear-module geometry
     // -----------------------------------------------------------------------
     const smY = capsuleCenterY - capsuleH / 2 - 18.0;
     const smRadius = capsuleBaseR;
@@ -1383,82 +1082,64 @@ class NasaSpaceRocket3D {
       translucentHullMat
     );
     smHull.position.set(0, smY, 0);
-    addPart(smHull, {
-      wbsId: '06.02',
-      entityName: 'Structures & Mechanisms',
-      partName: 'Service Module (SM) Cutaway Cylindrical Structure',
-      materialName: 'Carbon Fiber Skin with Composite Unpressurized Radiator Panels',
-      specStandard: 'NASA-STD-5020'
-    });
+    addPart(smHull);
 
-    // Deep Space Maneuvering Main Engine (AJ10-190 derivative / Methalox)
+    // Illustrative rear engine geometry
     const smEngineGroup = new THREE.Group();
-    const smGimbal = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 16), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.95 }));
+    const smGimbal = new THREE.Mesh(
+      new THREE.SphereGeometry(1.8, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.95 })
+    );
     smEngineGroup.add(smGimbal);
 
-    const smChamber = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 1.8, 4.5, 24), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 }));
+    const smChamber = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.2, 1.8, 4.5, 24),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+    );
     smChamber.position.set(0, -2.5, 0);
     smEngineGroup.add(smChamber);
 
-    const smNozzle = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 6.2, 12.0, 32, 4, true), copperNozzleMat);
+    const smNozzle = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 6.2, 12.0, 32, 4, true), copperToneSurfaceMat);
     smNozzle.position.set(0, -9.5, 0);
     smEngineGroup.add(smNozzle);
 
-    // Dual Linear TVC Gimbal Actuators (+/- 8 deg)
-    [[-2.2, 0], [0, 2.2]].forEach(([ax, az]) => {
-      const act = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 4.5, 12), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95 }));
+    // Illustrative movable support geometry
+    [
+      [-2.2, 0],
+      [0, 2.2]
+    ].forEach(([ax, az]) => {
+      const act = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, 4.5, 12),
+        new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95 })
+      );
       act.position.set(ax, -1.5, az);
       smEngineGroup.add(act);
     });
 
     smEngineGroup.position.set(0, smY - smHeight / 2, 0);
-    addPart(smEngineGroup, {
-      wbsId: '06.01',
-      entityName: 'Propulsion Systems',
-      partName: 'Deep Space Maneuvering Main Engine (26.7 kN Vacuum Thrust, Isp 316.5s)',
-      materialName: 'Niobium C-103 High-Expansion Nozzle with Inconel 718 Powerhead',
-      specStandard: 'NASA SP-125'
-    });
+    addPart(smEngineGroup);
 
-    // 4x Titanium Propellant Tanks (2 MMH Fuel + 2 NTO Oxidizer) with Capillary Vanes
+    // Illustrative container geometry
     const tankOffsets = [
-      { name: 'MMH Fuel Tank 1', x: -7.5, z: 0, color: 0x38bdf8 },
-      { name: 'MMH Fuel Tank 2', x: 7.5, z: 0, color: 0x38bdf8 },
-      { name: 'NTO Oxidizer Tank 1', x: 0, z: -7.5, color: 0xf59e0b },
-      { name: 'NTO Oxidizer Tank 2', x: 0, z: 7.5, color: 0xf59e0b }
+      { x: -7.5, z: 0, color: 0x38bdf8 },
+      { x: 7.5, z: 0, color: 0x38bdf8 },
+      { x: 0, z: -7.5, color: 0xf59e0b },
+      { x: 0, z: 7.5, color: 0xf59e0b }
     ];
     tankOffsets.forEach((tData) => {
-      const pTank = new THREE.Mesh(
-        new THREE.SphereGeometry(5.2, 24, 24),
-        titaniumTankMat
-      );
+      const pTank = new THREE.Mesh(new THREE.SphereGeometry(5.2, 24, 24), containerSurfaceMat);
       pTank.position.set(tData.x, smY + 1.5, tData.z);
-      addPart(pTank, {
-        wbsId: '06.01',
-        entityName: 'Propulsion Systems',
-        partName: `Titanium Grade 5 Propellant Tank (${tData.name}) with PMD Vanes`,
-        materialName: 'Ti-6Al-4V Forged Spherical Vessel with Internal Capillary Traps',
-        specStandard: 'AIAA S-080'
-      });
+      addPart(pTank);
     });
 
-    // 2x High-Pressure Helium COPV Pressurization Bottles (350 bar)
+    // Illustrative spherical containers
     [-11.5, 11.5].forEach((hx, hidx) => {
-      const copv = new THREE.Mesh(
-        new THREE.SphereGeometry(3.2, 20, 20),
-        copvCarbonMat
-      );
+      const copv = new THREE.Mesh(new THREE.SphereGeometry(3.2, 20, 20), darkCompositeAppearanceMat);
       copv.position.set(hx, smY + 5.0, 0);
-      addPart(copv, {
-        wbsId: '06.01',
-        entityName: 'Propulsion Systems',
-        partName: `Helium Pressurization COPV Bottle #${hidx + 1} (350 bar)`,
-        materialName: 'Carbon Fiber Overwrapped Vessel with Aluminum 6061-T6 Liner',
-        specStandard: 'AIAA S-080'
-      });
+      addPart(copv);
     });
 
-    // 4x RCS Quad Thruster Pods (24 total pulse thrusters for 6-DOF control)
+    // Illustrative small external shapes
     const rcsAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
     rcsAngles.forEach((rAng, rIdx) => {
       const rcsGroup = new THREE.Group();
@@ -1468,18 +1149,12 @@ class NasaSpaceRocket3D {
           new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.95 })
         );
         noz.rotation.z = (n * Math.PI) / 2;
-        noz.position.set(Math.cos(n * Math.PI / 2) * 0.7, Math.sin(n * Math.PI / 2) * 0.7, 0);
+        noz.position.set(Math.cos((n * Math.PI) / 2) * 0.7, Math.sin((n * Math.PI) / 2) * 0.7, 0);
         rcsGroup.add(noz);
       }
       rcsGroup.position.set(Math.cos(rAng) * (smRadius + 0.5), smY + 6.0, Math.sin(rAng) * (smRadius + 0.5));
       rcsGroup.rotation.y = -rAng;
-      addPart(rcsGroup, {
-        wbsId: '06.01',
-        entityName: 'Propulsion Systems',
-        partName: `Reaction Control System (RCS) Quad Thruster Pod #${rIdx + 1} (440 N per nozzle)`,
-        materialName: 'Niobium Coated Nozzles with Solenoid Pulse Pilot Valves',
-        specStandard: 'NASA SP-125'
-      });
+      addPart(rcsGroup);
     });
 
     // 4x Deployable UltraFlex Solar Array Wings (11.2 kW Generation)
@@ -1504,13 +1179,7 @@ class NasaSpaceRocket3D {
       const solarDist = smRadius + 11.0;
       solarGroup.position.set(Math.cos(sAng) * solarDist, smY, Math.sin(sAng) * solarDist);
       solarGroup.rotation.y = -sAng + Math.PI / 2;
-      addPart(solarGroup, {
-        wbsId: '06.07',
-        entityName: 'Electrical Power & Data Distribution',
-        partName: `Deployable UltraFlex Circular Solar Array Wing #${sIdx + 1} (11.2 kW Total)`,
-        materialName: 'InGaP/InGaAs/Ge Triple-Junction Solar Cells on Carbon Mesh',
-        specStandard: 'AIAA S-111'
-      });
+      addPart(solarGroup);
     });
 
     // Gimballed 1.2m Deep Space High-Gain Antenna (Ka/X-band DSN Link)
@@ -1522,19 +1191,16 @@ class NasaSpaceRocket3D {
     dish.rotation.x = Math.PI / 3;
     hgaGroup.add(dish);
 
-    const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.8, 12), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95 }));
+    const feed = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, 1.8, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95 })
+    );
     feed.rotation.x = Math.PI / 3;
     feed.position.set(0, 0.6, 0.8);
     hgaGroup.add(feed);
 
     hgaGroup.position.set(0, smY + 8.5, smRadius + 4.5);
-    addPart(hgaGroup, {
-      wbsId: '06.08',
-      entityName: 'Ground Support, Test & Deep Space Network (DSN)',
-      partName: '1.2m Gimballed Deep Space High-Gain Antenna (Ka/X-band DSN Link >50 Mbps)',
-      materialName: 'Carbon-Composite Reflector with Dual-Axis Rotary Gimbal',
-      specStandard: 'NASA-STD-7001'
-    });
+    addPart(hgaGroup);
   }
 }
 

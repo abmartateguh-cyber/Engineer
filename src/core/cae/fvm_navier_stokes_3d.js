@@ -3,7 +3,7 @@
  * Implements 3D unstructured polyhedral cell discretization, Menter k-omega SST turbulence,
  * automatic wall treatment (y+ blending), HLLC/Roe compressible shock capturing, and MRF rotating frame.
  * 
- * 100% Proprietary In-House Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class PolyhedralCell3D {

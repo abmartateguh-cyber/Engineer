@@ -1,6 +1,6 @@
 /**
  * OmniEng Universal Engineering Archive (.omni) & Command History Journal
- * 
+ *
  * Provides single-file container packaging for CAD, CAE, EDA, GNC, and Plant data
  * using native zlib compression, binary magic headers, integrity checksums,
  * and non-linear undo/redo command journaling.
@@ -17,27 +17,28 @@ const MAGIC_BYTES = Buffer.from('OMNIENG\x01', 'binary'); // 8-byte magic header
 const VAULT_MAGIC_BYTES = Buffer.from('OMNIVAUL', 'utf8'); // 8-byte encrypted vault header
 const CURRENT_SCHEMA_VERSION = 1;
 
-// Tier-1 Industrial Security Controls (CWE-400 Decompression Bomb & DoS Defense)
+// Resource limits for malformed archive structures and oversized sections.
+const MAX_ARCHIVE_SECTION_COUNT = 4096;
+const MAX_ARCHIVE_SIZE_BYTES = 512 * 1024 * 1024; // 512 MiB archive and aggregate expanded-content ceiling
 const MAX_UNCOMPRESSED_SECTION_SIZE = 500 * 1024 * 1024; // 500 MB ceiling
 const MAX_EXPANSION_RATIO = 50; // 50:1 maximum compression expansion ratio
-
 
 /**
  * Simple standard 32-bit CRC implementation for archive data integrity
  */
 function calculateCRC32(buffer) {
-  let crc = 0 ^ (-1);
+  let crc = 0 ^ -1;
   for (let i = 0; i < buffer.length; i++) {
-    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buffer[i]) & 0xFF];
+    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buffer[i]) & 0xff];
   }
-  return (crc ^ (-1)) >>> 0;
+  return (crc ^ -1) >>> 0;
 }
 
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
   let c = i;
   for (let j = 0; j < 8; j++) {
-    c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
   }
   CRC_TABLE[i] = c >>> 0;
 }
@@ -65,6 +66,14 @@ class OmniArchive {
     if (typeof name !== 'string' || name.trim().length === 0) {
       throw new Error('Section name must be a non-empty string');
     }
+    const nameBytes = Buffer.byteLength(name, 'utf8');
+    if (nameBytes > 0xffff) {
+      throw new Error('Section name exceeds the archive format limit of 65535 bytes');
+    }
+    if (!this.sections.has(name) && this.sections.size >= MAX_ARCHIVE_SECTION_COUNT) {
+      throw new Error(`Archive exceeds the maximum section count of ${MAX_ARCHIVE_SECTION_COUNT}`);
+    }
+
     let buffer;
     if (Buffer.isBuffer(content)) {
       buffer = content;
@@ -75,8 +84,24 @@ class OmniArchive {
     } else {
       throw new Error(`Unsupported content type for section '${name}'`);
     }
+    if (buffer.length > MAX_UNCOMPRESSED_SECTION_SIZE) {
+      throw new Error(`Section '${name}' exceeds maximum uncompressed size ${MAX_UNCOMPRESSED_SECTION_SIZE}`);
+    }
+    let aggregateRawLength = buffer.length;
+    let currentArchiveBytes = 12;
+    for (const [sectionName, entry] of this.sections.entries()) {
+      if (sectionName === name) continue;
+      aggregateRawLength += entry.rawLength;
+      currentArchiveBytes += Buffer.byteLength(sectionName, 'utf8') + 14 + entry.compressed.length;
+    }
+    if (aggregateRawLength > MAX_ARCHIVE_SIZE_BYTES) {
+      throw new Error(`Archive exceeds the maximum aggregate uncompressed size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+    }
 
     const compressed = zlib.deflateSync(buffer);
+    if (currentArchiveBytes + Buffer.byteLength(name, 'utf8') + 14 + compressed.length > MAX_ARCHIVE_SIZE_BYTES) {
+      throw new Error(`Archive exceeds the maximum serialized size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+    }
     const crc = calculateCRC32(compressed);
 
     this.sections.set(name, {
@@ -104,18 +129,24 @@ class OmniArchive {
 
     // Security Gate: Decompression Bomb Guard (CWE-400)
     if (entry.rawLength > MAX_UNCOMPRESSED_SECTION_SIZE) {
-      throw new Error(`Security Violation: Section '${name}' uncompressed size (${entry.rawLength} bytes) exceeds maximum ceiling (${MAX_UNCOMPRESSED_SECTION_SIZE} bytes)`);
+      throw new Error(
+        `Security Violation: Section '${name}' uncompressed size (${entry.rawLength} bytes) exceeds maximum ceiling (${MAX_UNCOMPRESSED_SECTION_SIZE} bytes)`
+      );
     }
     const compLen = Math.max(1, entry.compressed.length);
     if (entry.rawLength / compLen > MAX_EXPANSION_RATIO && entry.rawLength > 1024 * 1024) {
-      throw new Error(`Security Violation: Decompression bomb detected on section '${name}' (expansion ratio ${(entry.rawLength / compLen).toFixed(1)}:1 exceeds ${MAX_EXPANSION_RATIO}:1)`);
+      throw new Error(
+        `Security Violation: Decompression bomb detected on section '${name}' (expansion ratio ${(entry.rawLength / compLen).toFixed(1)}:1 exceeds ${MAX_EXPANSION_RATIO}:1)`
+      );
     }
 
     const decompressed = zlib.inflateSync(entry.compressed, {
       maxOutputLength: Math.min(entry.rawLength + 1024, MAX_UNCOMPRESSED_SECTION_SIZE)
     });
     if (decompressed.length !== entry.rawLength) {
-      throw new Error(`Security Error: Decompressed byte length (${decompressed.length}) does not match manifest header (${entry.rawLength})`);
+      throw new Error(
+        `Security Error: Decompressed byte length (${decompressed.length}) does not match manifest header (${entry.rawLength})`
+      );
     }
 
     if (asJson) {
@@ -153,14 +184,23 @@ class OmniArchive {
     //   [4 bytes uint32: crc32]
     //   [M bytes: compressed payload]
 
+    if (this.sections.size > MAX_ARCHIVE_SECTION_COUNT) {
+      throw new Error(`Archive exceeds the maximum section count of ${MAX_ARCHIVE_SECTION_COUNT}`);
+    }
+
     const header = Buffer.alloc(12);
     MAGIC_BYTES.copy(header, 0);
     header.writeUInt32BE(this.sections.size, 8);
 
     const chunks = [header];
+    let serializedSize = header.length;
+    let aggregateRawLength = 0;
 
     for (const [name, entry] of this.sections.entries()) {
       const nameBuf = Buffer.from(name, 'utf8');
+      if (nameBuf.length === 0 || nameBuf.length > 0xffff) {
+        throw new Error('Section name length is outside the archive format limits');
+      }
       const meta = Buffer.alloc(2 + nameBuf.length + 4 + 4 + 4);
       meta.writeUInt16BE(nameBuf.length, 0);
       nameBuf.copy(meta, 2);
@@ -170,6 +210,14 @@ class OmniArchive {
       meta.writeUInt32BE(entry.compressed.length, offset + 4);
       meta.writeUInt32BE(entry.crc, offset + 8);
 
+      aggregateRawLength += entry.rawLength;
+      serializedSize += meta.length + entry.compressed.length;
+      if (aggregateRawLength > MAX_ARCHIVE_SIZE_BYTES) {
+        throw new Error(`Archive exceeds the maximum aggregate uncompressed size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+      }
+      if (serializedSize > MAX_ARCHIVE_SIZE_BYTES) {
+        throw new Error(`Archive exceeds the maximum serialized size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+      }
       chunks.push(meta);
       chunks.push(entry.compressed);
     }
@@ -184,6 +232,9 @@ class OmniArchive {
     if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
       throw new Error('Invalid archive: buffer is too small');
     }
+    if (buffer.length > MAX_ARCHIVE_SIZE_BYTES) {
+      throw new Error(`Archive exceeds the maximum serialized size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+    }
 
     // Verify magic bytes
     if (!buffer.subarray(0, 8).equals(MAGIC_BYTES)) {
@@ -191,18 +242,35 @@ class OmniArchive {
     }
 
     const sectionCount = buffer.readUInt32BE(8);
+    if (sectionCount > MAX_ARCHIVE_SECTION_COUNT) {
+      throw new Error(`Malformed archive: section count exceeds maximum ${MAX_ARCHIVE_SECTION_COUNT}`);
+    }
+    // Every section needs at least a 2-byte name length and 12-byte metadata.
+    if (sectionCount > Math.floor((buffer.length - 12) / 14)) {
+      throw new Error('Malformed archive: section count exceeds the available data');
+    }
+
     const archive = new OmniArchive();
     archive.sections.clear();
 
     let offset = 12;
+    let aggregateRawLength = 0;
 
     for (let i = 0; i < sectionCount; i++) {
       if (offset + 2 > buffer.length) throw new Error('Malformed archive: unexpected EOF in section header');
       const nameLen = buffer.readUInt16BE(offset);
       offset += 2;
 
+      if (nameLen === 0) throw new Error('Malformed archive: section name must not be empty');
       if (offset + nameLen > buffer.length) throw new Error('Malformed archive: unexpected EOF in section name');
-      const name = buffer.subarray(offset, offset + nameLen).toString('utf8');
+      const nameBytes = buffer.subarray(offset, offset + nameLen);
+      const name = nameBytes.toString('utf8');
+      if (name.trim().length === 0 || !Buffer.from(name, 'utf8').equals(nameBytes)) {
+        throw new Error('Malformed archive: section name is empty or invalid UTF-8');
+      }
+      if (archive.sections.has(name)) {
+        throw new Error(`Malformed archive: duplicate section '${name}'`);
+      }
       offset += nameLen;
 
       if (offset + 12 > buffer.length) throw new Error('Malformed archive: unexpected EOF in section metadata');
@@ -211,6 +279,19 @@ class OmniArchive {
       const crc = buffer.readUInt32BE(offset + 8);
       offset += 12;
 
+      aggregateRawLength += rawLength;
+      if (aggregateRawLength > MAX_ARCHIVE_SIZE_BYTES) {
+        throw new Error(`Archive exceeds the maximum aggregate uncompressed size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+      }
+      if (rawLength > MAX_UNCOMPRESSED_SECTION_SIZE) {
+        throw new Error(
+          `Security Violation: Section '${name}' uncompressed size (${rawLength} bytes) exceeds maximum ${MAX_UNCOMPRESSED_SECTION_SIZE}`
+        );
+      }
+      if (compLength === 0) throw new Error(`Malformed archive: section '${name}' has an empty compressed payload`);
+      if (rawLength > 1024 * 1024 && rawLength / compLength > MAX_EXPANSION_RATIO) {
+        throw new Error(`Security Violation: Decompression bomb detected on section '${name}'`);
+      }
       if (offset + compLength > buffer.length) throw new Error('Malformed archive: unexpected EOF in section payload');
       const compressed = buffer.subarray(offset, offset + compLength);
       offset += compLength;
@@ -229,11 +310,19 @@ class OmniArchive {
       });
     }
 
+    if (offset !== buffer.length) {
+      throw new Error('Malformed archive: unexpected trailing bytes');
+    }
+
     // Refresh manifest
     const manifest = archive.getSection('manifest', true);
-    if (manifest) {
-      archive.manifest = manifest;
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+      throw new Error('Malformed archive: required project manifest is missing or invalid');
     }
+    if (manifest.schemaVersion !== CURRENT_SCHEMA_VERSION) {
+      throw new Error(`Unsupported archive schema version: ${manifest.schemaVersion}`);
+    }
+    archive.manifest = manifest;
 
     return archive;
   }
@@ -249,17 +338,41 @@ class OmniArchive {
   }
 
   static loadFromFile(filePath) {
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`Archive file not found: ${filePath}`);
+    let fileDescriptor;
+    try {
+      fileDescriptor = fs.openSync(filePath, 'r');
+    } catch (error) {
+      if (error.code === 'ENOENT') throw new Error(`Archive file not found: ${filePath}`);
+      throw error;
     }
-    const buf = fs.readFileSync(filePath);
-    return OmniArchive.loadFromBuffer(buf);
+
+    try {
+      const initialStat = fs.fstatSync(fileDescriptor);
+      if (!initialStat.isFile()) throw new Error('Archive path must identify a regular file');
+      if (initialStat.size > MAX_ARCHIVE_SIZE_BYTES) {
+        throw new Error(`Archive exceeds the maximum serialized size of ${MAX_ARCHIVE_SIZE_BYTES}`);
+      }
+
+      const buffer = Buffer.allocUnsafe(initialStat.size);
+      let bytesRead = 0;
+      while (bytesRead < buffer.length) {
+        const readCount = fs.readSync(fileDescriptor, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
+        if (readCount === 0) throw new Error('Archive file changed while it was being read');
+        bytesRead += readCount;
+      }
+
+      const finalStat = fs.fstatSync(fileDescriptor);
+      if (finalStat.size !== initialStat.size) throw new Error('Archive file changed while it was being read');
+      return OmniArchive.loadFromBuffer(buffer);
+    } finally {
+      fs.closeSync(fileDescriptor);
+    }
   }
 
   /**
    * Encrypts the entire archive using AES-256-GCM with PBKDF2 key derivation.
    * Directly protects confidential CAD IP from disk extraction (CWE-311).
-   * @param {string} password 
+   * @param {string} password
    * @returns {Buffer} Encrypted binary container
    */
   saveToEncryptedBuffer(password) {
@@ -272,8 +385,8 @@ class OmniArchive {
 
   /**
    * Decrypts and restores an OmniArchive from an AES-256-GCM encrypted buffer.
-   * @param {Buffer} encryptedBuffer 
-   * @param {string} password 
+   * @param {Buffer} encryptedBuffer
+   * @param {string} password
    * @returns {OmniArchive}
    */
   static loadFromEncryptedBuffer(encryptedBuffer, password) {
@@ -286,8 +399,8 @@ class OmniArchive {
 }
 
 /**
- * OmniVaultAES256: Industrial Encrypted Engineering Container
- * Implements authenticated symmetric encryption (AES-256-GCM) with random salt,
+ * Password-derived AES-256-GCM encryption helper for session snapshots.
+ * Uses authenticated symmetric encryption with random salt,
  * 100,000 PBKDF2 iterations, 96-bit IV, and 128-bit authentication tag.
  */
 class OmniVaultAES256 {
@@ -437,5 +550,6 @@ module.exports = {
   MAGIC_BYTES,
   VAULT_MAGIC_BYTES,
   MAX_UNCOMPRESSED_SECTION_SIZE,
+  MAX_ARCHIVE_SIZE_BYTES,
   MAX_EXPANSION_RATIO
 };

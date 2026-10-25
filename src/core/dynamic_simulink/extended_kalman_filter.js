@@ -1,7 +1,7 @@
 /**
  * OmniEng 9-DOF Extended Kalman Filter (EKF) Sensor Fusion
  * Standard: Quaternion Attitude & Position State Estimation
- * Industrial Parity: ArduPilot / PX4 EKF3 state estimation for UAV flight control.
+ * Experimental implementation: ArduPilot / PX4 EKF3 state estimation for UAV flight control.
  */
 
 class ExtendedKalmanFilter {

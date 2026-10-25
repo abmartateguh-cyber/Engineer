@@ -3,12 +3,12 @@
  * 
  * Implements high-performance graph partitioning and substructuring for distributed HPC:
  * 1. Dual-graph construction from 3D tetrahedral/hexahedral FEA meshes or CFD cell grids.
- * 2. Recursive Coordinate Bisection (RCB) and Kernighan-Lin edge cut optimization (parity with METIS / Scotch).
+ * 2. Recursive Coordinate Bisection (RCB) and Kernighan-Lin edge cut optimization (Experimental workflow related to METIS / Scotch).
  * 3. Schur Complement Substructuring:
  *    S_gamma = K_gamma,gamma - sum_p (K_gamma,I^(p) * [K_I,I^(p)]^-1 * K_I,gamma^(p))
  * 4. Enables out-of-core and multi-threaded parallel solves across distributed HPC worker nodes.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

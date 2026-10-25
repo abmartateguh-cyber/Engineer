@@ -1,12 +1,12 @@
 /**
  * OmniEng Venkatakrishnan Monotonic Slope Limiter & Gradient Reconstruction
  * 
- * Provides high-order non-oscillatory shock capturing matching NASA FUN3D / OpenFOAM:
+ * Experimental gradient reconstruction and slope-limiter example:
  * 1. Least-Squares and Green-Gauss gradient reconstruction on arbitrary polyhedra.
  * 2. Venkatakrishnan limiter Phi_i ensuring Total Variation Diminishing (TVD) property.
  * 3. Preserves second-order spatial accuracy in smooth regions without clipping local extrema.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent accuracy study or comparison to a production CFD solver is established.
  */
 
 'use strict';

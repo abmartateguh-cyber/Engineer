@@ -1,6 +1,6 @@
 /**
  * OmniEng 3D Multi-Body Assembly Kinematic Constraint Solver
- * Industrial Parity: Siemens D-Cubed AEM / SolidWorks Assembly Mates
+ * Experimental implementation: Siemens D-Cubed AEM / SolidWorks Assembly Mates
  *
  * Implements 6-DOF Multi-Body Kinematic Solvers with Levenberg-Marquardt optimization,
  * Dual Quaternion representations, and Rank-Revealing QR Decomposition for DOF analysis.
@@ -13,7 +13,7 @@
  *  - PERPENDICULAR_PLANES
  *  - COINCIDENT_POINTS (Ball joint / Pivot point)
  *
- * 100% In-House Proprietary Math - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { Vector3, Quaternion } = require('../math/linear_algebra');

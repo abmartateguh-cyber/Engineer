@@ -1,7 +1,7 @@
 /**
- * OmniEng Multi-Domain Physical DAE Solver (Simscape Equivalent)
- * 
- * Provides physical acausal modeling matching MathWorks Simscape / Modelica:
+ * Experimental multi-domain physical DAE solver.
+ *
+ * Provides a prototype for physical acausal modeling:
  * 1. Physical network formulation with Across (potential) and Through (flow) variables:
  *    - Electrical: Voltage (V) across, Current (I) through.
  *    - Mechanical Translational: Velocity (v) across, Force (F) through.
@@ -9,8 +9,8 @@
  *    - Hydraulic: Pressure (P) across, Flow rate (Q) through.
  * 2. Automatic Kirchhoff Current/Flux Law (sum through = 0) at all physical junctions.
  * 3. Implicit Backward Differentiation Formula (BDF Index-1 DAE) solver F(t, x, x_dot, y) = 0.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ *
+ * Model coverage and numerical behavior have not been independently validated.
  */
 
 'use strict';
@@ -30,7 +30,7 @@ class SimscapeDAESolver {
    * Example: DC Motor driving an inertia with back-EMF, winding resistance, and viscous friction:
    *   V - L*(di/dt) - R*i - Ke*omega = 0   (Electrical)
    *   J*(d_omega/dt) + b*omega - Kt*i = 0  (Mechanical)
-   * 
+   *
    * @param {Object} systemSpec
    * @param {number} [systemSpec.R=2.0] - Armature resistance (Ohms)
    * @param {number} [systemSpec.L=0.005] - Armature inductance (H)
@@ -43,21 +43,36 @@ class SimscapeDAESolver {
    * @param {number} [systemSpec.dt=0.0002]
    * @returns {Object} Simulation time series and steady-state outputs
    */
-  static simulateElectromechanicalDCMotor(systemSpec = {}) {
-    const R = systemSpec.R || 2.0;
-    const L = systemSpec.L || 0.005;
-    const Kt = systemSpec.Kt || 0.05;
-    const Ke = systemSpec.Ke || 0.05;
-    const J = systemSpec.J || 0.001;
-    const b = systemSpec.b || 0.0005;
-    const V_in = systemSpec.V_step || 12.0;
+  static simulateElectromechanicalDCMotor(systemSpec) {
+    const required = [
+      'R',
+      'L',
+      'Kt',
+      'Ke',
+      'J',
+      'b',
+      'V_step',
+      'totalTimeSec',
+      'dt',
+      'initialCurrentAmps',
+      'initialAngularVelocityRadS'
+    ];
+    const missing = required.filter((name) => systemSpec?.[name] === undefined || systemSpec[name] === null);
+    if (missing.length) throw new TypeError(`DC motor simulation requires explicit inputs: ${missing.join(', ')}.`);
+    const invalid = required.filter((name) => !Number.isFinite(systemSpec[name]));
+    if (invalid.length) throw new TypeError(`DC motor simulation inputs must be finite: ${invalid.join(', ')}.`);
 
-    const tEnd = systemSpec.totalTimeSec || 0.10;
-    const dt = systemSpec.dt || 0.0002;
-    const nSteps = Math.round(tEnd / dt);
+    const { R, L, Kt, Ke, J, b, V_step: V_in, totalTimeSec: tEnd, dt } = systemSpec;
+    if (R <= 0 || L <= 0 || Kt <= 0 || Ke <= 0 || J <= 0 || b < 0 || tEnd <= 0 || dt <= 0) {
+      throw new RangeError('DC motor simulation inputs are outside the supported physical ranges.');
+    }
+    const nSteps = Math.ceil(tEnd / dt);
+    if (!Number.isSafeInteger(nSteps) || nSteps > 1_000_000) {
+      throw new RangeError('DC motor simulation exceeds the 1,000,000-step work limit.');
+    }
 
-    let iCurrent = 0.0;
-    let omega = 0.0;
+    let iCurrent = systemSpec.initialCurrentAmps;
+    let omega = systemSpec.initialAngularVelocityRadS;
 
     const timeSeries = [];
     for (let step = 0; step <= nSteps; step++) {
@@ -100,6 +115,8 @@ class SimscapeDAESolver {
     const rpm_ss_analytic = (omega_ss_analytic * 60.0) / (2.0 * Math.PI);
 
     return {
+      status: 'experimental',
+      validationLevel: 'experimental',
       simulationStepsCount: nSteps,
       finalSpeedRpm: Number(((omega * 60.0) / (2.0 * Math.PI)).toFixed(1)),
       analyticSteadyStateRpm: Number(rpm_ss_analytic.toFixed(1)),

@@ -1,19 +1,21 @@
 /**
- * Test Suite 30: Industrial Production Grade Multi-Physics Solvers & Engines
- * 
- * Validates:
+ * Experimental multi-physics module smoke checks
+ *
+ * Exercises:
  * 1. STOP Multiphysics (FEA-Thermal-Optical Zernike surface sag & Schott dn/dT dispersion).
  * 2. HPC Cluster Gateway (Slurm sbatch, PBS Pro qsub, Recursive Coordinate Bisection).
  * 3. CAD G2 Variable-Radius Rolling-Ball Fillet & Gregory Corner Blend Patches.
- * 4. Transient Water Hammer MOC Hydraulic Surge Solver & ASME B31.3/B31.4 Compliance.
- * 5. SPEF Sub-3nm / Sky130 Interconnect Coupled RC Parasitic Extractor (IEEE 1481).
- * 
- * 100% Zero Dead Code & Zero Dead Logic Verification.
+ * 4. Transient Water Hammer MOC Hydraulic Surge Solver & experimental water-hammer calculation example.
+ * 5. Caller-supplied experimental SPEF-shaped RC formula example.
+ *
+ * These checks do not establish solver validation or release readiness.
  */
 
 'use strict';
 
 const assert = require('assert');
+const opticalExamples = require('./support/experimental_optics_examples');
+const { EXPERIMENTAL_SPEF_TEST_DATA } = require('./support/experimental_spef_inputs');
 
 // 1. STOP Multiphysics
 const { StopMultiphysicsCoupling } = require('../src/core/optics/stop_multiphysics_coupling.js');
@@ -32,7 +34,7 @@ const { SpefParasiticExtractor } = require('../src/core/eda/parasitic_spef_extra
 
 function runIndustrialMasterEnginesTests() {
   console.log('================================================================');
-  console.log('   RUNNING INDUSTRIAL PRODUCTION GRADE SOLVER SUITES (TRACK B)  ');
+  console.log('   RUNNING EXPERIMENTAL MULTI-PHYSICS MODULE CHECKS  ');
   console.log('================================================================');
 
   let passedTests = 0;
@@ -72,25 +74,56 @@ function runIndustrialMasterEnginesTests() {
     assert.strictEqual(Number(z4.toFixed(3)), 1.0);
   });
 
-  it('StopMultiphysicsCoupling calculates Schott glass dn/dT thermo-optic dispersion', () => {
-    // Schott N-BK7 glass with dT = +40 K
-    const deltaN = StopMultiphysicsCoupling.computeDnDt('N-BK7', 40.0, 0.5876);
+  it('StopMultiphysicsCoupling calculates from explicit test-only thermo-optic coefficients', () => {
+    const glass = opticalExamples.thermalGlassExamples['N-BK7'];
+    const properties = {
+      D0PerK: glass.D0,
+      D1PerK2: glass.D1,
+      D2PerK3: glass.D2,
+      E0Um2PerK: glass.E0,
+      E1Um2PerK2: glass.E1,
+      lambdaTkUm: glass.lambdaTk,
+      glassCtePerK: glass.cte,
+      source: 'test-only unverified optical example'
+    };
+    const deltaN = StopMultiphysicsCoupling.computeDnDt(properties, 1.5168, 40.0, 0.5876);
 
     assert(deltaN > 0, 'N-BK7 has positive dn/dT thermo-optic coefficient');
     assert(deltaN < 0.001, 'deltaN for 40K delta should be in 1e-4 range');
   });
 
   it('StopMultiphysicsCoupling executes coupled FEA-thermal ray perturbation and MTF loss', () => {
+    const glass = opticalExamples.thermalGlassExamples['N-BK7'];
     const analysis = StopMultiphysicsCoupling.solveStopCoupling(
-      { glass: 'N-BK7', entrancePupilDiameter: 50.0, baselineStrehl: 0.96 },
-      { ambientTempC: 65.0, structuralLoadN: 50.0 }
+      {
+        entrancePupilDiameterMm: 50.0,
+        baselineStrehl: 0.96,
+        refractiveIndexAtReferenceTemperature: 1.5168,
+        glassCtePerK: glass.cte,
+        structuralComplianceMmPerN: 1.2e-7,
+        thermalSagCoefficientMmPerK: 4e-7,
+        structuralPropertiesSource: 'test-only unverified optical example',
+        thermalProperties: {
+          D0PerK: glass.D0,
+          D1PerK2: glass.D1,
+          D2PerK3: glass.D2,
+          E0Um2PerK: glass.E0,
+          E1Um2PerK2: glass.E1,
+          lambdaTkUm: glass.lambdaTk,
+          glassCtePerK: glass.cte,
+          source: 'test-only unverified optical example'
+        }
+      },
+      { ambientTempC: 65.0, referenceTempC: 20.0, structuralLoadN: 50.0, wavelengthUm: 0.5876 }
     );
 
-    assert.strictEqual(analysis.status, 'CONVERGED');
+    assert.strictEqual(analysis.status, 'EXPERIMENTAL_ESTIMATE');
+    assert.strictEqual(analysis.validationLevel, 'experimental');
     assert(analysis.rmsWfeWaves > 0, 'Thermal soak must induce non-zero RMS wavefront error');
     assert(analysis.degradedStrehl <= analysis.baselineStrehl, 'Degraded Strehl ratio must not exceed baseline');
     assert(analysis.degradedStrehl > 0.0, 'Strehl ratio must remain positive');
     assert(analysis.thermalSoakMtf.lp10 > 0, 'MTF contrast must be positive');
+    assert.match(analysis.warnings[0], /no coupled structural solve/);
   });
 
   // ---------------------------------------------------------------------------
@@ -98,7 +131,7 @@ function runIndustrialMasterEnginesTests() {
   // ---------------------------------------------------------------------------
   console.log('\n[SECTION 2] HPC Cluster Gateway (Slurm, PBS Pro & RCB Partitioning)');
 
-  it('HpcClusterGateway generates validated Slurm sbatch script', () => {
+  it('HpcClusterGateway generates a Slurm script example', () => {
     const slurm = HpcClusterGateway.generateSlurmScript({
       jobName: 'raptor_coupled_cfd',
       partition: 'gpu-h100',
@@ -117,7 +150,7 @@ function runIndustrialMasterEnginesTests() {
     assert.strictEqual(slurm.totalGpus, 16);
   });
 
-  it('HpcClusterGateway generates PBS Pro qsub submission script', () => {
+  it('HpcClusterGateway generates a PBS script example', () => {
     const pbs = HpcClusterGateway.generatePbsScript({
       jobName: 'battery_thermal_fea',
       nodes: 2,
@@ -127,7 +160,10 @@ function runIndustrialMasterEnginesTests() {
     });
 
     assert(pbs.script.includes('#PBS -N battery_thermal_fea'), 'PBS must specify job name');
-    assert(pbs.script.includes('#PBS -l select=2:ncpus=64:mpiprocs=8:ompthreads=8'), 'PBS must specify select statement');
+    assert(
+      pbs.script.includes('#PBS -l select=2:ncpus=64:mpiprocs=8:ompthreads=8'),
+      'PBS must specify select statement'
+    );
     assert(pbs.script.includes('mpiexec -n 16 omnieng-headless-daemon'), 'PBS must launch mpiexec');
   });
 
@@ -211,12 +247,13 @@ function runIndustrialMasterEnginesTests() {
   console.log('\n[SECTION 4] Transient Water Hammer & Hydraulic Shockwave MOC');
 
   it('TransientWaterHammerSolver calculates Korteweg acoustic wave speed in steel pipe', () => {
+    assert.throws(() => TransientWaterHammerSolver.calculateWaveSpeed(), /requires explicit finite inputs/);
     // 300mm pipe, 8mm steel wall, water
     const waveSpeed = TransientWaterHammerSolver.calculateWaveSpeed({
       fluidDensity: 998.2,
       fluidBulkModulus: 2.19e9,
       pipeElasticModulus: 2.0e11,
-      pipeInnerDiameter: 0.30,
+      pipeInnerDiameter: 0.3,
       pipeWallThickness: 0.008,
       restraintFactor: 1.0
     });
@@ -225,6 +262,10 @@ function runIndustrialMasterEnginesTests() {
   });
 
   it('TransientWaterHammerSolver computes Joukowsky theoretical peak surge', () => {
+    assert.throws(
+      () => TransientWaterHammerSolver.joukowskySurge(1200.0, 2.0),
+      /requires positive waveSpeed and density/
+    );
     const surge = TransientWaterHammerSolver.joukowskySurge(1200.0, 2.0, 998.2);
     // Delta_P = 998.2 * 1200 * 2 = 2.395 MPa (~24 bar)
     assert(surge.surgePressurePa > 2.3e6 && surge.surgePressurePa < 2.5e6);
@@ -232,39 +273,47 @@ function runIndustrialMasterEnginesTests() {
     assert(surge.surgeHeadM > 240 && surge.surgeHeadM < 250);
   });
 
-  it('TransientWaterHammerSolver executes 1D MOC simulation with ASME B31.3 compliance report', () => {
+  it('TransientWaterHammerSolver returns an experimental 1D MOC estimate without a code verdict', () => {
+    assert.throws(() => TransientWaterHammerSolver.solveTransientMOC(), /requires explicit inputs/);
     const sim = TransientWaterHammerSolver.solveTransientMOC({
       pipeLength: 600.0,
       pipeDiameter: 0.25,
       pipeWallThickness: 0.007,
       darcyFrictionFactor: 0.02,
       reservoirHead: 80.0,
-      steadyFlowRate: 0.10,
+      steadyFlowRate: 0.1,
       valveClosureTime: 0.4,
       valveClosureLaw: 'linear',
       simulationDuration: 3.0,
       reaches: 12,
-      designPressureBar: 16.0
+      fluidDensity: 998.2,
+      fluidBulkModulus: 2.19e9,
+      pipeElasticModulus: 2.0e11,
+      restraintFactor: 1.0
     });
 
     assert.strictEqual(sim.success, true);
     assert.strictEqual(sim.courantNumber, 1.0);
+    assert.strictEqual(sim.codeAssessment, 'NOT_PERFORMED');
     assert(sim.totalStepsExecuted > 50);
     assert(sim.maxHeadObserved > sim.initialDischarge);
     assert(sim.valveTelemetry.timeHistory.length > 10);
-    assert(sim.codeCompliance.standard.includes('ASME B31.3'));
-    assert(typeof sim.codeCompliance.isCompliant === 'boolean');
-    assert(typeof sim.codeCompliance.peakHoopStressMpa === 'number');
+    assert.strictEqual(sim.validationLevel, 'experimental');
+    assert.strictEqual(sim.screeningStatus, 'EXPERIMENTAL_ESTIMATE_ONLY');
+    assert.strictEqual(sim.codeAssessment, 'NOT_PERFORMED');
+    assert(typeof sim.peakHoopStressMpaEstimate === 'number');
+    assert.strictEqual(Object.hasOwn(sim, 'codeCompliance'), false);
   });
 
   // ---------------------------------------------------------------------------
   // 5. SPEF Coupled RC Parasitic Extractor
   // ---------------------------------------------------------------------------
-  console.log('\n[SECTION 5] Sub-3nm / Sky130 SPEF Parasitic Extraction (IEEE 1481)');
+  console.log('\n[SECTION 5] Caller-supplied SPEF RC Formula Smoke Check (IEEE 1481)');
 
-  it('SpefParasiticExtractor extracts multi-net IEEE 1481 SPEF with cross-coupling and Elmore delay', () => {
+  it('SpefParasiticExtractor writes SPEF-shaped records and lumped RC formula estimates', () => {
     const pexResult = SpefParasiticExtractor.extractDesignSPEF({
       designName: 'alu_core_32b',
+      techPdk: EXPERIMENTAL_SPEF_TEST_DATA,
       nets: [
         {
           name: 'clk_tree_root',
@@ -273,12 +322,24 @@ function runIndustrialMasterEnginesTests() {
             { name: 'reg_bank/clk', direction: 'input', isPort: false, x: 250, y: 150 }
           ],
           segments: [
-            { layer: 'met4', lengthUm: 120.0, widthUm: 0.28, hasVia: true },
-            { layer: 'met3', lengthUm: 80.0, widthUm: 0.18, hasVia: false }
+            {
+              layer: 'test_metal_a',
+              lengthUm: 120.0,
+              widthUm: 0.28,
+              hasVia: true,
+              fromNode: 'clk_tree_root:1',
+              toNode: 'clk_tree_root:2'
+            },
+            {
+              layer: 'test_metal_b',
+              lengthUm: 80.0,
+              widthUm: 0.18,
+              hasVia: false,
+              fromNode: 'clk_tree_root:2',
+              toNode: 'clk_tree_root:3'
+            }
           ],
-          crossCouplings: [
-            { nodeA: 'clk_tree_root:1', nodeB: 'bus_data[0]:1', capFf: 0.35 }
-          ]
+          crossCouplings: [{ nodeA: 'clk_tree_root:1', nodeB: 'bus_data[0]:1', capFf: 0.35 }]
         },
         {
           name: 'bus_data[0]',
@@ -287,14 +348,24 @@ function runIndustrialMasterEnginesTests() {
             { name: 'ram/din[0]', direction: 'input', isPort: false, x: 200, y: 100 }
           ],
           segments: [
-            { layer: 'met2', lengthUm: 65.0, widthUm: 0.14, hasVia: false }
-          ]
+            {
+              layer: 'test_metal_a',
+              lengthUm: 65.0,
+              widthUm: 0.14,
+              hasVia: false,
+              fromNode: 'bus_data[0]:1',
+              toNode: 'bus_data[0]:2'
+            }
+          ],
+          crossCouplings: []
         }
       ]
     });
 
     assert.strictEqual(pexResult.success, true);
     assert.strictEqual(pexResult.netCount, 2);
+    assert.strictEqual(pexResult.dataStatus, 'caller-supplied-unverified');
+    assert.strictEqual(pexResult.technologyOrDatasetName, 'synthetic-spef-formula-test-data');
     assert(pexResult.totalDesignCapacitanceFf > 0);
     assert(pexResult.totalInterconnectResistanceOhms > 0);
     assert(pexResult.totalCrossCouplingCapacitanceFf > 0);
@@ -310,8 +381,28 @@ function runIndustrialMasterEnginesTests() {
     assert(spef.includes('*END'), 'Must contain *END delimiter');
 
     // Test Elmore Delay
-    assert(pexResult.extractedNets[0].elmoreDelayPs > 0, 'Elmore delay must be non-zero');
-    assert(pexResult.extractedNets[0].slew90Ps > pexResult.extractedNets[0].elmoreDelayPs, '10-90 slew must exceed Elmore tau');
+    assert(pexResult.extractedNets[0].lumpedRcTimeConstantPs > 0, 'Lumped RC time constant estimate must be non-zero');
+    assert(
+      pexResult.extractedNets[0].lumpedFirstOrderSlew90Ps > pexResult.extractedNets[0].lumpedRcTimeConstantPs,
+      'First-order 10-90 slew estimate must exceed the lumped RC time constant'
+    );
+  });
+
+  it('SpefParasiticExtractor rejects absent PDK records and implicit segment properties', () => {
+    assert.throws(
+      () => SpefParasiticExtractor.extractDesignSPEF({ designName: 'net', nets: [] }),
+      /Explicit layer property records/
+    );
+    assert.throws(
+      () =>
+        SpefParasiticExtractor.extractDesignSPEF({
+          designName: 'net',
+          techPdk: EXPERIMENTAL_SPEF_TEST_DATA,
+          nets: [{ name: 'n', pins: [], segments: [{ layer: 'test_metal_a' }], crossCouplings: [] }]
+        }),
+      /lengthUm must be a finite positive number/
+    );
+    assert.throws(() => SpefParasiticExtractor.parseSPEF(''), /non-empty SPEF text/);
   });
 
   it('SpefParasiticExtractor parses IEEE 1481 SPEF back into structured graph', () => {
@@ -343,7 +434,7 @@ function runIndustrialMasterEnginesTests() {
   });
 
   console.log('\n================================================================');
-  console.log(`  SUMMARY: ${passedTests} / ${totalTests} INDUSTRIAL MASTER ENGINE TESTS PASSED`);
+  console.log(`  SUMMARY: ${passedTests} / ${totalTests} EXPERIMENTAL MASTER ENGINE SMOKE CHECKS PASSED`);
   console.log('================================================================\n');
 
   return { total: totalTests, passed: passedTests };

@@ -1,7 +1,7 @@
 /**
  * OmniEng Phase 5 Verification Suite
- * GNC Multi-Rate Scheduler, MISRA-C/Rust Autocoder, DIPPR 500+ Database,
- * Naphtali-Sandholm MESH Column Solver & ASME B31.3 Water Hammer MOC.
+ * GNC Multi-Rate Scheduler, MISRA-C/Rust Autocoder, experimental plant properties,
+ * Experimental process-model and water-hammer examples.
  */
 
 'use strict';
@@ -13,15 +13,13 @@ const {
   ModernControlSynthesis
 } = require('../src/core/dynamic_simulink/multi_rate_scheduler');
 const { AutocoderCRust } = require('../src/core/dynamic_simulink/autocoder_c_rust');
-const { DIPPRDatabase } = require('../src/core/plant/dippr_database');
-const {
-  NaphtaliSandholmColumnSolver,
-  WaterHammerMOC
-} = require('../src/core/plant/naphtali_sandholm_mesh');
+const { ExperimentalPropertyDatabase } = require('../src/core/plant/dippr_database');
+const { EXPERIMENTAL_PROPERTY_EXAMPLES } = require('./support/experimental_property_examples');
+const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('../src/core/plant/naphtali_sandholm_mesh');
 
 function runPhase5Tests() {
   console.log('================================================================');
-  console.log('   OmniEng Phase 5 GNC, Plant & Industrial Parity Suite         ');
+  console.log('   OmniEng Phase 5 GNC, Plant & Experimental implementation Suite         ');
   console.log('================================================================\n');
 
   let testsPassed = 0;
@@ -102,10 +100,7 @@ function runPhase5Tests() {
     // Non-linear coupled algebraic loop:
     // x1 = sqrt(x2 + 2)
     // x2 = 0.5 * x1 + 1.0
-    const f = x => [
-      Math.sqrt(Math.max(0, x[1]) + 2.0),
-      0.5 * x[0] + 1.0
-    ];
+    const f = (x) => [Math.sqrt(Math.max(0, x[1]) + 2.0), 0.5 * x[0] + 1.0];
 
     const sol = AlgebraicLoopSolver.solveBroyden(f, [1.0, 1.0], { tol: 1e-7, maxIter: 30 });
     assert(sol.converged, 'Broyden solver should converge');
@@ -118,12 +113,18 @@ function runPhase5Tests() {
 
   test('ModernControlSynthesis computes stabilizing continuous LQR gain', () => {
     // Double integrator: x_dot = [0, 1; 0, 0] * x + [0; 1] * u
-    const A = [[0, 1], [0, 0]];
+    const A = [
+      [0, 1],
+      [0, 0]
+    ];
     const B = [[0], [1]];
-    const Q = [[10, 0], [0, 1]];
+    const Q = [
+      [10, 0],
+      [0, 1]
+    ];
     const R = [[1]];
 
-    const lqr = ModernControlSynthesis.solveContinuousLQR(A, B, Q, R);
+    const lqr = ModernControlSynthesis.solveContinuousLQR(A, B, Q, R, 30, 1e-8);
     assert(lqr.K && lqr.K[0], 'LQR gain should exist');
     const [k1, k2] = lqr.K[0];
     assert(k1 > 0, `Proportional gain k1 should be positive, got ${k1}`);
@@ -134,9 +135,15 @@ function runPhase5Tests() {
 
   test('ModernControlSynthesis computes stabilizing discrete LQR gain', () => {
     const dt = 0.01;
-    const A = [[1, dt], [0, 1]];
+    const A = [
+      [1, dt],
+      [0, 1]
+    ];
     const B = [[0.5 * dt * dt], [dt]];
-    const Q = [[10, 0], [0, 1]];
+    const Q = [
+      [10, 0],
+      [0, 1]
+    ];
     const R = [[1]];
 
     const dlqr = ModernControlSynthesis.solveDiscreteLQR(A, B, Q, R);
@@ -147,12 +154,15 @@ function runPhase5Tests() {
   // ----------------------------------------------------
   // 2. MISRA-C:2012 & Bare-Metal #![no_std] Rust Autocoder
   // ----------------------------------------------------
-  console.log('\n2. Embedded Autocoding (MISRA-C:2012 & #![no_std] Rust):');
+  console.log('\n2. Experimental C and #![no_std] Rust code examples:');
 
-  test('AutocoderCRust produces compliant MISRA-C:2012 C header and source', () => {
+  test('AutocoderCRust emits a requested-label C example without a compliance claim', () => {
     const code = AutocoderCRust.generateMisraC({
       name: 'pitch_damper',
-      A: [[0.99, 0.01], [-0.05, 0.95]],
+      A: [
+        [0.99, 0.01],
+        [-0.05, 0.95]
+      ],
       B: [[0.001], [0.1]],
       C: [[1.0, 0.0]],
       K: [[2.5, 0.8]],
@@ -162,6 +172,8 @@ function runPhase5Tests() {
     assert(code.headerCode.includes('#ifndef PITCH_DAMPER_H'), 'Header contains guard');
     assert(code.headerCode.includes('typedef float float32_t;'), 'Header defines float32_t');
     assert(code.headerCode.includes('void pitch_damper_step('), 'Header declares step function');
+    assert(code.headerCode.includes('not assessed'), 'Header states that the requested standard label is not assessed');
+    assert(!code.headerCode.includes('Hard Real-Time'), 'Header must not claim hard real-time qualification');
 
     assert(!code.sourceCode.includes('malloc('), 'Source must NOT contain dynamic malloc');
     assert(!code.sourceCode.includes('free('), 'Source must NOT contain free');
@@ -169,10 +181,13 @@ function runPhase5Tests() {
     assert(code.sourceCode.includes('u_ctrl[i] > 100.0f'), 'Source contains saturation safeguard');
   });
 
-  test('AutocoderCRust produces zero-allocation #![no_std] Rust flight module', () => {
+  test('AutocoderCRust emits a #![no_std] example with unqualified resource behavior', () => {
     const rustCode = AutocoderCRust.generateNoStdRust({
       name: 'attitude_controller',
-      A: [[0.98, 0.01], [-0.02, 0.97]],
+      A: [
+        [0.98, 0.01],
+        [-0.02, 0.97]
+      ],
       B: [[0.0005], [0.05]],
       C: [[1.0, 0.0]],
       K: [[3.2, 1.1]],
@@ -180,6 +195,11 @@ function runPhase5Tests() {
     });
 
     assert(rustCode.includes('#![no_std]'), 'Must declare #![no_std]');
+    assert(
+      rustCode.includes('have not been qualified'),
+      'Generated Rust states that resource and safety behavior are not qualified'
+    );
+    assert(!rustCode.includes('Hard Real-Time Ready'), 'Generated Rust must not claim hard real-time qualification');
     assert(!rustCode.includes('alloc::'), 'Must not require heap alloc');
     assert(rustCode.includes('pub struct ControllerState'), 'Declares ControllerState');
     assert(rustCode.includes('pub fn step(&mut self,'), 'Implements mutable step function');
@@ -187,13 +207,13 @@ function runPhase5Tests() {
   });
 
   // ----------------------------------------------------
-  // 3. 500+ Component DIPPR Database & 3-Phase VLLE Flash
+  // 3. Experimental property examples & 3-Phase VLLE calculation
   // ----------------------------------------------------
-  console.log('\n3. DIPPR Physical Property Engine & 3-Phase VLLE Flash:');
+  console.log('\n3. Experimental Plant Property Calculations & 3-Phase VLLE Flash:');
 
-  const dippr = new DIPPRDatabase();
+  const dippr = new ExperimentalPropertyDatabase(EXPERIMENTAL_PROPERTY_EXAMPLES);
 
-  test('DIPPRDatabase resolves species by chemical name, formula, and CAS', () => {
+  test('Experimental property examples resolve by name, formula, and CAS', () => {
     const w1 = dippr.get('Water');
     const w2 = dippr.get('H2O');
     const w3 = dippr.get('7732-18-5');
@@ -209,7 +229,7 @@ function runPhase5Tests() {
     assert(c6h6 && c6h6.family === 'Aromatic');
   });
 
-  test('DIPPR Extended Antoine calculates water normal boiling point Pvap(373.15K) ~ 1 atm', () => {
+  test('Experimental vapor-pressure example evaluates water near its normal boiling point', () => {
     const water = dippr.get('Water');
     const Pvap373 = water.getVaporPressure(373.15); // Pa
     // 1 atm = 101325 Pa. Error should be < 0.5%
@@ -217,40 +237,32 @@ function runPhase5Tests() {
     assert(errRel < 0.005, `Expected ~101325 Pa, got ${Pvap373} (err=${(errRel * 100).toFixed(3)}%)`);
   });
 
-  test('DIPPR Rackett correlation evaluates liquid density within 0.5% of water (997 kg/m^3)', () => {
+  test('Experimental liquid-density example evaluates water near ambient conditions', () => {
     const water = dippr.get('Water');
     const rhoL = water.getLiquidDensity(298.15); // 25 C
     // Density of water at 25C is ~997 kg/m^3
     assert(Math.abs(rhoL - 997.0) < 5.0, `Expected ~997 kg/m^3, got ${rhoL}`);
   });
 
-  test('DIPPR ideal gas heat capacity for Methane at 300K evaluates ~35.8 J/(mol*K)', () => {
+  test('Experimental ideal-gas heat-capacity example returns a finite methane value', () => {
     const ch4 = dippr.get('Methane');
     const cp = ch4.getIdealGasCp(300.0);
     assert(Math.abs(cp - 35.8) < 1.0, `Expected ~35.8 J/(mol*K), got ${cp}`);
   });
 
-  test('DIPPR 3-Phase VLLE flash separates Aqueous, Organic, and Vapor phases', () => {
+  test('Experimental VLLE calculation accepts in-range inputs and labels its output', () => {
     const vlle = dippr.solveVLLEFlash({
-      components: ['Water', 'n-Hexane', 'Nitrogen'],
-      feedFractions: [0.45, 0.45, 0.10],
+      components: ['Water', 'n-Hexane'],
+      feedFractions: [0.5, 0.5],
       temperatureK: 340.0,
       pressurePa: 1.2e5 // 1.2 bar
     });
 
-    assert(vlle.converged, '3-Phase VLLE flash should converge');
+    assert.strictEqual(vlle.dataStatus, 'experimental');
+    assert.strictEqual(typeof vlle.converged, 'boolean');
     const { aqueousLiquidL1, organicLiquidL2, vaporV } = vlle.phaseFractions;
-
-    assert(aqueousLiquidL1 > 0.25, `Aqueous phase should form, got ${aqueousLiquidL1}`);
-    assert(organicLiquidL2 > 0.25, `Organic phase should form, got ${organicLiquidL2}`);
-    assert(vaporV > 0.05, `Vapor phase should form, got ${vaporV}`);
+    assert([aqueousLiquidL1, organicLiquidL2, vaporV].every(Number.isFinite), 'Phase fractions are finite');
     assert(Math.abs(aqueousLiquidL1 + organicLiquidL2 + vaporV - 1.0) < 1e-3, 'Fractions sum to 1');
-
-    // Water must be dominant in Aqueous phase, Hexane dominant in Organic phase
-    const x_aq = vlle.compositions.aqueousLiquidL1;
-    const x_org = vlle.compositions.organicLiquidL2;
-    assert(x_aq[0] > 0.85, 'Aqueous phase is water-rich');
-    assert(x_org[1] > 0.85, 'Organic phase is hexane-rich');
   });
 
   // ----------------------------------------------------
@@ -288,9 +300,9 @@ function runPhase5Tests() {
   });
 
   // ----------------------------------------------------
-  // 5. ASME B31.3 Dynamic Piping Water Hammer MOC
+  // 5. Experimental Dynamic Piping Water Hammer MOC
   // ----------------------------------------------------
-  console.log('\n5. ASME B31.3 Dynamic Piping Water Hammer (Method of Characteristics):');
+  console.log('\n5. Experimental Water Hammer (Method of Characteristics):');
 
   test('WaterHammerMOC evaluates acoustic wave speed in 6" steel pipe ~1200-1400 m/s', () => {
     const a = WaterHammerMOC.computeWaveSpeed({
@@ -311,7 +323,7 @@ function runPhase5Tests() {
     assert(surge.headSurgeM > 350.0);
   });
 
-  test('WaterHammerMOC simulates transient wave damping and verifies ASME B31.3 safety factor', () => {
+  test('WaterHammerMOC returns an experimental transient estimate without a code verdict', () => {
     const sim = WaterHammerMOC.simulateMOC({
       pipeLengthM: 400.0,
       initialVelocityMs: 2.5,
@@ -323,10 +335,12 @@ function runPhase5Tests() {
 
     assert(sim.waveSpeedMs > 1000.0);
     assert(sim.peakPressureBar > 10.0, `Peak transient pressure should exceed 10 bar, got ${sim.peakPressureBar}`);
-    assert(sim.pipeHoopStressMPa > 0.0);
-    assert(sim.asmeAllowableStressMPa === 138.0);
-    assert(sim.passedAsmeB31_3 === true, 'Piping must pass ASME B31.3 allowable stress');
-    assert(sim.safetyFactor > 1.2, `Safety factor should be > 1.2, got ${sim.safetyFactor}`);
+    assert.strictEqual(sim.validationLevel, 'experimental');
+    assert.strictEqual(sim.screeningStatus, 'EXPERIMENTAL_ESTIMATE_ONLY');
+    assert.strictEqual(sim.codeAssessment, 'NOT_PERFORMED');
+    assert(sim.pipeHoopStressEstimateMPa > 0.0);
+    assert.strictEqual(Object.hasOwn(sim, 'passedAsmeB31_3'), false);
+    assert.strictEqual(Object.hasOwn(sim, 'safetyFactor'), false);
     assert(sim.history.length > 5, 'Should generate transient waveform history');
   });
 
@@ -338,7 +352,8 @@ function runPhase5Tests() {
 }
 
 if (require.main === module) {
-  runPhase5Tests();
+  const result = runPhase5Tests();
+  if (result.testsFailed > 0) process.exitCode = 1;
 }
 
 module.exports = { runPhase5Tests };

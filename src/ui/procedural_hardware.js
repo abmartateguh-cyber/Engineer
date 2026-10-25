@@ -1,19 +1,31 @@
 /**
- * OmniEng Procedural Mechanical Hardware Engine
+ * OmniEng procedural hardware geometry helpers for illustrative UI scenes.
  * Inspired by wheresryan22/anatomy "The object is the explanation" rules.
- * 
- * Generates true precision physical components:
+ * Generates synthetic geometry examples:
  * - Diamond and straight knurled thumb screws & focus rings
- * - ISO 4762 socket head cap screws with hex recesses
- * - ASME B16.5 high-pressure pipe flanges with bolt circles
+ * - Socket-head screw-like forms with hex recesses
+ * - Generic flange forms with bolt circles
  * - Helical coil springs with compression support
- * - Dial indicator gauges with live moving needles
- * - Calibrated linear ruler strips
+ * - Dial-like indicators with animated needles
+ * - Ruler-like visual tick strips
  * - Continuous scalloped weld beads
  */
 
 (function (root, factory) {
-  const THREE = (typeof window !== 'undefined' && window.THREE) ? window.THREE : ((typeof global !== 'undefined' && global.THREE) ? global.THREE : (typeof require !== 'undefined' ? (function () { try { return require('three'); } catch (e) { return null; } })() : null));
+  const THREE =
+    typeof window !== 'undefined' && window.THREE
+      ? window.THREE
+      : typeof global !== 'undefined' && global.THREE
+        ? global.THREE
+        : typeof require !== 'undefined'
+          ? (function () {
+              try {
+                return require('three');
+              } catch (e) {
+                return null;
+              }
+            })()
+          : null;
   const instance = factory(THREE);
   if (typeof module === 'object' && module.exports) {
     module.exports = instance;
@@ -24,7 +36,7 @@
   if (typeof window !== 'undefined') {
     window.ProceduralHardware = instance;
   }
-}(typeof self !== 'undefined' ? self : this, function (THREE) {
+})(typeof self !== 'undefined' ? self : this, function (THREE) {
   'use strict';
 
   if (!THREE) {
@@ -32,7 +44,7 @@
   }
 
   /**
-   * Default high-grade industrial materials
+   * Default display materials for synthetic UI geometry
    */
   function getDefaultMaterials() {
     return {
@@ -63,7 +75,8 @@
       } else {
         knurlCount = opt1;
         if (opt2 && opt2.isMaterial) mat = opt2;
-        else if (typeof opt2 === 'number') mat = new THREE.MeshStandardMaterial({ color: opt2, metalness: 0.85, roughness: 0.25 });
+        else if (typeof opt2 === 'number')
+          mat = new THREE.MeshStandardMaterial({ color: opt2, metalness: 0.85, roughness: 0.25 });
       }
     } else if (opt1 && opt1.isMaterial) {
       mat = opt1;
@@ -103,9 +116,16 @@
   }
 
   /**
-   * 2. ISO 4762 Socket Head Cap Screw
+   * 2. Illustrative socket-head screw form
    */
-  function createSocketHeadScrew(headR = 3.5, headH = 3.5, threadR = 2.0, threadL = 8.0, hexDrive = 2.5, material = null) {
+  function createSocketHeadScrew(
+    headR = 3.5,
+    headH = 3.5,
+    threadR = 2.0,
+    threadL = 8.0,
+    hexDrive = 2.5,
+    material = null
+  ) {
     const group = new THREE.Group();
     const mats = getDefaultMaterials();
     const mat = material || mats.blackOxide;
@@ -139,8 +159,8 @@
     group.add(washer);
 
     group.userData = {
-      type: 'SocketHeadScrew',
-      standard: 'ISO 4762 / DIN 912',
+      type: 'IllustrativeSocketHeadScrew',
+      isSyntheticExample: true,
       nominalDiameterMm: threadR * 2,
       headR,
       threadL
@@ -164,7 +184,8 @@
       mat = colorOrMat;
     }
     const screw = createSocketHeadScrew(headR, headH, threadR, threadL, hexDrive, mat);
-    screw.userData.standard = 'ISO 4762 / DIN 912';
+    screw.userData.type = 'IllustrativeSocketHeadScrew';
+    screw.userData.isSyntheticExample = true;
     screw.userData.nominalDiameterMm = nominalD;
     return screw;
   }
@@ -174,7 +195,7 @@
    */
   function createFastenerArray(positions = [], screwOptions = {}, material = null) {
     const group = new THREE.Group();
-    positions.forEach(pos => {
+    positions.forEach((pos) => {
       const screw = createSocketHeadScrew(
         screwOptions.headR || 3.0,
         screwOptions.headH || 3.0,
@@ -193,7 +214,7 @@
   }
 
   /**
-   * 4. ASME B16.5 High-Pressure Pipe Flange Assembly
+   * 4. Illustrative flange assembly
    */
   function createFlangeAssembly(pipeR = 12, flangeR = 24, thickness = 6, boltCount = 8, boltR = 2.2, material = null) {
     const group = new THREE.Group();
@@ -207,7 +228,13 @@
     holePath.absarc(0, 0, pipeR, 0, Math.PI * 2, true);
     flangeShape.holes.push(holePath);
 
-    const extrudeSettings = { depth: thickness, bevelEnabled: true, bevelThickness: 0.8, bevelSize: 0.8, bevelSegments: 3 };
+    const extrudeSettings = {
+      depth: thickness,
+      bevelEnabled: true,
+      bevelThickness: 0.8,
+      bevelSize: 0.8,
+      bevelSegments: 3
+    };
     const flangeGeom = new THREE.ExtrudeGeometry(flangeShape, extrudeSettings);
     const flangeMesh = new THREE.Mesh(flangeGeom, mat);
     flangeMesh.position.z = -thickness * 0.5;
@@ -254,8 +281,8 @@
     }
 
     group.userData = {
-      type: 'FlangeAssembly',
-      standard: 'ASME B16.5 Class 300',
+      type: 'IllustrativeFlangeAssembly',
+      isSyntheticExample: true,
       pipeR,
       flangeR,
       boltCount
@@ -269,7 +296,7 @@
   function createCoilSpring(arg1 = 8, arg2 = 40, arg3 = 6, arg4 = 1.0, arg5 = null, arg6 = 'y') {
     const group = new THREE.Group();
     const mats = getDefaultMaterials();
-    
+
     let outerR = arg1;
     let freeLength = 40;
     let activeCoils = 6;
@@ -285,12 +312,14 @@
         activeCoils = typeof arg4 === 'number' ? arg4 : 6;
         if (typeof arg5 === 'string') axis = arg5;
         if (arg6 && arg6.isMaterial) mat = arg6;
-        else if (typeof arg6 === 'number') mat = new THREE.MeshStandardMaterial({ color: arg6, metalness: 0.85, roughness: 0.25 });
+        else if (typeof arg6 === 'number')
+          mat = new THREE.MeshStandardMaterial({ color: arg6, metalness: 0.85, roughness: 0.25 });
       } else {
         freeLength = arg2;
         activeCoils = arg3;
         if (typeof arg4 === 'number') wireR = arg4;
-        if (typeof arg5 === 'number') mat = new THREE.MeshStandardMaterial({ color: arg5, metalness: 0.85, roughness: 0.25 });
+        if (typeof arg5 === 'number')
+          mat = new THREE.MeshStandardMaterial({ color: arg5, metalness: 0.85, roughness: 0.25 });
         else if (arg5 && arg5.isMaterial) mat = arg5;
         if (typeof arg6 === 'string') axis = arg6;
       }
@@ -342,7 +371,7 @@
   }
 
   /**
-   * 6. Calibrated Dial Indicator Gauge (with live needle)
+   * 6. Illustrative dial indicator (with animated needle)
    * Signature: (radius, minVal, maxVal, currentVal, units, depthOrMaterial)
    */
   function createDialGauge(radius = 16, minVal = 0, maxVal = 100, currentVal = 0, units = 'MPa', depthOrMaterial = 8) {
@@ -380,7 +409,7 @@
     const tickGroup = new THREE.Group();
     tickGroup.position.z = depth * 0.52;
     for (let i = 0; i <= tickCount; i++) {
-      const angle = (i / tickCount) * (Math.PI * 1.5) - (Math.PI * 1.25);
+      const angle = (i / tickCount) * (Math.PI * 1.5) - Math.PI * 1.25;
       const isMajor = i % 5 === 0;
       const tLen = isMajor ? radius * 0.18 : radius * 0.09;
       const tW = isMajor ? 0.3 : 0.15;
@@ -409,34 +438,48 @@
 
     group.add(needleMesh);
 
-    // Function to rotate needle to value
+    // A null value or invalid range keeps the dial decorative and hides its needle.
     group.setGaugeValue = function (val) {
+      const hasScale = Number.isFinite(minVal) && Number.isFinite(maxVal) && maxVal > minVal;
+      if (!hasScale || !Number.isFinite(val)) {
+        needleMesh.visible = false;
+        if (group.userData) {
+          group.userData.currentValue = null;
+          group.userData.readingAvailable = false;
+        }
+        return;
+      }
+
+      needleMesh.visible = true;
       const clamped = Math.max(minVal, Math.min(maxVal, val));
-      const frac = (clamped - minVal) / (maxVal - minVal || 1);
-      const needleAngle = frac * (Math.PI * 1.5) - (Math.PI * 1.25);
+      const frac = (clamped - minVal) / (maxVal - minVal);
+      const needleAngle = frac * (Math.PI * 1.5) - Math.PI * 1.25;
       needleMesh.rotation.z = needleAngle - Math.PI / 2;
       if (group.userData) {
         group.userData.currentValue = val;
+        group.userData.readingAvailable = true;
       }
     };
-    group.setGaugeValue(currentVal);
 
     group.userData = {
-      type: 'Calibrated Dial Gauge',
+      type: 'IllustrativeDialGauge',
+      isSyntheticExample: true,
       radius,
       units,
-      minVal,
-      maxVal,
-      currentValue: currentVal,
+      minVal: Number.isFinite(minVal) ? minVal : null,
+      maxVal: Number.isFinite(maxVal) ? maxVal : null,
+      currentValue: null,
+      readingAvailable: false,
       setNeedleValue: function (val) {
         group.setGaugeValue(val);
       }
     };
+    group.setGaugeValue(currentVal);
     return group;
   }
 
   /**
-   * 7. Calibrated Linear Ruler Strip
+   * 7. Ruler-like visual tick strip
    */
   function createRulerStrip(length = 120, width = 10, tickStep = 5, units = 'mm', material = null) {
     const group = new THREE.Group();
@@ -451,7 +494,7 @@
     // Scale ticks directly added to group so children.length >= 10
     const tickCount = Math.floor(length / tickStep);
     for (let i = 0; i <= tickCount; i++) {
-      const x = (i * tickStep) - length * 0.5;
+      const x = i * tickStep - length * 0.5;
       const isMajor = i % 5 === 0;
       const tH = isMajor ? width * 0.55 : width * 0.28;
       const tW = isMajor ? 0.4 : 0.2;
@@ -464,6 +507,7 @@
 
     group.userData = {
       type: 'RulerStrip',
+      isSyntheticExample: true,
       lengthMm: length,
       length,
       units
@@ -515,7 +559,7 @@
   }
 
   /**
-   * 9. Precision Deep-Groove Ball Bearing Assembly (SKF 6200 Series)
+   * 9. Illustrative deep-groove ball bearing assembly
    */
   function createBallBearingAssembly(innerR = 10, outerR = 26, width = 8, ballCount = 8, material = null) {
     const group = new THREE.Group();
@@ -559,8 +603,8 @@
     }
 
     group.userData = {
-      type: 'Deep Groove Ball Bearing',
-      standard: 'SKF 6200 Series',
+      type: 'IllustrativeDeepGrooveBallBearing',
+      isSyntheticExample: true,
       innerR,
       outerR,
       width,
@@ -570,7 +614,7 @@
   }
 
   /**
-   * 10. DIN 471 External Retaining Snap Ring (Circlip)
+   * 10. Illustrative external retaining ring
    */
   function createRetainingRing(shaftR = 12, material = null) {
     const group = new THREE.Group();
@@ -591,7 +635,7 @@
     const endAngle1 = (Math.PI * 2 - arcAngle) * 0.5;
     const endAngle2 = endAngle1 + arcAngle;
 
-    [endAngle1, endAngle2].forEach(ang => {
+    [endAngle1, endAngle2].forEach((ang) => {
       const earGeom = new THREE.CylinderGeometry(radialWidth * 0.6, radialWidth * 0.6, ringThickness, 12);
       const ear = new THREE.Mesh(earGeom, ringMat);
       ear.rotation.x = Math.PI / 2;
@@ -600,15 +644,15 @@
     });
 
     group.userData = {
-      type: 'Retaining Snap Ring',
-      standard: 'DIN 471',
+      type: 'IllustrativeRetainingRing',
+      isSyntheticExample: true,
       shaftR
     };
     return group;
   }
 
   /**
-   * 11. Split Cotter Pin (ISO 1234 / DIN 94)
+   * 11. Illustrative split cotter pin
    */
   function createCotterPin(nominalD = 2.0, length = 18.0, material = null) {
     const group = new THREE.Group();
@@ -633,8 +677,8 @@
     group.add(prong1, prong2);
 
     group.userData = {
-      type: 'Split Cotter Pin',
-      standard: 'ISO 1234 / DIN 94',
+      type: 'IllustrativeSplitCotterPin',
+      isSyntheticExample: true,
       nominalD,
       length
     };
@@ -656,4 +700,4 @@
     createRetainingRing,
     createCotterPin
   };
-}));
+});

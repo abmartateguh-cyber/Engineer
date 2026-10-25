@@ -1,8 +1,7 @@
 /**
- * OmniEng Optical Engineering & Lens Mechanics Solver
- * Industrial Parity: PTC Creo / Siemens NX Optomechanics & Zemax OpticStudio.
- * Computes paraxial thick lens matrix ray tracing, chromatic dispersion, 
- * aperture stop geometry, depth of field (DoF), and diffraction-limited Airy disks.
+ * Experimental optical algorithms for caller-supplied prescriptions, material
+ * properties, and ray inputs. No independent optical validation or commercial
+ * parity is implied.
  */
 
 const { OpticalMaterials } = require('./optical_materials');
@@ -13,179 +12,175 @@ class OpticalEngine {
   static Materials = OpticalMaterials;
   static SkewTracer = SkewRayTracer;
   static Seidel = SeidelAberrations;
-  static get50mmPrescription() {
-    return {
-      focalLengthMm: 50.0,
-      nominalFStop: 1.4,
-      designAperture: 1.4,
-      designWavelengthNm: 550.0, // Mid-visible green d-line
-      sensorFormat: 'FullFrame_35mm',
-      sensorWidthMm: 36.0,
-      sensorHeightMm: 24.0,
-      flangeFocalDistanceMm: 44.0, // Canon EF / Leica standard
-      groups: [1, 2, 3, 4, 5, 6],
-      elements: [
-        {
-          id: 'E1_FrontAsphere',
-          name: 'Front Aspherical Meniscus Element',
-          group: 1,
-          glassKey: 'Schott_NBK7',
-          refractiveIndex: 1.5168,
-          refractiveIndex_nd: 1.5168,
-          abbeNumber: 64.17,
-          abbeNumber_Vd: 64.17,
-          radiusFrontMm: 42.5,
-          radiusRearMm: 110.0,
-          centerThicknessMm: 7.8,
-          thicknessMm: 7.8,
-          diameterMm: 48.0,
-          clearApertureMm: 48.0,
-          zPosMm: 0.0,
-          colorHex: 0x38bdf8
-        },
-        {
-          id: 'E2_ThickMeniscus',
-          name: 'Positive Meniscus Crown Element',
-          group: 2,
-          glassKey: 'Schott_NBK7',
-          refractiveIndex: 1.5168,
-          refractiveIndex_nd: 1.5168,
-          abbeNumber: 64.17,
-          abbeNumber_Vd: 64.17,
-          radiusFrontMm: 28.0,
-          radiusRearMm: 54.0,
-          centerThicknessMm: 6.2,
-          thicknessMm: 6.2,
-          diameterMm: 42.0,
-          clearApertureMm: 42.0,
-          zPosMm: 10.5,
-          colorHex: 0x60a5fa
-        },
-        {
-          id: 'E3_AchromatCrown',
-          name: 'Achromatic Doublet Crown Element (Low Dispersion)',
-          group: 3,
-          glassKey: 'OpticalFluorite_CaF2',
-          refractiveIndex: 1.4338,
-          refractiveIndex_nd: 1.4338,
-          abbeNumber: 95.3,
-          abbeNumber_Vd: 95.3,
-          radiusFrontMm: 48.0,
-          radiusRearMm: -24.5,
-          centerThicknessMm: 4.8,
-          thicknessMm: 4.8,
-          diameterMm: 36.0,
-          clearApertureMm: 36.0,
-          zPosMm: 19.0,
-          colorHex: 0xa78bfa
-        },
-        {
-          id: 'E4_AchromatFlint',
-          name: 'Achromatic Doublet Flint Element (Dense Flint Dispersion)',
-          group: 3,
-          glassKey: 'Schott_NSF11',
-          refractiveIndex: 1.7847,
-          refractiveIndex_nd: 1.7847,
-          abbeNumber: 25.76,
-          abbeNumber_Vd: 25.76,
-          radiusFrontMm: -24.5,
-          radiusRearMm: 32.0,
-          centerThicknessMm: 2.2,
-          thicknessMm: 2.2,
-          diameterMm: 36.0,
-          clearApertureMm: 36.0,
-          zPosMm: 23.8,
-          colorHex: 0xc084fc
-        },
-        // Aperture Stop located at z = 28.5 mm
-        {
-          id: 'E5_VariatorNegative',
-          name: 'Autofocus Variator Biconcave Element',
-          group: 4,
-          glassKey: 'Schott_NSF11',
-          refractiveIndex: 1.7847,
-          refractiveIndex_nd: 1.7847,
-          abbeNumber: 25.76,
-          abbeNumber_Vd: 25.76,
-          radiusFrontMm: -35.0,
-          radiusRearMm: 28.0,
-          centerThicknessMm: 2.8,
-          thicknessMm: 2.8,
-          diameterMm: 32.0,
-          clearApertureMm: 32.0,
-          zPosMm: 33.0,
-          colorHex: 0x818cf8
-        },
-        {
-          id: 'E6_VariatorPositive',
-          name: 'Biconvex Rear Master Element',
-          group: 5,
-          glassKey: 'Schott_NBK7',
-          refractiveIndex: 1.5168,
-          refractiveIndex_nd: 1.5168,
-          abbeNumber: 64.17,
-          abbeNumber_Vd: 64.17,
-          radiusFrontMm: 36.0,
-          radiusRearMm: -42.0,
-          centerThicknessMm: 5.4,
-          thicknessMm: 5.4,
-          diameterMm: 34.0,
-          clearApertureMm: 34.0,
-          zPosMm: 38.5,
-          colorHex: 0x38bdf8
-        },
-        {
-          id: 'E7_RearDoubletCrown',
-          name: 'Rear Field Flattener Crown Element',
-          group: 6,
-          glassKey: 'Schott_NBK7',
-          refractiveIndex: 1.5168,
-          refractiveIndex_nd: 1.5168,
-          abbeNumber: 64.17,
-          abbeNumber_Vd: 64.17,
-          radiusFrontMm: 55.0,
-          radiusRearMm: -30.0,
-          centerThicknessMm: 4.2,
-          thicknessMm: 4.2,
-          diameterMm: 36.0,
-          clearApertureMm: 36.0,
-          zPosMm: 46.5,
-          colorHex: 0x2dd4bf
-        },
-        {
-          id: 'E8_RearDoubletFlint',
-          name: 'Rear High-Index Correcting Flint Element',
-          group: 6,
-          glassKey: 'Schott_NSF11',
-          refractiveIndex: 1.7847,
-          refractiveIndex_nd: 1.7847,
-          abbeNumber: 25.76,
-          abbeNumber_Vd: 25.76,
-          radiusFrontMm: -30.0,
-          radiusRearMm: -85.0,
-          centerThicknessMm: 2.6,
-          thicknessMm: 2.6,
-          diameterMm: 36.0,
-          clearApertureMm: 36.0,
-          zPosMm: 50.7,
-          colorHex: 0x34d399
-        }
-      ]
+  static _materialProperties(material) {
+    if (typeof material === 'number' && Number.isFinite(material) && material > 0) {
+      return { nd: material, nF: material, nC: material };
+    }
+    if (
+      material &&
+      typeof material === 'object' &&
+      ['nd', 'nF', 'nC'].every((key) => Number.isFinite(material[key]) && material[key] > 0)
+    ) {
+      return { nd: material.nd, nF: material.nF, nC: material.nC };
+    }
+    const properties = OpticalMaterials.getFraunhoferProperties(material);
+    if (!['nd', 'nF', 'nC'].every((key) => Number.isFinite(properties[key]) && properties[key] > 0)) {
+      throw new TypeError('An optical material must supply finite positive d/F/C indices.');
+    }
+    return properties;
+  }
+
+  static _requirePrescription(prescription) {
+    if (
+      !prescription ||
+      typeof prescription !== 'object' ||
+      !Array.isArray(prescription.elements) ||
+      prescription.elements.length === 0
+    ) {
+      throw new TypeError('An explicit optical prescription with at least one element is required.');
+    }
+    for (const field of ['focalLengthMm', 'objectSpaceMaterial', 'gapMaterial', 'imageSpaceMaterial']) {
+      if (prescription[field] === undefined || prescription[field] === null) {
+        throw new TypeError(`Optical prescription requires explicit ${field}.`);
+      }
+    }
+    if (!Number.isFinite(prescription.focalLengthMm) || prescription.focalLengthMm <= 0) {
+      throw new TypeError('Optical prescription focalLengthMm must be finite and positive.');
+    }
+    return prescription;
+  }
+
+  // Compatibility alias: the application no longer bundles a 50 mm lens prescription.
+  static get50mmPrescription(prescription) {
+    if (prescription === undefined) {
+      throw new RangeError('No source-reviewed 50 mm prescription is bundled; provide an explicit prescription.');
+    }
+    return this._requirePrescription(prescription);
+  }
+
+  static getOpticalSurfaces(prescription) {
+    const rx = this._requirePrescription(prescription);
+    const objectSpace = this._materialProperties(rx.objectSpaceMaterial);
+    const gapMedium = this._materialProperties(rx.gapMaterial);
+    const imageSpace = this._materialProperties(rx.imageSpaceMaterial);
+    const surfaces = [];
+    let surrounding = objectSpace;
+    let skipFront = false;
+
+    const appendSurface = (element, id, radius, zVertex, nextMedium, properties, coefficients = [0, 0, 0, 0]) => {
+      surfaces.push({
+        id,
+        radius,
+        zVertex,
+        thickness: element.centerThicknessMm,
+        clearRadius: element.clearApertureMm / 2,
+        nIncident: properties.nd,
+        nTransmitted: nextMedium.nd,
+        nIncidentF: properties.nF,
+        nIncidentC: properties.nC,
+        nTransmittedF: nextMedium.nF,
+        nTransmittedC: nextMedium.nC,
+        conic: element.conicFront || 0,
+        asphericCoeffs: coefficients,
+        asphericA4: coefficients[0] || 0
+      });
     };
+
+    for (let index = 0; index < rx.elements.length; index++) {
+      const element = rx.elements[index];
+      const requiredNumbers = [
+        element?.radiusFrontMm,
+        element?.radiusRearMm,
+        element?.centerThicknessMm,
+        element?.clearApertureMm,
+        element?.zPosMm
+      ];
+      if (!element || !element.opticalMaterial || !requiredNumbers.every(Number.isFinite)
+        || element.centerThicknessMm <= 0 || element.clearApertureMm <= 0) {
+        throw new TypeError(`Prescription element ${index} has incomplete geometry or material data.`);
+      }
+
+      const material = this._materialProperties(element.opticalMaterial);
+      const frontCoefficients = element.asphericCoeffsFront || [0, 0, 0, 0];
+      if (!Array.isArray(frontCoefficients) || frontCoefficients.length !== 4
+        || !frontCoefficients.every(Number.isFinite)) {
+        throw new TypeError(`Prescription element ${index} has invalid aspheric coefficients.`);
+      }
+      if (!skipFront) {
+        appendSurface(
+          element,
+          `${element.id || index}_Front`,
+          element.radiusFrontMm,
+          element.zPosMm,
+          material,
+          surrounding,
+          frontCoefficients
+        );
+      }
+
+      const nextElement = rx.elements[index + 1];
+      const cemented = Boolean(element.cementedToNext);
+      if (cemented) {
+        if (!nextElement) throw new TypeError('The final prescription element cannot be cemented to a following element.');
+        if (!nextElement.opticalMaterial) throw new TypeError('A cemented element needs explicit material data.');
+        const nextMaterial = this._materialProperties(nextElement.opticalMaterial);
+        appendSurface(
+          element,
+          `${element.id || index}_${nextElement.id || index + 1}_Cemented`,
+          element.radiusRearMm,
+          element.zPosMm + element.centerThicknessMm,
+          nextMaterial,
+          material
+        );
+        surrounding = nextMaterial;
+        skipFront = true;
+      } else {
+        const outgoingMedium = nextElement ? gapMedium : imageSpace;
+        appendSurface(
+          element,
+          `${element.id || index}_Rear`,
+          element.radiusRearMm,
+          element.zPosMm + element.centerThicknessMm,
+          outgoingMedium,
+          material
+        );
+        surrounding = outgoingMedium;
+        skipFront = false;
+      }
+    }
+    return surfaces;
   }
 
   /**
    * Computes optical diffraction limits, depth of field, and aperture geometry.
    * @param {number} focalLengthMm e.g. 50mm
    * @param {number} fStop e.g. 1.4, 2.8, 5.6, 16.0
-   * @param {number} subjectDistM e.g. 2.0m
+   * @param {number} subjectDistM
+   * @param {number} wavelengthNm
+   * @param {number} circleOfConfusionMm
    */
-  static solveOpticalMetrics(focalLengthMm = 50.0, fStop = 1.4, subjectDistM = 2.0) {
+  static solveOpticalMetrics(focalLengthMm, fStop, subjectDistM, wavelengthNm, circleOfConfusionMm) {
+    if (
+      !Number.isFinite(focalLengthMm) ||
+      focalLengthMm <= 0 ||
+      !Number.isFinite(fStop) ||
+      fStop <= 0 ||
+      !Number.isFinite(subjectDistM) ||
+      subjectDistM <= 0 ||
+      !Number.isFinite(wavelengthNm) ||
+      wavelengthNm <= 0 ||
+      !Number.isFinite(circleOfConfusionMm) ||
+      circleOfConfusionMm <= 0
+    ) {
+      throw new TypeError(
+        'solveOpticalMetrics requires positive focalLengthMm, fStop, subjectDistM, wavelengthNm, and circleOfConfusionMm inputs.'
+      );
+    }
     const f = Number(focalLengthMm);
     const N = Number(fStop);
     const s = Number(subjectDistM) * 1000; // in mm
-    const lambdaNm = 550.0;
-    const lambdaMm = lambdaNm * 1e-6; // 0.00055 mm
+    const lambdaNm = Number(wavelengthNm);
+    const lambdaMm = lambdaNm * 1e-6;
 
     // 1. Entrance Pupil Diameter (Clear aperture opening)
     // D = f / N
@@ -195,12 +190,9 @@ class OpticalEngine {
     // NA = n * sin(theta) ≈ D / (2 * f)
     const NA = entrancePupilDiameterMm / (2 * f);
 
-    // 3. Airy Disk Diameter (Diffraction limit at 550nm green light)
+    // 3. Airy Disk Diameter at the caller-supplied wavelength
     // d_Airy = 2.44 * lambda * N
-    const airyDiskDiameterUm = (2.44 * lambdaMm * N) * 1000;
-
-    // 4. Circle of Confusion (c) for 35mm Full Frame
-    const circleOfConfusionMm = 0.029; // Zeiss standard: d / 1500 ≈ 43.3 / 1500 = 0.029 mm
+    const airyDiskDiameterUm = 2.44 * lambdaMm * N * 1000;
 
     // 5. Hyperfocal Distance (H)
     // H = (f^2) / (N * c) + f
@@ -234,6 +226,7 @@ class OpticalEngine {
       numericalAperture: Number(NA.toFixed(4)),
       airyDiskDiameterUm: Number(airyDiskDiameterUm.toFixed(2)),
       diffractionAiryDiskDiameter_um: Number(airyDiskDiameterUm.toFixed(2)),
+      wavelengthNm: lambdaNm,
       circleOfConfusionMm: circleOfConfusionMm,
       hyperfocalDistanceM: Number(hyperfocalM.toFixed(2)),
       hyperfocalDistance_m: Number(hyperfocalM.toFixed(2)),
@@ -246,152 +239,41 @@ class OpticalEngine {
       cutoffSpatialFreqLpMm: Math.round(cutoffSpatialFreqLpMm),
       mtf50ResolutionLpMm: Math.round(mtf50LpMm),
       mtf50ResolutionLimit_lp_per_mm: Math.round(mtf50LpMm),
-      isDiffractionLimited: N >= 8.0,
-      opticalResolutionRating: N <= 2.8 ? 'Ultra-High Contrast (Center Sharp)' : (N <= 8.0 ? 'Optimal Sweet Spot (Edge-to-Edge Sharp)' : 'Diffraction Softening')
+      validationLevel: 'experimental',
+      assumptions: ['MTF50 is estimated from a fixed approximation to the diffraction cutoff.']
     };
   }
 
   /**
-   * Traces light ray trajectories through the 8-element optical system
-   * Returns 3D coordinate paths for entrance pupil rays converging to the sensor focal point.
+   * Traces an explicit prescription through the sequential skew-ray engine.
    */
-  static traceRays(fStop = 1.4, rayCount = 7) {
-    const prescription = this.get50mmPrescription();
-    const maxRadius = (prescription.focalLengthMm / fStop) / 2;
-    const sensorZ = 75.0; // Sensor position in assembly local space
-    const rays = [];
-
-    // Generate rays distributed across entrance pupil
-    for (let i = 0; i < rayCount; i++) {
-      const frac = (i / (rayCount - 1)) * 2 - 1; // -1.0 to +1.0
-      const initialY = frac * maxRadius;
-
-      // Polyline points through lens elements
-      const pathPoints = [];
-      // 1. Incoming parallel ray from infinity
-      pathPoints.push({ z: -35.0, y: initialY });
-      // 2. Front element entry
-      pathPoints.push({ z: 0.0, y: initialY });
-      // 3. Middle group refraction
-      pathPoints.push({ z: 12.0, y: initialY * 0.92 });
-      // 4. Doublet entry
-      pathPoints.push({ z: 22.0, y: initialY * 0.78 });
-      // 5. Aperture stop waist
-      pathPoints.push({ z: 28.5, y: initialY * 0.62 });
-      // 6. Variator refraction
-      pathPoints.push({ z: 36.0, y: initialY * 0.50 });
-      // 7. Rear relay exit
-      pathPoints.push({ z: 52.0, y: initialY * 0.35 });
-      // 8. Focal convergence on sensor plane
-      pathPoints.push({ z: sensorZ, y: 0.0 });
-
-      const isTop = (i === rayCount - 1);
-      const isBottom = (i === 0);
-      const isCenter = (i === Math.floor(rayCount / 2));
-      const rayId = isCenter ? 'center' : (isTop ? 'marginal_top' : (isBottom ? 'marginal_bottom' : `ray_${i}`));
-
-      rays.push({
-        id: rayId,
-        rayIndex: i,
-        initialHeightMm: initialY,
-        startY: initialY,
-        path: pathPoints,
-        points: pathPoints,
-        isMarginal: Math.abs(frac) > 0.9,
-        isAxial: Math.abs(frac) < 0.1
-      });
-    }
-
-    return rays;
+  static traceRays(prescription, options) {
+    return this.traceExactSkewRays(prescription, options).tracedRays;
   }
 
-  /**
-   * Converts the 50mm lens prescription into an array of sequential optical surfaces
-   * for exact 3D vector skew ray tracing and Seidel sums.
-   */
-  static getOpticalSurfaces() {
-    const rx = this.get50mmPrescription();
-    const surfaces = [];
-    let skipFront = false;
-
-    for (let i = 0; i < rx.elements.length; i++) {
-      const el = rx.elements[i];
-      const glass = el.glassKey || 'Schott_NBK7';
-      const props = OpticalMaterials.getFraunhoferProperties(glass);
-
-      // Front surface of element (unless cemented to previous)
-      if (!skipFront) {
-        surfaces.push({
-          id: `${el.id}_Front`,
-          elementName: el.name,
-          radius: el.radiusFrontMm,
-          zVertex: el.zPosMm,
-          thickness: el.centerThicknessMm,
-          clearRadius: (el.diameterMm || 40.0) / 2.0,
-          glassKey: glass,
-          nIncident: 1.0,
-          nTransmitted: props.nd,
-          conic: (i === 0) ? -0.45 : 0.0, // Front element is aspheric
-          asphericCoeffs: (i === 0) ? [1.2e-6, -3.5e-10, 0, 0] : [0, 0, 0, 0],
-          asphericA4: (i === 0) ? 1.2e-6 : 0.0
-        });
-      }
-
-      const isCementedToNext = (i < rx.elements.length - 1) && 
-        (Math.abs((el.zPosMm + el.centerThicknessMm) - rx.elements[i + 1].zPosMm) < 0.05);
-
-      if (isCementedToNext) {
-        const nextEl = rx.elements[i + 1];
-        const nextProps = OpticalMaterials.getFraunhoferProperties(nextEl.glassKey);
-        // Cemented contact interface
-        surfaces.push({
-          id: `${el.id}_${nextEl.id}_Cemented`,
-          elementName: `Cemented Interface (${el.name} / ${nextEl.name})`,
-          radius: el.radiusRearMm,
-          zVertex: el.zPosMm + el.centerThicknessMm,
-          thickness: nextEl.centerThicknessMm,
-          clearRadius: Math.min((el.diameterMm || 40.0) / 2.0, (nextEl.diameterMm || 40.0) / 2.0),
-          glassKey: nextEl.glassKey,
-          nIncident: props.nd,
-          nTransmitted: nextProps.nd,
-          conic: 0.0,
-          asphericCoeffs: [0, 0, 0, 0],
-          asphericA4: 0.0
-        });
-        skipFront = true;
-      } else {
-        // Rear surface into Air
-        surfaces.push({
-          id: `${el.id}_Rear`,
-          elementName: el.name,
-          radius: el.radiusRearMm,
-          zVertex: el.zPosMm + el.centerThicknessMm,
-          thickness: (i < rx.elements.length - 1) ? Math.max(0.1, rx.elements[i + 1].zPosMm - (el.zPosMm + el.centerThicknessMm)) : 22.0,
-          clearRadius: (el.diameterMm || 40.0) / 2.0,
-          glassKey: 'Air',
-          nIncident: props.nd,
-          nTransmitted: 1.0,
-          conic: 0.0,
-          asphericCoeffs: [0, 0, 0, 0],
-          asphericA4: 0.0
-        });
-        skipFront = false;
-      }
+  static traceExactSkewRays(prescription, options = {}) {
+    const rx = this._requirePrescription(prescription);
+    const {
+      fStop,
+      fieldAngleDeg,
+      numRings,
+      raysPerRing,
+      wavelengthUm,
+      sensorZMm,
+      maxFrequencyLpMm
+    } = options;
+    if (!Number.isFinite(fStop) || fStop <= 0
+      || !Number.isFinite(fieldAngleDeg)
+      || !Number.isInteger(numRings) || numRings < 1
+      || !Number.isInteger(raysPerRing) || raysPerRing < 1
+      || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0
+      || !Number.isFinite(sensorZMm)
+      || !Number.isFinite(maxFrequencyLpMm) || maxFrequencyLpMm <= 0) {
+      throw new TypeError('Ray tracing requires explicit aperture, field, pupil sampling, wavelength, sensor, and frequency inputs.');
     }
 
-    return surfaces;
-  }
-
-  /**
-   * Runs exact 3D vector skew ray tracing through the entire optical system,
-   * calculating the 2D spot diagram, RMS spot radius, and MTF curves.
-   */
-  static traceExactSkewRays(fStop = 1.4, fieldAngleDeg = 0.0, numRings = 4, raysPerRing = 10, wavelengthUm = 0.5875618) {
-    const rx = this.get50mmPrescription();
-    const entrancePupilRadius = (rx.focalLengthMm / fStop) / 2.0;
-    const surfaces = this.getOpticalSurfaces();
-    const sensorZ = 75.0; // Sensor image plane
-
+    const entrancePupilRadius = rx.focalLengthMm / fStop / 2;
+    const surfaces = this.getOpticalSurfaces(rx);
     const pupilRays = SkewRayTracer.generatePupilRayGrid(
       entrancePupilRadius,
       numRings,
@@ -399,32 +281,27 @@ class OpticalEngine {
       fieldAngleDeg,
       wavelengthUm
     );
-
-    const tracedRays = SkewRayTracer.traceOpticalSystem(surfaces, pupilRays, sensorZ);
-    const spotDiagram = SkewRayTracer.computeSpotDiagram(tracedRays);
-    const mtf = SkewRayTracer.computeMTFCurve(spotDiagram.rmsSpotRadiusMm || 0.015, fStop, 120);
-
+    const tracedRays = SkewRayTracer.traceOpticalSystem(surfaces, pupilRays, sensorZMm);
+    const spotDiagram = SkewRayTracer.computeSpotDiagram(tracedRays, sensorZMm);
+    const mtf = SkewRayTracer.computeMTFCurve(spotDiagram.rmsSpotRadiusMm, fStop, maxFrequencyLpMm);
     return {
       fStop,
       fieldAngleDeg,
       wavelengthUm,
-      entrancePupilRadiusMm: Number(entrancePupilRadius.toFixed(2)),
+      entrancePupilRadiusMm: entrancePupilRadius,
       rayCount: tracedRays.length,
       spotDiagram,
       mtf,
-      tracedRays
+      tracedRays,
+      validationLevel: 'experimental'
     };
   }
 
-  /**
-   * Computes 3rd-order Seidel primary aberration coefficients for the 50mm system.
-   */
-  static computeSeidelAberrations(fStop = 1.4, fieldAngleDeg = 23.4) {
-    const rx = this.get50mmPrescription();
-    const entrancePupilRadius = (rx.focalLengthMm / fStop) / 2.0;
-    const surfaces = this.getOpticalSurfaces();
-
-    return SeidelAberrations.computeSeidelCoefficients(surfaces, entrancePupilRadius, fieldAngleDeg);
+  static computeSeidelAberrations(prescription, options = {}) {
+    const rx = this._requirePrescription(prescription);
+    const { entrancePupilRadiusMm, fieldAngleDeg } = options;
+    const surfaces = this.getOpticalSurfaces(rx);
+    return SeidelAberrations.computeSeidelCoefficients(surfaces, entrancePupilRadiusMm, fieldAngleDeg);
   }
 }
 

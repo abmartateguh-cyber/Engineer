@@ -1,13 +1,7 @@
 /**
- * OmniEng GPU-Parallel Preconditioned Conjugate Gradient (PCG) Solver
- * 
- * Implements high-throughput parallel linear system acceleration matching NVIDIA AmgX / cuSPARSE:
- * 1. WebGPU / GPGPU compute shader architecture with memory buffer binding emulation.
- * 2. Parallel SpMV (Sparse Matrix-Vector Multiply): y = A * x in O(NNZ / P) time.
- * 3. Parallel vector dot products, axpy operations, and Jacobi diagonal preconditioning.
- * 4. Automatic residual reduction and convergence termination: ||r_k|| / ||b|| < tolerance.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental serial CPU Preconditioned Conjugate Gradient solver.
+ * This compatibility-named implementation uses JavaScript Float64Array loops;
+ * it does not dispatch WebGPU or native sparse-library kernels.
  */
 
 'use strict';
@@ -15,170 +9,245 @@
 class GPUParallelPCGSolver {
   /**
    * @param {Object} options
-   * @param {number} [options.maxIterations=1000]
-   * @param {number} [options.tolerance=1e-8]
-   * @param {boolean} [options.useWebGPU=true]
+   * @param {number} [options.maxIterations=1000] Algorithm iteration limit
+   * @param {number} [options.tolerance=1e-8] Algorithm relative-residual target
    */
   constructor(options = {}) {
-    this.maxIterations = options.maxIterations || 1000;
-    this.tolerance = options.tolerance || 1e-8;
-    this.useWebGPU = options.useWebGPU !== false;
-    this.workgroupSize = 64; // WebGPU 1D workgroup size
+    if (!options || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError('PCG solver options must be an object.');
+    }
+    const unsupported = Object.keys(options).filter((key) => !['maxIterations', 'tolerance'].includes(key));
+    if (unsupported.length > 0) {
+      const error = new Error(`PCG solver does not support the '${unsupported[0]}' option.`);
+      error.code = 'UNSUPPORTED';
+      throw error;
+    }
+    this.maxIterations = options.maxIterations ?? 1000;
+    this.tolerance = options.tolerance ?? 1e-8;
+    if (!Number.isInteger(this.maxIterations) || this.maxIterations < 1) {
+      throw new RangeError('maxIterations must be a positive integer.');
+    }
+    if (!Number.isFinite(this.tolerance) || this.tolerance <= 0 || this.tolerance >= 1) {
+      throw new RangeError('tolerance must be finite and between zero and one.');
+    }
   }
 
   /**
-   * Executes parallel PCG solver on CSR sparse matrix representation
-   * @param {Object} csr - { n, nnz, rowPtr, colIdx, values }
-   * @param {Float64Array|Array<number>} b - Right-hand side vector
-   * @param {Float64Array|Array<number>} [x0] - Initial guess vector
-   * @returns {Object} Solution vector and convergence metrics
+   * Solves a caller-supplied dense matrix or CSR system using serial CPU PCG.
+   * The matrix is expected to be symmetric positive definite.
    */
   solve(matrixOrCsr, b, x0 = null) {
     let csr = matrixOrCsr;
-    if (Array.isArray(matrixOrCsr) && Array.isArray(matrixOrCsr[0]) || (Array.isArray(matrixOrCsr) && matrixOrCsr[0] instanceof Float64Array)) {
+    const firstRow = Array.isArray(matrixOrCsr) ? matrixOrCsr[0] : null;
+    const firstRowIsVector =
+      Array.isArray(firstRow) || (ArrayBuffer.isView(firstRow) && typeof firstRow.length === 'number');
+
+    if (Array.isArray(matrixOrCsr) && firstRowIsVector) {
       const n = matrixOrCsr.length;
-      const rows = [];
-      let totalNnz = 0;
+      if (n < 1) throw new TypeError('Dense PCG matrix must contain at least one row.');
+      const rowPtr = new Int32Array(n + 1);
+      const colIdx = [];
+      const values = [];
       for (let i = 0; i < n; i++) {
-        const row = [];
-        for (let j = 0; j < matrixOrCsr[i].length; j++) {
-          const v = matrixOrCsr[i][j];
-          if (Math.abs(v) > 1e-15) {
-            row.push({ j, v });
-            totalNnz++;
+        const row = matrixOrCsr[i];
+        if (!(Array.isArray(row) || (ArrayBuffer.isView(row) && typeof row.length === 'number')) || row.length !== n) {
+          throw new TypeError('Dense PCG matrix must be square.');
+        }
+        for (let j = 0; j < n; j++) {
+          const value = row[j];
+          if (!Number.isFinite(value)) throw new TypeError('Dense PCG matrix values must be finite.');
+          if (value !== 0) {
+            colIdx.push(j);
+            values.push(value);
           }
         }
-        rows.push(row);
+        rowPtr[i + 1] = values.length;
       }
-      const rowPtr = new Int32Array(n + 1);
-      const colIdx = new Int32Array(totalNnz);
-      const values = new Float64Array(totalNnz);
-      let idx = 0;
-      for (let i = 0; i < n; i++) {
-        rowPtr[i] = idx;
-        for (const item of rows[i]) {
-          colIdx[idx] = item.j;
-          values[idx] = item.v;
-          idx++;
-        }
-      }
-      rowPtr[n] = totalNnz;
-      csr = { n, nnz: totalNnz, rowPtr, colIdx, values };
+      csr = { n, rowPtr, colIdx, values };
     }
 
-    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    const n = csr.n;
+    const n = csr?.n;
+    const isArrayLike = (value) =>
+      Array.isArray(value) || (ArrayBuffer.isView(value) && typeof value.length === 'number');
+    if (
+      !Number.isInteger(n) ||
+      n < 1 ||
+      !isArrayLike(csr.rowPtr) ||
+      !isArrayLike(csr.colIdx) ||
+      !isArrayLike(csr.values)
+    ) {
+      throw new TypeError('PCG requires a square dense matrix or CSR data with n, rowPtr, colIdx, and values.');
+    }
+    const rowPtr = Array.from(csr.rowPtr);
+    const colIdx = Array.from(csr.colIdx);
+    const val = Array.from(csr.values);
+    if (rowPtr.length !== n + 1 || rowPtr[0] !== 0 || rowPtr[n] !== val.length || colIdx.length !== val.length) {
+      throw new TypeError('CSR row pointers, columns, and values must have consistent lengths.');
+    }
+    for (let row = 0; row < n; row++) {
+      if (
+        !Number.isInteger(rowPtr[row]) ||
+        !Number.isInteger(rowPtr[row + 1]) ||
+        rowPtr[row] < 0 ||
+        rowPtr[row] > rowPtr[row + 1] ||
+        rowPtr[row + 1] > val.length
+      ) {
+        throw new TypeError('CSR row pointers must be integer offsets in nondecreasing order.');
+      }
+    }
+    for (let entry = 0; entry < val.length; entry++) {
+      if (!Number.isInteger(colIdx[entry]) || colIdx[entry] < 0 || colIdx[entry] >= n) {
+        throw new TypeError('CSR column indices must refer to valid matrix columns.');
+      }
+      if (!Number.isFinite(val[entry])) throw new TypeError('CSR matrix values must be finite.');
+    }
+    if (!isArrayLike(b) || b.length !== n || !Array.from(b).every(Number.isFinite)) {
+      throw new TypeError('PCG right-hand side must contain one finite number per matrix row.');
+    }
+    if (x0 !== null && (!isArrayLike(x0) || x0.length !== n || !Array.from(x0).every(Number.isFinite))) {
+      throw new TypeError('PCG initial guess must contain one finite number per matrix row.');
+    }
+
+    const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const x = new Float64Array(n);
-    if (x0) {
-      for (let i = 0; i < n; i++) x[i] = x0[i];
-    }
+    if (x0 !== null) for (let i = 0; i < n; i++) x[i] = x0[i];
 
-    const rowPtr = csr.rowPtr;
-    const colIdx = csr.colIdx;
-    const val = csr.values;
-
-    // 1. Compute Jacobi diagonal preconditioner M_inv[i] = 1.0 / A[i,i]
+    // A missing or non-positive diagonal is invalid for Jacobi-preconditioned PCG.
     const invDiag = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      let diagVal = 1.0;
-      const start = rowPtr[i];
-      const end = rowPtr[i + 1];
-      for (let k = start; k < end; k++) {
-        if (colIdx[k] === i) {
-          diagVal = val[k];
-          break;
+      let diagonal = 0;
+      let foundDiagonal = false;
+      for (let entry = rowPtr[i]; entry < rowPtr[i + 1]; entry++) {
+        if (colIdx[entry] === i) {
+          diagonal += val[entry];
+          foundDiagonal = true;
         }
       }
-      invDiag[i] = Math.abs(diagVal) > 1e-14 ? 1.0 / diagVal : 1.0;
+      if (!foundDiagonal || !Number.isFinite(diagonal) || diagonal <= 0) {
+        throw new TypeError(`PCG matrix row ${i} requires a finite positive diagonal.`);
+      }
+      invDiag[i] = 1 / diagonal;
+      if (!Number.isFinite(invDiag[i])) throw new RangeError(`PCG Jacobi inverse overflows at row ${i}.`);
     }
 
-    // 2. Initial residual r0 = b - A * x0
     const r = new Float64Array(n);
-    const z = new Float64Array(n); // Preconditioned residual z = M_inv * r
-    const p = new Float64Array(n); // Search direction
-    const Ap = new Float64Array(n); // A * p
-
-    let bNormSq = 0.0;
+    const z = new Float64Array(n);
+    const p = new Float64Array(n);
+    const Ap = new Float64Array(n);
+    let bNorm = 0;
     for (let i = 0; i < n; i++) {
-      bNormSq += b[i] * b[i];
-      let Ax_i = 0.0;
-      const start = rowPtr[i];
-      const end = rowPtr[i + 1];
-      for (let k = start; k < end; k++) {
-        Ax_i += val[k] * x[colIdx[k]];
-      }
-      r[i] = b[i] - Ax_i;
+      bNorm = Math.hypot(bNorm, b[i]);
+      let Ax = 0;
+      for (let entry = rowPtr[i]; entry < rowPtr[i + 1]; entry++) Ax += val[entry] * x[colIdx[entry]];
+      r[i] = b[i] - Ax;
       z[i] = invDiag[i] * r[i];
       p[i] = z[i];
     }
+    if (!Number.isFinite(bNorm)) throw new RangeError('PCG right-hand-side norm is outside the finite numeric range.');
 
-    const bNorm = Math.sqrt(bNormSq) || 1.0;
-    let rzOld = 0.0;
+    const residualScale = bNorm === 0 ? 1 : bNorm;
+    let rzOld = 0;
+    let finalResidualNorm = 0;
+    let initialResidualNorm = 0;
     for (let i = 0; i < n; i++) {
       rzOld += r[i] * z[i];
+      finalResidualNorm = Math.hypot(finalResidualNorm, r[i]);
+      initialResidualNorm = Math.hypot(initialResidualNorm, r[i]);
+    }
+    if (!Number.isFinite(rzOld) || rzOld < 0 || !Number.isFinite(finalResidualNorm)) {
+      throw new RangeError('PCG initial residual is invalid; the matrix may not be positive definite.');
     }
 
     let iterations = 0;
-    let finalResidualNorm = Math.sqrt(rzOld);
-
-    // 3. Parallel PCG Iteration Loop
-    for (let iter = 0; iter < this.maxIterations; iter++) {
-      iterations++;
-
-      // Parallel SpMV: Ap = A * p
-      let pAp = 0.0;
+    let converged = finalResidualNorm / residualScale <= this.tolerance;
+    let terminationReason = converged ? 'tolerance-reached' : 'maximum-iterations';
+    for (let iter = 0; iter < this.maxIterations && !converged; iter++) {
+      let pAp = 0;
       for (let i = 0; i < n; i++) {
-        let sum = 0.0;
-        const start = rowPtr[i];
-        const end = rowPtr[i + 1];
-        for (let k = start; k < end; k++) {
-          sum += val[k] * p[colIdx[k]];
-        }
+        let sum = 0;
+        for (let entry = rowPtr[i]; entry < rowPtr[i + 1]; entry++) sum += val[entry] * p[colIdx[entry]];
         Ap[i] = sum;
         pAp += p[i] * sum;
       }
+      if (!Number.isFinite(pAp) || pAp <= 0) {
+        terminationReason = 'non-positive-curvature';
+        break;
+      }
 
-      if (Math.abs(pAp) < 1e-30) break;
       const alpha = rzOld / pAp;
-
-      // Update solution x = x + alpha * p, r = r - alpha * Ap
-      let rzNew = 0.0;
-      let rNormSq = 0.0;
+      if (!Number.isFinite(alpha)) {
+        terminationReason = 'non-finite-step';
+        break;
+      }
+      let rzNew = 0;
+      finalResidualNorm = 0;
       for (let i = 0; i < n; i++) {
         x[i] += alpha * p[i];
         r[i] -= alpha * Ap[i];
         z[i] = invDiag[i] * r[i];
         rzNew += r[i] * z[i];
-        rNormSq += r[i] * r[i];
+        finalResidualNorm = Math.hypot(finalResidualNorm, r[i]);
       }
-
-      finalResidualNorm = Math.sqrt(rNormSq);
-      if (finalResidualNorm / bNorm < this.tolerance) {
+      iterations++;
+      if (!Number.isFinite(rzNew) || rzNew < 0 || !Number.isFinite(finalResidualNorm)) {
+        terminationReason = 'non-finite-residual';
         break;
       }
-
-      const beta = rzNew / rzOld;
-      for (let i = 0; i < n; i++) {
-        p[i] = z[i] + beta * p[i];
+      if (finalResidualNorm / residualScale <= this.tolerance) {
+        converged = true;
+        terminationReason = 'tolerance-reached';
+        break;
       }
+      if (!Number.isFinite(rzOld) || rzOld <= 0) {
+        terminationReason = 'invalid-preconditioned-residual';
+        break;
+      }
+      const beta = rzNew / rzOld;
+      if (!Number.isFinite(beta)) {
+        terminationReason = 'non-finite-direction-update';
+        break;
+      }
+      for (let i = 0; i < n; i++) p[i] = z[i] + beta * p[i];
       rzOld = rzNew;
     }
 
-    const elapsedMs = Math.max(1e-3, (typeof performance !== 'undefined' ? performance.now() : Date.now()) - tStart);
+    const recursiveResidualNorm = finalResidualNorm;
+    let verifiedResidualNorm = 0;
+    for (let i = 0; i < n; i++) {
+      let Ax = 0;
+      for (let entry = rowPtr[i]; entry < rowPtr[i + 1]; entry++) Ax += val[entry] * x[colIdx[entry]];
+      verifiedResidualNorm = Math.hypot(verifiedResidualNorm, b[i] - Ax);
+    }
+    if (!Number.isFinite(verifiedResidualNorm)) {
+      throw new RangeError('PCG final residual is outside the finite numeric range.');
+    }
+    const relativeResidual = verifiedResidualNorm / residualScale;
+    converged = relativeResidual <= this.tolerance;
+    if (converged) terminationReason = 'tolerance-reached';
+    else if (terminationReason === 'tolerance-reached') terminationReason = 'residual-recheck-failed';
+    const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - tStart;
+    const estimatedThroughputGFlops =
+      elapsedMs > 0 ? Number(((iterations * val.length * 2e-9) / (elapsedMs / 1000)).toFixed(4)) : null;
     return {
       solution: x,
       iterations,
-      converged: (finalResidualNorm / bNorm) <= this.tolerance,
-      initialResidual: bNorm,
-      finalResidualNorm,
-      residualNorm: finalResidualNorm,
-      relativeResidual: finalResidualNorm / bNorm,
-      // Honest backend label: this implementation executes on the CPU (JS, Float64Array).
-      // A WGSL SpMV path is not dispatched here, so no GPU speedup is claimed.
-      hardwareAcceleration: 'CPU (JavaScript Float64Array CSR SpMV)',
+      converged,
+      initialResidual: initialResidualNorm,
+      initialResidualNorm,
+      rightHandSideNorm: bNorm,
+      recursiveResidualNorm,
+      finalResidualNorm: verifiedResidualNorm,
+      residualNorm: verifiedResidualNorm,
+      relativeResidual,
+      maxIterations: this.maxIterations,
+      tolerance: this.tolerance,
+      terminationReason,
+      validationLevel: 'experimental',
+      hardwareAcceleration: 'CPU (serial JavaScript Float64Array CSR SpMV)',
       gpuSpeedupVerified: false,
       elapsedMs,
-      throughputGFlops: Number(((iterations * (csr.nnz || val.length) * 2 * 1e-9) / (elapsedMs / 1000)).toFixed(4))
+      estimatedThroughputGFlops,
+      throughputGFlops: estimatedThroughputGFlops
     };
   }
 }
@@ -190,4 +259,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.GPUParallelPCGSolver = GPUParallelPCGSolver;
 }
-

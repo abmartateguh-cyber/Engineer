@@ -1,15 +1,7 @@
 /**
- * OmniEng ASME Y14.5-2018 Geometric Dimensioning and Tolerancing (GD&T) Engine
- * 
- * Provides automated inspection and compliance validation matching Siemens NX / CATIA:
- * 1. Semantic Datum Reference Frame (DRF) establishment (Primary [A], Secondary [B], Tertiary [C]).
- * 2. Feature Control Frame (FCF) evaluation:
- *    - True Position with MMC / LMC Material Condition Bonus Tolerance.
- *    - Profile of a Surface & Profile of a Line.
- *    - Orientation (Perpendicularity, Parallelism, Angularity).
- *    - Form & Runout (Circular Runout, Total Runout, Cylindricity).
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental GD&T arithmetic examples for simple position, profile, and
+ * orientation inputs. These helpers do not implement a complete ASME Y14.5
+ * interpretation or provide an inspection or compliance decision.
  */
 
 'use strict';
@@ -52,7 +44,8 @@ class FeatureControlFrame {
 
 class GDTEngine {
   /**
-   * Evaluates True Position of a hole or cylindrical pin per ASME Y14.5
+   * Computes a simple position-deviation and supplied-tolerance comparison.
+   * This does not interpret a complete ASME Y14.5 callout.
    * @param {Object} holeSpec
    * @param {number} holeSpec.nominalX - Basic dimension X (mm)
    * @param {number} holeSpec.nominalY - Basic dimension Y (mm)
@@ -63,7 +56,7 @@ class GDTEngine {
    * @param {number} holeSpec.lowerTolerance - Lower size tolerance (e.g. -0.05)
    * @param {number} holeSpec.upperTolerance - Upper size tolerance (e.g. +0.10)
    * @param {FeatureControlFrame} fcf - Position Feature Control Frame
-   * @returns {Object} Inspection result with bonus tolerance and pass/fail status
+   * @returns {Object} Experimental arithmetic result for the supplied values
    */
   static evaluateTruePosition(holeSpec, fcf) {
     const dx = holeSpec.measuredX - holeSpec.nominalX;

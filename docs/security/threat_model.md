@@ -1,252 +1,82 @@
-# OmniEng Platform Threat Model & Security Architecture
+# OmniEng Source-Based Security Threat Model
 
-**Document Version:** 4.0.0 (Tier-1 Industrial Production)  
-**Standard Compliance:** DO-178C DAL-A, ISO 26262 ASIL-D, IEC 62443-4-2, NIST SP 800-53 Rev. 5, OWASP Top 10 Desktop Application Security  
-**Scope:** Electron Main Process, Preload Script, Renderer Workstation UI, Multi-Domain Engineering Solvers, File Parsers, IPC Gateway, Cryptographic Vault  
+**Status:** Source-based design review; no penetration test, independent security assessment, or standards compliance assessment has been performed.
+**Updated:** 2026-10-25
+**Scope:** Electron main process, preload bridge, renderer, IPC handlers, project archive helpers, imported engineering data, and bundled dependencies.
 
----
+## Purpose and assumptions
 
-## 1. Executive Summary & Architectural Overview
+This model records the trust boundaries, assets, attack surfaces, observed controls, and unresolved risks in the current source tree. It covers the local desktop application. It does not assess a hosted service, an installed signed package, or a configured Stenographer daemon. Source inspection and Node-based tests do not prove packaged Electron behavior.
 
-OmniEng is an industrial-grade engineering computer-aided workstation integrating CAD, CAE, EDA, Optical Engineering, Process Flow, and Controls synthesis. Because OmniEng processes high-value proprietary intellectual property (ITAR defense components, automotive CAD models, 3nm nanometer semiconductor layouts, pharmaceutical chemical flowsheets), maintaining an uncompromised security posture is paramount.
+Assume a user may open a malicious or corrupted engineering file, follow a malicious link rendered by the application, enter hostile prompt or model text, or install a build whose dependency or build inputs have been compromised. The renderer and all imported data are untrusted. The main process is trusted with operating-system and filesystem access and must validate every renderer request.
 
-The platform employs a **defense-in-depth, zero-trust boundary model**:
-1. **Renderer Isolation:** The UI renderer process is treated as completely untrusted. Even if an adversary achieves arbitrary JavaScript execution inside the renderer (e.g. through a compromised web dependency or malicious dynamic diagram), they are constrained by strict OS sandboxing, context isolation, and a hardened Content Security Policy.
-2. **Schema-Gated IPC Gateway:** Zero raw IPC invocations are permitted. 100% of IPC channels (104/104) are routed through a declarative schema validation engine that strictly types, bounds, and scrubs inputs, neutralizing prototype pollution and path traversal attacks before dispatching to computational kernels.
-3. **Cryptographic Protection at Rest:** Engineering assemblies, schematics, and simulation results are protected using an AES-256-GCM authenticated vault with PBKDF2 key derivation (100,000 rounds) and decompression bomb protection.
-4. **Fuzz-Hardened Parser Pipeline:** All binary and ASCII file importers (STEP ISO 10303-21, GDSII Stream, SEMI P39 OASIS, IEEE 1800 SystemVerilog, and `.omni` archives) undergo extensive automated fuzzing (12,000+ vector campaigns per release) to eliminate memory safety vulnerabilities and denial-of-service risks.
+## Assets and security goals
 
----
+- Confidentiality and integrity of project geometry, circuits, flowsheets, model inputs, simulation outputs, and encrypted session snapshots.
+- Availability of the workstation while parsing files or running calculations.
+- Integrity of project state, engineering decisions, validation records, and provenance.
+- Integrity of packaged application code and its dependency/build chain.
+- Correctly scoped access to privileged main-process operations.
 
-## 2. Process Model & Sandboxing Architecture
+## System and trust boundaries
 
-```
-+-----------------------------------------------------------------------------------+
-|                              UNTRUSTED UI RENDERER                                |
-|  - sandbox: true                                                                  |
-|  - contextIsolation: true                                                         |
-|  - nodeIntegration: false                                                         |
-|  - Content Security Policy (strict script-src 'self', no eval, no external fetch)  |
-|  - Three.js WebGL / WebGPU Viewport                                              |
-|  - Workstation Modeless Docking & Keymap Manager                                  |
-+-----------------------------------------------------------------------------------+
-                                         |
-                       window.omniEngAPI (Exposed Context Bridge)
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-|                             SECURE PRELOAD BOUNDARY                               |
-|  - contextBridge.exposeInMainWorld('omniEngAPI', { ... })                         |
-|  - Strictly typed channel wrappers                                                |
-|  - Zero leakage of NodeJS process, require, or native primitives                  |
-+-----------------------------------------------------------------------------------+
-                                         |
-                        IPC Message (channel, validated payload)
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-|                      TRUSTED MAIN PROCESS IPC SECURITY GATEWAY                    |
-|  - defineHandler(channel, schema, handler)                                        |
-|  - 100% Schema Validation (105 / 105 Channels Verified)                            |
-|  - Prototype Pollution Stripper (CWE-1321 Mitigation)                             |
-|  - Path Traversal & Canonicalization Sanitizer (CWE-22 Mitigation)                |
-|  - CI Enforced Gate: scripts/check_ipc.js (Zero raw ipcMain.handle violations)    |
-+-----------------------------------------------------------------------------------+
-        |                 |                 |                  |                 |
-        v                 v                 v                  v                 v
-  [CAD Router]      [CAE Router]      [EDA Router]      [Optics Router]    [System Vault]
+```mermaid
+flowchart LR
+    DATA["Project files and imported data<br/>untrusted"] --> R["Electron renderer<br/>untrusted"]
+    USER["User prompts and actions"] --> R
+    R --> P["Named contextBridge methods"]
+    P --> IPC["IPC sender gate, sanitation,<br/>route schemas"]
+    IPC --> M["Electron main process<br/>filesystem and OS authority"]
+    PKG["npm dependencies and build inputs"] --> M
+    PKG --> R
 ```
 
-### 2.1 Sandboxing & Context Isolation Directives
-In `main.js`, `BrowserWindow` creation enforces the following inviolable parameters:
-```javascript
-webPreferences: {
-  sandbox: true,
-  contextIsolation: true,
-  nodeIntegration: false,
-  nodeIntegrationInWorker: false,
-  enableRemoteModule: false,
-  allowRunningInsecureContent: false,
-  webSecurity: true
-}
-```
+The `BrowserWindow` enables sandboxing and context isolation and disables Node integration. The preload exposes named `ipcRenderer.invoke` methods through `contextBridge`. `src/main/ipc/define_handler.js` checks that calls originate from the main frame and the resolved `src/index.html` path before sanitation and route validation. The route schemas are lightweight and vary in strictness; they are not shared exact contracts.
 
-### 2.2 Content Security Policy (CSP)
-The main window enforces a strict Content Security Policy in `src/index.html`:
-```html
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:;">
-```
-- Disallows external domain script loading, preventing CDN poisoning or remote code execution.
-- Disallows external data exfiltration via unauthorized network connections.
-- Frame and object loading are disabled by default.
+`main.js` denies new windows. Its `will-navigate` handler blocks URLs that do not start with `file://`, so it still permits navigation to other local file URLs. The IPC sender gate rejects those other file paths, but the navigation behavior itself has not been tested in packaged Electron. No explicit permission request or permission check handlers were found in the inspected source; permission behavior is not covered by this model's tests.
 
-### 2.3 Window Navigation & Popup Controls
-In `main.js`, all navigation and window creation events are intercepted and denied:
-```javascript
-mainWindow.webContents.setWindowOpenHandler(() => {
-  return { action: 'deny' };
-});
+The workbench and detached-panel CSPs now omit `'unsafe-inline'` from `script-src`; a regression check verifies both documents use external same-origin scripts and contain no inline event handlers. Both policies still permit inline styles, which remains a CSP weakness. User-entered assistant messages and command-palette empty-state text use text nodes; the assistant response renderer allows only a small set of formatting elements through DOM construction. Caller-input drop and wizard results, provider node data, telemetry values, sample catalog fields, viewport raycast metadata, and geometry-healer output also use text nodes. AI parameter suggestions are restricted to named settings and checked against value types and ranges before changing UI state; consumer controls render bounded numeric values. Drafting output is limited to a 1 MB generated SVG and displayed as an image data URL, while the report iframe uses an empty sandbox. The Bode panel validates finite, strictly increasing analyzer samples, constructs the SVG and metrics with DOM nodes and text nodes, labels margins as sampled estimates without refinement, and omits unsupported stability and bandwidth claims. A missing or unsupported synthetic preset fails closed. The optical inspector escapes caller surface JSON, error messages, and warnings before its HTML templates; hostile-markup assertions cover those fields. Verilog and rectangle-screen metrics are built from DOM text nodes; malformed counts and numeric results display as unavailable. Scalar optics and piping estimate views now build result cards with DOM nodes, display only finite numeric outputs (plus the optics engine's literal `Infinity` sentinel for focus limits), and show malformed metrics as unavailable. Targeted tests exercise production engine responses, hostile fields, and the app wiring. These controls do not establish a penetration-tested boundary or cover every dynamic renderer path. Inline style permission and remaining high-change UI behavior are open risks.
 
-mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-  const parsed = new URL(navigationUrl);
-  if (parsed.protocol !== 'file:') {
-    event.preventDefault();
-  }
-});
-```
+New workspace tabs are also built with DOM nodes; document IDs are assigned as attributes, and titles and badges are set through `textContent`. A hostile-label contract checks the production helper and app wiring.
 
-### 2.4 Automation & Test Harness Gating
-Automated test hooks (such as `executeJavaScript` used for UI test evaluation) are strictly gated behind:
-1. Explicit CLI flag: `--test-ui`
-2. Non-production environment check: `!app.isPackaged`
-In production distributions, the test listener is entirely inactive, preventing remote execution vectors.
+The `check:renderer-sinks` gate inventories first-party scripts loaded by both active renderer documents: `src/index.html` and the detached-panel page `src/ui/panel_host.html`. It pins 16 `innerHTML` assignments across `app.js`, `icons.js`, `optical_inspector_ui.js`, and `spice_oscilloscope_ui.js`, and rejects new assignments plus `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval`, `Function` construction, runtime script creation, and dynamic imports. The current sink data paths have focused source contracts: app templates interpolate bounded numeric, enum, and boolean state; the optical inspector escapes caller JSON, errors, and warnings and formats result metrics from numeric fields; the SPICE view uses a static form template and places returned text through DOM text properties; icon hydration reads only own keys from a frozen catalog. This is an inventory and targeted source characterization, not proof of complete renderer safety. The vendored Three.js script is excluded, as are dormant files under `src/public/plugins`; dependency and plugin provenance review remains separate.
 
----
+## Threat register
 
-## 3. IPC Schema Gateway & Zero-Trust Channel Architecture
+Severity is a qualitative prioritization for this source review, not a measured risk score.
 
-The IPC Gateway (`src/main/ipc/define_handler.js`) enforces strict structural integrity across all 98 communication channels.
+| ID    | Threat and impact                                                                                                             | Observed controls and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Residual status                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| TM-01 | Renderer script injection could invoke exposed bridge methods or mislead an engineer.                                         | `sandbox`, `contextIsolation`, disabled Node integration, and named preload methods are present. Selected chat, palette, drop/wizard, provider telemetry, healer, sample catalog, and viewport sinks use text nodes; AI parameter edits are allow-listed and bounded; the drawing preview uses image mode; and the report iframe is sandboxed. Both documents block inline scripts; the Bode panel validates and renders returned samples through DOM construction and fails closed on an invalid preset. The optical inspector escapes caller JSON, errors, and warnings before HTML insertion and has hostile-markup checks. Verilog and rectangle-screen metrics use DOM construction and finite-value formatting. Inline styles remain allowed, and the broad renderer behavior review is not finished. | **High / open**                         |
+| TM-02 | A child frame, remote page, or navigated local file could attempt privileged IPC, causing unintended operations.              | The shared IPC wrapper checks main-frame identity and the exact local `src/index.html` path. Node tests cover hostile sender cases; packaged Electron behavior is unverified. `will-navigate` permits any `file://` URL, although the IPC gate rejects a different file path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | **High / partial**                      |
+| TM-03 | Malformed or adversarial engineering input could consume excessive CPU or memory, crash the app, or produce incorrect output. | Routes and parsers have different checks. Some routes bound payloads, but there is no uniform size/resource contract or complete parser-fuzz campaign.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **High / open**                         |
+| TM-04 | A malformed `.omni` archive could cause resource exhaustion, ambiguous section data, or misleading project metadata.          | The archive parser rejects section tables above 4,096 entries, impossible counts, empty/invalid UTF-8 and duplicate names, oversized sections, aggregate uncompressed or serialized archives above 512 MiB, excessive expansion ratios, truncated data, trailing bytes, and missing or unsupported manifests. The renderer-facing load route caps input at 100 MiB. `loadFromFile` checks a regular file's size through an open descriptor before reading and detects size changes. CRC32 detects accidental corruption but does not authenticate an archive. Focused archive tests cover a valid file round trip, a sparse over-limit file, and malformed section-table cases; sustained malicious-file coverage is incomplete.                                                                            | **High / partial**                      |
+| TM-05 | A weak or stolen password could disclose an encrypted session snapshot.                                                       | The snapshot helper uses AES-256-GCM with per-file salt and nonce and PBKDF2-HMAC-SHA-256 at 100,000 iterations. Password policy, key handling, and cryptographic choices have not received independent review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | **Medium / open**                       |
+| TM-06 | A compromised dependency or build artifact could execute code or expose project data.                                         | A lockfile, dependency audit, and SBOM generation exist. Current audit found no known vulnerabilities; release artifacts are unsigned and the build chain has no independent attestation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **High / open**                         |
+| TM-07 | An unsupported or incorrect engineering result could drive an unsafe design decision.                                         | Domains are marked experimental and validation records distinguish unavailable cases from passes. Independent reference coverage and domain review remain incomplete.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **High / open**                         |
+| TM-08 | Hostile prompt or engineering text could steer the legacy macro toward unintended operations or unsupported conclusions.      | Required-input checks and fail-closed routes constrain some actions. There is no Stenographer policy gateway, approval center, project-revision binding, or durable engineering record.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **High / open**                         |
+| TM-09 | Caller-supplied identity fields could be mistaken for authorization.                                                          | The product IAM IPC route returns `UNSUPPORTED` without an authenticated provider. The legacy helper labels decisions as unverified and unenforced and must not authorize product operations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Medium / mitigated in current route** |
+| TM-10 | Lost or corrupted project state could discard acknowledged engineering work.                                                  | The current archive helper can serialize project sections, but full save, autosave, atomic recovery, and revision-history workflows are not available.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **High / open**                         |
 
-### 3.1 Declarative Schema Enforcement
-Every IPC handler registers through:
-```javascript
-defineHandler(channelName, schema, handlerFunction);
-```
-If an incoming message deviates from the schema (missing mandatory fields, invalid data types, numbers out of bounds, extraneous properties), the gateway immediately aborts the call and logs a security violation:
-```json
-{
-  "error": "IPC Schema Validation Failed for channel omni:cad-extrude: missing required field 'depth'",
-  "code": "ERR_INVALID_IPC_PAYLOAD"
-}
-```
+## Verification evidence and limits
 
-### 3.2 Automated CI Security Gate (`scripts/check_ipc.js`)
-To prevent developer regression, the CI pipeline runs `scripts/check_ipc.js` on every commit. This script parses all files in `src/main/ipc/*.js` and `preload.js`:
-- Ensures **zero** instances of raw `ipcMain.handle` or `ipcMain.on` exist outside the gateway.
-- Verifies a 1:1 bi-directional mapping between preload API methods and registered schema handlers.
-- Build fails immediately if any channel is unregistered or unvalidated.
+- `test/test_workspace_tab_view.js` exercises the workspace-tab DOM builder with hostile title and badge strings and verifies the controller uses it without the tab `innerHTML` sink. This is a targeted Node-side UI contract, not a packaged renderer security assessment.
+- `test/test_measurement_hud_view.js` exercises finite caliper coordinates and results, hostile and non-finite values, viewport wiring, helper load order, and the absence of measurement HUD `innerHTML` interpolation. This is a targeted Node-side UI contract, not a packaged renderer security assessment.
+- `test/test_command_palette_view.js` exercises hostile command labels, IDs, and icon keys, verifies DOM-only row construction and static icon-key wiring, and checks that the app uses the helper without palette `innerHTML`. The icon catalog smoke contract verifies that the catalog/API are frozen and that inherited property names do not hydrate. `scripts/check_renderer_sinks.js`, wired into the root suite and CI, pins the active first-party sink inventory. These are targeted Node-side UI contracts, not a packaged renderer security assessment.
+- `test/test_bode_ui_contract.js` exercises the production analyzer response, sample validation, DOM rendering, unsupported-claim removal, and explicit synthetic-preset handling. `test/test_anatomy_craft_parity.js` checks hostile optical surface JSON, errors, and warnings against the inspector HTML templates. `test/test_eda_result_view.js` exercises production Verilog and rectangle-rule results, malformed metrics, and workbench wiring. `test/test_engineering_result_view.js` exercises production scalar-optics and piping-estimate results, hostile or non-finite response values, and app wiring. These are targeted Node-side UI contracts, not an Electron renderer security assessment.
 
-### 3.3 Prototype Pollution Scrubbing (CWE-1321)
-The gateway recursively iterates through all incoming payload objects and strips dangerous prototype poisoning keys:
-```javascript
-function stripPrototypePollution(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(stripPrototypePollution);
-  const clean = Object.create(null);
-  for (const [key, value] of Object.entries(obj)) {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      continue; // Strip pollution attempt
-    }
-    clean[key] = stripPrototypePollution(value);
-  }
-  return clean;
-}
-```
+- Source observations: `main.js`, `preload.js`, `src/index.html`, `src/main/ipc/define_handler.js`, `src/main/ipc/system_ipc.js`, `src/core/security/ipc_validator.js`, and `src/core/storage/omni_archive.js`.
+- `node test/test_phase1_upgrade.js` exercises a valid archive round trip and malformed section-table cases. These tests do not establish resistance to all crafted archives or prove packaged Electron behavior.
+- `test/test_phase9_enterprise_security.js` and the root suite exercise selected IPC and security-helper cases. Parser smoke checks in `test/fuzz/test_parsers_fuzz.js` are not a substitute for a sustained fuzzing campaign.
+- `test/test_anatomy_craft_parity.js` checks the allow-listed DOM text builder against hostile markup and checks assistant, palette, drop/wizard, provider telemetry, sample catalog, viewport metadata, and report iframe paths. `test/test_new_industrial_engines.js` checks hostile drafting labels are escaped and CAD IPC routes reject implicit units/defaults. These are targeted source characterizations, not renderer or protocol penetration tests.
+- The configured dependency audit reports known advisories for the resolved dependency tree; it does not attest to package integrity or the absence of unknown vulnerabilities.
 
----
+## Required security work
 
-## 4. STRIDE Threat Analysis Matrix
-
-| Threat Category | Asset / Target | Threat Scenario | Impact | Mitigation in OmniEng | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Spoofing** | IPC Handlers | Malicious script attempts to invoke elevated main-process routines. | Privilege escalation, arbitrary file access | Context bridge isolation; only safe, pre-whitelisted primitives exposed. Schema gate validates sender frame context. | **Mitigated** |
-| **Tampering** | In-flight IPC Data | Tampering with geometry or FEA solver parameters in transit. | Incorrect structural engineering calculations | Deep-freeze of deserialized IPC arguments; strict type and bounds assertions. | **Mitigated** |
-| **Tampering** | Project Files (.omni) | Unauthorized alteration of encrypted project files or simulation records. | IP corruption, sabotage of mission-critical CAD | AES-256-GCM 128-bit authentication tag; modification renders ciphertext unreadable with authentication exception. | **Mitigated** |
-| **Repudiation** | Safety Signoff & Tool Dossiers | Disavowing a CAD revision or DO-178C tool qualification report. | Inability to audit engineering failure origins | Tamper-proof Immutable Audit Ledger (`audit_ledger.js`) signing all operations with SHA-256 hash chains. | **Mitigated** |
-| **Information Disclosure** | Proprietary CAD / EDA IP | Malicious actor reads project files at rest or dumps heap memory. | Loss of trade secrets, ITAR/EAR export control violation | AES-256-GCM authenticated vault with PBKDF2 (100k rounds) key derivation; zero cleartext writing to disk. | **Mitigated** |
-| **Denial of Service** | File Parsers | Malformed STEP, GDSII, or OASIS files triggering buffer overflow or infinite loop. | Application crash, CPU exhaustion | 12,000+ vector fuzz test suite; bounded integer decoders; recursion limiters; decompress bomb guards. | **Mitigated** |
-| **Denial of Service** | Numerical Solvers | Poorly conditioned matrix ($A$) causing solver to hang indefinitely. | Workstation UI lockup, unbounded resource consumption | Solvers run asynchronously with iteration caps and residual convergence checks; UI main thread is non-blocking. | **Mitigated** |
-| **Elevation of Privilege** | Electron Host System | Renderer breakout accessing host OS shell, filesystem, or network. | Complete host compromise | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`. No `child_process` execution on user inputs. | **Mitigated** |
-
----
-
-## 5. Cryptography & IP Protection at Rest
-
-OmniEng includes a native military-grade cryptographic vault (`OmniVaultAES256` in `src/core/storage/omni_archive.js`) designed to protect trade secrets and classified defense engineering designs.
-
-### 5.1 Algorithm & Key Derivation Specifications
-- **Cipher:** AES-256-GCM (Galois/Counter Mode) authenticated encryption.
-- **Key Derivation Function (KDF):** PBKDF2 (RFC 2898) with HMAC-SHA-256.
-- **Iteration Count:** 100,000 rounds.
-- **Salt:** 16 bytes (128 bits) of cryptographically secure pseudo-random bytes (`crypto.randomBytes(16)`).
-- **Initialization Vector (IV):** 12 bytes (96 bits) unique IV per encryption operation.
-- **Authentication Tag:** 16 bytes (128 bits) GCM MAC tag.
-
-### 5.2 Container Serialization Layout
-The encrypted vault container is packed into a tamper-evident binary format:
-```
-+-----------------------------------------------------------------------------------+
-| Offset (bytes) | Length   | Field Name       | Description                         |
-+----------------+----------+------------------+-------------------------------------+
-| 0x00           | 4 bytes  | Magic Header     | 'OVA1' (OmniVault AES-256 v1)       |
-| 0x04           | 16 bytes | KDF Salt         | Cryptographic salt for PBKDF2       |
-| 0x14           | 12 bytes | AES IV / Nonce   | Unique GCM initialization vector    |
-| 0x20           | 16 bytes | GCM Auth Tag     | 128-bit authentication integrity tag |
-| 0x30           | N bytes  | Ciphertext       | AES-256-GCM encrypted payload       |
-+-----------------------------------------------------------------------------------+
-```
-Any modification to the salt, IV, auth tag, or ciphertext causes GCM authentication failure immediately during decryption, rejecting the corrupted stream before decompression.
-
-### 5.3 Decompression Bomb Guard (Zip Bomb Mitigation)
-When decompressing `.omni` archives or embedded compressed streams, OmniEng enforces strict resource quotas:
-- **Maximum Uncompressed Size:** 1.0 GB per container.
-- **Maximum Compression Ratio:** 100:1.
-- **Streaming Length Verification:** Input streams are inspected before and during inflation; exceeding thresholds throws an immediate `DecompressionBombSecurityException`.
-
----
-
-## 6. File Parser Hardening & Fuzz Testing Assurance
-
-OmniEng interfaces with legacy and complex industrial file formats that are historically prone to memory corruption and parsing vulnerabilities. The platform employs hardened parsers backed by continuous fuzz testing.
-
-### 6.1 Fuzzed Parsers & Hardening Techniques
-1. **STEP (ISO 10303-21) CAD Parser:**
-   - Token stream length limits.
-   - Guard against circular entity references in `#123=PRODUCT(...)` trees.
-   - Bounded string tokenization preventing heap exhaustion on multi-gigabyte STEP models.
-2. **GDSII Stream Engine:**
-   - 2-byte record length integrity check.
-   - Unknown record type graceful skipping without desynchronization.
-   - Buffer slice boundary assertions preventing out-of-bounds reads.
-3. **SEMI P39 OASIS Stream Engine:**
-   - 13-byte magic header (`%SEMI-OASIS\r\n`) exact byte verification.
-   - `decodeVint` 64-bit integer overflow bounds check (maximum 10 bytes per vint).
-   - Modal state coordinate range clamps preventing floating-point overflow.
-4. **IEEE 1800 SystemVerilog Synthesizer:**
-   - AST depth limiter (maximum nesting depth of 128 levels) preventing stack overflow.
-   - Macro expansion cycle detection.
-5. **Security IPC Validator:**
-   - Fuzzed with recursive prototype pollution vectors (`__proto__`, `constructor.prototype`).
-   - Fuzzed with relative and absolute path traversal vectors (`../../../../etc/passwd`, `C:\Windows\System32`).
-
-### 6.2 Fuzz Suite Metrics (Suite 25)
-The test suite (`test/fuzz/test_parsers_fuzz.js`) runs on every CI build:
-- **STEP Parser:** 2,000 malformed, truncated, and random-byte inputs.
-- **GDSII Engine:** 2,000 bit-flipped and corrupt record length inputs.
-- **OASIS Engine:** 2,000 corrupt vint and modal sequence inputs.
-- **OmniVault AES-256:** Corrupt headers, tampered auth tags, truncated salts, bit-flipped ciphertexts.
-- **SystemVerilog Synthesizer:** 2,000 malformed HDL syntax and infinite recursion vectors.
-- **IPC Gateway:** 2,000 prototype pollution and path traversal payloads.
-- **Total:** 12,000+ fuzzing vectors with **100% survival rate (0 unhandled crashes, 0 memory leaks)**.
-
----
-
-## 7. Common Weakness Enumeration (CWE) Compliance
-
-OmniEng explicitly addresses the following CWE entries:
-
-| CWE ID | Vulnerability Title | Defense Mechanism in OmniEng | Verification Gate |
-| :--- | :--- | :--- | :--- |
-| **CWE-20** | Improper Input Validation | Strict schema validation on all 98 IPC channels using declarative type/bounds rules. | `node scripts/check_ipc.js` & Fuzz-6 |
-| **CWE-22** | Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal') | Automatic sanitization and canonicalization of all file paths; rejection of paths containing `..` or non-whitelisted root paths. | IPC Validator Unit Tests & Fuzz-6 |
-| **CWE-78** | Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection') | Zero use of shell command strings; strict invocation of native APIs without child process spawning on untrusted input. | Architecture Static Analysis |
-| **CWE-119** | Improper Restriction of Operations within the Bounds of a Memory Buffer | JavaScript typed arrays (`Uint8Array`, `Float64Array`) with strict offset and length bounds checks across all binary engines. | Fuzz-2, Fuzz-3, Fuzz-4 |
-| **CWE-311** | Missing Encryption of Sensitive Data | AES-256-GCM authenticated vault with PBKDF2 (100k iterations) for all project archives. | Benchmark 14 & Fuzz-4 |
-| **CWE-400** | Uncontrolled Resource Consumption | Maximum decompression ratios (100:1) and caps (1 GB); solver iteration caps; memory allocation bounds. | Suite 25 Fuzz Suite |
-| **CWE-1321**| Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution') | Recursive prototype scrubbing (`stripPrototypePollution`) stripping `__proto__`, `constructor`, `prototype`. | Test Suite 24 & Fuzz-6 |
-
----
-
-## 8. Incident Response & Vulnerability Disclosure
-
-Security findings or anomalies should be escalated directly to the OmniEng Platform Security Officer. Vulnerabilities reported are triaged according to CVSS v3.1 scoring, with critical issues remediated and released under a 24-hour SLA. All production releases include cryptographically signed release checksums and automated Software Bill of Materials (SBOM) generation.
+1. Remove `'unsafe-inline'` from `style-src` after replacing inline style attributes and style blocks with reviewed CSS rules.
+2. Restrict navigation to the exact application entry point; add default-deny permission handlers and packaged Electron tests for navigation, IPC sender rejection, and permissions.
+3. Replace lightweight route schemas with shared exact contracts and consistent payload, unit, and resource bounds.
+4. Add sustained fuzzing for archives and supported engineering parsers.
+5. Review encryption parameters, error handling, password policy, and key management with a cryptography specialist.
+6. Sign and verify packaged artifacts and establish build provenance.
+7. Reassess this model when the above controls have current implementation and test evidence.

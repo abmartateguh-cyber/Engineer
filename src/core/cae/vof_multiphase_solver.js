@@ -1,13 +1,13 @@
 /**
  * OmniEng Volume of Fluid (VOF) Multiphase CFD Solver
  * 
- * Implements immiscible free-surface tracking matching ANSYS Fluent / OpenFOAM interFoam:
+ * Experimental immiscible free-surface tracking example:
  * 1. Phase volume fraction transport: d(alpha)/dt + div(alpha * u) = 0, alpha in [0, 1].
  * 2. Piecewise Linear Interface Calculation (PLIC) geometric reconstruction.
  * 3. Continuum Surface Force (CSF) surface tension model: F_st = sigma * kappa * grad(alpha).
  * 4. Spatial mixture property interpolation: rho = alpha*rho1 + (1-alpha)*rho2.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent multiphase validation or comparison to a production CFD solver is established.
  */
 
 'use strict';
@@ -128,4 +128,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.VOFMultiphaseSolver = VOFMultiphaseSolver;
 }
-

@@ -1,7 +1,7 @@
 /**
  * OmniEng STEP (ISO 10303-21) AP203/AP214 CAD Translator
  * Standard: ISO 10303-21 Clear Text Encoding of the Exchange Structure
- * Industrial Parity: Siemens NX / PTC Creo / SolidWorks / FreeCAD STEP exchange.
+ * Experimental implementation: Siemens NX / PTC Creo / SolidWorks / FreeCAD STEP exchange.
  */
 
 class StepTranslator {

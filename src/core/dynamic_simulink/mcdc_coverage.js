@@ -1,14 +1,6 @@
 /**
- * OmniEng FAA DO-178C DAL-A & ISO 26262 ASIL-D Structural MC/DC Coverage Analyzer
- * 
- * Provides flight software certification code coverage matching LDRA / VectorCAST:
- * 1. Modified Condition / Decision Coverage (MC/DC) verification.
- * 2. Independence pair detection: condition C_i independently flips decision D from True to False.
- * 3. 100% Truth table enumeration and automated minimal test vector synthesis.
- * 4. Statement, Branch, and Condition Coverage aggregation.
- * 5. Tamper-evident SHA-256 DO-178C DAL-A Qualification Dossier generation.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental modified condition/decision coverage pair diagnostics.
+ * The results are not standards qualification or certification evidence.
  */
 
 'use strict';
@@ -17,7 +9,7 @@ const crypto = require('crypto');
 
 class MCDCCoverageAnalyzer {
   /**
-   * Analyzes an N-variable boolean decision D = f(C1, C2, ... Cn) for MC/DC compliance
+   * Analyzes supplied Boolean vectors for independent condition/decision pairs.
    * @param {string[]} conditionNames - e.g. ['hydraulic_press_ok', 'alt_valid', 'pilot_override']
    * @param {Function} decisionFunc - Boolean function (c1, c2, ... cn) => boolean
    * @param {Array<boolean[]>} executedTestVectors - Array of boolean evaluation vectors
@@ -84,16 +76,14 @@ class MCDCCoverageAnalyzer {
       });
     }
 
-    const coveragePct = (coveredConditions / n) * 100.0;
-    const meetsDAL_A = coveragePct === 100.0;
+    const coveragePct = n === 0 ? 0 : (coveredConditions / n) * 100.0;
 
     return {
+      dataStatus: 'experimental',
       totalConditions: n,
       coveredConditions,
       mcdcCoveragePercent: Number(coveragePct.toFixed(1)),
-      meetsDO178C_DAL_A: meetsDAL_A,
-      meetsISO26262_ASIL_D: meetsDAL_A,
-      verdict: meetsDAL_A ? 'MCDC_100_PERCENT_CERTIFIED' : 'MCDC_DEFICIENT',
+      allConditionsHavePairs: coveragePct === 100.0,
       conditionStatus
     };
   }
@@ -224,19 +214,14 @@ class MCDCCoverageAnalyzer {
     };
   }
 
-  /**
-   * Generates a formal DO-178C DAL-A & ISO 26262 ASIL-D Qualification Dossier
-   * @param {string} decisionId
-   * @param {string[]} conditionNames
-   * @param {Function} decisionFunc
-   * @param {Array<boolean[]>} testSuite
-   * @returns {Object} Structured dossier with SHA-256 seal
-   */
+  /** Deprecated compatibility name; returns an experimental coverage diagnostic. */
   static generateDO178CDossier(decisionId, conditionNames, decisionFunc, testSuite) {
     const coverage = this.evaluateMCDCCoverage(conditionNames, decisionFunc, testSuite);
     
     const dossier = {
-      standard: 'DO-178C Table A-7 (DAL-A) / ISO 26262 Table 12 (ASIL-D)',
+      dataStatus: 'experimental',
+      status: 'diagnostic-only',
+      standardsAssessment: 'not performed',
       decisionId,
       conditions: conditionNames,
       testCaseCount: testSuite.length,
@@ -249,8 +234,7 @@ class MCDCCoverageAnalyzer {
         totalConditions: coverage.totalConditions,
         coveredConditions: coverage.coveredConditions,
         mcdcCoveragePercent: coverage.mcdcCoveragePercent,
-        meetsDAL_A: coverage.meetsDO178C_DAL_A,
-        verdict: coverage.verdict
+        allConditionsHavePairs: coverage.allConditionsHavePairs
       },
       independencePairs: coverage.conditionStatus,
       timestamp: new Date().toISOString()
@@ -266,4 +250,3 @@ class MCDCCoverageAnalyzer {
 module.exports = {
   MCDCCoverageAnalyzer
 };
-

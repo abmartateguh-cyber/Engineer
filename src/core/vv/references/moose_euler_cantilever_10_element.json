@@ -1,0 +1,42 @@
+{
+  "id": "MOOSE_EULER_CANTILEVER_10_ELEMENT",
+  "formatVersion": 1,
+  "name": "Small-strain high-shear-stiffness cantilever bending, ten elements",
+  "referenceKind": "published cross-solver finite-element result",
+  "source": {
+    "organization": "Idaho National Laboratory MOOSE Framework",
+    "documentTitle": "Beams — Verification and Validation",
+    "url": "https://mooseframework.inl.gov/releases/moose/2022-06-10/modules/tensor_mechanics/beam_vandv.html",
+    "modelInput": "modules/tensor_mechanics/test/tests/beam/static/euler_small_strain_y.i",
+    "originalStudy": "Prathap and Bhashyam (1982), International Journal for Numerical Methods in Engineering, volume 18, pages 195–210",
+    "retrieved": "2026-10-25"
+  },
+  "case": {
+    "model": "straight cantilever, clamped at x=0, transverse tip load in local y",
+    "elementCount": 10,
+    "length": 4,
+    "lengthUnits": "m",
+    "youngsModulus": 2.60072400269,
+    "shearModulus": 10000,
+    "poissonRatio": -0.9998699638,
+    "shearCorrectionFactor": 0.85,
+    "area": 0.554256,
+    "secondMomentIy": 0.0141889,
+    "secondMomentIz": 0.0141889,
+    "tipLoad": 0.0001,
+    "tipLoadUnits": "N",
+    "reportedTipDeflection": 0.05766,
+    "deflectionUnits": "m"
+  },
+  "tolerances": {
+    "maximumRelativeTipDeflectionError": 0.01,
+    "maximumIndependentlyComputedRelativeResidual": 1e-10
+  },
+  "limitations": [
+    "The MOOSE reference case uses an Euler-Bernoulli beam; OmniEng evaluates its Timoshenko element with the published high-shear-stiffness properties. This tests the thin-beam limit and does not add an Euler-Bernoulli element formulation.",
+    "The public beam module exposes an element stiffness matrix, not a beam-mesh assembler. The verification harness assembles the documented straight, uniform mesh and uses the production sparse solver.",
+    "The source load is scaled by 1e-4 relative to the cited study; the fixture preserves the MOOSE V&V input scaling and its reported ten-element result.",
+    "This is an experimental cross-solver correlation for one linear beam case. It does not establish mesh convergence, general beam workflow validation, or release maturity.",
+    "Redistribution rights for the source documentation/data have not been independently reviewed."
+  ]
+}

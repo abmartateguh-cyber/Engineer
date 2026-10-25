@@ -1,7 +1,7 @@
 /**
  * OmniEng J2 von Mises Non-Linear Plasticity Solver
  * Standard: 3D Radial Return Mapping Algorithm with Isotropic Hardening
- * Industrial Parity: Ansys Mechanical / Abaqus Standard & Explicit material constitutive models.
+ * Experimental implementation: Ansys Mechanical / Abaqus Standard & Explicit material constitutive models.
  */
 
 class J2Plasticity {

@@ -22,6 +22,14 @@ class IPCValidator {
       return input;
     }
 
+    // Preserve binary IPC payloads so their declared buffer schema can enforce size limits.
+    if (Buffer.isBuffer(input)) {
+      return Buffer.from(input);
+    }
+    if (input instanceof Uint8Array) {
+      return new Uint8Array(input);
+    }
+
     if (Array.isArray(input)) {
       return input.map(item => IPCValidator.sanitize(item));
     }

@@ -1,5 +1,5 @@
 /**
- * OmniEng Phase 3 Upgrade Verification Suite: Structural & Fluid Mechanics Parity
+ * OmniEng Phase 3 Upgrade Verification Suite: Structural & Fluid Mechanics Experimental workflow
  * Validates:
  * 1. Native 3D Delaunay & Advancing-Front Tet/Hex Mesher (TET4 & TET10)
  * 2. Gauss-Point Continuum Non-Linear J2 Plasticity & Mortar Contact
@@ -26,7 +26,7 @@ function assert(condition, message) {
 
 function runPhase3Tests() {
   console.log('================================================================');
-  console.log('   OmniEng Phase 3 Structural & Fluid Mechanics Parity Suite   ');
+  console.log('   OmniEng Phase 3 Structural & Fluid Mechanics Experimental workflow Suite   ');
   console.log('================================================================\n');
 
   // --- Group 1: Native 3D Delaunay & Advancing-Front Mesher ---

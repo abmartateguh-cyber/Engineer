@@ -1,7 +1,7 @@
 /**
  * OmniEng Explicit Dynamics & Crashworthiness Solver
  * 
- * Implements high-velocity impact and nonlinear transient mechanics matching LS-DYNA / Abaqus Explicit:
+ * Experimental explicit time-integration example:
  * 1. Central difference explicit time integration (no matrix inversion required):
  *    a_n = M^(-1) * (F_ext_n - F_int_n - C * v_n)
  *    v_(n+1/2) = v_(n-1/2) + dt * a_n
@@ -10,7 +10,7 @@
  *    dt_crit = L_e / c_d, where c_d = sqrt(E * (1 - nu) / (rho * (1 + nu) * (1 - 2*nu)))
  * 3. Contact penalty interface and total energy conservation auditing (Kinetic + Strain = Total).
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent impact validation or comparison to a production crash solver is established.
  */
 
 'use strict';
@@ -111,4 +111,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.ExplicitDynamicsCrashSolver = ExplicitDynamicsCrashSolver;
 }
-

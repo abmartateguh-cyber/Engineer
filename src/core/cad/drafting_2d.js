@@ -5,10 +5,17 @@
  * Implements automated orthographic projections (First-Angle & Third-Angle),
  * Hidden-Line Removal (HLR), associative dimensioning, and ASME/ISO Feature Control Frames.
  *
- * 100% In-House Algorithmic Geometry - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { Vector3 } = require('../math/linear_algebra');
+
+function escapeXmlText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 class FeatureControlFrame {
   /**
@@ -36,16 +43,16 @@ class FeatureControlFrame {
    */
   getSymbol() {
     const symbols = {
-      'POSITION': '⌖',
-      'FLATNESS': '⏥',
-      'PERPENDICULARITY': '⟂',
-      'PARALLELISM': '//',
-      'CONCENTRICITY': '◎',
-      'RUNOUT': '↗',
-      'TOTAL_RUNOUT': '⌰',
-      'CYLINDRICITY': '⌭',
-      'STRAIGHTNESS': '—',
-      'CIRCULARITY': '○'
+      POSITION: '⌖',
+      FLATNESS: '⏥',
+      PERPENDICULARITY: '⟂',
+      PARALLELISM: '//',
+      CONCENTRICITY: '◎',
+      RUNOUT: '↗',
+      TOTAL_RUNOUT: '⌰',
+      CYLINDRICITY: '⌭',
+      STRAIGHTNESS: '—',
+      CIRCULARITY: '○'
     };
     return symbols[this.characteristic] || '⌖';
   }
@@ -62,7 +69,8 @@ class FeatureControlFrame {
    */
   toString() {
     const sym = this.getSymbol();
-    const tolStr = (this.diameter ? '⌀' : '') + this.tolerance + (this.modifier ? ' ' + this.getModifierSymbol(this.modifier) : '');
+    const tolStr =
+      (this.diameter ? '⌀' : '') + this.tolerance + (this.modifier ? ' ' + this.getModifierSymbol(this.modifier) : '');
     const compartments = [sym, tolStr];
     if (this.datumPrimary) compartments.push(this.datumPrimary);
     if (this.datumSecondary) compartments.push(this.datumSecondary);
@@ -75,8 +83,12 @@ class FeatureControlFrame {
    */
   toSVG(x, y, height = 24) {
     const sym = this.getSymbol();
-    const tolStr = (this.diameter ? '⌀' : '') + this.tolerance + (this.modifier ? ' ' + this.getModifierSymbol(this.modifier) : '');
-    const boxes = [{ text: sym, width: 28 }, { text: tolStr, width: 56 }];
+    const tolStr =
+      (this.diameter ? '⌀' : '') + this.tolerance + (this.modifier ? ' ' + this.getModifierSymbol(this.modifier) : '');
+    const boxes = [
+      { text: sym, width: 28 },
+      { text: tolStr, width: 56 }
+    ];
     if (this.datumPrimary) boxes.push({ text: this.datumPrimary, width: 24 });
     if (this.datumSecondary) boxes.push({ text: this.datumSecondary, width: 24 });
     if (this.datumTertiary) boxes.push({ text: this.datumTertiary, width: 24 });
@@ -85,7 +97,7 @@ class FeatureControlFrame {
     let svg = `<g class="gdt-fcf" font-family="monospace" font-size="${height * 0.55}">`;
     for (const b of boxes) {
       svg += `<rect x="${curX}" y="${y}" width="${b.width}" height="${height}" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>`;
-      svg += `<text x="${curX + b.width / 2}" y="${y + height * 0.7}" text-anchor="middle" fill="#e0f2fe">${b.text}</text>`;
+      svg += `<text x="${curX + b.width / 2}" y="${y + height * 0.7}" text-anchor="middle" fill="#e0f2fe">${escapeXmlText(b.text)}</text>`;
       curX += b.width;
     }
     svg += '</g>';
@@ -109,8 +121,10 @@ class DraftingEngine2D {
     const viewDir = DraftingEngine2D._getViewDirection(viewType);
     const lines = [];
 
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
 
     for (const edge of solid.edges) {
       const p1_3d = edge.start.point;
@@ -120,9 +134,10 @@ class DraftingEngine2D {
       const p2_2d = DraftingEngine2D._projectPoint(p2_3d, viewType);
 
       // Determine visibility by testing adjacent face normals
-      const adjFaces = solid.faces.filter(f =>
-        f.vertices.some(v => v.point.distanceTo(p1_3d) < 1e-4) &&
-        f.vertices.some(v => v.point.distanceTo(p2_3d) < 1e-4)
+      const adjFaces = solid.faces.filter(
+        (f) =>
+          f.vertices.some((v) => v.point.distanceTo(p1_3d) < 1e-4) &&
+          f.vertices.some((v) => v.point.distanceTo(p2_3d) < 1e-4)
       );
 
       let isVisible = false;
@@ -157,11 +172,16 @@ class DraftingEngine2D {
 
   static _getViewDirection(viewType) {
     switch (viewType.toUpperCase()) {
-      case 'FRONT': return new Vector3(0, 0, 1);
-      case 'TOP': return new Vector3(0, 1, 0);
-      case 'RIGHT': return new Vector3(1, 0, 0);
-      case 'ISOMETRIC': return new Vector3(1, 1, 1).normalize();
-      default: return new Vector3(0, 0, 1);
+      case 'FRONT':
+        return new Vector3(0, 0, 1);
+      case 'TOP':
+        return new Vector3(0, 1, 0);
+      case 'RIGHT':
+        return new Vector3(1, 0, 0);
+      case 'ISOMETRIC':
+        return new Vector3(1, 1, 1).normalize();
+      default:
+        return new Vector3(0, 0, 1);
     }
   }
 
@@ -240,13 +260,13 @@ class DraftingEngine2D {
     svg += `  <line x1="${tbX}" y1="${tbY + 70}" x2="${tbX + 350}" y2="${tbY + 70}" stroke="#334155" stroke-width="1"/>\n`;
     svg += `  <line x1="${tbX + 175}" y1="${tbY + 35}" x2="${tbX + 175}" y2="${tbY + 110}" stroke="#334155" stroke-width="1"/>\n`;
 
-    svg += `  <text x="${tbX + 12}" y="${tbY + 24}" fill="#38bdf8" font-size="14" font-weight="bold">OMNIENG INDUSTRIAL DRAFTING</text>\n`;
+    svg += `  <text x="${tbX + 12}" y="${tbY + 24}" fill="#38bdf8" font-size="14" font-weight="bold">OMNIENG EXPERIMENTAL DRAWING</text>\n`;
     svg += `  <text x="${tbX + 12}" y="${tbY + 54}" fill="#94a3b8" font-size="10">PART NAME:</text>\n`;
-    svg += `  <text x="${tbX + 12}" y="${tbY + 65}" fill="#f8fafc" font-size="11" font-weight="bold">${title}</text>\n`;
+    svg += `  <text x="${tbX + 12}" y="${tbY + 65}" fill="#f8fafc" font-size="11" font-weight="bold">${escapeXmlText(title)}</text>\n`;
     svg += `  <text x="${tbX + 190}" y="${tbY + 54}" fill="#94a3b8" font-size="10">DWG NO:</text>\n`;
-    svg += `  <text x="${tbX + 190}" y="${tbY + 65}" fill="#38bdf8" font-size="11" font-weight="bold">${partNumber}</text>\n`;
-    svg += `  <text x="${tbX + 12}" y="${tbY + 90}" fill="#94a3b8" font-size="10">SCALE: ${scale}</text>\n`;
-    svg += `  <text x="${tbX + 190}" y="${tbY + 90}" fill="#94a3b8" font-size="10">STD: ISO 1101 / ASME Y14.5</text>\n`;
+    svg += `  <text x="${tbX + 190}" y="${tbY + 65}" fill="#38bdf8" font-size="11" font-weight="bold">${escapeXmlText(partNumber)}</text>\n`;
+    svg += `  <text x="${tbX + 12}" y="${tbY + 90}" fill="#94a3b8" font-size="10">SCALE: ${escapeXmlText(scale)}</text>\n`;
+    svg += `  <text x="${tbX + 190}" y="${tbY + 90}" fill="#94a3b8" font-size="10">Experimental sample; standards unchecked</text>\n`;
     svg += `</g>\n`;
 
     // Render GD&T Feature Control Frames
@@ -272,7 +292,7 @@ class DraftingEngine2D {
     let svg = `<g class="view-${viewData.viewType.toLowerCase()}">\n`;
 
     // View title label
-    svg += `  <text x="${cx}" y="${cy}" fill="#64748b" font-family="sans-serif" font-size="12" font-weight="bold">${label}</text>\n`;
+    svg += `  <text x="${cx}" y="${cy}" fill="#64748b" font-family="sans-serif" font-size="12" font-weight="bold">${escapeXmlText(label)}</text>\n`;
 
     const spanX = Math.max(1e-4, bounds.width);
     const spanY = Math.max(1e-4, bounds.height);

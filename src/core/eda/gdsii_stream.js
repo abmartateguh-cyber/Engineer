@@ -3,7 +3,7 @@
  * High-performance binary serialization and deserialization of integrated circuit layouts.
  * Supports GDSII Stream Format (Release 6.0) specification with full record type encoding/decoding.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 // GDSII Record Data Types

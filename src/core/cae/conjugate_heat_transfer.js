@@ -1,13 +1,13 @@
 /**
  * OmniEng Conjugate Heat Transfer (CHT) Solid-Fluid Interface Coupling Engine
  * 
- * Provides rigorous thermal coupling matching ANSYS Fluent CHT / Star-CCM+:
+ * Experimental thermal coupling example:
  * 1. Interface energy flux conservation across non-conformal fluid-solid boundaries.
  * 2. Enforces temperature continuity: T_fluid = T_solid.
  * 3. Enforces heat flux continuity: -k_fluid * (dT/dn)_fluid = -k_solid * (dT/dn)_solid.
  * 4. Harmonic mean thermal conductivity weighting across interface cells.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent CHT validation or comparison to a production solver is established.
  */
 
 'use strict';

@@ -1,20 +1,9 @@
 /**
- * OmniEng Transient Water Hammer & Hydraulic Shockwave Solver (MOC)
- * 
- * Implements high-fidelity 1D acoustic pressure transient simulation matching Bentley HAMMER / Wanda:
- * 1. Wave Speed Calculation (Korteweg-Joukowsky formula considering fluid bulk modulus, 
- *    pipe elastic modulus, diameter-to-wall thickness ratio, and pipe support restraint).
- * 2. Method of Characteristics (MOC) with exact Courant condition (Cr = 1.0) grid:
- *    - Compatibility equations along C+ and C- characteristics with Darcy-Weisbach friction damping.
- * 3. Boundary Conditions:
- *    - Constant-head upstream reservoir.
- *    - Fast-closing downstream valve with configurable closure schedules (instantaneous, linear, S-curve).
- *    - Air chamber / surge vessel cushioning with polytropic gas expansion (P * V^gamma = const).
- * 4. ASME B31.3 / B31.4 Piping Code Transient Overpressure Verification:
- *    - Allowable surge pressure margin (up to 133% design pressure allowable limit).
- *    - Dynamic hoop stress and rupture risk evaluation.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Simplified experimental 1D water-hammer calculation example.
+ *
+ * The bundled assumptions and boundary conditions have not been independently
+ * validated. This module does not assess ASME B31.3/B31.4 compliance or provide
+ * a design recommendation.
  */
 
 'use strict';
@@ -33,17 +22,33 @@ class TransientWaterHammerSolver {
    * @param {number} [conduit.restraintFactor=1.0] - c1 (1.0 for anchored pipe against axial motion)
    * @returns {number} Acoustic wave propagation speed a (m/s)
    */
-  static calculateWaveSpeed(conduit = {}) {
-    const rho = conduit.fluidDensity || 998.2;
-    const K = conduit.fluidBulkModulus || 2.19e9;
-    const E = conduit.pipeElasticModulus || 2.0e11;
-    const D = conduit.pipeInnerDiameter || 0.30;
-    const e = conduit.pipeWallThickness || 0.008;
-    const c1 = conduit.restraintFactor !== undefined ? conduit.restraintFactor : 1.0;
+  static calculateWaveSpeed(conduit) {
+    const names = [
+      'fluidDensity',
+      'fluidBulkModulus',
+      'pipeElasticModulus',
+      'pipeInnerDiameter',
+      'pipeWallThickness',
+      'restraintFactor'
+    ];
+    const missing = names.filter((name) => !Number.isFinite(conduit?.[name]));
+    if (missing.length)
+      throw new TypeError(`calculateWaveSpeed requires explicit finite inputs: ${missing.join(', ')}.`);
+    const {
+      fluidDensity: rho,
+      fluidBulkModulus: K,
+      pipeElasticModulus: E,
+      pipeInnerDiameter: D,
+      pipeWallThickness: e,
+      restraintFactor: c1
+    } = conduit;
+    if (rho <= 0 || K <= 0 || E <= 0 || D <= 0 || e <= 0 || e >= D / 2 || c1 < 0) {
+      throw new RangeError('Wave-speed inputs are outside the supported positive geometry and property ranges.');
+    }
 
     // a = sqrt( (K / rho) / (1 + (K / E) * (D / e) * c1) )
     const denominator = 1.0 + (K / E) * (D / e) * c1;
-    const waveSpeed = Math.sqrt((K / rho) / denominator);
+    const waveSpeed = Math.sqrt(K / rho / denominator);
     return Number(waveSpeed.toFixed(2));
   }
 
@@ -56,7 +61,16 @@ class TransientWaterHammerSolver {
    * @param {number} [density=998.2] - rho (kg/m^3)
    * @returns {{surgePressurePa: number, surgeHeadM: number}}
    */
-  static joukowskySurge(waveSpeed, initialVelocity, density = 998.2) {
+  static joukowskySurge(waveSpeed, initialVelocity, density) {
+    if (
+      !Number.isFinite(waveSpeed) ||
+      waveSpeed <= 0 ||
+      !Number.isFinite(initialVelocity) ||
+      !Number.isFinite(density) ||
+      density <= 0
+    ) {
+      throw new TypeError('joukowskySurge requires positive waveSpeed and density and a finite initialVelocity.');
+    }
     const deltaP = density * waveSpeed * initialVelocity;
     const deltaH = (waveSpeed * initialVelocity) / GRAVITY;
     return {
@@ -79,33 +93,88 @@ class TransientWaterHammerSolver {
    * @param {number} [params.simulationDuration=5.0] - Total simulation duration t_max (s)
    * @param {number} [params.reaches=20] - Number of spatial reach divisions N
    * @param {Object} [params.surgeTank] - Optional surge mitigation vessel { volumeM3, polytropicGamma }
-   * @returns {Object} Transient simulation results and ASME B31.3 compliance
+   * @returns {Object} Experimental transient estimates and sampled history
    */
-  static solveTransientMOC(params = {}) {
-    const L = params.pipeLength || 1000.0;
-    const D = params.pipeDiameter || 0.30;
-    const e = params.pipeWallThickness || 0.008;
-    const f = params.darcyFrictionFactor || 0.018;
-    const H_res = params.reservoirHead !== undefined ? params.reservoirHead : 100.0;
-    const Q0 = params.steadyFlowRate !== undefined ? params.steadyFlowRate : 0.15;
-    const Tc = params.valveClosureTime !== undefined ? params.valveClosureTime : 0.5;
-    const closureLaw = params.valveClosureLaw || 'linear';
-    const tMax = params.simulationDuration || 5.0;
-    const N = Math.max(4, params.reaches || 20);
-    const rho = params.fluidDensity || 998.2;
+  static solveTransientMOC(params) {
+    const required = [
+      'pipeLength',
+      'pipeDiameter',
+      'pipeWallThickness',
+      'darcyFrictionFactor',
+      'reservoirHead',
+      'steadyFlowRate',
+      'valveClosureTime',
+      'valveClosureLaw',
+      'simulationDuration',
+      'reaches',
+      'fluidDensity',
+      'fluidBulkModulus',
+      'pipeElasticModulus',
+      'restraintFactor'
+    ];
+    const missing = required.filter((name) => params?.[name] === undefined || params[name] === null);
+    if (missing.length) throw new TypeError(`solveTransientMOC requires explicit inputs: ${missing.join(', ')}.`);
+    if (params.surgeTank !== undefined) {
+      throw new TypeError('A surge-tank model is unavailable; no surge-tank calculation was run.');
+    }
+    const finiteNames = required.filter((name) => name !== 'valveClosureLaw' && name !== 'reaches');
+    const nonFinite = finiteNames.filter((name) => !Number.isFinite(params[name]));
+    if (nonFinite.length || !Number.isInteger(params.reaches) || params.reaches < 4) {
+      throw new TypeError(
+        `solveTransientMOC requires finite physical inputs and integer reaches >= 4${nonFinite.length ? `; invalid: ${nonFinite.join(', ')}` : ''}.`
+      );
+    }
+    const {
+      pipeLength: L,
+      pipeDiameter: D,
+      pipeWallThickness: e,
+      darcyFrictionFactor: f,
+      reservoirHead: H_res,
+      steadyFlowRate: Q0,
+      valveClosureTime: Tc,
+      valveClosureLaw: closureLaw,
+      simulationDuration: tMax,
+      reaches: N,
+      fluidDensity: rho,
+      fluidBulkModulus,
+      pipeElasticModulus,
+      restraintFactor
+    } = params;
+    if (
+      L <= 0 ||
+      D <= 0 ||
+      e <= 0 ||
+      e >= D / 2 ||
+      f < 0 ||
+      H_res <= 0 ||
+      Q0 < 0 ||
+      Tc <= 0 ||
+      tMax <= 0 ||
+      rho <= 0 ||
+      fluidBulkModulus <= 0 ||
+      pipeElasticModulus <= 0 ||
+      restraintFactor < 0 ||
+      !['instantaneous', 'linear', 's_curve'].includes(closureLaw)
+    ) {
+      throw new RangeError('Transient MOC inputs are outside the supported ranges.');
+    }
 
     const A = (Math.PI * D * D) / 4.0;
-    const waveSpeed = params.waveSpeed || this.calculateWaveSpeed({
+    const waveSpeed = this.calculateWaveSpeed({
       fluidDensity: rho,
-      fluidBulkModulus: params.fluidBulkModulus,
-      pipeElasticModulus: params.pipeElasticModulus,
+      fluidBulkModulus,
+      pipeElasticModulus,
       pipeInnerDiameter: D,
-      pipeWallThickness: e
+      pipeWallThickness: e,
+      restraintFactor
     });
 
     const dx = L / N;
     const dt = dx / waveSpeed; // Strict Courant condition Cr = 1.0
     const numTimeSteps = Math.ceil(tMax / dt);
+    if (!Number.isSafeInteger(numTimeSteps) || numTimeSteps > 1_000_000) {
+      throw new RangeError('Transient MOC request exceeds the 1,000,000-step work limit.');
+    }
 
     // MOC Coefficients:
     // B = a / (g * A)
@@ -123,7 +192,7 @@ class TransientWaterHammerSolver {
 
     for (let i = 0; i <= N; i++) {
       const x = i * dx;
-      const hFriction = (f * x / D) * ((v0 * v0) / (2.0 * GRAVITY));
+      const hFriction = ((f * x) / D) * ((v0 * v0) / (2.0 * GRAVITY));
       H_prev[i] = H_res - hFriction;
       Q_prev[i] = Q0;
     }
@@ -146,7 +215,7 @@ class TransientWaterHammerSolver {
         return 0.5 * (1.0 + Math.cos(Math.PI * s));
       }
       // Linear
-      return 1.0 - (t / Tc);
+      return 1.0 - t / Tc;
     };
 
     // Time-marching MOC
@@ -157,7 +226,6 @@ class TransientWaterHammerSolver {
       // Characteristic equation from Node 1 (C-):
       // H_0 = C_M + B * Q_0  ==>  Q_0 = (H_res - C_M) / B
       const CM_upstream = H_prev[1] - B * Q_prev[1] + R * Q_prev[1] * Math.abs(Q_prev[1]);
-      H_curr[0] = H_res;
       H_curr[0] = H_res;
       Q_curr[0] = (H_res - CM_upstream) / B;
 
@@ -206,13 +274,6 @@ class TransientWaterHammerSolver {
         H_curr[N] = CP_valve - B * Q_curr[N];
       }
 
-      // Air chamber cushioning attenuation if surge tank is attached at valve
-      if (params.surgeTank && params.surgeTank.volumeM3) {
-        const gamma = params.surgeTank.polytropicGamma || 1.2;
-        const dampingFactor = 0.72; // Polytropic gas compression cushion
-        H_curr[N] = H_curr[N] * (1.0 - dampingFactor) + H_prev[N] * dampingFactor;
-      }
-
       if (H_curr[N] > maxHeadObserved) {
         maxHeadObserved = H_curr[N];
         maxPressureLocationX = L;
@@ -233,35 +294,15 @@ class TransientWaterHammerSolver {
       }
     }
 
-    // ASME B31.3 / B31.4 Piping Code Structural Stress Verification
-    const designPressureBar = params.designPressureBar || 16.0; // Typical Class 150 rating
-    const designPressurePa = designPressureBar * 1e5;
-    const maxSurgePressurePa = (maxHeadObserved * rho * GRAVITY);
-    const maxSurgePressureBar = maxSurgePressurePa / 1e5;
-
-    // ASME B31.3 allows 133% of design pressure for occasional transient events
-    const allowableSurgePressureBar = designPressureBar * 1.33;
-    const overpressureRatio = maxSurgePressureBar / designPressureBar;
-
-    // Hoop stress: sigma_h = P * D / (2 * e)
-    const peakHoopStressMpa = (maxSurgePressurePa * D) / (2.0 * e * 1e6);
-    const pipeYieldStrengthMpa = params.pipeYieldStrengthMpa || 240.0; // ASTM A106 Grade B (240 MPa SMYS)
-    const allowableHoopStressMpa = pipeYieldStrengthMpa * 0.72 * 1.33; // 72% SMYS with 1.33 surge allowance
-
-    const codeCompliance = {
-      standard: 'ASME B31.3 / B31.4',
-      designPressureBar,
-      maxSurgePressureBar: Number(maxSurgePressureBar.toFixed(2)),
-      allowableSurgePressureBar: Number(allowableSurgePressureBar.toFixed(2)),
-      overpressureRatio: Number(overpressureRatio.toFixed(3)),
-      peakHoopStressMpa: Number(peakHoopStressMpa.toFixed(2)),
-      allowableHoopStressMpa: Number(allowableHoopStressMpa.toFixed(2)),
-      isCompliant: maxSurgePressureBar <= allowableSurgePressureBar && peakHoopStressMpa <= allowableHoopStressMpa,
-      cavitationRisk: minHeadObserved < -10.0 // Vapor pressure column separation limit (~ -10m water gauge)
-    };
+    const maxPressurePaEstimate = maxHeadObserved * rho * GRAVITY;
+    const peakHoopStressMpaEstimate = (maxPressurePaEstimate * D) / (2.0 * e * 1e6);
 
     return {
       success: true,
+      validationLevel: 'experimental',
+      screeningStatus: 'EXPERIMENTAL_ESTIMATE_ONLY',
+      model: 'simplified-1d-moc-example',
+      codeAssessment: 'NOT_PERFORMED',
       pipeLength: L,
       waveSpeed,
       courantNumber: 1.0,
@@ -271,9 +312,10 @@ class TransientWaterHammerSolver {
       initialDischarge: Q0,
       maxHeadObserved: Number(maxHeadObserved.toFixed(2)),
       minHeadObserved: Number(minHeadObserved.toFixed(2)),
+      maxPressureBarEstimate: Number((maxPressurePaEstimate / 1e5).toFixed(2)),
+      peakHoopStressMpaEstimate: Number(peakHoopStressMpaEstimate.toFixed(2)),
       maxPressureLocationX: Number(maxPressureLocationX.toFixed(2)),
       joukowskyTheoreticalMaxHead: this.joukowskySurge(waveSpeed, v0, rho).surgeHeadM,
-      codeCompliance,
       valveTelemetry: {
         timeHistory,
         headHistory: H_at_valve,

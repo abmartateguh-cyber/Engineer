@@ -1,16 +1,35 @@
 /**
- * OmniEng Vapor-Liquid Equilibrium (VLE) Phase Envelope & Fractionation Column Profiler
- * Generates Peng-Robinson P-T Phase Envelopes and Tray-by-Tray Distillation Column Profiles.
- * Parity with Aspen HYSYS & Pro/II.
+ * Experimental Wilson/Rachford-Rice phase-envelope estimate.
+ * Distillation tray data is unavailable until a sourced assay and independently reviewed
+ * column model are configured.
  */
 
 const { ThermodynamicsEngine } = require('./thermodynamics');
 
 class VLEPhaseEnvelopeEngine {
   /**
-   * Generates a Pressure-Temperature (P-T) Phase Envelope for a multi-component hydrocarbon mixture.
+   * Generates a range-limited P-T estimate using Wilson K-values and Rachford-Rice.
+   * This is not a Peng-Robinson fugacity calculation or an independently validated result.
    */
-  static generatePTEnvelope(composition = { Methane: 0.2, Propane: 0.5, nPentane: 0.3 }, pMinBar = 1.0, pMaxBar = 60.0, points = 25) {
+  static generatePTEnvelope(composition, pMinBar, pMaxBar, points, componentProperties) {
+    if (
+      !composition ||
+      typeof composition !== 'object' ||
+      Array.isArray(composition) ||
+      Object.keys(composition).length === 0
+    ) {
+      throw new TypeError('An explicit non-empty component composition is required.');
+    }
+    if (!Number.isFinite(pMinBar) || !Number.isFinite(pMaxBar) || pMinBar <= 0 || pMaxBar <= pMinBar) {
+      throw new RangeError('Explicit pressure bounds must be finite, positive, and increasing in bar.');
+    }
+    if (!Number.isInteger(points) || points < 2 || points > 1000) {
+      throw new RangeError('An explicit point count from 2 through 1000 is required.');
+    }
+    if (!componentProperties || typeof componentProperties !== 'object' || Array.isArray(componentProperties)) {
+      throw new TypeError('Explicit component property records with source and license provenance are required.');
+    }
+
     const envelope = [];
     const logPMin = Math.log10(pMinBar);
     const logPMax = Math.log10(pMaxBar);
@@ -18,12 +37,8 @@ class VLEPhaseEnvelopeEngine {
 
     for (let i = 0; i < points; i++) {
       const pBar = Math.pow(10, logPMin + i * step);
-
-      // Bubble point temperature (vapor fraction beta = 0.0)
-      const tBubble = this._findSaturationTemp(composition, pBar, 0.001);
-
-      // Dew point temperature (vapor fraction beta = 1.0)
-      const tDew = this._findSaturationTemp(composition, pBar, 0.999);
+      const tBubble = this._findSaturationTemp(composition, pBar, 0.001, componentProperties);
+      const tDew = this._findSaturationTemp(composition, pBar, 0.999, componentProperties);
 
       envelope.push({
         pressureBar: Number(pBar.toFixed(2)),
@@ -33,87 +48,44 @@ class VLEPhaseEnvelopeEngine {
       });
     }
 
-    // Critical Point approximation
-    const cricondenbar = Math.max(...envelope.map(e => e.pressureBar));
-    const cricondentherm = Math.max(...envelope.map(e => e.dewPointTempC));
-
     return {
-      composition,
-      criticalPoint: {
-        estimatedTc_C: Number((cricondentherm * 0.92).toFixed(1)),
-        estimatedPc_Bar: Number((cricondenbar * 0.96).toFixed(1))
-      },
-      cricondenbar_Bar: cricondenbar,
-      cricondentherm_C: cricondentherm,
+      status: 'experimental-estimate',
+      validationLevel: 'experimental',
+      dataStatus: 'caller-supplied-unverified-data',
+      model: 'Wilson K-value estimates with bisection on Rachford-Rice; not a Peng-Robinson fugacity EOS',
+      warnings: [
+        'No independent phase-equilibrium reference is configured.',
+        'Critical-point properties are not calculated.',
+        'The bounded temperature search does not report a bracket or convergence diagnostic.'
+      ],
+      composition: { ...composition },
+      componentProperties,
+      sampledPressureMaxBar: Math.max(...envelope.map((point) => point.pressureBar)),
+      sampledDewPointMaxC: Math.max(...envelope.map((point) => point.dewPointTempC)),
       points: envelope
     };
   }
 
-  /**
-   * Calculates detailed tray-by-tray hydraulic and thermal profile for an atmospheric crude tower.
-   */
-  static generateColumnTrayProfile(trayCount = 30, feedTray = 22, feedBPD = 50000) {
-    const trays = [];
-    const overheadTempC = 110.0;
-    const bottomsTempC = 360.0;
-    const overheadPressureBar = 1.8;
-    const bottomsPressureBar = 3.2;
-
-    for (let j = 1; j <= trayCount; j++) {
-      // Non-linear column temperature profile (S-curve distribution)
-      const normHeight = (j - 1) / (trayCount - 1);
-      const tempC = overheadTempC + (bottomsTempC - overheadTempC) * Math.pow(normHeight, 1.4);
-      const pressureBar = overheadPressureBar + (bottomsPressureBar - overheadPressureBar) * normHeight;
-
-      // Product cut composition distribution
-      // Overhead Trays (1-8): Naphtha rich
-      // Middle Trays (9-18): Kerosene rich
-      // Lower Trays (19-27): Diesel rich
-      // Bottom Trays (28-30): Atmospheric residue
-      let naphthaMolePct = Math.max(0, 95.0 * Math.exp(-normHeight * 6.0));
-      let keroseneMolePct = Math.max(0, 80.0 * Math.exp(-Math.pow((normHeight - 0.45) * 4.5, 2)));
-      let dieselMolePct = Math.max(0, 85.0 * Math.exp(-Math.pow((normHeight - 0.75) * 5.0, 2)));
-      let residueMolePct = Math.max(0, 100.0 * Math.pow(normHeight, 3.5));
-
-      const sum = naphthaMolePct + keroseneMolePct + dieselMolePct + residueMolePct;
-      naphthaMolePct = Number(((naphthaMolePct / sum) * 100).toFixed(1));
-      keroseneMolePct = Number(((keroseneMolePct / sum) * 100).toFixed(1));
-      dieselMolePct = Number(((dieselMolePct / sum) * 100).toFixed(1));
-      residueMolePct = Number(((residueMolePct / sum) * 100).toFixed(1));
-
-      trays.push({
-        trayIndex: j,
-        trayRole: j === 1 ? 'Overhead Condenser Collector' : j === feedTray ? 'Crude Flash Zone Feed' : j === trayCount ? 'Bottoms Reboiler Sump' : 'Fractionation Stage',
-        temperatureC: Number(tempC.toFixed(1)),
-        pressureBar: Number(pressureBar.toFixed(2)),
-        liquidFlowM3h: Number((feedBPD * 0.0066 * (1.1 - normHeight * 0.3)).toFixed(1)),
-        vaporFlowM3h: Number((feedBPD * 0.0066 * (0.8 + (1.0 - normHeight) * 0.4)).toFixed(1)),
-        liquidCompositionMolPct: {
-          naphtha: naphthaMolePct,
-          kerosene: keroseneMolePct,
-          diesel: dieselMolePct,
-          residue: residueMolePct
-        }
-      });
-    }
-
+  /** Legacy API retained while fabricated tray profiles are withdrawn. */
+  static generateColumnTrayProfile() {
     return {
-      towerTag: 'V-101 Atmospheric Crude Column',
-      trayCount,
-      feedTray,
-      feedBPD,
-      overheadTempC,
-      bottomsTempC,
-      trays
+      success: false,
+      status: 'unavailable',
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message:
+          'Column profiles are unavailable until a sourced crude assay, reviewed column model, and independent reference are configured.'
+      }
     };
   }
 
-  static _findSaturationTemp(composition, pBar, targetBeta) {
+  static _findSaturationTemp(composition, pBar, targetBeta, componentProperties) {
     let tLow = -40.0;
     let tHigh = 160.0;
     for (let iter = 0; iter < 15; iter++) {
       const tMid = (tLow + tHigh) / 2;
-      const flash = ThermodynamicsEngine.flashVLE(composition, tMid, pBar);
+      const flash = ThermodynamicsEngine.flashVLE(composition, tMid, pBar, componentProperties);
       if (flash.vaporFraction > targetBeta) {
         tHigh = tMid;
       } else {

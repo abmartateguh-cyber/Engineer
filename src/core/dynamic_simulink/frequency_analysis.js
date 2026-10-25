@@ -1,7 +1,7 @@
 /**
  * OmniEng Control Systems Frequency Response & Bode Plot Analyzer
  * Calculates G(jω) frequency response, Gain Margin, Phase Margin, and stability metrics.
- * Parity with MATLAB Control System Toolbox (bode, margin, nyquist).
+ * Experimental workflow related to MATLAB Control System Toolbox (bode, margin, nyquist).
  */
 
 class FrequencyResponseAnalyzer {
@@ -9,7 +9,29 @@ class FrequencyResponseAnalyzer {
    * Computes Bode plot frequency response for transfer function:
    * G(s) = (num_k * s^k + ... + num_0) / (den_n * s^n + ... + den_0)
    */
-  static computeBode(numCoeffs = [1.0], denCoeffs = [1.0, 2.0, 1.0], omegaMin = 0.01, omegaMax = 100.0, points = 60) {
+  static computeBode(numCoeffs, denCoeffs, omegaMin, omegaMax, points) {
+    if (
+      !Array.isArray(numCoeffs) ||
+      numCoeffs.length === 0 ||
+      numCoeffs.length > 500 ||
+      !Array.isArray(denCoeffs) ||
+      denCoeffs.length === 0 ||
+      denCoeffs.length > 500 ||
+      !numCoeffs.every(Number.isFinite) ||
+      !denCoeffs.every(Number.isFinite) ||
+      denCoeffs[0] === 0 ||
+      !Number.isFinite(omegaMin) ||
+      omegaMin <= 0 ||
+      !Number.isFinite(omegaMax) ||
+      omegaMax <= omegaMin ||
+      !Number.isInteger(points) ||
+      points < 2 ||
+      points > 10000
+    ) {
+      throw new TypeError(
+        'computeBode requires finite numerator and nonzero-leading denominator coefficients, positive ordered frequencies, and 2–10000 sample points.'
+      );
+    }
     const frequencies = [];
     const logMin = Math.log10(omegaMin);
     const logMax = Math.log10(omegaMax);
@@ -35,6 +57,9 @@ class FrequencyResponseAnalyzer {
 
       // Complex division: (Nr + j Ni) / (Dr + j Di)
       const denMagSq = denEval.real * denEval.real + denEval.imag * denEval.imag;
+      if (!Number.isFinite(denMagSq) || denMagSq <= 0) {
+        throw new RangeError(`Transfer-function denominator is singular at ${w} rad/s.`);
+      }
       const realG = (numEval.real * denEval.real + numEval.imag * denEval.imag) / denMagSq;
       const imagG = (numEval.imag * denEval.real - numEval.real * denEval.imag) / denMagSq;
 
@@ -74,20 +99,15 @@ class FrequencyResponseAnalyzer {
       });
     }
 
-    // Default stability assessment
-    const isStable = (phaseMarginDeg !== null && phaseMarginDeg > 0) || (gainMarginDb !== null && gainMarginDb > 0);
-
     return {
+      validationLevel: 'experimental',
       numCoeffs,
       denCoeffs,
-      gainCrossoverFreq: gainCrossoverFreq ? Number(gainCrossoverFreq.toFixed(3)) : 'None (No 0dB crossing)',
-      phaseMarginDeg: phaseMarginDeg !== null ? phaseMarginDeg : '> 90° (Highly Stable)',
-      phaseCrossoverFreq: phaseCrossoverFreq ? Number(phaseCrossoverFreq.toFixed(3)) : 'None (Phase > -180°)',
-      gainMarginDb: gainMarginDb !== null ? gainMarginDb : '+Infinity dB (Unconditionally Stable)',
-      isStable,
-      stabilityVerdict: isStable
-        ? `STABLE (Phase Margin: ${phaseMarginDeg !== null ? phaseMarginDeg + '°' : '>90°'})`
-        : 'UNSTABLE — Phase Margin < 0° (Oscillatory / Divergent)',
+      gainCrossoverFreq: gainCrossoverFreq === null ? null : Number(gainCrossoverFreq.toFixed(3)),
+      phaseMarginDeg,
+      phaseCrossoverFreq: phaseCrossoverFreq === null ? null : Number(phaseCrossoverFreq.toFixed(3)),
+      gainMarginDb,
+      marginAssessment: 'NOT_PERFORMED',
       bodePoints: response
     };
   }

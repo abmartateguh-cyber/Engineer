@@ -1,7 +1,7 @@
 /**
  * OmniEng TEMA Shell & Tube Heat Exchanger Rating Engine
  * Standard: TEMA Class R/C/B & Bell-Delaware LMTD Method
- * Industrial Parity: Aspen EDR / HTRI Xchanger Suite thermal rating.
+ * Experimental implementation: Aspen EDR / HTRI Xchanger Suite thermal rating.
  */
 
 class HeatExchangerTEMA {

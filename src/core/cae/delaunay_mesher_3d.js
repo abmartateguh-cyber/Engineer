@@ -1,9 +1,8 @@
 /**
- * OmniEng 3D Native Delaunay & Advancing-Front Tetrahedral Mesher
- * Generates constrained 3D volume meshes (TET4 & TET10) from B-Rep boundary surfaces
- * with curvature-adaptive sizing, boundary layer inflation, and ISO/NAFEMS quality metrics.
+ * Experimental tetrahedral mesh generation utilities.
+ * Mesh output and quality estimates are not independently validated against ISO or NAFEMS criteria.
  * 
- * 100% Proprietary In-House Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { PrismLayerMesher } = require('./prism_layer_mesher');

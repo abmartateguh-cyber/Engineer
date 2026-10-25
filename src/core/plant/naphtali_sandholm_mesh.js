@@ -1,17 +1,8 @@
 /**
- * OmniEng Naphtali-Sandholm Simultaneous MESH Distillation Column Solver & ASME B31.3 Water Hammer MOC
- * 
- * Provides:
- * 1. Naphtali-Sandholm Simultaneous MESH Column Solver:
- *    - Material (M), Equilibrium (E), Summation (S), and Heat (H) non-linear system.
- *    - Block Tridiagonal Jacobian assembly with block Thomas algorithm O(N) inversion.
- *    - Multi-component hydrocarbon & petrochemical fractionation with rapid quadratic convergence.
- * 2. ASME B31.3 Dynamic Piping Water Hammer & Acoustic Wave Solver (Method of Characteristics):
- *    - Elastic wavespeed evaluation in pipe walls.
- *    - Joukowsky transient peak pressure surge & reflection.
- *    - MOC space-time characteristic grid with Darcy-Weisbach friction wave damping.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental process-model and water-hammer example routines.
+ *
+ * These simplified calculations have not been independently validated. They do
+ * not establish process-model accuracy or piping-code compliance.
  */
 
 'use strict';
@@ -233,7 +224,8 @@ class NaphtaliSandholmColumnSolver {
 
 class WaterHammerMOC {
   /**
-   * Unified solve method for ASME B31.3 Method of Characteristics water hammer analysis.
+   * Runs a simplified experimental water-hammer example.
+   * No piping-code assessment or allowable-stress decision is made.
    */
   static solve(options = {}) {
     const D = options.innerDiameterM || options.pipeDiameterM || 0.150;
@@ -272,16 +264,17 @@ class WaterHammerMOC {
     });
 
     return {
+      validationLevel: 'experimental',
+      screeningStatus: 'EXPERIMENTAL_ESTIMATE_ONLY',
+      model: 'simplified-1d-moc-example',
+      codeAssessment: 'NOT_PERFORMED',
       waveSpeedMps,
       joukowskyDeltaP_Pa: surge.pressureSurgePa,
       headSurgeM: surge.headSurgeM,
       steadyPressurePa: P0,
       maxPressurePa: P0 + surge.pressureSurgePa,
       peakPressureMocBar: mocRes.peakPressureBar,
-      pipeHoopStressMPa: mocRes.pipeHoopStressMPa,
-      asmeAllowableStressMPa: mocRes.asmeAllowableStressMPa,
-      safetyFactor: mocRes.safetyFactor,
-      passedAsmeB31_3: mocRes.passedAsmeB31_3,
+      pipeHoopStressEstimateMPa: mocRes.pipeHoopStressEstimateMPa,
       history: mocRes.history
     };
   }
@@ -337,7 +330,7 @@ class WaterHammerMOC {
    * @param {number} [options.closureTimeSec=0.2]
    * @param {number} [options.frictionFactor=0.018]
    * @param {number} [options.totalTimeSec=2.0]
-   * @returns {Object} MOC pressure waveform and ASME B31.3 stress evaluation
+   * @returns {Object} Experimental MOC pressure estimates and sampled history
    */
   static simulateMOC(options = {}) {
     const L = options.pipeLengthM || 500.0;
@@ -421,20 +414,17 @@ class WaterHammerMOC {
       }
     }
 
-    // ASME B31.3 Hoop Stress Verification
-    // Allowable stress for ASTM A106 Grade B at 20C is Sh = 138 MPa (20,000 psi)
-    const Sh_allowable = 138.0e6; // Pa
+    // Thin-wall hoop-stress estimate using the supplied illustrative geometry.
     const hoopStress = (maxPressurePa * D) / (2.0 * t_wall);
-    const safetyFactor = Sh_allowable / hoopStress;
 
     return {
+      validationLevel: 'experimental',
+      screeningStatus: 'EXPERIMENTAL_ESTIMATE_ONLY',
+      codeAssessment: 'NOT_PERFORMED',
       waveSpeedMs: Number(a.toFixed(1)),
       joukowskySurgeBar: Number((this.computeJoukowskySurge(rho, a, v0).pressureSurgePa / 1e5).toFixed(2)),
       peakPressureBar: Number((maxPressurePa / 1e5).toFixed(2)),
-      pipeHoopStressMPa: Number((hoopStress / 1e6).toFixed(2)),
-      asmeAllowableStressMPa: Number((Sh_allowable / 1e6).toFixed(2)),
-      safetyFactor: Number(safetyFactor.toFixed(2)),
-      passedAsmeB31_3: safetyFactor >= 1.0,
+      pipeHoopStressEstimateMPa: Number((hoopStress / 1e6).toFixed(2)),
       timeStepSec: Number(dt.toFixed(5)),
       history: valvePressureHistory
     };

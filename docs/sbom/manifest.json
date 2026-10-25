@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-10-24T00:03:57.434Z",
+  "command": "npm sbom --package-lock-only --sbom-format <cyclonedx|spdx>",
+  "packageLockSha256": "587084e6f4689a2caafe143f49a00fca8fff4cd436f91edb7f70bc52e0d93a9f",
+  "formats": [
+    "CycloneDX",
+    "SPDX"
+  ],
+  "dependencyReview": "SBOM generation does not constitute manual license or provenance approval."
+}

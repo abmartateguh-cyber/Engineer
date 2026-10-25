@@ -1,43 +1,54 @@
 /**
- * OmniEng Explicit Dynamics Phone Drop-Test Simulator (Ansys Mechanical Equivalent)
- * Solves high-speed transient impact onto hard surfaces using central difference explicit time-stepping.
+ * Simplified experimental handset impact example.
+ *
+ * Contact and stress assumptions are illustrative. This is not a validated
+ * product drop test, material failure assessment, or commercial solver result.
  */
 
 class DropTestSimulator {
   /**
-   * Run explicit dynamic drop simulation
+   * Run a simplified impact estimate with bundled contact assumptions
    * @param {Object} options Configuration parameters
-   */
+  */
   static runSimulation(options = {}) {
-    const {
-      dropHeight = 1.5, // meters
-      phoneMass = 0.205, // kg (e.g. 205g iPhone / Galaxy)
-      impactAngle = 'corner', // 'face', 'edge', 'corner'
-      chassisMaterial = { name: 'Titanium Grade 5', yieldStress: 880e6, E: 114e9 },
-      screenMaterial = { name: 'Aluminosilicate Glass', fractureStress: 140e6, E: 72e9 },
-      totalTime = 0.003, // 3 milliseconds duration
-      dt = 1e-6 // 1 microsecond time step
-    } = options;
+    const { dropHeight, phoneMass, impactAngle } = options;
+    if (!Number.isFinite(dropHeight) || dropHeight <= 0 ||
+        !Number.isFinite(phoneMass) || phoneMass <= 0 ||
+        !['corner', 'edge', 'face'].includes(impactAngle)) {
+      throw new TypeError('DropTestSimulator requires dropHeight in meters, phoneMass in kilograms, and impactAngle (corner, edge, or face).');
+    }
+
+    const totalTime = 0.003;
+    const dt = 1e-6;
 
     const g = 9.80665;
     // Impact velocity v = sqrt(2 * g * h)
     const impactVelocity = Math.sqrt(2 * g * dropHeight); // ~5.42 m/s for 1.5m
 
-    // Effective contact stiffness based on orientation
-    let contactStiffness = 5e7; // N/m
-    let contactArea = 0.0001; // m^2
-    if (impactAngle === 'corner') {
-      contactStiffness = 2.5e7;
-      contactArea = 0.00002;
-    } else if (impactAngle === 'edge') {
-      contactStiffness = 8.0e7;
-      contactArea = 0.0002;
-    } else if (impactAngle === 'face') {
-      contactStiffness = 2.5e8;
-      contactArea = 0.012;
-    }
+    // Illustrative contact-force coefficient and area selected by orientation.
+    const contactPropertiesByAngle = {
+      corner: { contactStiffness: 2.5e7, contactArea: 0.00002 },
+      edge: { contactStiffness: 8.0e7, contactArea: 0.0002 },
+      face: { contactStiffness: 2.5e8, contactArea: 0.012 }
+    };
+    const { contactStiffness, contactArea } = contactPropertiesByAngle[impactAngle];
 
     const dampingCoeff = 2 * 0.08 * Math.sqrt(contactStiffness * phoneMass);
+    const modelAssumptions = {
+      contactForceCoefficientNPerMPow1_2: contactStiffness,
+      contactAreaM2: contactArea,
+      dampingCoefficientNsPerM: dampingCoeff,
+      dampingRatio: 0.08,
+      contactForceExponent: 1.2,
+      chassisAreaScaleFactor: 1.5,
+      chassisStressScaleFactor: 0.45,
+      screenAreaScaleFactor: 2.0,
+      screenStressScaleFactor: 0.28,
+      gravityMPerS2: g,
+      integrationMethod: 'explicit-central-difference',
+      integrationDurationS: totalTime,
+      integrationStepS: dt
+    };
 
     // Initial conditions at impact (t = 0)
     let z = 0; // penetration into contact plane
@@ -50,7 +61,6 @@ class DropTestSimulator {
     let peakDeceleration = 0;
     let peakChassisStress = 0;
     let peakScreenStress = 0;
-    let glassCrackDetected = false;
 
     for (let step = 0; step < timeSteps; step++) {
       const t = step * dt;
@@ -58,7 +68,7 @@ class DropTestSimulator {
       // Contact force calculation
       let fContact = 0;
       if (z > 0) {
-        // Hertzian contact with damping
+        // Illustrative nonlinear contact force with damping
         fContact = contactStiffness * Math.pow(z, 1.2) + dampingCoeff * vz;
         if (fContact < 0) fContact = 0;
       }
@@ -75,17 +85,13 @@ class DropTestSimulator {
       if (decelerationG > peakDeceleration) peakDeceleration = decelerationG;
       if (fContact > peakForce) peakForce = fContact;
 
-      // Stress propagation through internal structure
+      // Illustrative stress-like scalars from assumed contact areas and scale factors.
       const dynamicForce = fContact;
-      const chassisStress = (dynamicForce / (contactArea * 1.5)) * 0.45;
-      const screenStress = (dynamicForce / (contactArea * 2.0)) * 0.28;
+      const chassisStress = (dynamicForce / (contactArea * modelAssumptions.chassisAreaScaleFactor)) * modelAssumptions.chassisStressScaleFactor;
+      const screenStress = (dynamicForce / (contactArea * modelAssumptions.screenAreaScaleFactor)) * modelAssumptions.screenStressScaleFactor;
 
       if (chassisStress > peakChassisStress) peakChassisStress = chassisStress;
       if (screenStress > peakScreenStress) peakScreenStress = screenStress;
-
-      if (screenStress > screenMaterial.fractureStress) {
-        glassCrackDetected = true;
-      }
 
       // Record sample points (every 20 steps to avoid memory explosion)
       if (step % 20 === 0) {
@@ -106,17 +112,22 @@ class DropTestSimulator {
     }
 
     return {
+      validationLevel: 'experimental',
+      screeningStatus: 'EXPERIMENTAL_ESTIMATE_ONLY',
+      model: 'simplified-single-degree-of-freedom-impact-example',
+      status: 'EXPERIMENTAL_ESTIMATE_ONLY',
+      inputs: {
+        dropHeightM: dropHeight,
+        phoneMassKg: phoneMass,
+        impactAngle
+      },
+      modelAssumptions,
       dropHeight,
       impactVelocity: +impactVelocity.toFixed(2),
       peakForce_N: +peakForce.toFixed(1),
       peakDeceleration_G: +peakDeceleration.toFixed(1),
       peakChassisStress_MPa: +(peakChassisStress / 1e6).toFixed(1),
-      chassisYieldStress_MPa: +(chassisMaterial.yieldStress / 1e6).toFixed(1),
-      chassisPermanentDeformation: peakChassisStress > chassisMaterial.yieldStress,
       peakScreenStress_MPa: +(peakScreenStress / 1e6).toFixed(1),
-      screenFractureStress_MPa: +(screenMaterial.fractureStress / 1e6).toFixed(1),
-      glassCrackDetected,
-      status: glassCrackDetected ? 'FAIL (Glass Shattered)' : (peakChassisStress > chassisMaterial.yieldStress ? 'WARNING (Plastic Deformation)' : 'PASS (Survived Unscathed)'),
       timeHistory
     };
   }

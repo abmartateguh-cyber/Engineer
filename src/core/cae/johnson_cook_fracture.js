@@ -1,7 +1,7 @@
 /**
  * OmniEng Johnson-Cook Dynamic Fracture & High-Strain-Rate Failure Engine
  * Standard: Johnson-Cook Failure Model (1985)
- * Industrial Parity: LS-DYNA MAT_015 / Ansys Explicit AUTODYN dynamic impact failure.
+ * Experimental implementation: LS-DYNA MAT_015 / Ansys Explicit AUTODYN dynamic impact failure.
  */
 
 class JohnsonCookFracture {

@@ -1,12 +1,12 @@
 /**
- * OmniEng Non-Ideal Liquid Phase Activity Coefficient Models
+ * Experimental non-ideal liquid phase activity-coefficient examples
  * 
- * Implements Aspen HYSYS / Aspen Plus Parity for polar and azeotropic chemical systems:
+ * Implements simple binary examples for polar and azeotropic chemical systems:
  * 1. NRTL (Non-Random Two-Liquid): Renon & Prausnitz (1968) formulation
  * 2. UNIQUAC (Universal Quasi-Chemical): Combinatorial & Residual formulation
  * 3. Vapor-Liquid Equilibrium (VLE) bubble-point pressure & azeotrope locator
  * 
- * Validated against published NIST ethanol-water benchmark data (Azeotrope at 1 atm: 78.15°C, x_ethanol = 0.894).
+ * The embedded parameters have not been sourced or independently validated; they are not benchmark data.
  */
 
 class ActivityCoefficientModels {

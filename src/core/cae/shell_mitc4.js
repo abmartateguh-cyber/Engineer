@@ -1,13 +1,13 @@
 /**
  * OmniEng MITC4 Shell Element (Mixed Interpolation of Tensorial Components)
  * 
- * Provides locking-free structural shell analysis matching Abaqus (S4/S4R) and ANSYS (SHELL181):
+ * Experimental MITC4-style shell element calculation:
  * 1. Mindlin-Reissner first-order shear deformation plate theory with thickness t.
  * 2. 6 DOFs per node: [u, v, w, theta_x, theta_y, theta_z] including fictitious drilling stiffness.
  * 3. Covariant projection of transverse shear strain tensor components (gamma_rz, gamma_sz)
- *    evaluated at mid-side tying points A, B, C, D, eliminating shear locking as t/L -> 0.
+ *    evaluated at mid-side tying points A, B, C, D.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent shell-element validation or shear-locking study is included.
  */
 
 'use strict';

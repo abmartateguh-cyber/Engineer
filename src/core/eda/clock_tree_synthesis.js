@@ -2,8 +2,8 @@
  * OmniEng Clock Tree Synthesis (CTS), Multi-Layer Maze Routing & BSIM4 Compact Model Engine
  * Implements H-tree & MMM clock synthesis, PathFinder negotiated congestion A* routing,
  * and BSIM4 MOSFET velocity saturation / DIBL non-linear SPICE compact modeling.
- * 
- * 100% Proprietary In-House Implementation - Zero External Dependencies.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class ClockSink {
@@ -67,9 +67,11 @@ class ClockTreeSynthesizer {
     };
   }
 
-  static synthesizeHTree(sinks, rootPos) {
-    const cts = new ClockTreeSynthesizer();
-    const sinkObjects = sinks.map((s, i) => (s instanceof ClockSink ? s : new ClockSink(s.id || i, s.x, s.y, (s.capPf || (s.capFf ? s.capFf * 1e-3 : 0.012)))));
+  static synthesizeHTree(sinks, rootPos, options = {}) {
+    const cts = new ClockTreeSynthesizer(options);
+    const sinkObjects = sinks.map((s, i) =>
+      s instanceof ClockSink ? s : new ClockSink(s.id || i, s.x, s.y, s.capPf || (s.capFf ? s.capFf * 1e-3 : 0.012))
+    );
     const res = cts.synthesizeClockTree(sinkObjects);
     return {
       type: 'H-Tree',
@@ -107,8 +109,11 @@ class ClockTreeSynthesizer {
     const distLeft = Math.abs(meanX - leftChild.x) + Math.abs(meanY - leftChild.y);
     const distRight = Math.abs(meanX - rightChild.x) + Math.abs(meanY - rightChild.y);
 
-    leftChild.delayNs = this.bufferDelayNs + (distLeft * this.wireResistancePerUm) * (distLeft * this.wireCapacitancePerUmPf * 0.5) * 1e-3;
-    rightChild.delayNs = this.bufferDelayNs + (distRight * this.wireResistancePerUm) * (distRight * this.wireCapacitancePerUmPf * 0.5) * 1e-3;
+    leftChild.delayNs =
+      this.bufferDelayNs + distLeft * this.wireResistancePerUm * (distLeft * this.wireCapacitancePerUmPf * 0.5) * 1e-3;
+    rightChild.delayNs =
+      this.bufferDelayNs +
+      distRight * this.wireResistancePerUm * (distRight * this.wireCapacitancePerUmPf * 0.5) * 1e-3;
 
     node.children = [leftChild, rightChild];
     return node;
@@ -128,7 +133,7 @@ class ClockTreeSynthesizer {
 
   _getTreeDepth(node) {
     if (!node || node.children.length === 0) return 1;
-    return 1 + Math.max(...node.children.map(c => this._getTreeDepth(c)));
+    return 1 + Math.max(...node.children.map((c) => this._getTreeDepth(c)));
   }
 
   _countBuffers(node) {
@@ -168,7 +173,9 @@ class MazeRouterPathFinder {
    * Routes a net between (x1, y1) on startLayer and (x2, y2) on targetLayer
    */
   routeNet(netIdOrP1, x1OrP2, y1, l1, x2, y2, l2, maxRipupIterations = 3) {
-    let p1, p2, netId = 'net_0';
+    let p1,
+      p2,
+      netId = 'net_0';
     if (typeof netIdOrP1 === 'object') {
       p1 = netIdOrP1;
       p2 = x1OrP2;
@@ -284,14 +291,14 @@ class BSIM4MosfetModel {
       type = String(typeOrOptions).toUpperCase();
     }
     this.type = type; // 'NMOS' or 'PMOS'
-    this.W = params.W || 1.0e-6; // Width 1 um
-    this.L = params.L || 0.13e-6; // Length 130 nm
-    this.tox = params.tox || 2.5e-9; // Gate oxide thickness 2.5 nm
-    this.Vth0 = params.Vth0 || (type === 'NMOS' ? 0.42 : -0.42); // Threshold voltage (V)
-    this.mu0 = params.mu0 || (type === 'NMOS' ? 0.045 : 0.018); // Low-field mobility m^2/(V*s)
-    this.vsat = params.vsat || 1.0e5; // Velocity saturation (m/s)
-    this.dibl_eta = params.dibl_eta || 0.06; // DIBL coefficient
-    this.lambda = params.lambda || 0.04; // Channel length modulation (1/V)
+    this.W = params.W ?? 1.0e-6; // Width 1 um
+    this.L = params.L ?? 0.13e-6; // Length 130 nm
+    this.tox = params.tox ?? 2.5e-9; // Gate oxide thickness 2.5 nm
+    this.Vth0 = params.Vth0 ?? (type === 'NMOS' ? 0.42 : -0.42); // Threshold voltage (V)
+    this.mu0 = params.mu0 ?? (type === 'NMOS' ? 0.045 : 0.018); // Low-field mobility m^2/(V*s)
+    this.vsat = params.vsat ?? 1.0e5; // Velocity saturation (m/s)
+    this.dibl_eta = params.dibl_eta ?? 0.06; // DIBL coefficient
+    this.lambda = params.lambda ?? 0.04; // Channel length modulation (1/V)
     this.epsOx = 3.9 * 8.854e-12; // SiO2 permittivity
     this.Cox = this.epsOx / this.tox; // Oxide capacitance F/m^2
   }
@@ -336,32 +343,34 @@ class BSIM4MosfetModel {
     if (vds < Vdsat) {
       // Linear regime with velocity degradation
       const denom = 1.0 + vds / EsatL;
-      Ids = beta * ((Vov - 0.5 * vds) * vds) / denom;
+      Ids = (beta * ((Vov - 0.5 * vds) * vds)) / denom;
     } else {
       // Saturation regime with channel length modulation (CLM)
       const denom = 1.0 + Vdsat / EsatL;
-      Ids = beta * ((Vov - 0.5 * Vdsat) * Vdsat) / denom;
-      Ids *= (1.0 + this.lambda * (vds - Vdsat));
+      Ids = (beta * ((Vov - 0.5 * Vdsat) * Vdsat)) / denom;
+      Ids *= 1.0 + this.lambda * (vds - Vdsat);
     }
 
     return isN ? Ids : -Ids;
   }
 
   static solveInverterVTC(nmos, pmos, Vdd = 1.2, steps = 30) {
-    return nmos.evaluateInverterVTC(Vdd, steps);
+    return nmos.evaluateInverterVTC(Vdd, steps, pmos);
   }
 
   /**
    * Evaluates CMOS Inverter Voltage Transfer Characteristic (VTC)
    */
-  evaluateInverterVTC(Vdd = 1.2, steps = 30) {
-    const pmos = new BSIM4MosfetModel('PMOS', { W: this.W * 2.5, L: this.L });
+  evaluateInverterVTC(Vdd = 1.2, steps = 30, pmosModel = null) {
+    const pmos = pmosModel || new BSIM4MosfetModel('PMOS', { W: this.W * 2.5, L: this.L });
     const curve = [];
 
     for (let i = 0; i <= steps; i++) {
       const Vin = (i / steps) * Vdd;
       // Bisection solve for Vout such that I_nmos(Vin, Vout) + I_pmos(Vin - Vdd, Vout - Vdd) = 0
-      let low = 0.0, high = Vdd, Vout = Vdd / 2;
+      let low = 0.0,
+        high = Vdd,
+        Vout = Vdd / 2;
       for (let iter = 0; iter < 20; iter++) {
         Vout = (low + high) / 2;
         const inmos = this.evaluateCurrent(Vin, Vout);

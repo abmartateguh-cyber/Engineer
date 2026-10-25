@@ -4,11 +4,11 @@
  * Provides automated distillation curve interconversion (ASTM D86, D1160, D2887 to TBP),
  * probability density spline fitting, Watson Kw characterization, and continuous
  * splitting into discrete pseudo-components with thermodynamic critical properties
- * (Tb, SG, MW, Tc, Pc, omega) for Aspen HYSYS / Aspen Plus parity.
+ * (Tb, SG, MW, Tc, Pc, omega) for Aspen HYSYS / Aspen Plus Experimental workflow.
  * 
- * Parity standard: Aspen HYSYS Oil Characterization & Petroleum Assay Manager.
+ * Unverified comparison target: Aspen HYSYS Oil Characterization & Petroleum Assay Manager.
  * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

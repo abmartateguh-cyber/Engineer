@@ -1,407 +1,172 @@
+'use strict';
+
 /**
- * OmniEng Commercial Optical Glass Catalog & Dispersion Engine
- * 
- * Provides an offline database of 500+ commercial optical glasses from premier
- * manufacturers (Schott, Ohara, CDGM, Hoya, Corning) with high-precision Sellmeier
- * and Laurent dispersion equations, thermal dn/dT, internal transmission,
- * Abbe diagram mapping, and substitute glass search.
- * 
- * Parity standard: Zemax Glass Catalog / CODE V Glass DB / Schott Glass Master.
- * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental Sellmeier calculation helpers with an empty default catalog.
+ * Callers may pass explicitly supplied records; this module contains no vendor data.
  */
-
 class OpticalGlassCatalog {
-  constructor() {
-    // Standard Fraunhofer spectral reference lines (in micrometers)
-    this.spectralLines = {
-      t: 1.01398,  // Infrared Hg
-      s: 0.85211,  // Near-IR Cs
-      r: 0.70652,  // Red He
-      C: 0.65627,  // Red H line
-      C_prime: 0.64385, // Red Cd line
-      d: 0.58756,  // Yellow He line (standard d)
-      e: 0.54607,  // Green Hg line (standard e)
-      F: 0.48613,  // Blue H line
-      F_prime: 0.47999, // Blue Cd line
-      g: 0.43583,  // Violet Hg line
-      h: 0.40466,  // Violet Hg line
-      i: 0.36501   // UV Hg line
-    };
-
-    // Curated high-precision Sellmeier optical glass catalog
-    this.database = this._initializeCatalog();
+  constructor(records = []) {
+    if (!Array.isArray(records)) throw new TypeError('Optical material records must be supplied as an array.');
+    this.spectralLines = Object.freeze({
+      t: 1.01398,
+      s: 0.85211,
+      r: 0.70652,
+      C: 0.65627,
+      C_prime: 0.64385,
+      d: 0.58756,
+      e: 0.54607,
+      F: 0.48613,
+      F_prime: 0.47999,
+      g: 0.43583,
+      h: 0.40466,
+      i: 0.36501
+    });
+    this.database = new Map();
+    records.forEach((record) => this.registerGlass(record));
   }
 
-  /**
-   * Initializes standard baseline glasses with certified Sellmeier coefficients.
-   */
-  _initializeCatalog() {
-    const catalog = new Map();
-
-    const standardGlasses = [
-      {
-        name: 'N-BK7',
-        supplier: 'Schott',
-        type: 'Crown',
-        formula: 'sellmeier1',
-        B: [1.03961212, 0.231792344, 1.01046945],
-        C: [0.00600069867, 0.0200179144, 103.560653],
-        density: 2.51, // g/cm^3
-        thermalExpansion: 7.1e-6, // /K
-        dndT: 3.0e-6
-      },
-      {
-        name: 'F_SILICA',
-        supplier: 'Corning',
-        type: 'Fused Silica',
-        formula: 'sellmeier1',
-        B: [0.6961663, 0.4079426, 0.8974794],
-        C: [0.004679148, 0.013512063, 97.9340025],
-        density: 2.20,
-        thermalExpansion: 0.52e-6,
-        dndT: 10.0e-6
-      },
-      {
-        name: 'N-SF11',
-        supplier: 'Schott',
-        type: 'Flint',
-        formula: 'sellmeier1',
-        B: [1.73759695, 0.313747346, 1.89878101],
-        C: [0.013188707, 0.0623068142, 155.23629],
-        density: 3.22,
-        thermalExpansion: 7.6e-6,
-        dndT: 8.5e-6
-      },
-      {
-        name: 'N-SF5',
-        supplier: 'Schott',
-        type: 'Flint',
-        formula: 'sellmeier1',
-        B: [1.52481889, 0.187085527, 1.42729015],
-        C: [0.0112547545, 0.0588995306, 129.141675],
-        density: 2.86,
-        thermalExpansion: 8.2e-6,
-        dndT: 5.2e-6
-      },
-      {
-        name: 'N-SK16',
-        supplier: 'Schott',
-        type: 'Dense Crown',
-        formula: 'sellmeier1',
-        B: [1.32796058, 0.203878418, 0.835605694],
-        C: [0.00762403336, 0.0312155703, 85.3475995],
-        density: 3.58,
-        thermalExpansion: 6.3e-6,
-        dndT: 4.1e-6
-      },
-      {
-        name: 'N-FK51A',
-        supplier: 'Schott',
-        type: 'Fluorite Crown',
-        formula: 'sellmeier1',
-        B: [0.971247817, 0.216901417, 0.904651666],
-        C: [0.00472301995, 0.0153575612, 168.68133],
-        density: 3.76,
-        thermalExpansion: 13.4e-6,
-        dndT: -5.7e-6
-      },
-      {
-        name: 'N-BAF10',
-        supplier: 'Schott',
-        type: 'Barium Flint',
-        formula: 'sellmeier1',
-        B: [1.5851495, 0.143559385, 1.08521269],
-        C: [0.00926681282, 0.0424489805, 105.613573],
-        density: 3.77,
-        thermalExpansion: 6.8e-6,
-        dndT: 3.8e-6
-      },
-      {
-        name: 'S-FPL51',
-        supplier: 'Ohara',
-        type: 'Extra-Low Dispersion',
-        formula: 'sellmeier1',
-        B: [0.965416, 0.213946, 0.892461],
-        C: [0.004689, 0.015219, 165.234],
-        density: 3.75,
-        thermalExpansion: 13.0e-6,
-        dndT: -5.9e-6
-      },
-      {
-        name: 'H-K9L',
-        supplier: 'CDGM',
-        type: 'Crown',
-        formula: 'sellmeier1',
-        B: [1.03961212, 0.231792344, 1.01046945],
-        C: [0.00600069867, 0.0200179144, 103.560653],
-        density: 2.51,
-        thermalExpansion: 7.1e-6,
-        dndT: 3.0e-6
-      },
-      {
-        name: 'CAF2',
-        supplier: 'Schott',
-        type: 'Crystal',
-        formula: 'sellmeier1',
-        B: [0.5675888, 0.4710914, 3.8484723],
-        C: [0.00252642999, 0.0100783328, 1200.556],
-        density: 3.18,
-        thermalExpansion: 18.8e-6,
-        dndT: -8.5e-6
-      },
-      {
-        name: 'SAPPHIRE',
-        supplier: 'Crystal',
-        type: 'Anisotropic Crystal',
-        formula: 'sellmeier1',
-        B: [1.4313493, 0.65054713, 5.3414021],
-        C: [0.0052799261, 0.0142382647, 325.017834],
-        density: 3.98,
-        thermalExpansion: 5.3e-6,
-        dndT: 13.0e-6
-      },
-      {
-        name: 'CALCITE',
-        supplier: 'Crystal',
-        type: 'Uniaxial Birefringent Crystal',
-        formula: 'birefringent',
-        no: 1.658,
-        ne: 1.486,
-        birefringence: -0.172,
-        density: 2.71,
-        thermalExpansion: 24.3e-6,
-        dndT: -12.0e-6
-      },
-      {
-        name: 'QUARTZ',
-        supplier: 'Crystal',
-        type: 'Uniaxial Birefringent Crystal',
-        formula: 'birefringent',
-        no: 1.544,
-        ne: 1.553,
-        birefringence: 0.009,
-        density: 2.65,
-        thermalExpansion: 7.1e-6,
-        dndT: -5.5e-6
-      },
-      {
-        name: 'YVO4',
-        supplier: 'Crystal',
-        type: 'Uniaxial Birefringent Crystal',
-        formula: 'birefringent',
-        no: 1.957,
-        ne: 2.165,
-        birefringence: 0.208,
-        density: 4.22,
-        thermalExpansion: 4.4e-6,
-        dndT: 8.5e-6
-      },
-      {
-        name: 'MGF2',
-        supplier: 'Crystal',
-        type: 'Uniaxial Birefringent Crystal',
-        formula: 'birefringent',
-        no: 1.378,
-        ne: 1.390,
-        birefringence: 0.012,
-        density: 3.15,
-        thermalExpansion: 13.7e-6,
-        dndT: 1.1e-6
-      }
-    ];
-
-    standardGlasses.forEach(g => catalog.set(g.name.toUpperCase(), g));
-
-    // Comprehensive 1,500+ global optical glass database
-    // Schott, Ohara, CDGM, Hoya, Sumita
-    const prefixes = [
-      'N-K', 'N-SK', 'N-SSK', 'N-LAK', 'N-F', 'N-SF', 'N-LAF', 'N-KZFS', 'N-PK', 'N-PSK', 'N-FK',
-      'S-BSM', 'S-TIL', 'S-TIM', 'S-LAH', 'S-FPL', 'S-LAL', 'S-TIH', 'S-NBM', 'S-BAL',
-      'H-ZK', 'H-ZLaF', 'H-ZF', 'H-LaK', 'H-K', 'H-BaK', 'H-QF', 'H-FK',
-      'E-FD', 'E-F', 'E-SK', 'E-ADL', 'M-NBF', 'K-FIR'
-    ];
-
-    for (const p of prefixes) {
-      for (let i = 1; i <= 50; i++) {
-        const name = `${p}${i}`;
-        if (!catalog.has(name)) {
-          const isFlint = p.includes('F') || p.includes('SF') || p.includes('LAF') || p.includes('ZF') || p.includes('FD');
-          const baseB1 = isFlint ? 1.40 + (i * 0.01) : 1.05 + (i * 0.008);
-          const baseB2 = isFlint ? 0.25 + (i * 0.003) : 0.18 + (i * 0.002);
-          const baseB3 = isFlint ? 1.50 + (i * 0.012) : 0.95 + (i * 0.005);
-          const c1 = 0.006 + (i * 0.0002);
-          const c2 = 0.022 + (i * 0.0005);
-          const c3 = 110.0 + (i * 1.2);
-
-          let supplier = 'Schott';
-          if (p.startsWith('S-')) supplier = 'Ohara';
-          else if (p.startsWith('H-')) supplier = 'CDGM';
-          else if (p.startsWith('E-')) supplier = 'Hoya';
-          else if (p.startsWith('K-') || p.startsWith('M-')) supplier = 'Sumita';
-
-          catalog.set(name, {
-            name,
-            supplier,
-            type: isFlint ? 'Flint' : 'Crown',
-            formula: 'sellmeier1',
-            B: [baseB1, baseB2, baseB3],
-            C: [c1, c2, c3],
-            density: isFlint ? 3.4 : 2.6,
-            thermalExpansion: (6.5 + (i % 5) * 0.5) * 1e-6,
-            dndT: (2.5 + (i % 6) * 0.8) * 1e-6
-          });
+  registerGlass(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new TypeError('An optical material record is required.');
+    }
+    if (typeof record.name !== 'string' || !record.name.trim()) {
+      throw new TypeError('An optical material record needs a nonempty name.');
+    }
+    if (record.formula === 'sellmeier1') {
+      for (const field of ['B', 'C']) {
+        if (!Array.isArray(record[field]) || record[field].length !== 3 || !record[field].every(Number.isFinite)) {
+          throw new TypeError(`Sellmeier ${field} coefficients must contain three finite numbers.`);
         }
       }
+    } else if (record.formula === 'birefringent') {
+      if (![record.no, record.ne].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)) {
+        throw new TypeError('Birefringent records need finite positive ordinary and extraordinary indices.');
+      }
+    } else {
+      throw new TypeError('Optical material formula must be sellmeier1 or birefringent.');
     }
-
-    return catalog;
+    const normalized = {
+      ...record,
+      dataStatus: record.dataStatus || 'caller-supplied',
+      provenance: record.provenance || null
+    };
+    this.database.set(record.name.trim().toUpperCase(), normalized);
+    return normalized;
   }
 
-  /**
-   * Retrieves glass metadata from catalog.
-   * 
-   * @param {string} glassName
-   * @returns {Object|null}
-   */
   getGlass(glassName) {
-    if (!glassName) return null;
+    if (typeof glassName !== 'string' || !glassName.trim()) return null;
     return this.database.get(glassName.trim().toUpperCase()) || null;
   }
 
-  /**
-   * Calculates the refractive index n(lambda) at a specific wavelength (in microns).
-   * 
-   * Sellmeier 1 formula:
-   * n^2 - 1 = B1*lambda^2 / (lambda^2 - C1) + B2*lambda^2 / (lambda^2 - C2) + B3*lambda^2 / (lambda^2 - C3)
-   * 
-   * @param {string|Object} glass - Name or glass object
-   * @param {number} wavelengthUm - Wavelength in microns (e.g. 0.58756)
-   * @param {number} [temperatureC=20.0] - Ambient temperature
-   * @returns {number} Refractive index n
-   */
   calculateIndex(glass, wavelengthUm = 0.58756, temperatureC = 20.0) {
-    const g = typeof glass === 'string' ? this.getGlass(glass) : glass;
-    if (!g) {
-      throw new Error(`Glass '${glass}' not found in optical catalog.`);
+    const record = typeof glass === 'string' ? this.getGlass(glass) : glass;
+    if (!record) throw new RangeError(`Glass '${glass}' is not available; supply an explicit optical material record.`);
+    if (record.formula !== 'sellmeier1' || !Array.isArray(record.B) || !Array.isArray(record.C)) {
+      throw new TypeError('The supplied record is not an isotropic three-term Sellmeier material.');
+    }
+    if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
+      throw new TypeError('Wavelength must be a finite positive value in micrometers.');
+    }
+    if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC)) {
+      throw new TypeError('Temperature must be a finite value in degrees Celsius.');
     }
 
-    const lam = wavelengthUm;
-    const lam2 = lam * lam;
-    const B = g.B;
-    const C = g.C;
-
-    let nSqMinus1 = 0.0;
-    for (let k = 0; k < 3; k++) {
-      const denom = lam2 - C[k];
-      if (Math.abs(denom) > 1e-12) {
-        nSqMinus1 += (B[k] * lam2) / denom;
+    const wavelengthSquared = wavelengthUm * wavelengthUm;
+    let nSquared = 1;
+    for (let index = 0; index < 3; index++) {
+      const denominator = wavelengthSquared - record.C[index];
+      if (Math.abs(denominator) < 1e-15) {
+        throw new RangeError(`Wavelength ${wavelengthUm} um is singular for the supplied Sellmeier record.`);
       }
+      nSquared += (record.B[index] * wavelengthSquared) / denominator;
+    }
+    if (!Number.isFinite(nSquared) || nSquared <= 0) {
+      throw new RangeError('The supplied Sellmeier coefficients do not produce a finite positive index.');
     }
 
-    let n = Math.sqrt(1.0 + Math.max(0.0, nSqMinus1));
-
-    // Temperature correction dn/dT
-    if (temperatureC !== 20.0 && g.dndT) {
-      const deltaT = temperatureC - 20.0;
-      n += g.dndT * deltaT;
+    let index = Math.sqrt(nSquared);
+    if (temperatureC !== 20.0 && record.dndT !== undefined) {
+      if (typeof record.dndT !== 'number' || !Number.isFinite(record.dndT)) {
+        throw new TypeError('The supplied thermo-optic coefficient must be finite.');
+      }
+      index += record.dndT * (temperatureC - 20.0);
     }
-
-    return n;
+    if (!Number.isFinite(index) || index <= 0) {
+      throw new RangeError('The supplied material data produce a nonpositive refractive index.');
+    }
+    return index;
   }
 
-  /**
-   * Alias for calculateIndex for Zemax/Code V compatibility
-   */
   getRefractiveIndex(glass, wavelengthUm = 0.58756, temperatureC = 20.0) {
     return this.calculateIndex(glass, wavelengthUm, temperatureC);
   }
 
-  /**
-   * Computes standard optical properties: nd, nF, nC, Abbe number Vd, and partial dispersion Pg,F.
-   * 
-   * @param {string|Object} glass
-   * @returns {Object} Full optical characterization
-   */
   getOpticalProperties(glass) {
-    const g = typeof glass === 'string' ? this.getGlass(glass) : glass;
-    if (!g) throw new Error(`Glass '${glass}' not found.`);
-
-    const nd = this.calculateIndex(g, this.spectralLines.d);
-    const nF = this.calculateIndex(g, this.spectralLines.F);
-    const nC = this.calculateIndex(g, this.spectralLines.C);
-    const ne = this.calculateIndex(g, this.spectralLines.e);
-    const ng = this.calculateIndex(g, this.spectralLines.g);
-
-    // Abbe number Vd = (nd - 1) / (nF - nC)
-    const vd = (nd - 1.0) / (nF - nC);
-    // Abbe number Ve = (ne - 1) / (nF' - nC')
-    const nFp = this.calculateIndex(g, this.spectralLines.F_prime);
-    const nCp = this.calculateIndex(g, this.spectralLines.C_prime);
-    const ve = (ne - 1.0) / (nFp - nCp);
-
-    // Relative partial dispersion Pg,F = (ng - nF) / (nF - nC)
-    const pgF = (ng - nF) / (nF - nC);
+    const record = typeof glass === 'string' ? this.getGlass(glass) : glass;
+    if (!record) throw new RangeError(`Glass '${glass}' is not available; supply an explicit optical material record.`);
+    const nd = this.calculateIndex(record, this.spectralLines.d);
+    const nF = this.calculateIndex(record, this.spectralLines.F);
+    const nC = this.calculateIndex(record, this.spectralLines.C);
+    const ne = this.calculateIndex(record, this.spectralLines.e);
+    const ng = this.calculateIndex(record, this.spectralLines.g);
+    const nFp = this.calculateIndex(record, this.spectralLines.F_prime);
+    const nCp = this.calculateIndex(record, this.spectralLines.C_prime);
+    const deltaN = nF - nC;
+    if (Math.abs(deltaN) < 1e-15 || Math.abs(nFp - nCp) < 1e-15) {
+      throw new RangeError('The supplied Sellmeier record does not define finite Abbe numbers.');
+    }
 
     return {
-      name: g.name,
-      supplier: g.supplier,
-      type: g.type,
+      name: record.name,
+      supplier: record.supplier,
+      type: record.type,
+      dataStatus: record.dataStatus || 'caller-supplied',
+      provenance: record.provenance || null,
       nd,
       ne,
       nF,
       nC,
       ng,
-      Abbe_Vd: vd,
-      Abbe_Ve: ve,
-      partialDispersion_PgF: pgF,
-      density: g.density,
-      thermalExpansion: g.thermalExpansion,
-      dndT: g.dndT
+      Abbe_Vd: (nd - 1.0) / deltaN,
+      Abbe_Ve: (ne - 1.0) / (nFp - nCp),
+      partialDispersion_PgF: (ng - nF) / deltaN,
+      density: record.density,
+      thermalExpansion: record.thermalExpansion,
+      dndT: record.dndT
     };
   }
 
-  /**
-   * Finds nearest alternative commercial glass on the Abbe diagram (nd vs Vd).
-   * 
-   * @param {number} targetNd - Target refractive index
-   * @param {number} targetVd - Target Abbe number
-   * @param {number} [maxResults=5]
-   * @returns {Array<Object>} Nearest catalog glasses sorted by Euclidean distance
-   */
   findNearestGlasses(targetNd, targetVd, maxResults = 5) {
+    if (![targetNd, targetVd].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+      throw new TypeError('Target index and Abbe values must be finite numbers.');
+    }
+    if (!Number.isInteger(maxResults) || maxResults < 0)
+      throw new RangeError('maxResults must be a nonnegative integer.');
     const candidates = [];
-
-    for (const [name, g] of this.database.entries()) {
-      const props = this.getOpticalProperties(g);
-      // Normalized distance in nd-Vd space
-      const dNd = (props.nd - targetNd) / 0.1;
-      const dVd = (props.Abbe_Vd - targetVd) / 10.0;
-      const dist = Math.sqrt(dNd * dNd + dVd * dVd);
-
+    for (const [name, record] of this.database.entries()) {
+      if (record.formula !== 'sellmeier1') continue;
+      const properties = this.getOpticalProperties(record);
+      const dNd = (properties.nd - targetNd) / 0.1;
+      const dVd = (properties.Abbe_Vd - targetVd) / 10.0;
       candidates.push({
         name,
-        supplier: g.supplier,
-        type: g.type,
-        nd: props.nd,
-        Abbe_Vd: props.Abbe_Vd,
-        distance: dist
+        supplier: record.supplier,
+        type: record.type,
+        nd: properties.nd,
+        Abbe_Vd: properties.Abbe_Vd,
+        distance: Math.sqrt(dNd * dNd + dVd * dVd)
       });
     }
-
     candidates.sort((a, b) => a.distance - b.distance);
     return candidates.slice(0, maxResults);
   }
 
-  /**
-   * Total number of glasses in offline catalog.
-   */
   get catalogSize() {
     return this.database.size;
   }
 }
 
-// Isomorphic Export
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { OpticalGlassCatalog };
 }

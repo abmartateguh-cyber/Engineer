@@ -1,7 +1,7 @@
 /**
- * OmniEng Boundary Layer Prism Meshing Engine
- * Generates anisotropic extruded boundary layer prism (pentahedral/hexahedral) elements
- * along wall surfaces to resolve turbulent viscous sublayers with y+ <= 1.0.
+ * Experimental OmniEng prism-layer mesh generator.
+ * Generates anisotropic extruded prisms from a supplied triangular surface mesh.
+ * It does not establish a y+ target or turbulent boundary-layer accuracy.
  *
  * Implements:
  * 1. Schlichting empirical skin-friction estimation for target y+ first cell height.
@@ -17,27 +17,23 @@
 
 class PrismLayerMesher {
   /**
-   * Computes recommended first cell height y1 for target y+
+   * Estimates a first cell height from supplied flow conditions and target y+.
+   * The empirical estimate has no independent accuracy evidence.
    * @param {Object} flowConditions
    * @param {number} flowConditions.velocity - Freestream velocity U_inf (m/s)
    * @param {number} flowConditions.density - Fluid density rho (kg/m^3)
    * @param {number} flowConditions.viscosity - Dynamic viscosity mu (Pa*s)
    * @param {number} flowConditions.refLength - Characteristic length L (m)
-   * @param {number} [flowConditions.targetYPlus=1.0] - Desired y+
+   * @param {number} flowConditions.targetYPlus - Requested y+ value
    */
   static calculateFirstLayerHeight(flowConditions) {
-    const {
-      velocity,
-      density,
-      viscosity,
-      refLength,
-      targetYPlus = 1.0
-    } = flowConditions;
+    const { velocity, density, viscosity, refLength, targetYPlus } = flowConditions;
 
     if (!velocity || velocity <= 0) throw new Error('Velocity must be positive');
     if (!density || density <= 0) throw new Error('Density must be positive');
     if (!viscosity || viscosity <= 0) throw new Error('Viscosity must be positive');
     if (!refLength || refLength <= 0) throw new Error('Reference length must be positive');
+    if (!targetYPlus || targetYPlus <= 0) throw new Error('Target y+ must be positive');
 
     // Reynolds number: Re = (rho * U * L) / mu
     const Re = (density * velocity * refLength) / viscosity;
@@ -79,12 +75,7 @@ class PrismLayerMesher {
    */
   static generatePrismLayers(surfaceMesh, options = {}) {
     const { vertices, triangles } = surfaceMesh;
-    const {
-      firstLayerHeight,
-      growthRatio = 1.20,
-      layerCount = 5,
-      maxCornerAngleRad = Math.PI / 4
-    } = options;
+    const { firstLayerHeight, growthRatio = 1.2, layerCount = 5, maxCornerAngleRad = Math.PI / 4 } = options;
 
     if (!vertices || vertices.length === 0) throw new Error('Empty vertices array');
     if (!triangles || triangles.length === 0) throw new Error('Empty triangles array');
@@ -243,17 +234,21 @@ class PrismLayerMesher {
    * Computes volume of 6-node wedge/prism by decomposing into 3 tetrahedra
    */
   static _computePrismVolume(verts, nodes) {
-    const p = nodes.map(idx => verts[idx]);
+    const p = nodes.map((idx) => verts[idx]);
 
     // Tet volume formula: |det([p1-p0, p2-p0, p3-p0])| / 6.0
     const tetVol = (a, b, c, d) => {
-      const vax = b[0] - a[0], vay = b[1] - a[1], vaz = b[2] - a[2];
-      const vbx = c[0] - a[0], vby = c[1] - a[1], vbz = c[2] - a[2];
-      const vcx = d[0] - a[0], vcy = d[1] - a[1], vcz = d[2] - a[2];
+      const vax = b[0] - a[0],
+        vay = b[1] - a[1],
+        vaz = b[2] - a[2];
+      const vbx = c[0] - a[0],
+        vby = c[1] - a[1],
+        vbz = c[2] - a[2];
+      const vcx = d[0] - a[0],
+        vcy = d[1] - a[1],
+        vcz = d[2] - a[2];
 
-      const det = vax * (vby * vcz - vbz * vcy) -
-                  vay * (vbx * vcz - vbz * vcx) +
-                  vaz * (vbx * vcy - vby * vcx);
+      const det = vax * (vby * vcz - vbz * vcy) - vay * (vbx * vcz - vbz * vcx) + vaz * (vbx * vcy - vby * vcx);
       return Math.abs(det) / 6.0;
     };
 
@@ -269,7 +264,9 @@ class PrismLayerMesher {
    * Computes centroid of 6-node prism
    */
   static _computePrismCentroid(verts, nodes) {
-    let cx = 0, cy = 0, cz = 0;
+    let cx = 0,
+      cy = 0,
+      cz = 0;
     for (const idx of nodes) {
       cx += verts[idx][0];
       cy += verts[idx][1];

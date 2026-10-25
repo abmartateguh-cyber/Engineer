@@ -1,14 +1,8 @@
 /**
- * OmniEng Headless Linux HPC Solver Daemon
- * 
- * Provides production CLI and headless server execution for cloud clusters (AWS Batch, Slurm, K8s):
- * - Zero GUI/Electron/Chromium dependencies. Pure headless V8 execution.
- * - Multi-core compute dispatch across all 6 engineering disciplines:
- *   FEA (TET10), CFD (FVM Transonic), EDA (Sky130), Optics (Polarization), Plant (DIPPR/MOC), Controls (FMI 3.0/DO-178C).
- * - Exit code 0 on verified physical convergence; 1 on divergence/error.
- * - JSON and standard stream logging for HPC job managers.
- * 
- * 100% In-House Proprietary Implementation.
+ * Experimental local dispatcher for selected JavaScript calculations.
+ * This module is not an HPC provider and does not establish solver convergence.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -21,7 +15,6 @@ const { FEASolver } = require('../core/cae/fea_structural');
 const { FVMNavierStokes3D } = require('../core/cae/fvm_navier_stokes_3d');
 const { PolarizationRayTracer } = require('../core/optics/polarization_ray_tracer');
 const { OpticalGlassCatalog } = require('../core/optics/optical_glass_catalog');
-const { DIPPRDatabase } = require('../core/plant/dippr_database');
 const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('../core/plant/naphtali_sandholm_mesh');
 const { LefDefParser } = require('../core/eda/lef_def_parser');
 const { Sky130PdkAdapter } = require('../core/eda/sky130_pdk_adapter');
@@ -32,30 +25,33 @@ const { FmiMasterEngine, FmuSlave } = require('../core/cosim/fmi_master_engine')
 const { DomainDecompositionEngine } = require('../core/math/domain_decomposition');
 
 class HeadlessSolverDaemon {
-  /**
-   * Health check for cluster readiness
-   * @returns {{ status: string, version: string, enginesLoaded: number, timestamp: string }}
-   */
+  /** Returns a static process description, not a cluster readiness check. */
   static getHealth() {
     return {
-      status: 'HEALTHY',
-      version: '3.0.0-HPC-HEADLESS',
+      status: 'experimental',
+      releaseApproved: false,
+      version: process.env.npm_package_version || 'unreleased',
       platform: process.platform,
       arch: process.arch,
       nodeVersion: process.version,
-      enginesLoaded: 12,
       timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Dispatches and solves a batch engineering job (instance method for IPC host)
+   * Dispatches a local experimental calculation.
    * @param {Object} jobSpec
    * @returns {Object} Solution results and execution telemetry
    */
   dispatchJob(jobSpec) {
-    const discipline = (jobSpec.type || jobSpec.discipline || 'fea').toLowerCase();
-    const parameters = jobSpec.params || jobSpec.parameters || {};
+    if (!jobSpec || typeof jobSpec !== 'object') throw new TypeError('A job specification is required.');
+    const requestedDiscipline = jobSpec.type || jobSpec.discipline;
+    if (typeof requestedDiscipline !== 'string' || !requestedDiscipline.trim())
+      throw new TypeError('A discipline is required.');
+    const discipline = requestedDiscipline.toLowerCase();
+    const parameters = jobSpec.params || jobSpec.parameters;
+    if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters))
+      throw new TypeError('Solver parameters are required.');
     return HeadlessSolverDaemon.solveJob({ discipline, parameters });
   }
 
@@ -65,8 +61,14 @@ class HeadlessSolverDaemon {
    * @returns {Object} Solution results
    */
   static dispatchJob(jobSpec) {
-    const discipline = (jobSpec.type || jobSpec.discipline || 'fea').toLowerCase();
-    const parameters = jobSpec.params || jobSpec.parameters || {};
+    if (!jobSpec || typeof jobSpec !== 'object') throw new TypeError('A job specification is required.');
+    const requestedDiscipline = jobSpec.type || jobSpec.discipline;
+    if (typeof requestedDiscipline !== 'string' || !requestedDiscipline.trim())
+      throw new TypeError('A discipline is required.');
+    const discipline = requestedDiscipline.toLowerCase();
+    const parameters = jobSpec.params || jobSpec.parameters;
+    if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters))
+      throw new TypeError('Solver parameters are required.');
     return HeadlessSolverDaemon.solveJob({ discipline, parameters });
   }
 
@@ -78,8 +80,13 @@ class HeadlessSolverDaemon {
    * @returns {Object} Solution results and execution telemetry
    */
   static solveJob(jobSpec) {
+    if (!jobSpec || typeof jobSpec !== 'object') throw new TypeError('A job specification is required.');
+    const discipline = jobSpec.discipline;
+    const parameters = jobSpec.parameters;
+    if (typeof discipline !== 'string' || !discipline.trim()) throw new TypeError('A discipline is required.');
+    if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters))
+      throw new TypeError('Solver parameters are required.');
     const tStart = Date.now();
-    const { discipline, parameters = {} } = jobSpec;
 
     let result = null;
 
@@ -87,10 +94,10 @@ class HeadlessSolverDaemon {
       case 'fea': {
         const solver = new FEASolver();
         if (parameters.nodes) {
-          parameters.nodes.forEach(n => solver.addNode(n.x, n.y, n.z));
+          parameters.nodes.forEach((n) => solver.addNode(n.x, n.y, n.z));
         }
         if (parameters.elements) {
-          parameters.elements.forEach(e => solver.addElement(e.nodes || e, e.material));
+          parameters.elements.forEach((e) => solver.addElement(e.nodes || e, e.material));
         }
         result = solver.solveStatic();
         break;
@@ -109,7 +116,11 @@ class HeadlessSolverDaemon {
         break;
       }
       case 'optics': {
-        result = PolarizationRayTracer.evaluateFresnel(parameters.n1 || 1.0, parameters.n2 || 1.5, parameters.thetaI || 0.0);
+        result = PolarizationRayTracer.evaluateFresnel(
+          parameters.n1 || 1.0,
+          parameters.n2 || 1.5,
+          parameters.thetaI || 0.0
+        );
         break;
       }
       case 'eda': {
@@ -128,7 +139,11 @@ class HeadlessSolverDaemon {
         break;
       }
       case 'partition': {
-        result = DomainDecompositionEngine.partitionMesh(parameters.nodes, parameters.elements, parameters.numPartitions || 4);
+        result = DomainDecompositionEngine.partitionMesh(
+          parameters.nodes,
+          parameters.elements,
+          parameters.numPartitions || 4
+        );
         break;
       }
       default:
@@ -137,7 +152,8 @@ class HeadlessSolverDaemon {
 
     const tEnd = Date.now();
     return {
-      status: 'CONVERGED',
+      status: 'COMPUTED_EXPERIMENTAL',
+      validationLevel: 'experimental',
       discipline,
       durationMs: tEnd - tStart,
       timestamp: new Date().toISOString(),
@@ -152,7 +168,8 @@ class HeadlessSolverDaemon {
     if (args.includes('--health')) {
       const health = this.getHealth();
       console.log(JSON.stringify(health, null, 2));
-      process.exit(0);
+      process.exitCode = 0;
+      return;
     }
 
     const solveIdx = args.indexOf('--solve');
@@ -178,18 +195,19 @@ class HeadlessSolverDaemon {
         const outJson = JSON.stringify(res, null, 2);
         if (outputPath) {
           fs.writeFileSync(path.resolve(outputPath), outJson, 'utf8');
-          console.log(`[OmniEng HPC] Solution successfully written to ${outputPath}`);
+          console.log(`[OmniEng] Experimental calculation result written to ${outputPath}`);
         } else {
           console.log(outJson);
         }
-        process.exit(0);
+        process.exitCode = 0;
       } catch (err) {
-        console.error(`[OmniEng HPC Error] ${err.message}`);
-        process.exit(1);
+        console.error(`[OmniEng Experimental Dispatcher Error] ${err.message}`);
+        process.exitCode = 1;
+        return;
       }
     }
 
-    console.log('OmniEng Headless HPC Solver Daemon v3.0');
+    console.log('OmniEng Experimental Local Solver Dispatcher');
     console.log('Usage:');
     console.log('  node src/main/headless_solver_daemon.js --health');
     console.log('  node src/main/headless_solver_daemon.js --solve --input=<spec.json> [--out=<out.json>]');

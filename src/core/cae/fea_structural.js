@@ -1,6 +1,7 @@
 /**
- * OmniEng Structural FEA (Finite Element Analysis) Engine (Ansys Mechanical Equivalent)
- * Implements 3D tetrahedral/solid element stiffness assembly, boundary conditions, and von Mises stress computation.
+ * Experimental structural finite element analysis (FEA) routines.
+ * Implements 3D solid element stiffness assembly, boundary conditions, and von Mises stress computation.
+ * No independent solver validation or production-use evidence is established.
  */
 
 const { LinearSolver } = require('../math/linear_algebra');

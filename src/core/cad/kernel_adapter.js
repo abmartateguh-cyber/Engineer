@@ -1,16 +1,14 @@
 /**
  * OmniEng Unified CAD Geometry Kernel Adapter
  * 
- * Bridges between OmniEng Sovereign Topological B-Rep and Open CASCADE (OCCT) WASM.
+ * Experimental adapter around the legacy polygon-mesh geometry implementation.
  * Provides unified interfaces for:
  * 1. STEP AP242 / AP203 / AP214 import, export, and B-Rep conversion
  * 2. Exact Boolean operations (Fuse/Union, Cut/Difference, Common/Intersection)
  * 3. Rolling-ball fillets, chamfers, and draft angles with persistent naming
  * 4. NIST Recommended Practice validation properties (Volume, Surface Area, Centroid)
  * 
- * Parity Standard: Open CASCADE Technology 7.8 / Parasolid V35.
- * 
- * 100% In-House Sovereign Implementation with Optional OCCT-WASM Binding.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -28,10 +26,10 @@ class GeometryKernelAdapter {
    * @param {Object} [options.occtInstance=null] - Optional opencascade.js instance
    */
   constructor(options = {}) {
-    this.preferredBackend = options.preferredBackend || 'SOVEREIGN_BREP';
+    this.preferredBackend = options.preferredBackend || 'legacy-mesh-brep';
     this.occt = options.occtInstance || (typeof window !== 'undefined' ? window.occt : null);
     this.namingManager = new PersistentNamingManager();
-    this.activeBackend = this.occt ? 'OCCT_WASM' : 'SOVEREIGN_BREP';
+    this.activeBackend = 'legacy-mesh-brep';
   }
 
   /**
@@ -141,8 +139,7 @@ class GeometryKernelAdapter {
   }
 
   /**
-   * Computes NIST recommended validation properties for CAD model exchange (Volume, Area, Centroid).
-   * Conforming to NIST Recommended Practices for AP242 / CAx-IF.
+   * Computes experimental primitive/model metrics (volume, area, centroid).
    * 
    * @param {SolidBody} body
    * @returns {{volume: number, surfaceArea: number, centroid: {x: number, y: number, z: number}, boundingBox: Object}}
@@ -168,6 +165,7 @@ class GeometryKernelAdapter {
     return {
       volume: parseFloat(volume.toFixed(4)),
       surfaceArea: parseFloat(surfaceArea.toFixed(4)),
+      validationLevel: 'experimental',
       centroid: {
         x: parseFloat(cx.toFixed(4)),
         y: parseFloat(cy.toFixed(4)),
@@ -187,11 +185,11 @@ class GeometryKernelAdapter {
   getKernelInfo() {
     return {
       activeBackend: this.activeBackend,
-      hasOcctWasm: !!this.occt,
-      isSovereignBRep: true,
-      persistentNamingEnabled: true,
-      ap242Compliance: true,
-      nistValidationPropsSupported: true
+      occtAvailableButUnused: !!this.occt,
+      isSovereignBRep: false,
+      persistentNaming: 'experimental',
+      ap242Compliance: false,
+      validationProperties: 'experimental'
     };
   }
 }

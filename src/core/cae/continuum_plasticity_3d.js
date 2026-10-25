@@ -3,7 +3,7 @@
  * Implements 10-node quadratic tetrahedral elements (TET10), Gauss-point radial return mapping,
  * Johnson-Cook rate/thermal softening, augmented Lagrangian mortar contact, and Lanczos modal extraction.
  * 
- * 100% Proprietary In-House Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const { Matrix, Vector, LinearSolver } = require('../math/linear_algebra');

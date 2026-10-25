@@ -1,19 +1,16 @@
 /**
- * OmniEng HPC Distributed Cluster Gateway & Workload Orchestrator
- * Connects OmniEng to industrial supercomputing environments (Slurm, PBS Pro, MPI-4, OpenMP).
+ * OmniEng HPC job-script and domain-decomposition examples
  * 
  * Provides:
- * 1. Automated Slurm (sbatch) & PBS (qsub) cluster job script generation
- * 2. Recursive Coordinate Bisection (RCB) geometric domain decomposition for distributed MPI ranks
- * 3. Out-of-core sparse matrix chunk streaming calculator
- * 4. Cluster telemetry and node allocation validation
+ * Generates Slurm/PBS script templates and provides experimental decomposition helpers.
+ * It does not connect to a scheduler, submit jobs, or report live cluster telemetry.
  */
 
 'use strict';
 
 class HpcClusterGateway {
   /**
-   * Generates a validated Slurm job submission script
+   * Generates a Slurm script template; scheduler acceptance has not been tested here.
    * @param {Object} options
    */
   static generateSlurmScript(options = {}) {

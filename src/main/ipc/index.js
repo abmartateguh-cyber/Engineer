@@ -1,7 +1,7 @@
 /**
- * OmniEng Master IPC Registration Hub
+ * OmniEng IPC Registration Hub
  * 
- * Aggregates all domain routers under unified schema validation and audit logging:
+ * Aggregates domain routers under shared wrapper checks and per-route validation:
  * - CAD Router (22 channels)
  * - CAE Router (22 channels)
  * - EDA Router (17 channels)
@@ -9,7 +9,7 @@
  * - Plant Router (15 channels)
  * - Controls Router (13 channels)
  * - System Router (29 channels)
- * Total: 131/131 Channels 100% Schema-Validated
+ * Handler registration does not establish complete schema coverage or release readiness.
  */
 
 'use strict';
@@ -33,7 +33,7 @@ function registerAllIpcHandlers(dependencies = {}) {
   registerSystemIpc(dependencies);
 
   const total = getRegisteredChannels().length;
-  console.log(`[OmniEng IPC Security Gateway] Successfully registered and validated ${total} channels across 7 domains.`);
+  console.log(`[OmniEng IPC] Registered ${total} channels across 7 domains; this does not establish schema coverage or sender authorization.`);
   return { success: true, registeredCount: total };
 }
 

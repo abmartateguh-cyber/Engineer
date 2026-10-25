@@ -6,7 +6,7 @@
  * 2. G1/G2 tangent and curvature continuous spine offset contact ribbons.
  * 3. N-sided Gregory corner blend patches resolving multi-edge vertex singularities.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

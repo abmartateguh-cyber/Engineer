@@ -5,9 +5,9 @@
  * holdup vessels, dynamic vapor pressure integration, control valve trim
  * characteristics, PID loop control, and API 521 emergency blowdown depressurization.
  * 
- * Parity standard: Aspen HYSYS Dynamics / AVEVA DYNSIM / Honeywell UniSim.
+ * Unverified comparison target: Aspen HYSYS Dynamics / AVEVA DYNSIM / Honeywell UniSim.
  * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class DynamicFlowsheetSolver {

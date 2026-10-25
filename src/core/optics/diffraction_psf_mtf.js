@@ -1,14 +1,14 @@
 /**
  * OmniEng 2D FFT Diffraction Point Spread Function (PSF) & Wavefront MTF Engine
  * 
- * Provides physical wave optics propagation matching Zemax OpticStudio / CODE V:
+ * Experimental diffraction and wavefront calculation example:
  * 1. Complex generalized pupil function: P(u, v) = A(u, v) * exp(i * 2*pi * W(u, v) / lambda).
  * 2. 2D Fast Fourier Transform (Cooley-Tukey Radix-2 FFT) of complex pupil.
  * 3. Polychromatic Point Spread Function: PSF(x, y) = |FFT{ P(u, v) }|^2.
  * 4. Wavefront Modulation Transfer Function: MTF(fx, fy) = |FFT{ PSF(x, y) }| / MTF(0, 0).
  * 5. Analytical Airy disk verification: r_airy = 1.22 * lambda * F_number.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent optical validation or comparison to a production ray tracer is established.
  */
 
 'use strict';

@@ -1,13 +1,14 @@
 /**
- * OmniEng Industrial Sheet Metal Unfolding & K-Factor Bend Deduction Engine
+ * OmniEng Experimental Sheet Metal Unfolding & K-Factor Example
  * 
- * Provides accurate sheet metal flat pattern development matching SOLIDWORKS / Creo / NX:
+ * Illustrates sheet metal flat-pattern calculations:
  * 1. Exact neutral axis K-factor formulation: BA = (pi/180) * theta * (R + K * T).
  * 2. Setback (OSB) and Bend Deduction: BD = 2 * (R + T) * tan(theta / 2) - BA.
  * 3. Automated corner reliefs (rectangular, tear, obround) to eliminate stress concentration.
  * 4. 2D Flat blank generation with bend lines, angles, and tooling punch direction.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No material-specific bend data, manufacturing validation, or comparison to commercial CAD
+ * systems is established.
  */
 
 'use strict';

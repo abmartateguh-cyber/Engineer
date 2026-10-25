@@ -6,311 +6,594 @@
 'use strict';
 
 const { defineHandler } = require('./define_handler');
-const { CFDSolver2D } = require('../../core/cae/cfd_navier_stokes');
-const { QuadcopterDynamics } = require('../../core/dynamic_simulink/drone_flight_dynamics');
 const { BlockDiagramGraph } = require('../../core/dynamic_simulink/block_graph');
 const { FrequencyResponseAnalyzer } = require('../../core/dynamic_simulink/frequency_analysis');
-const { MultiRateScheduler, AlgebraicLoopSolver, ModernControlSynthesis } = require('../../core/dynamic_simulink/multi_rate_scheduler');
+const { ModernControlSynthesis } = require('../../core/dynamic_simulink/multi_rate_scheduler');
 const { AutocoderCRust } = require('../../core/dynamic_simulink/autocoder_c_rust');
 const { ModelPredictiveController } = require('../../core/dynamic_simulink/model_predictive_control');
 const { SimscapeDAESolver } = require('../../core/dynamic_simulink/simscape_dae_solver');
-const { MCDCCoverageAnalyzer } = require('../../core/dynamic_simulink/mcdc_coverage');
-const { FmiMasterEngine, FmuSlave } = require('../../core/cosim/fmi_master_engine');
-const { NasaRocketPropulsion } = require('../../core/aerospace/nasa_rocket_propulsion');
-
-function registerControlsIpc() {
-  // 1. Propeller Thrust & Power
-  defineHandler('omni:solve-propeller', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const { rpm = 8000, diameterInches = 5.0, pitchInches = 3.0 } = params;
-    return CFDSolver2D.solvePropellerThrust(rpm, diameterInches, pitchInches);
-  }, { domain: 'controls', description: 'Compute propeller static thrust and mechanical power' });
-
-  // 2. Drone 6-DOF Flight Dynamics
-  defineHandler('omni:simulate-drone', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    return QuadcopterDynamics.simulateFlightMission(params);
-  }, { domain: 'controls', description: '6-DOF rigid body quadcopter trajectory and battery telemetry' });
-
-  // 3. Block Diagram Graph Simulation
-  defineHandler('omni:simulate-block-diagram', {
-    type: 'object',
-    optional: true
-  }, async (event, { graphData = {}, tEnd = 10.0, dt = 0.01 } = {}) => {
-    const graph = BlockDiagramGraph.fromJSON(graphData);
-    return graph.simulate(tEnd || 10.0, dt || 0.01);
-  }, { domain: 'controls', description: 'Continuous-time Simulink block diagram graph integrator' });
-
-  // 4. Bode Frequency Response Analysis
-  defineHandler('omni:solve-bode', {
-    type: 'object',
-    optional: true
-  }, async (event, { numCoeffs = [1], denCoeffs = [1, 1], omegaMin = 0.1, omegaMax = 1000, points = 100 } = {}) => {
-    return FrequencyResponseAnalyzer.computeBode(numCoeffs, denCoeffs, omegaMin, omegaMax, points);
-  }, { domain: 'controls', description: 'Compute transfer function gain margin, phase margin, and Bode plot' });
-
-  // 5. Deterministic Multi-Rate Scheduler
-  defineHandler('omni:schedule-multi-rate', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const scheduler = new MultiRateScheduler({ baseRateHz: params.baseRateHz || 1000 });
-    scheduler.addTask({
-      id: 'task_fast',
-      name: 'Inner Fast Loop',
-      sampleRateHz: 1000,
-      priority: 1,
-      stepFn: (t, dt, inps) => ({ count: (inps.count || 0) + 1 })
-    });
-    scheduler.addTask({
-      id: 'task_slow',
-      name: 'Outer Slow Loop',
-      sampleRateHz: 100,
-      priority: 2,
-      stepFn: (t, dt, inps) => ({ target: 10.0 })
-    });
-    scheduler.connectTasks('task_fast', 'task_slow');
-    const res = scheduler.run(params.durationSec || 0.05);
-    return { success: true, result: res };
-  }, { domain: 'controls', description: 'Deterministic multi-rate task execution without jitter' });
-
-  // 6. Algebraic Loop Broyden Solver
-  defineHandler('omni:solve-algebraic-loop', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const f = x => [Math.sqrt(Math.max(0, x[1]) + 2.0), 0.5 * x[0] + 1.0];
-    const res = AlgebraicLoopSolver.solveBroyden(f, params.x0 || [1.0, 1.0]);
-    return { success: true, result: res };
-  }, { domain: 'controls', description: 'Solve implicit non-linear feedback loops via Broyden method' });
-
-  // 7. Modern Control Synthesis (LQR)
-  defineHandler('omni:synthesize-lqr', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const A = params.A || [[0, 1], [0, 0]];
-    const B = params.B || [[0], [1]];
-    const Q = params.Q || [[10, 0], [0, 1]];
-    const R = params.R || [[1]];
-    const cLqr = ModernControlSynthesis.solveContinuousLQR(A, B, Q, R);
-    return { success: true, continuous: cLqr };
-  }, { domain: 'controls', description: 'Solve continuous-time algebraic Riccati equation (CARE) for optimal gain K' });
-
-  // 8. MISRA-C & #![no_std] Rust Autocoder
-  defineHandler('omni:autocode-controller', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const spec = params.modelSpec || {
-      name: 'flight_attitude',
-      A: [[0.98, 0.01], [-0.02, 0.97]],
-      B: [[0.001], [0.08]],
-      C: [[1.0, 0.0]],
-      K: [[2.8, 1.0]],
-      sampleRateHz: 1000
-    };
-    const cCode = AutocoderCRust.generateMisraC(spec);
-    const rustCode = AutocoderCRust.generateNoStdRust(spec);
-    const autosar = AutocoderCRust.generateAutosarSWC(spec);
-    return { success: true, cCode, rustCode, autosar };
-  }, { domain: 'controls', description: 'Generate certified MISRA-C:2012 and zero-allocation Rust code' });
-
-  // 9. Model Predictive Control (MPC) QP
-  defineHandler('omni:solve-mpc', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const mpc = new ModelPredictiveController(params.options || {});
-    const res = mpc.computeControlAction(params.x0 || [0.0, 0.0], params.yRef !== undefined ? params.yRef : 1.0);
-    return { success: true, result: res };
-  }, { domain: 'controls', description: 'Solve constrained quadratic programming (QP) receding horizon control' });
-
-  // 10. Simscape DAE Multiphysics Network
-  defineHandler('omni:simulate-simscape-dae', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const res = SimscapeDAESolver.simulateElectromechanicalDCMotor(params || {});
-    return { success: true, result: res };
-  }, { domain: 'controls', description: 'Integrate stiff index-1 DAE network via backward differentiation formula' });
-
-  // 11. DO-178C DAL-A MC/DC Coverage Analyzer
-  defineHandler('omni:evaluate-mcdc-coverage', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const conditionNames = params.conditionNames || ['A', 'B', 'C'];
-    const decisionFunc = (A, B, C) => A && (B || C);
-    const testVectors = params.testVectors || [
-      [false, true, false],
-      [true, true, false],
-      [true, false, false],
-      [true, false, true]
-    ];
-    const report = MCDCCoverageAnalyzer.evaluateMCDCCoverage(conditionNames, decisionFunc, testVectors);
-    return { success: true, report };
-  }, { domain: 'controls', description: 'Verify Modified Condition/Decision Coverage independence pairs' });
-
-  // 12. FMI 2.0 Co-Simulation Master
-  defineHandler('omni:run-fmi-cosimulation', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const master = new FmiMasterEngine(params.config || { startTime: 0, stopTime: 0.05, defaultStepSize: 0.001 });
-    const slave1 = new FmuSlave({ instanceName: 'Controller', variables: [{ vr: 1, initial: 10.0, causality: 'output' }] });
-    const slave2 = new FmuSlave({ instanceName: 'Actuator', variables: [{ vr: 2, initial: 0.0, causality: 'input' }] });
-    master.addSlave(slave1);
-    master.addSlave(slave2);
-    master.addConnection(slave1, 1, slave2, 2);
-    const sim = master.simulate();
-    return { success: true, result: sim };
-  }, { domain: 'controls', description: 'Orchestrate multi-FMU co-simulation master with algebraic loop resolution' });
-
-  // 13. AUTOSAR Classic 4.4 SWC & ARXML Descriptor Generator
-  defineHandler('omni:generate-autosar-swc', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const spec = params.modelSpec || {
-      name: 'actuator_controller',
-      A: [[0.98, 0.01], [-0.02, 0.97]],
-      B: [[0.001], [0.05]],
-      C: [[1.0, 0.0]],
-      K: [[3.2, 1.1]],
-      sampleRateHz: 1000
-    };
-    const autosar = AutocoderCRust.generateAutosarSWC(spec);
-    return { success: true, ...autosar };
-  }, { domain: 'controls', description: 'Generate certified AUTOSAR Classic 4.4 C SWC, RTE headers, and ARXML descriptor' });
-
-  // 14. NASA Space Rocket Engine & Launch Vehicle Calculations
-  defineHandler('omni:solve-nasa-rocket', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const pcBar = (params.chamberPressurePa ? params.chamberPressurePa / 1e5 : params.chamberPressureBar) || 200.0;
-    const of = params.mixtureRatio || params.ofRatio || 6.0;
-    const eps = params.expansionRatio || 77.5;
-    const propellant = params.propellantType || (of > 5.0 ? 'LOX_LH2' : 'LOX_LCH4');
-
-    const engine = new NasaRocketPropulsion({
-      propellantType: propellant,
-      chamberPressureBar: pcBar,
-      mixtureRatio: of,
-      expansionRatio: eps,
-      throatDiameterM: params.throatDiameterM || 0.28
-    });
-
-    const eq = engine.evaluateCombustionEquilibrium(propellant, pcBar, of);
-    const enginePerf = engine.calculateEnginePerformance({
-      propellantType: propellant,
-      chamberPressureBar: pcBar,
-      ofRatio: of,
-      expansionRatio: eps,
-      ambientPressurePa: 101325,
-      throatDiameterM: params.throatDiameterM || 0.28
-    });
-    const cool = engine.calculateBartzRegenerativeCooling(enginePerf);
-    const tp = engine.calculateTurbopumpSystem(enginePerf, cool);
-    const traj = engine.simulateAscentTrajectory({
-      thrustPerEngineSL_kN: enginePerf.thrustSeaLevelKN,
-      Isp_sl: enginePerf.ispSeaLevelS,
-      Isp_vac: enginePerf.ispVacuumS
-    });
-    const staging = engine.calculateStagingDeltaV({
-      stage1IspVac: enginePerf.ispVacuumS
-    });
-    const iso = engine.calculateIsogridTankBuckling(params.isogrid || {});
-    const wbsEntities = engine.getNasaSubsystemEntities();
-    const turbopumpPowerMw = (tp.fuelPump.pumpPowerW + tp.oxPump.pumpPowerW) / 1e6;
-
-    const payload = {
-      equilibrium: {
-        ...eq,
-        characteristicVelocity_m_s: eq.characteristicVelocityM_s
-      },
-      expansion: {
-        ...enginePerf,
-        thrust_sl_kN: enginePerf.thrustSeaLevelN / 1000.0,
-        thrust_vac_kN: enginePerf.thrustVacuumN / 1000.0,
-        isp_sl_s: enginePerf.ispSeaLevelS,
-        isp_vac_s: enginePerf.ispVacuumS,
-        exitMach: enginePerf.exitMach,
-        exitPressureBar: enginePerf.exitPressurePa / 1e5
-      },
-      bartzHeatTransfer: {
-        ...cool,
-        qThroat_MW_m2: cool.qThroat_W_m2 / 1e6
-      },
-      turbopumpBalance: {
-        ...tp,
-        dischargeMarginBar: 28.5,
-        fuelPumpPowerMW: tp.fuelPump.pumpPowerW / 1e6,
-        oxPumpPowerMW: tp.oxPump.pumpPowerW / 1e6,
-        turbopumpPowerMw
-      },
-      isogridBuckling: iso,
-      stagingDeltaV: staging,
-      engine: {
-        ispVacSec: enginePerf.ispVacuumS,
-        ispSlSec: enginePerf.ispSeaLevelS,
-        thrustVacN: enginePerf.thrustVacuumN,
-        thrustSlN: enginePerf.thrustSeaLevelN,
-        exitMach: enginePerf.exitMach,
-        throatDiameterM: enginePerf.throatDiameterM,
-        exitDiameterM: enginePerf.exitDiameterM,
-        exitPressureBar: enginePerf.exitPressurePa / 1e5
-      },
-      cooling: cool,
-      turbomachinery: {
-        turbopumpPowerMw,
-        fuelPump: tp.fuelPump,
-        oxPump: tp.oxPump,
-        turbine: tp.turbine
-      },
-      trajectory: {
-        maxQ_kPa: traj.maxDynamicPressureKPa,
-        maxDynamicPressureKPa: traj.maxDynamicPressureKPa,
-        maxQ_altM: traj.maxQAltitudeM,
-        maxQ_timeS: traj.maxQTimeS,
-        apogeeKm: traj.apogeeKm,
-        timeline: traj.timeline
-      },
-      staging,
-      isogrid: {
-        marginOfSafety: iso.marginOfSafety,
-        skinThicknessMm: iso.skinThicknessMm,
-        flangeWidthMm: iso.flangeWidthMm,
-        ribDepthMm: iso.ribDepthMm,
-        isSafe: iso.isSafe
-      },
-      wbsTree: wbsEntities,
-      spacecraftInterior: engine.getNasaSpacecraftInteriorSpecification()
-    };
-
-    return {
-      success: true,
-      result: payload,
-      ...payload
-    };
-  }, { domain: 'aerospace', description: 'NASA CEA Thermochemistry, Bartz cooling, Turbomachinery, and Staging Delta-V' });
-
-  // 15. NASA Deep Space Crew Craft Full Interior Engineering Specification
-  defineHandler('omni:get-nasa-spacecraft-spec', {
-    type: 'object',
-    optional: true
-  }, async (event, params = {}) => {
-    const engine = new NasaRocketPropulsion({});
-    return {
-      success: true,
-      specification: engine.getNasaSpacecraftInteriorSpecification()
-    };
-  }, { domain: 'aerospace', description: 'Retrieve NASA deep-space crewed spacecraft full interior subsystem specification' });
+function unavailableControlRoute(message) {
+  return {
+    success: false,
+    status: 'unavailable',
+    validationLevel: 'experimental',
+    error: { code: 'UNSUPPORTED', message }
+  };
 }
 
-module.exports = { registerControlsIpc };
+const MATRIX_SCHEMA = {
+  type: 'array',
+  minItems: 1,
+  maxItems: 100,
+  items: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'number' } }
+};
+const VECTOR_SCHEMA = { type: 'array', minItems: 1, maxItems: 100, items: { type: 'number' } };
+const fixedUnitSchema = (unit, dimension) => ({
+  type: 'object',
+  required: ['unit', 'dimension'],
+  additionalProperties: false,
+  properties: {
+    unit: { type: 'string', enum: [unit] },
+    dimension: { type: 'string', enum: [dimension] }
+  }
+});
+const DIMENSIONLESS_SIGNAL_GRAPH_UNITS_SCHEMA = {
+  type: 'object',
+  required: ['tEnd', 'dt', 'signal', 'stepTime', 'sourceFrequency', 'gain', 'pid', 'layout'],
+  additionalProperties: false,
+  properties: {
+    tEnd: fixedUnitSchema('s', 'time'),
+    dt: fixedUnitSchema('s', 'time'),
+    signal: fixedUnitSchema('1', 'dimensionless'),
+    stepTime: fixedUnitSchema('s', 'time'),
+    sourceFrequency: fixedUnitSchema('Hz', 'frequency'),
+    gain: fixedUnitSchema('1', 'dimensionless'),
+    pid: {
+      type: 'object',
+      required: ['kp', 'ki', 'kd', 'initialState', 'limits'],
+      additionalProperties: false,
+      properties: {
+        kp: fixedUnitSchema('1', 'dimensionless'),
+        ki: fixedUnitSchema('s^-1', 'frequency'),
+        kd: fixedUnitSchema('s', 'time'),
+        initialState: fixedUnitSchema('s', 'time'),
+        limits: fixedUnitSchema('1', 'dimensionless')
+      }
+    },
+    layout: fixedUnitSchema('px', 'display-coordinate')
+  }
+};
+const BLOCK_DIAGRAM_TYPES = ['source_step', 'source_sine', 'source_constant', 'gain', 'sum', 'pid', 'scope'];
+const BLOCK_DIAGRAM_PARAMETER_FIELDS = {
+  source_step: {
+    required: ['stepTime', 'initialValue', 'finalValue'],
+    allowed: ['stepTime', 'initialValue', 'finalValue']
+  },
+  source_sine: { required: ['frequency', 'amplitude'], allowed: ['frequency', 'amplitude'] },
+  source_constant: { required: ['value'], allowed: ['value'] },
+  gain: { required: ['k'], allowed: ['k'] },
+  sum: { required: [], allowed: [] },
+  pid: {
+    required: ['kp', 'ki', 'kd', 'initialState'],
+    allowed: ['kp', 'ki', 'kd', 'initialState', 'limitMin', 'limitMax']
+  },
+  scope: { required: [], allowed: [] }
+};
+const BLOCK_DIAGRAM_BLOCK_SCHEMA = {
+  type: 'object',
+  required: ['id', 'type', 'params'],
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string', maxLength: 128 },
+    type: { type: 'string', enum: BLOCK_DIAGRAM_TYPES },
+    name: { type: 'string', maxLength: 160 },
+    params: { type: 'object' },
+    x: { type: 'number' },
+    y: { type: 'number' }
+  }
+};
+const BLOCK_DIAGRAM_CONNECTION_SCHEMA = {
+  type: 'object',
+  required: ['fromBlock', 'toBlock'],
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string', maxLength: 128 },
+    fromBlock: { type: 'string', maxLength: 128 },
+    fromPort: { type: 'number', integer: true, min: 0, max: 0 },
+    toBlock: { type: 'string', maxLength: 128 },
+    toPort: { type: 'number', integer: true, min: 0, max: 0 }
+  }
+};
+const BLOCK_DIAGRAM_REQUEST_SCHEMA = {
+  type: 'object',
+  required: ['graphData', 'tEnd', 'dt', 'units'],
+  additionalProperties: false,
+  properties: {
+    graphData: {
+      type: 'object',
+      required: ['blocks', 'connections'],
+      additionalProperties: false,
+      properties: {
+        blocks: { type: 'array', minItems: 1, maxItems: 1000, items: BLOCK_DIAGRAM_BLOCK_SCHEMA },
+        connections: { type: 'array', maxItems: 10000, items: BLOCK_DIAGRAM_CONNECTION_SCHEMA }
+      }
+    },
+    tEnd: { type: 'number', min: 0.000001, max: 1000000 },
+    dt: { type: 'number', min: 0.000001, max: 1000000 },
+    units: DIMENSIONLESS_SIGNAL_GRAPH_UNITS_SCHEMA
+  }
+};
+
+function validateBlockDiagramGraph(graphData) {
+  if (!graphData || typeof graphData !== 'object' || Array.isArray(graphData)) {
+    throw new TypeError('Caller-supplied graphData must be an object.');
+  }
+  const unexpectedGraphFields = Object.keys(graphData).filter((key) => !['blocks', 'connections'].includes(key));
+  if (unexpectedGraphFields.length) {
+    throw new TypeError(`Unexpected graphData properties: ${unexpectedGraphFields.join(', ')}.`);
+  }
+  if (!Array.isArray(graphData.blocks) || graphData.blocks.length < 1 || graphData.blocks.length > 1000) {
+    throw new TypeError('Block graph requires between 1 and 1,000 blocks.');
+  }
+  if (!Array.isArray(graphData.connections) || graphData.connections.length > 10000) {
+    throw new TypeError('Block graph requires a connections array with at most 10,000 entries.');
+  }
+
+  const ids = new Set();
+  for (let index = 0; index < graphData.blocks.length; index++) {
+    const block = graphData.blocks[index];
+    const fields = block && BLOCK_DIAGRAM_PARAMETER_FIELDS[block.type];
+    if (!block || typeof block !== 'object' || Array.isArray(block) || !fields) {
+      throw new TypeError(`Block ${index + 1} has an unsupported shape or type.`);
+    }
+    if (Object.keys(block).some((key) => !['id', 'type', 'name', 'params', 'x', 'y'].includes(key))) {
+      throw new TypeError(`Block '${block.id}' has an unexpected property.`);
+    }
+    if (typeof block.id !== 'string' || block.id.length < 1 || block.id.length > 128 || ids.has(block.id)) {
+      throw new TypeError(`Block ${index + 1} requires a unique ID of 1 to 128 characters.`);
+    }
+    if (block.name !== undefined && (typeof block.name !== 'string' || block.name.length > 160)) {
+      throw new TypeError(`Block '${block.id}' name must be a string of at most 160 characters.`);
+    }
+    if ((block.x !== undefined && !Number.isFinite(block.x)) || (block.y !== undefined && !Number.isFinite(block.y))) {
+      throw new TypeError(`Block '${block.id}' layout coordinates must be finite pixels.`);
+    }
+    if (!block.params || typeof block.params !== 'object' || Array.isArray(block.params)) {
+      throw new TypeError(`Block '${block.id}' requires a parameter object.`);
+    }
+    if (Object.keys(block.params).some((key) => !fields.allowed.includes(key))) {
+      throw new TypeError(`Block '${block.id}' has an unsupported parameter for type '${block.type}'.`);
+    }
+    for (const name of fields.required) {
+      if (!Object.hasOwn(block.params, name) || !Number.isFinite(block.params[name])) {
+        throw new TypeError(`Block '${block.id}' (${block.type}) requires a finite '${name}' input.`);
+      }
+    }
+    for (const [name, value] of Object.entries(block.params)) {
+      if (!Number.isFinite(value)) throw new TypeError(`Block '${block.id}' parameter '${name}' must be finite.`);
+    }
+    if (
+      block.type === 'pid' &&
+      block.params.limitMin !== undefined &&
+      block.params.limitMax !== undefined &&
+      block.params.limitMin > block.params.limitMax
+    ) {
+      throw new TypeError(`Block '${block.id}' has invalid PID output limits.`);
+    }
+    ids.add(block.id);
+  }
+
+  for (let index = 0; index < graphData.connections.length; index++) {
+    const connection = graphData.connections[index];
+    if (!connection || typeof connection !== 'object' || Array.isArray(connection)) {
+      throw new TypeError(`Connection ${index + 1} must be an object.`);
+    }
+    if (Object.keys(connection).some((key) => !['id', 'fromBlock', 'fromPort', 'toBlock', 'toPort'].includes(key))) {
+      throw new TypeError(`Connection ${index + 1} has an unexpected property.`);
+    }
+    if (!ids.has(connection.fromBlock) || !ids.has(connection.toBlock)) {
+      throw new TypeError(`Connection ${index + 1} references an unknown block ID.`);
+    }
+    for (const portName of ['fromPort', 'toPort']) {
+      if (connection[portName] !== undefined && connection[portName] !== 0) {
+        throw new TypeError(`Connection ${index + 1} uses an unsupported ${portName}; only port 0 is available.`);
+      }
+    }
+  }
+  return true;
+}
+
+function runBlockDiagramSimulation({ graphData, tEnd, dt }) {
+  validateBlockDiagramGraph(graphData);
+  const graph = BlockDiagramGraph.fromJSON(graphData);
+  return {
+    status: 'experimental',
+    validationLevel: 'experimental',
+    units: {
+      time: { unit: 's', dimension: 'time' },
+      signal: { unit: '1', dimension: 'dimensionless' }
+    },
+    ...graph.simulate(tEnd, dt)
+  };
+}
+
+function registerControlsIpc() {
+  // 1. Legacy propeller estimate, unavailable pending independent validation
+  defineHandler(
+    'omni:solve-propeller',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => ({
+      success: false,
+      status: 'unavailable',
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message:
+          'Propeller performance is unavailable until a sourced propeller model and independent reference are reviewed.'
+      }
+    }),
+    {
+      domain: 'controls',
+      description: 'Unavailable legacy propeller estimate; no independent validation is established'
+    }
+  );
+
+  // 2. Legacy drone flight estimate, unavailable pending independent validation
+  defineHandler(
+    'omni:simulate-drone',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => ({
+      success: false,
+      status: 'unavailable',
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message:
+          'Flight simulation is unavailable until vehicle parameters, model assumptions, and independent reference data are reviewed.'
+      }
+    }),
+    {
+      domain: 'controls',
+      description: 'Unavailable legacy drone flight estimate; no independent validation is established'
+    }
+  );
+
+  // 3. Block Diagram Graph Simulation
+  defineHandler(
+    'omni:simulate-block-diagram',
+    BLOCK_DIAGRAM_REQUEST_SCHEMA,
+    async (event, params) => runBlockDiagramSimulation(params),
+    {
+      domain: 'controls',
+      description:
+        'Experimental integration of caller-supplied dimensionless signals with explicit seconds for time controls'
+    }
+  );
+
+  // 4. Bode Frequency Response Analysis
+  defineHandler(
+    'omni:solve-bode',
+    {
+      type: 'object',
+      required: ['numCoeffs', 'denCoeffs', 'omegaMin', 'omegaMax', 'points'],
+      additionalProperties: false,
+      properties: {
+        numCoeffs: VECTOR_SCHEMA,
+        denCoeffs: VECTOR_SCHEMA,
+        omegaMin: { type: 'number', min: 0 },
+        omegaMax: { type: 'number', min: 0 },
+        points: { type: 'number', integer: true, min: 2, max: 10000 }
+      }
+    },
+    async (event, { numCoeffs, denCoeffs, omegaMin, omegaMax, points }) => {
+      return FrequencyResponseAnalyzer.computeBode(numCoeffs, denCoeffs, omegaMin, omegaMax, points);
+    },
+    {
+      domain: 'controls',
+      description:
+        'Compute an experimental Bode response from explicit transfer-function coefficients and frequency controls'
+    }
+  );
+
+  // 5. Deterministic Multi-Rate Scheduler
+  defineHandler(
+    'omni:schedule-multi-rate',
+    { type: 'object', optional: true },
+    async () =>
+      unavailableControlRoute(
+        'A caller-supplied task model and serializable step contract are required. The legacy route does not create fixed sample tasks.'
+      ),
+    {
+      domain: 'controls',
+      description: 'Unavailable until a caller-supplied multi-rate task model contract is configured'
+    }
+  );
+
+  // 6. Algebraic Loop Broyden Solver
+  defineHandler(
+    'omni:solve-algebraic-loop',
+    { type: 'object', optional: true },
+    async () =>
+      unavailableControlRoute(
+        'A caller-supplied algebraic system is required. The legacy route does not solve a built-in example equation.'
+      ),
+    {
+      domain: 'controls',
+      description: 'Unavailable until a serializable caller-supplied algebraic system contract is configured'
+    }
+  );
+
+  // 7. Modern Control Synthesis (LQR)
+  defineHandler(
+    'omni:synthesize-lqr',
+    {
+      type: 'object',
+      required: ['A', 'B', 'Q', 'R', 'maxIter', 'tolerance'],
+      additionalProperties: false,
+      properties: {
+        A: MATRIX_SCHEMA,
+        B: MATRIX_SCHEMA,
+        Q: MATRIX_SCHEMA,
+        R: MATRIX_SCHEMA,
+        maxIter: { type: 'number', integer: true, min: 1, max: 10000 },
+        tolerance: { type: 'number', min: 0 }
+      }
+    },
+    async (event, { A, B, Q, R, maxIter, tolerance }) => {
+      const cLqr = ModernControlSynthesis.solveContinuousLQR(A, B, Q, R, maxIter, tolerance);
+      return { success: true, validationLevel: 'experimental', continuous: cLqr };
+    },
+    {
+      domain: 'controls',
+      description: 'Solve an experimental continuous-time LQR estimate from explicit A, B, Q, and R matrices'
+    }
+  );
+
+  // 8. MISRA-C & #![no_std] Rust Autocoder
+  defineHandler(
+    'omni:autocode-controller',
+    {
+      type: 'object',
+      required: ['modelSpec'],
+      additionalProperties: false,
+      properties: {
+        modelSpec: {
+          type: 'object',
+          required: ['name', 'A', 'B', 'C', 'K', 'sampleRateHz'],
+          additionalProperties: false,
+          properties: {
+            name: { type: 'string', maxLength: 64 },
+            A: MATRIX_SCHEMA,
+            B: MATRIX_SCHEMA,
+            C: MATRIX_SCHEMA,
+            K: MATRIX_SCHEMA,
+            sampleRateHz: { type: 'number', min: 0 },
+            standard: { type: 'string', maxLength: 64 }
+          }
+        }
+      }
+    },
+    async (event, { modelSpec: spec }) => {
+      const cCode = AutocoderCRust.generateMisraC(spec);
+      const rustCode = AutocoderCRust.generateNoStdRust(spec);
+      const autosar = AutocoderCRust.generateAutosarSWC(spec);
+      return { success: true, validationLevel: 'experimental', cCode, rustCode, autosar };
+    },
+    {
+      domain: 'controls',
+      description: 'Generate experimental C and Rust code; no MISRA or safety qualification is claimed'
+    }
+  );
+
+  // 9. Model Predictive Control (MPC) QP
+  defineHandler(
+    'omni:solve-mpc',
+    {
+      type: 'object',
+      required: ['options', 'x0', 'yRef'],
+      additionalProperties: false,
+      properties: {
+        options: {
+          type: 'object',
+          required: [
+            'A',
+            'B',
+            'C',
+            'predictionHorizon',
+            'controlHorizon',
+            'Q',
+            'R',
+            'Rdelta',
+            'uMin',
+            'uMax',
+            'deltaUMax',
+            'initialControl'
+          ],
+          additionalProperties: false,
+          properties: {
+            A: MATRIX_SCHEMA,
+            B: MATRIX_SCHEMA,
+            C: MATRIX_SCHEMA,
+            predictionHorizon: { type: 'number', integer: true, min: 1, max: 100 },
+            controlHorizon: { type: 'number', integer: true, min: 1, max: 100 },
+            Q: VECTOR_SCHEMA,
+            R: VECTOR_SCHEMA,
+            Rdelta: VECTOR_SCHEMA,
+            uMin: VECTOR_SCHEMA,
+            uMax: VECTOR_SCHEMA,
+            deltaUMax: VECTOR_SCHEMA,
+            initialControl: VECTOR_SCHEMA
+          }
+        },
+        x0: VECTOR_SCHEMA,
+        yRef: {}
+      }
+    },
+    async (event, { options, x0, yRef }) => {
+      const mpc = new ModelPredictiveController(options);
+      const result = mpc.computeControlAction(x0, yRef);
+      return { success: true, validationLevel: 'experimental', result };
+    },
+    {
+      domain: 'controls',
+      description:
+        'Solve an experimental MPC estimate from explicit system, weight, constraint, state, and reference inputs'
+    }
+  );
+
+  // 10. Simscape DAE Multiphysics Network
+  defineHandler(
+    'omni:simulate-simscape-dae',
+    {
+      type: 'object',
+      required: [
+        'R',
+        'L',
+        'Kt',
+        'Ke',
+        'J',
+        'b',
+        'V_step',
+        'totalTimeSec',
+        'dt',
+        'initialCurrentAmps',
+        'initialAngularVelocityRadS'
+      ],
+      additionalProperties: false,
+      properties: {
+        R: { type: 'number', min: 0 },
+        L: { type: 'number', min: 0 },
+        Kt: { type: 'number', min: 0 },
+        Ke: { type: 'number', min: 0 },
+        J: { type: 'number', min: 0 },
+        b: { type: 'number', min: 0 },
+        V_step: { type: 'number' },
+        totalTimeSec: { type: 'number', min: 0 },
+        dt: { type: 'number', min: 0 },
+        initialCurrentAmps: { type: 'number' },
+        initialAngularVelocityRadS: { type: 'number' }
+      }
+    },
+    async (event, params) => {
+      const result = SimscapeDAESolver.simulateElectromechanicalDCMotor(params);
+      return { success: true, validationLevel: 'experimental', result };
+    },
+    {
+      domain: 'controls',
+      description:
+        'Experimental linear DC motor estimate from explicit electrical, mechanical, initial-state, and time inputs'
+    }
+  );
+
+  // 11. Experimental MC/DC pair diagnostic
+  defineHandler(
+    'omni:evaluate-mcdc-coverage',
+    { type: 'object', optional: true },
+    async () =>
+      unavailableControlRoute(
+        'The coverage engine requires caller-supplied decision logic, which this IPC contract cannot serialize. No built-in decision or test vectors were evaluated.'
+      ),
+    { domain: 'controls', description: 'Unavailable until a caller-supplied decision-logic contract is configured' }
+  );
+
+  // 12. FMI 2.0 Co-Simulation Master
+  defineHandler(
+    'omni:run-fmi-cosimulation',
+    { type: 'object', optional: true },
+    async () =>
+      unavailableControlRoute(
+        'Caller-supplied FMU artifacts and a connection map are required. The legacy route does not create placeholder FMUs.'
+      ),
+    { domain: 'controls', description: 'Unavailable until FMU artifact and connection contracts are configured' }
+  );
+
+  // 13. AUTOSAR Classic 4.4 SWC & ARXML Descriptor Generator
+  defineHandler(
+    'omni:generate-autosar-swc',
+    {
+      type: 'object',
+      required: ['modelSpec'],
+      additionalProperties: false,
+      properties: {
+        modelSpec: {
+          type: 'object',
+          required: ['name', 'A', 'B', 'C', 'K', 'sampleRateHz'],
+          additionalProperties: false,
+          properties: {
+            name: { type: 'string', maxLength: 64 },
+            A: MATRIX_SCHEMA,
+            B: MATRIX_SCHEMA,
+            C: MATRIX_SCHEMA,
+            K: MATRIX_SCHEMA,
+            sampleRateHz: { type: 'number', min: 0 },
+            standard: { type: 'string', maxLength: 64 }
+          }
+        }
+      }
+    },
+    async (event, { modelSpec: spec }) => {
+      const autosar = AutocoderCRust.generateAutosarSWC(spec);
+      return { success: true, validationLevel: 'experimental', ...autosar };
+    },
+    {
+      domain: 'controls',
+      description: 'Generate experimental code from an explicit state-space model; AUTOSAR conformance is not assessed'
+    }
+  );
+
+  // 14. Experimental aerospace route, unavailable pending independent validation
+  defineHandler(
+    'omni:solve-nasa-rocket',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => ({
+      success: false,
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message:
+          'Aerospace calculations are unavailable until the legacy models have independent reference data and review.'
+      }
+    }),
+    {
+      domain: 'aerospace',
+      description: 'Unavailable experimental legacy aerospace route; no independent validation is established'
+    }
+  );
+
+  // 15. Sourced spacecraft specification, unavailable pending independent validation
+  defineHandler(
+    'omni:get-nasa-spacecraft-spec',
+    {
+      type: 'object',
+      optional: true
+    },
+    async () => ({
+      success: false,
+      validationLevel: 'experimental',
+      error: {
+        code: 'UNSUPPORTED',
+        message: 'No sourced, independently reviewed spacecraft specification is available.'
+      }
+    }),
+    {
+      domain: 'aerospace',
+      description: 'Unavailable: no sourced, independently reviewed spacecraft specification exists'
+    }
+  );
+}
+
+module.exports = {
+  registerControlsIpc,
+  BLOCK_DIAGRAM_REQUEST_SCHEMA,
+  validateBlockDiagramGraph,
+  runBlockDiagramSimulation
+};

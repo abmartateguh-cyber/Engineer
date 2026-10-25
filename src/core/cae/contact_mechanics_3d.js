@@ -1,14 +1,11 @@
 /**
- * OmniEng 3D Nonlinear Contact Mechanics Engine
- * 
- * Implements Augmented Lagrangian and Penalty contact formulations for
- * 3D multi-body structural contact, frictionless and Coulomb frictional interfaces.
- * 
- * Includes canonical Hertz contact benchmark analytical verification (within 3% accuracy).
- * 
- * Parity standard: Abaqus / Standard (*CONTACT PAIR, MORTAR) / ANSYS Mechanical.
- * 
- * 100% In-House Sovereign Implementation. Zero External Dependencies.
+ * OmniEng Hertz Contact Analytical Estimate and Legacy Quadrature
+ *
+ * Provides closed-form Hertz contact estimates and a legacy midpoint
+ * quadrature of the analytical pressure profile. It does not assemble a
+ * discrete contact model or execute an augmented-Lagrangian/penalty solve.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -16,10 +13,8 @@
 class ContactMechanics3D {
   /**
    * @param {Object} [options]
-   * @param {number} [options.penaltyStiffness=1.0e10] - Normal penalty stiffness epsilon_n (N/m^3)
-   * @param {number} [options.frictionCoefficient=0.0] - Coulomb friction coefficient mu
-   * @param {number} [options.maxIterations=20] - Max Augmented Lagrangian outer iterations
-   * @param {number} [options.tolerance=1.0e-4] - Gap penetration tolerance (meters)
+   * Legacy options are retained for compatibility. The current estimate path
+   * does not use penalty, friction, iteration, or gap-tolerance settings.
    */
   constructor(options = {}) {
     this.penaltyStiffness = options.penaltyStiffness || 1.0e10;
@@ -30,7 +25,7 @@ class ContactMechanics3D {
 
   /**
    * Computes analytical Hertz contact solution for sphere on elastic half-space (or two spheres).
-   * 
+   *
    * @param {Object} params
    * @param {number} params.radius1 - Radius of sphere 1 (m)
    * @param {number} [params.radius2=Infinity] - Radius of sphere 2 / half-space (m)
@@ -51,7 +46,7 @@ class ContactMechanics3D {
 
     // 2. Relative Radius of Curvature R*
     // 1 / R* = 1 / R1 + 1 / R2
-    const invRStar = (1.0 / radius1) + (isFinite(radius2) ? 1.0 / radius2 : 0.0);
+    const invRStar = 1.0 / radius1 + (isFinite(radius2) ? 1.0 / radius2 : 0.0);
     const RStar = 1.0 / invRStar;
 
     // 3. Contact Patch Radius a = ((3 * F * R*) / (4 * E*))^(1/3)
@@ -77,11 +72,11 @@ class ContactMechanics3D {
   }
 
   /**
-   * Solves 3D contact using discrete Augmented Lagrangian discretization.
-   * Compares discretized finite element node pairs against analytical benchmark.
-   * 
+   * Integrates the closed-form Hertz pressure profile at radial midpoints.
+   * This legacy method does not execute a discrete contact mechanics solve.
+   *
    * @param {Object} params - Contact problem definition
-   * @returns {Object} Solved contact state, contact pressure, and accuracy vs analytical
+   * @returns {Object} Experimental analytical estimate and quadrature diagnostics
    */
   solveSphereOnFlatContact(params) {
     const analytical = this.computeAnalyticalHertz(params);
@@ -109,20 +104,33 @@ class ContactMechanics3D {
       }
     }
 
-    const pressureErrorPercent = Math.abs((computedMaxPressure - analytical.maxPressurePa) / analytical.maxPressurePa) * 100.0;
+    const profileMaxPressureErrorPercent =
+      Math.abs((computedMaxPressure - analytical.maxPressurePa) / analytical.maxPressurePa) * 100.0;
+    const integratedForceErrorPercent = Math.abs((computedTotalForce - load) / load) * 100.0;
+    const profileQuadrature = {
+      indentationDepthMm: analytical.indentationDepthMm,
+      maxPressurePa: computedMaxPressure,
+      maxPressureMpa: computedMaxPressure / 1.0e6,
+      totalForceNewtons: computedTotalForce
+    };
 
     return {
-      converged: true,
-      iterations: 3,
+      status: 'estimate-only',
+      validationLevel: 'experimental',
+      solverExecuted: false,
+      solverMethod: 'closed-form-hertz-profile-midpoint-quadrature',
+      warning: 'No discrete contact solver ran; reported values are an analytical profile quadrature estimate.',
+      converged: false,
+      iterations: null,
       analytical,
-      numerical: {
-        indentationDepthMm: analytical.indentationDepthMm,
-        maxPressurePa: computedMaxPressure,
-        maxPressureMpa: computedMaxPressure / 1.0e6,
-        totalForceNewtons: computedTotalForce
-      },
-      pressureErrorPercent,
-      isHertzCompliant: pressureErrorPercent <= 3.0 // Exit gate: within 3% of analytical
+      profileQuadrature,
+      // Legacy field names remain for callers that consume the old response.
+      // These values are quadrature diagnostics, not a solver result.
+      numerical: profileQuadrature,
+      profileMaxPressureErrorPercent,
+      integratedForceErrorPercent,
+      pressureErrorPercent: profileMaxPressureErrorPercent,
+      isHertzCompliant: null
     };
   }
 }

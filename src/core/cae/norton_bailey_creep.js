@@ -6,7 +6,7 @@
  * 
  * Standards: ASME Section III Subsection NH / API 579-1 / ASME B&PV Section VIII
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

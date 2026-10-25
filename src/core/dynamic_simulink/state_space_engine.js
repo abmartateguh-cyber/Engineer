@@ -1,7 +1,7 @@
 /**
  * OmniEng State-Space & Non-Linear Dynamic Blocks Engine
  * Standard: Continuous/Discrete State-Space and Canonical Transfer Function Forms
- * Industrial Parity: MATLAB / Simulink Continuous & Non-Linear Block Library.
+ * Experimental implementation: MATLAB / Simulink Continuous & Non-Linear Block Library.
  */
 
 class StateSpaceEngine {

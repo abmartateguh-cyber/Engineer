@@ -1,14 +1,14 @@
 /**
- * OmniEng Tier-1 Production Fuzz Testing Suite (CWE-20 / CWE-400 Robustness)
- * 
+ * Experimental malformed-input smoke checks (not a production fuzzing campaign)
+ *
  * Generates 12,000+ malformed, truncated, out-of-bounds, adversarial inputs across:
  *   1. ISO 10303-21 STEP Parser (StepTranslator)
  *   2. GDSII Stream Engine (GdsiiStreamEngine)
  *   3. SEMI P39 OASIS Binary Stream Engine (OasisStreamEngine)
  *   4. OmniArchive (.omni) Container & AES-256 Vault (OmniVaultAES256)
- *   5. IEEE 1800 SystemVerilog HDL Synthesizer (SystemVerilogSynthesizer)
+ *   5. Partial SystemVerilog declaration inspector (SystemVerilogSynthesizer)
  *   6. Security IPC Gateway Validator (IPCValidator)
- * 
+ *
  * Verifies that all parsers fail gracefully with controlled exceptions
  * and NEVER crash the V8 runtime, segfault, loop infinitely, or leak memory.
  */
@@ -27,7 +27,7 @@ const { SystemVerilogSynthesizer } = require('../../src/core/eda/system_verilog_
 const { IPCValidator } = require('../../src/core/security/ipc_validator');
 
 // Pseudo-random deterministic generator for repeatable fuzz campaigns
-function createPrng(seed = 0x1337C0DE) {
+function createPrng(seed = 0x1337c0de) {
   let s = seed;
   return function next() {
     s = (s * 1664525 + 1013904223) >>> 0;
@@ -37,12 +37,12 @@ function createPrng(seed = 0x1337C0DE) {
 
 function runParserFuzzTests() {
   console.log('\n================================================================');
-  console.log('   RUNNING TIER-1 PRODUCTION PARSER FUZZING SUITE (12,000 RUNS) ');
+  console.log('   RUNNING EXPERIMENTAL PARSER SMOKE CHECKS (12,000 INPUTS)     ');
   console.log('================================================================\n');
 
   let passed = 0;
   let total = 0;
-  const prng = createPrng(0xACE12345);
+  const prng = createPrng(0xace12345);
 
   function runFuzzGate(name, fn) {
     total++;
@@ -94,7 +94,7 @@ END-ISO-10303-21;`;
         candidate = 'ISO-10303-21; DATA;\n' + '#1=CARTESIAN_POINT(' + '('.repeat(i % 50) + '1.0, 2.0, 3.0';
       } else if (strategy === 3) {
         // Non-string or extreme length
-        candidate = 'DATA;\n' + '#999999999999999=CARTESIAN_POINT(\'\', (NaN, Infinity, -0.0));\nENDSEC;';
+        candidate = 'DATA;\n' + "#999999999999999=CARTESIAN_POINT('', (NaN, Infinity, -0.0));\nENDSEC;";
       } else {
         // Pure random ASCII garbage
         const len = Math.floor(prng() * 256) + 1;
@@ -124,21 +124,30 @@ END-ISO-10303-21;`;
       } else if (strategy === 1) {
         // GDSII header with invalid declared record lengths (huge, negative, 0)
         buf = Buffer.alloc(32);
-        const badLen = [0, 1, 2, 3, 0xFFFF, 0x7FFF][i % 6];
+        const badLen = [0, 1, 2, 3, 0xffff, 0x7fff][i % 6];
         buf.writeUInt16BE(badLen, 0);
         buf.writeUInt16BE(GdsRecordType.HEADER, 2);
       } else if (strategy === 2) {
         // Valid header followed by truncated record payload
         buf = Buffer.from([
-          0x00, 0x06, 0x00, 0x02, 0x02, 0x58, // HEADER
-          0x00, 0x1C, 0x01, 0x02,             // BGNLIB declared 28 bytes, but only 4 provided
-          0x00, 0x00
+          0x00,
+          0x06,
+          0x00,
+          0x02,
+          0x02,
+          0x58, // HEADER
+          0x00,
+          0x1c,
+          0x01,
+          0x02, // BGNLIB declared 28 bytes, but only 4 provided
+          0x00,
+          0x00
         ]);
       } else {
         // Endless loop attempt with unknown record types
         buf = Buffer.alloc(64);
         buf.writeUInt16BE(4, 0);
-        buf.writeUInt16BE(0xFFEE, 2); // Unknown record
+        buf.writeUInt16BE(0xffee, 2); // Unknown record
         buf.writeUInt16BE(4, 4);
         buf.writeUInt16BE(GdsRecordType.ENDLIB, 6);
       }
@@ -156,7 +165,7 @@ END-ISO-10303-21;`;
   // ----------------------------------------------------------------
   runFuzzGate('[FUZZ-3] SEMI P39 OASIS Stream (2,000 Vint & Modal State Vectors)...', () => {
     const engine = new OasisStreamEngine();
-    const validMagic = [0x25, 0x53, 0x45, 0x4D, 0x49, 0x2D, 0x4F, 0x41, 0x53, 0x49, 0x53, 0x0D, 0x0A];
+    const validMagic = [0x25, 0x53, 0x45, 0x4d, 0x49, 0x2d, 0x4f, 0x41, 0x53, 0x49, 0x53, 0x0d, 0x0a];
 
     for (let i = 0; i < 2000; i++) {
       let buf;
@@ -167,14 +176,14 @@ END-ISO-10303-21;`;
         buf = crypto.randomBytes(len);
       } else if (strategy === 1) {
         // Valid magic header followed by vint overflow (continuous 0x80+ bytes)
-        const overflowVint = Array(15).fill(0xFF);
+        const overflowVint = Array(15).fill(0xff);
         buf = Buffer.from([...validMagic, 1, ...overflowVint]);
       } else if (strategy === 2) {
         // Valid magic header followed by corrupt record type
-        buf = Buffer.from([...validMagic, 0x7E, 0x01, 0x02]);
+        buf = Buffer.from([...validMagic, 0x7e, 0x01, 0x02]);
       } else {
         // Valid magic header with truncated string length
-        buf = Buffer.from([...validMagic, 13, 0x7F, 0x00]); // CELL record claiming 127 bytes, but 1 byte provided
+        buf = Buffer.from([...validMagic, 13, 0x7f, 0x00]); // CELL record claiming 127 bytes, but 1 byte provided
       }
 
       try {
@@ -211,7 +220,7 @@ END-ISO-10303-21;`;
       } else if (strategy === 3) {
         corruptEncrypted = Buffer.from(validEncrypted);
         const bodyOffset = 52 + (i % Math.max(1, corruptEncrypted.length - 52));
-        corruptEncrypted[bodyOffset] ^= 0xAA;
+        corruptEncrypted[bodyOffset] ^= 0xaa;
       } else {
         corruptEncrypted = crypto.randomBytes(64);
       }
@@ -240,7 +249,7 @@ END-ISO-10303-21;`;
       } else if (strat === 2) {
         // Corrupt payload byte to trigger CRC checksum failure
         corruptArchive = Buffer.from(validArchiveBuf);
-        corruptArchive[corruptArchive.length - 1] ^= 0xFF;
+        corruptArchive[corruptArchive.length - 1] ^= 0xff;
       } else {
         // Random bytes
         corruptArchive = crypto.randomBytes(Math.floor(prng() * 40) + 1);
@@ -253,9 +262,9 @@ END-ISO-10303-21;`;
   });
 
   // ----------------------------------------------------------------
-  // Gate 5: IEEE 1800 SystemVerilog HDL Fuzzing (2,000 malformed inputs)
+  // Gate 5: Partial SystemVerilog declaration inspector fuzzing (2,000 malformed inputs)
   // ----------------------------------------------------------------
-  runFuzzGate('[FUZZ-5] IEEE 1800 SystemVerilog Synthesizer (2,000 Corrupted HDL Inputs)...', () => {
+  runFuzzGate('[FUZZ-5] SystemVerilog declaration inspector (2,000 corrupted inputs)...', () => {
     const synth = new SystemVerilogSynthesizer();
     const fragments = [
       'module test (input clk, output reg q);',
@@ -276,7 +285,7 @@ END-ISO-10303-21;`;
         code = fragments.join('\n').replace('clk', 'clk @@ $$ && ' + String(i));
       } else if (strategy === 2) {
         // Extreme identifier length
-        code = `module ${'A'.repeat(i % 1000 + 1)} (input clk); endmodule`;
+        code = `module ${'A'.repeat((i % 1000) + 1)} (input clk); endmodule`;
       } else {
         // Empty or whitespace only
         code = ' '.repeat(i % 50);

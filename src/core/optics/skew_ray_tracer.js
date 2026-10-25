@@ -1,10 +1,8 @@
 /**
  * OmniEng Exact 3D Skew Ray Tracing Engine
  * Standard: Vector Snell's Law & Conic/Polynomial Aspherical Surfaces
- * Industrial Parity: Zemax OpticStudio / SYNOPSYS CODE V exact ray tracing.
+ * Experimental implementation: Zemax OpticStudio / SYNOPSYS CODE V exact ray tracing.
  */
-
-const { OpticalMaterials } = require('./optical_materials');
 
 class SkewRayTracer {
   /**
@@ -350,8 +348,8 @@ class SkewRayTracer {
    * @param {number} fStop Lens numerical aperture f-number
    * @param {number} maxLpMm Max spatial frequency (lp/mm)
    */
-  static computeMTFCurve(rmsSpotRadiusMm = 0.015, fStop = 1.4, maxLpMm = 120) {
-    const lambdaMm = 0.00055; // 550 nm green
+  static computeMTFCurve(rmsSpotRadiusMm = 0.015, fStop = 1.4, maxLpMm = 120, wavelengthNm = 550) {
+    const lambdaMm = wavelengthNm * 1e-6;
     const cutoffFreqLpMm = 1.0 / (lambdaMm * fStop); // Diffraction cutoff = 1 / (λ * N)
 
     const frequencies = [];
@@ -425,10 +423,10 @@ class SkewRayTracer {
       const thickness = s.thickness !== undefined ? s.thickness : (s.thicknessMm || 0);
       const zVertex = s.zVertex !== undefined ? s.zVertex : currentZ;
       currentZ += thickness;
-      const glass = s.glass || s.glassKey || 'Air';
-      const prevGlass = idx === 0 ? 'Air' : (surfaces[idx - 1].glass || surfaces[idx - 1].glassKey || 'Air');
-      const nIncident = s.nIncident || OpticalMaterials.getRefractiveIndex(prevGlass, wl);
-      const nTransmitted = s.nTransmitted || OpticalMaterials.getRefractiveIndex(glass, wl);
+      const { nIncident, nTransmitted } = s;
+      if (![nIncident, nTransmitted].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)) {
+        throw new TypeError(`Surface ${idx} requires explicit positive incident and transmitted refractive indices.`);
+      }
       return {
         radius,
         zVertex,

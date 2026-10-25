@@ -1,6 +1,6 @@
 /**
  * OmniEng Phase 2 Upgrade Verification Suite:
- * CAD Kernel & Geometric Modeling Parity
+ * CAD Kernel & Geometric Modeling Experimental workflow
  *
  * Verifies:
  * 1. NurbsBasis: Cox-de Boor recursion, derivatives, partition of unity
@@ -22,7 +22,7 @@ const { FeatureControlFrame, DraftingEngine2D } = require('../src/core/cad/draft
 
 function runPhase2Tests() {
   console.log('\n================================================================');
-  console.log('   OmniEng Phase 2 CAD Kernel & Modeling Parity Suite           ');
+  console.log('   OmniEng Phase 2 CAD Kernel & Modeling Experimental workflow Suite           ');
   console.log('================================================================\n');
 
   let passed = 0;

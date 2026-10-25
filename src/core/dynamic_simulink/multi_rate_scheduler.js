@@ -1,13 +1,13 @@
 /**
  * OmniEng Dynamic Simulink Multi-Rate Scheduler & Modern Control Synthesis
- * 
+ *
  * Provides:
  * 1. Hybrid Continuous/Discrete Multi-Rate Scheduler (deterministic multi-frequency execution with ZOH).
  * 2. Tarjan's Strongly Connected Components (SCC) algebraic loop detector.
  * 3. Broyden quasi-Newton non-linear algebraic loop solver with backtracking line search.
  * 4. Modern Control Synthesis: Continuous and Discrete LQR via Algebraic Riccati Equation (CARE/DARE).
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -59,7 +59,7 @@ class ScheduledTask {
     this.priority = config.priority || 1;
     this.phaseOffsetSec = config.phaseOffsetSec || 0.0;
     this.stepFn = config.stepFn || ((t, dt, inputs) => inputs);
-    
+
     this.executionCount = 0;
     this.lastExecutionTime = -1.0;
     this.state = {};
@@ -110,7 +110,7 @@ class MultiRateScheduler {
     const periodTicks = Math.round(task.periodSec * this.baseRateHz);
     const offsetTicks = Math.round(task.phaseOffsetSec * this.baseRateHz);
     if (periodTicks <= 0) return true;
-    return (tick - offsetTicks) >= 0 && ((tick - offsetTicks) % periodTicks === 0);
+    return tick - offsetTicks >= 0 && (tick - offsetTicks) % periodTicks === 0;
   }
 
   /**
@@ -188,7 +188,7 @@ class MultiRateScheduler {
       totalTicks,
       simulatedTime: this.currentTime,
       logCount: log.length,
-      taskStats: Array.from(this.tasks.values()).map(t => ({
+      taskStats: Array.from(this.tasks.values()).map((t) => ({
         id: t.id,
         name: t.name,
         rateHz: t.sampleRateHz,
@@ -270,7 +270,7 @@ class AlgebraicLoopSolver {
     const n = x0.length;
 
     let x = [...x0];
-    
+
     // Evaluate initial residual R(x) = f(x) - x
     const fx = f(x);
     let r = new Float64Array(n);
@@ -386,7 +386,7 @@ class ModernControlSynthesis {
    * Solves Continuous-time Linear Quadratic Regulator (CARE):
    * A^T * P + P * A - P * B * R^(-1) * B^T * P + Q = 0
    * Gain K = R^(-1) * B^T * P
-   * 
+   *
    * Uses iterative Kleinman Newton-Raphson method.
    * @param {number[][]} A - n x n system matrix
    * @param {number[][]} B - n x m input matrix
@@ -394,7 +394,10 @@ class ModernControlSynthesis {
    * @param {number[][]} R - m x m control weight (positive-definite)
    * @returns {{P: number[][], K: number[][], closedLoopA: number[][]}}
    */
-  static solveContinuousLQR(A, B, Q, R, maxIter = 30, tol = 1e-8) {
+  static solveContinuousLQR(A, B, Q, R, maxIter, tol) {
+    if (!Number.isInteger(maxIter) || maxIter < 1 || maxIter > 10000 || !Number.isFinite(tol) || tol <= 0) {
+      throw new TypeError('solveContinuousLQR requires positive iteration and tolerance inputs.');
+    }
     const n = A.length;
     const m = B[0].length;
     const Rinv = this._invertMatrix(R);
@@ -408,7 +411,7 @@ class ModernControlSynthesis {
       }
     }
 
-    let P = Q.map(row => [...row]);
+    let P = Q.map((row) => [...row]);
 
     for (let iter = 0; iter < maxIter; iter++) {
       // Closed-loop Ac = A - B*K
@@ -470,7 +473,7 @@ class ModernControlSynthesis {
    * Solves Discrete-time Linear Quadratic Regulator (DARE):
    * P = A^T * P * A - (A^T * P * B) * (R + B^T * P * B)^(-1) * (B^T * P * A) + Q
    * Gain K = (R + B^T * P * B)^(-1) * B^T * P * A
-   * 
+   *
    * @param {number[][]} A
    * @param {number[][]} B
    * @param {number[][]} Q
@@ -478,7 +481,7 @@ class ModernControlSynthesis {
    */
   static solveDiscreteLQR(A, B, Q, R, maxIter = 80, tol = 1e-9) {
     const n = A.length;
-    let P = Q.map(row => [...row]);
+    let P = Q.map((row) => [...row]);
 
     for (let iter = 0; iter < maxIter; iter++) {
       const AT = this._transpose(A);
@@ -575,7 +578,7 @@ class ModernControlSynthesis {
         out[i][j] = sum;
       }
     }
-    return out.map(r => Array.from(r));
+    return out.map((r) => Array.from(r));
   }
 
   static _invertMatrix(M) {
@@ -604,7 +607,9 @@ class ModernControlSynthesis {
       for (let k = i + 1; k < n; k++) {
         if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
       }
-      const tmp = A[i]; A[i] = A[maxRow]; A[maxRow] = tmp;
+      const tmp = A[i];
+      A[i] = A[maxRow];
+      A[maxRow] = tmp;
       const pivot = A[i][i];
       if (Math.abs(pivot) < 1e-12) throw new Error('Matrix is singular');
       for (let j = 0; j < 2 * n; j++) A[i][j] /= pivot;
@@ -662,8 +667,12 @@ class ModernControlSynthesis {
       for (let k = i + 1; k < n2; k++) {
         if (Math.abs(Mat[k][i]) > Math.abs(Mat[maxR][i])) maxR = k;
       }
-      const tmpM = Mat[i]; Mat[i] = Mat[maxR]; Mat[maxR] = tmpM;
-      const tmpR = rhs[i]; rhs[i] = rhs[maxR]; rhs[maxR] = tmpR;
+      const tmpM = Mat[i];
+      Mat[i] = Mat[maxR];
+      Mat[maxR] = tmpM;
+      const tmpR = rhs[i];
+      rhs[i] = rhs[maxR];
+      rhs[maxR] = tmpR;
 
       const pivot = Mat[i][i];
       if (Math.abs(pivot) > 1e-12) {

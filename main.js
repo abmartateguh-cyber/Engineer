@@ -1,9 +1,9 @@
 /**
  * OmniEng Main Process (Electron Application)
- * Connects high-performance native simulation engines, local file systems, and IPC bridges.
- * 
+ * Connects experimental JavaScript calculation examples, local file systems, and IPC bridges.
+ *
  * Architecture & Security Hardening:
- * - 100% Schema-Validated IPC Gateway via defineHandler and domain routers
+ * - Project-specific IPC input checks through defineHandler and domain routers
  * - Sandbox enabled, context isolation enforced, node integration disabled
  * - Navigation and window-open guards (CWE-200 / CWE-94)
  * - Zero raw ipcMain.handle calls in main process
@@ -20,11 +20,14 @@ const fs = require('fs');
 const { registerAllIpcHandlers } = require('./src/main/ipc');
 
 // Domain Service Singletons
-const { OmniAIEngine } = require('./src/core/ai/omni_ai_engine');
 const { CloudHPCEngine } = require('./src/core/hpc/cloud_cluster');
 const { SymbolicReasoner } = require('./src/core/ai/symbolic_reasoner');
-const { DropTestWizard, DroneDesignWizard, CameraLensWizard, PCBDesignWizard } = require('./src/ui/wizards/design_wizards');
-const { DIPPRDatabase } = require('./src/core/plant/dippr_database');
+const {
+  DropTestWizard,
+  DroneDesignWizard,
+  CameraLensWizard,
+  PCBDesignWizard
+} = require('./src/ui/wizards/design_wizards');
 const { ImmutableAuditLedger } = require('./src/core/compliance/immutable_audit_ledger');
 const { OutOfCoreAssemblyManager } = require('./src/core/cad/out_of_core_octree');
 const { KeymapManager } = require('./src/ui/keymap_manager');
@@ -34,9 +37,6 @@ const auditLedger = new ImmutableAuditLedger('OmniEng_Commercial_2026');
 const outOfCoreOctree = new OutOfCoreAssemblyManager();
 const keymapManager = new KeymapManager();
 const dockingManager = new DockingManager();
-const dipprDatabase = new DIPPRDatabase();
-
-const aiEngine = new OmniAIEngine();
 const hpcEngine = new CloudHPCEngine();
 const symbolicReasoner = new SymbolicReasoner();
 const designWizards = {
@@ -66,7 +66,9 @@ function createWindow() {
   });
 
   // Strict Navigation & Window Opening Security Guards (CWE-200 / CWE-94)
-  win.webContents.setWindowOpenHandler(() => { return { action: 'deny' }; });
+  win.webContents.setWindowOpenHandler(() => {
+    return { action: 'deny' };
+  });
   win.webContents.on('will-navigate', (event, navigationUrl) => {
     if (!navigationUrl.startsWith('file://')) {
       event.preventDefault();
@@ -81,24 +83,24 @@ app.whenReady().then(() => {
   // Enterprise Headless CLI Mode Handling
   if (process.argv.includes('--version') || process.argv.includes('-v')) {
     const pkg = require('./package.json');
-    console.log(`${pkg.productName || 'OmniEng'} v${pkg.version} [Tier-1 Industrial Full Production Release]`);
+    console.log(`${pkg.productName || 'OmniEng'} v${pkg.version} [experimental workbench]`);
     app.exit(0);
     return;
   }
 
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(`
-OmniEng — Universal Multi-Industry Engineering & Simulation Platform
-Version: 1.0.0 (Tier-1 Industrial Full Production Release)
+OmniEng — Experimental Engineering Workbench
+Version: ${require('./package.json').version} (experimental; not release-approved)
 
 Usage:
   omnieng [options] [project.omni]
 
 Options:
   --version, -v          Display platform release version and build info
-  --help, -h             Display this enterprise CLI usage manual
-  --benchmark            Run all 9 gold-standard regulatory V&V benchmarks headlessly
-  --test-ui              Run automated headless Electron integration test suite
+  --help, -h             Display command-line options
+  --benchmark            Run benchmarks (currently unavailable)
+  --test-ui              Run the Electron UI diagnostic mode
   --capture              Run automated visual showcase and screenshot capture
   --no-devtools          Launch without developer inspection tools
 `);
@@ -107,20 +109,19 @@ Options:
   }
 
   if (process.argv.includes('--benchmark')) {
-    const { runVVVerificationBenchmarks } = require('./test/vv/run_vv');
-    const stats = runVVVerificationBenchmarks();
-    app.exit(stats.failed === 0 ? 0 : 1);
+    console.error(
+      'No released benchmark service is configured. Use the experimental test diagnostics with `npm run test:vv`.'
+    );
+    app.exit(2);
     return;
   }
 
-  // Register All 123 Schema-Validated Domain IPC Handlers
+  // Register domain IPC handlers with project-specific input checks.
   registerAllIpcHandlers({
     auditLedger,
     outOfCoreOctree,
     keymapManager,
     dockingManager,
-    dipprDatabase,
-    aiEngine,
     hpcEngine,
     symbolicReasoner,
     designWizards
@@ -145,7 +146,7 @@ Options:
       console.log('\n====================================================');
       console.log('   OmniEng Electron UI & Headless Integration Test');
       console.log('====================================================');
-      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       await sleep(1500);
 
       try {
@@ -172,8 +173,10 @@ Options:
             document.getElementById('ribbon-btn-optics').click();
             await new Promise(r => setTimeout(r, 600));
             assert(document.getElementById('modal-optical-inspector').classList.contains('active'), 'Optical modal opens active');
-            assert(!!document.getElementById('canvas-spot-diagram'), 'Optical Spot Diagram canvas rendered');
-            assert(!!document.getElementById('canvas-mtf-curve'), 'Optical MTF chart canvas rendered');
+            const opticalStatus = document.getElementById('optical-inspector-body').textContent;
+            assert(opticalStatus.includes('Experimental optical analysis unavailable'), 'Optical inspection reports unavailable without a supplied prescription');
+            assert(!document.getElementById('canvas-spot-diagram'), 'No spot plot is shown without calculated ray data');
+            assert(!document.getElementById('canvas-mtf-curve'), 'No MTF plot is shown without calculated optical data');
             document.getElementById('btn-close-optical-inspector').click();
             assert(!document.getElementById('modal-optical-inspector').classList.contains('active'), 'Optical modal closes');
 
@@ -195,7 +198,13 @@ Options:
             assert(!document.getElementById('modal-flowsheet-pfd').classList.contains('active'), 'Flowsheet modal closes');
 
             // 5. Test STEP and Gerber API invocations
-            const stepRes = await window.omniEngAPI.exportSTEP({ width: 30, height: 50, depth: 15 });
+            const stepRes = await window.omniEngAPI.exportSTEP({
+              width: 30,
+              height: 50,
+              depth: 15,
+              units: 'mm',
+              name: 'Test_Bracket'
+            });
             assert(stepRes && stepRes.success && stepRes.stepText.includes('ISO-10303-21'), 'IPC exportSTEP generates valid ISO-10303-21 string');
 
             const gerberRes = await window.omniEngAPI.exportGerber({
@@ -344,7 +353,7 @@ Options:
             assert(simscapeRes && simscapeRes.success && simscapeRes.result.simulationStepsCount > 0, 'IPC simulateSimscapeDAE integrates index-1 stiff DAE network');
 
             const mcdcRes = await window.omniEngAPI.evaluateMcdcCoverage({});
-            assert(mcdcRes && mcdcRes.success && mcdcRes.report.mcdcCoveragePercent === 100, 'IPC evaluateMcdcCoverage verifies DO-178C DAL-A MC/DC independence pairs');
+            assert(mcdcRes && mcdcRes.success && mcdcRes.report.mcdcCoveragePercent === 100 && mcdcRes.report.dataStatus === 'experimental', 'IPC evaluateMcdcCoverage reports experimental coverage diagnostics');
 
             const prRes = await window.omniEngAPI.flashPengRobinson({});
             assert(prRes && prRes.success && prRes.flash.converged, 'IPC flashPengRobinson executes PR-78 cubic VLE flash with Rachford-Rice');
@@ -372,7 +381,8 @@ Options:
             // 15. Test WebGPU Viewport & Interactive Block Canvas in window
             assert(typeof window.HighCapacityWebGPUViewport === 'function', 'HighCapacityWebGPUViewport loaded in window');
             const gpuVp = new window.HighCapacityWebGPUViewport({ canvasId: 'main-canvas' });
-            assert(gpuVp && gpuVp.maxPolygons === 5000000, 'HighCapacityWebGPUViewport initialized with 5M polygon target');
+            assert(gpuVp && gpuVp.maxPolygons === null && gpuVp.maxPolygonsEnforced === false, 'Viewport helper does not claim an unenforced polygon capacity');
+            assert(gpuVp.getTelemetry().fps === null, 'Viewport helper does not fabricate FPS telemetry');
             assert(typeof window.InteractiveBlockCanvasEngine === 'function', 'InteractiveBlockCanvasEngine loaded in window');
             const blockCanvas = new window.InteractiveBlockCanvasEngine();
             assert(blockCanvas && typeof blockCanvas.createBlock === 'function', 'InteractiveBlockCanvasEngine initialized');
@@ -909,7 +919,7 @@ Options:
       const outputDir = process.env.CAPTURE_OUTPUT_DIR || path.join(__dirname, 'screenshots');
       if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       await sleep(2500);
 
       // Shot 1: Full Application with 72m Space Rocket
@@ -1008,7 +1018,7 @@ Options:
       const outputDir = process.env.CAPTURE_OUTPUT_DIR || path.join(__dirname, 'screenshots');
       if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       await sleep(1800);
 
       // Switch to 50mm Lens Cutaway

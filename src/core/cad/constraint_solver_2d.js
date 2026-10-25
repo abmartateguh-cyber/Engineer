@@ -1,7 +1,7 @@
 /**
  * OmniEng 2D Variational Geometric Constraint Solver
  * Standard: Non-linear Least-Squares Levenberg-Marquardt Solver
- * Industrial Parity: Siemens D-Cubed 2D DCM / FreeCAD Sketcher solver.
+ * Experimental implementation: Siemens D-Cubed 2D DCM / FreeCAD Sketcher solver.
  */
 
 class ConstraintSolver2D {

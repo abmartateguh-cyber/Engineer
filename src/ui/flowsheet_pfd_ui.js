@@ -1,203 +1,167 @@
 /**
- * OmniEng Flowsheet Process Flow Diagram (PFD) UI
- * Standard: Aspen HYSYS / AVEVA PRO/II / DWSIM Flowsheet Parity
- * Renders:
- * 1. Process stream summary table with thermodynamic state variables
- * 2. Unit Operations status cards (Mixers, Separators, Compressors, Splitters)
- * 3. Overall flowsheet material & energy conservation balance
+ * Experimental plant flowsheet panel.
+ * Renders caller-provided stream results without generating sample values.
  */
 
 class FlowsheetPfdUI {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
-    this.solution = null;
   }
 
-  /**
-   * Initializes or updates the complete flowsheet PFD pane.
-   * @param {Object} data { solution, units, streams }
-   */
-  render(data = {}) {
+  render(result) {
     if (!this.container) return;
-    this.solution = data.solution || this._getDefaultSolution();
 
-    const streams = this.solution.streams || [];
-    const inFlow = 100.0;
-    const sProd = streams.find(s => s.id === 'S_PRODUCT') || { molarFlowKmolH: 1.27 };
-    const sVap = streams.find(s => s.id === 'S_VAPOR') || { molarFlowKmolH: 98.73 };
-    const outFlow = sProd.molarFlowKmolH + sVap.molarFlowKmolH;
-    const balanceErr = Math.abs(inFlow - outFlow);
+    const solution = result && result.solution && typeof result.solution === 'object' ? result.solution : {};
+    const streams = Array.isArray(solution.streams)
+      ? solution.streams
+      : Array.isArray(result && result.streams)
+        ? result.streams
+        : null;
+    const units = Array.isArray(solution.units)
+      ? solution.units
+      : Array.isArray(result && result.units)
+        ? result.units
+        : [];
 
-    this.container.innerHTML = `
-      <div class="flowsheet-pfd-layout" style="display: flex; flex-direction: column; gap: 14px; color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <!-- PFD Top Status Banner -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #0c1220; padding: 12px 16px; border-radius: 6px; border: 1px solid var(--border-color);">
-          <div>
-            <div style="font-weight: 700; color: var(--accent-cyan); font-size: 14px; display: flex; align-items: center; gap: 8px;">
-              <span class="icon-slot" data-omni-icon="flowsheet"></span> Aspen HYSYS Cyclic Process Flowsheet — Natural Gas Condensate Plant
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-              Wegstein Acceleration Solver • Peng-Robinson (PR-EOS) Cubic Thermodynamics • Recycle Tearing Loop
-            </div>
-          </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <span style="font-size: 11px; padding: 4px 10px; border-radius: 12px; background: rgba(52, 211, 153, 0.15); color: #34d399; font-weight: 600; border: 1px solid rgba(52, 211, 153, 0.3);">
-              CONVERGED (${this.solution.iterations || 5} iters)
-            </span>
-            <button class="btn-primary" id="btn-recompute-flowsheet" style="margin-top: 0; padding: 5px 12px; font-size: 11px; width: auto; display: inline-flex; align-items: center; gap: 6px;">
-              <span class="icon-slot" data-omni-icon="refresh"></span> Re-run Flowsheet
-            </button>
-          </div>
-        </div>
+    const panel = document.createElement('section');
+    panel.className = 'experimental-unavailable-panel';
+    panel.style.cssText =
+      'padding:24px; border:1px solid var(--border-color); border-radius:8px; background:#0c1220; color:var(--text-main);';
 
-        <!-- Conservation Accounting Cards -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Fresh Inflow (S1)</div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);">${inFlow.toFixed(2)} kmol/h</div>
-            <div style="font-size: 10px; color: var(--text-muted);">25.0°C • 20.0 bar</div>
-          </div>
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Total Outflow (Vapor+Liq)</div>
-            <div style="font-size: 16px; font-weight: 700; color: #34d399;">${outFlow.toFixed(2)} kmol/h</div>
-            <div style="font-size: 10px; color: var(--text-muted);">Vapor: ${sVap.molarFlowKmolH.toFixed(2)} • Liquid: ${sProd.molarFlowKmolH.toFixed(2)}</div>
-          </div>
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Mass Balance Error</div>
-            <div style="font-size: 16px; font-weight: 700; color: #a78bfa;">${(balanceErr * 1000).toFixed(4)} mol/h</div>
-            <div style="font-size: 10px; color: var(--text-muted);">< 0.0001% tolerance</div>
-          </div>
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Recycle Flow (S_RECYCLE)</div>
-            <div style="font-size: 16px; font-weight: 700; color: #fbbf24;">
-              ${(streams.find(s => s.id === 'S_RECYCLE') || { molarFlowKmolH: 0.55 }).molarFlowKmolH.toFixed(2)} kmol/h
-            </div>
-            <div style="font-size: 10px; color: var(--text-muted);">Torn Stream (Wegstein Q=-0.42)</div>
-          </div>
-        </div>
+    const title = document.createElement('h2');
+    title.textContent = 'Experimental plant flowsheet';
+    title.style.cssText = 'margin:0 0 8px; font-size:16px; color:var(--accent-cyan);';
 
-        <!-- Unit Operations Flow Architecture -->
-        <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-            <span class="icon-slot" data-omni-icon="flowsheet"></span> Flowsheet Block Diagram Architecture
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 6px 0;">
-            <!-- Unit 1: Mixer -->
-            <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; min-width: 140px; text-align: center;">
-              <div style="font-size: 10px; color: var(--accent-cyan); font-weight: 600;">UNIT: MIX1</div>
-              <div style="font-size: 12px; font-weight: 700; margin: 4px 0;">Inlet Stream Mixer</div>
-              <div style="font-size: 9px; color: var(--text-muted);">In: [S1, S_RECYCLE] → Out: S2</div>
-            </div>
+    const message = document.createElement('p');
+    message.textContent = streams
+      ? 'Caller-provided flowsheet data is shown below. Solver validity and independent accuracy are not assessed.'
+      : this._getUnavailableMessage(result);
+    message.style.cssText = 'margin:0; max-width:720px; line-height:1.5; color:var(--text-muted);';
 
-            <div style="color: var(--text-dim); font-size: 14px;">&rarr;</div>
+    const maturity = document.createElement('p');
+    maturity.textContent = 'Maturity: experimental.';
+    maturity.style.cssText = 'margin:12px 0 0; font-size:11px; color:var(--text-dim);';
 
-            <!-- Unit 2: Flash Drum -->
-            <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; min-width: 150px; text-align: center;">
-              <div style="font-size: 10px; color: #a78bfa; font-weight: 600;">UNIT: FLASH1</div>
-              <div style="font-size: 12px; font-weight: 700; margin: 4px 0;">Low-Temp Separator</div>
-              <div style="font-size: 9px; color: var(--text-muted);">-20.0°C • 18.0 bar • VLE Separation</div>
-            </div>
-
-            <div style="color: var(--text-dim); font-size: 14px;">&rarr;</div>
-
-            <!-- Unit 3: Splitter -->
-            <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; min-width: 150px; text-align: center;">
-              <div style="font-size: 10px; color: #34d399; font-weight: 600;">UNIT: SPLIT1</div>
-              <div style="font-size: 12px; font-weight: 700; margin: 4px 0;">Condensate Splitter</div>
-              <div style="font-size: 9px; color: var(--text-muted);">70% Product / 30% Recycle</div>
-            </div>
-
-            <div style="color: var(--text-dim); font-size: 14px;">&rarr;</div>
-
-            <!-- Unit 4: Recycle Loop Back -->
-            <div style="background: #1e1b4b; border: 1px dashed #6366f1; border-radius: 6px; padding: 8px 12px; min-width: 150px; text-align: center;">
-              <div style="font-size: 10px; color: #818cf8; font-weight: 600;">TEAR: S_RECYCLE</div>
-              <div style="font-size: 12px; font-weight: 700; margin: 4px 0;">Recycle to MIX1</div>
-              <div style="font-size: 9px; color: #c7d2fe;">Wegstein Accelerated Feedback</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Complete Stream Summary Table -->
-        <div style="background: #060911; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-            <span class="icon-slot" data-omni-icon="ebom"></span> Thermodynamic Stream Property Table (Aspen HYSYS Workbook Parity)
-          </div>
-          <div style="max-height: 220px; overflow-y: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-dim); background: #0a0f1d;">
-                  <th style="padding: 6px 10px;">Stream ID</th>
-                  <th style="padding: 6px 10px;">Phase Description</th>
-                  <th style="padding: 6px 10px;">Temp (°C)</th>
-                  <th style="padding: 6px 10px;">Pressure (bar)</th>
-                  <th style="padding: 6px 10px;">Vapor Fraction</th>
-                  <th style="padding: 6px 10px;">Molar Flow (kmol/h)</th>
-                  <th style="padding: 6px 10px;">Mass Flow (kg/h)</th>
-                  <th style="padding: 6px 10px;">Composition (C1 / C2 / C3)</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${this._renderStreamRows(streams)}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
-
-    if (typeof window !== 'undefined' && window.OmniIcons) {
-      window.OmniIcons.hydrateAll(this.container);
-    }
+    panel.append(title, message, maturity);
+    if (streams) panel.append(this._renderStreamTable(streams));
+    if (units.length > 0) panel.append(this._renderUnitList(units));
+    this.container.replaceChildren(panel);
   }
 
-  _renderStreamRows(streams) {
-    if (!streams || streams.length === 0) {
-      return `<tr><td colspan="8" style="padding: 12px; text-align: center; color: var(--text-dim);">No streams calculated.</td></tr>`;
-    }
-
-    return streams.map(s => {
-      const pBar = (s.pressureKPa ? s.pressureKPa / 100.0 : 1.013).toFixed(2);
-      const vFrac = s.vaporFraction !== undefined ? s.vaporFraction.toFixed(3) : '1.000';
-      const flow = s.molarFlowKmolH !== undefined ? s.molarFlowKmolH.toFixed(2) : '100.00';
-      
-      let phase = 'Vapor Phase';
-      if (s.vaporFraction === 0) phase = 'Subcooled Liquid';
-      else if (s.vaporFraction < 1.0 && s.vaporFraction > 0) phase = 'Two-Phase (VLE)';
-
-      const comp = s.composition || { Methane: 0.7, Ethane: 0.2, Propane: 0.1 };
-      const compStr = `${(comp.Methane || 0).toFixed(2)} / ${(comp.Ethane || 0).toFixed(2)} / ${(comp.Propane || 0).toFixed(2)}`;
-      const mw = (comp.Methane || 0) * 16.04 + (comp.Ethane || 0) * 30.07 + (comp.Propane || 0) * 44.10;
-      const massFlowKgH = (s.molarFlowKmolH * mw).toFixed(1);
-
-      return `
-        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-main);">
-          <td style="padding: 6px 10px; font-weight: 700; color: var(--accent-cyan); font-family: monospace;">${s.id}</td>
-          <td style="padding: 6px 10px;">${phase}</td>
-          <td style="padding: 6px 10px; font-family: monospace;">${s.temperatureC !== undefined ? s.temperatureC.toFixed(1) : '25.0'}</td>
-          <td style="padding: 6px 10px; font-family: monospace;">${pBar}</td>
-          <td style="padding: 6px 10px; font-family: monospace; color: #a78bfa;">${vFrac}</td>
-          <td style="padding: 6px 10px; font-family: monospace; font-weight: 600;">${flow}</td>
-          <td style="padding: 6px 10px; font-family: monospace;">${massFlowKgH}</td>
-          <td style="padding: 6px 10px; font-family: monospace; color: var(--text-muted);">${compStr}</td>
-        </tr>
-      `;
-    }).join('');
+  _getUnavailableMessage(result) {
+    if (typeof (result && result.error) === 'string') return result.error;
+    if (result && result.error && typeof result.error.message === 'string') return result.error.message;
+    return 'Flowsheet results are unavailable. No validated user flowsheet schema or independent validation reference is configured.';
   }
 
-  _getDefaultSolution() {
-    return {
-      converged: true,
-      iterations: 5,
-      streams: [
-        { id: 'S1', name: 'Fresh Feed', temperatureC: 25.0, pressureKPa: 2000.0, molarFlowKmolH: 100.0, vaporFraction: 1.0, composition: { Methane: 0.7, Ethane: 0.2, Propane: 0.1 } },
-        { id: 'S2', name: 'Mixed Feed', temperatureC: 24.8, pressureKPa: 1800.0, molarFlowKmolH: 100.55, vaporFraction: 0.999, composition: { Methane: 0.698, Ethane: 0.201, Propane: 0.101 } },
-        { id: 'S_VAPOR', name: 'Sales Gas Vapor', temperatureC: -20.0, pressureKPa: 1800.0, molarFlowKmolH: 98.73, vaporFraction: 1.0, composition: { Methane: 0.705, Ethane: 0.200, Propane: 0.095 } },
-        { id: 'S_LIQ', name: 'Raw NGL Condensate', temperatureC: -20.0, pressureKPa: 1800.0, molarFlowKmolH: 1.82, vaporFraction: 0.0, composition: { Methane: 0.072, Ethane: 0.312, Propane: 0.367 } },
-        { id: 'S_PRODUCT', name: 'NGL Product Stream', temperatureC: -20.0, pressureKPa: 1800.0, molarFlowKmolH: 1.27, vaporFraction: 0.0, composition: { Methane: 0.072, Ethane: 0.312, Propane: 0.367 } },
-        { id: 'S_RECYCLE', name: 'Recycle to MIX1', temperatureC: -20.0, pressureKPa: 1800.0, molarFlowKmolH: 0.55, vaporFraction: 0.0, composition: { Methane: 0.072, Ethane: 0.312, Propane: 0.367 } }
-      ]
-    };
+  _renderStreamTable(streams) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'max-height:220px; overflow:auto; margin-top:14px;';
+    const table = document.createElement('table');
+    table.style.cssText = 'width:100%; border-collapse:collapse; font-size:11px; text-align:left;';
+    const header = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    for (const label of [
+      'Stream ID',
+      'Phase',
+      'Temperature (°C)',
+      'Pressure (kPa)',
+      'Vapor fraction',
+      'Molar flow (kmol/h)',
+      'Composition'
+    ]) {
+      const cell = document.createElement('th');
+      cell.textContent = label;
+      cell.style.cssText = 'padding:6px 10px; color:var(--text-dim); border-bottom:1px solid var(--border-color);';
+      headerRow.append(cell);
+    }
+    header.append(headerRow);
+    const body = document.createElement('tbody');
+    const validStreams = streams.filter((stream) => stream && typeof stream === 'object' && !Array.isArray(stream));
+    if (validStreams.length === 0) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 7;
+      cell.textContent = 'No stream records were supplied.';
+      cell.style.cssText = 'padding:12px; text-align:center; color:var(--text-dim);';
+      row.append(cell);
+      body.append(row);
+    }
+    for (const stream of validStreams) {
+      const row = document.createElement('tr');
+      row.style.cssText = 'border-bottom:1px solid rgba(255,255,255,0.05); color:var(--text-main);';
+      const vaporFraction = this._firstFinite(stream, ['vaporFraction']);
+      const pressureKPa = this._firstFinite(stream, ['pressureKPa', 'P_kPa']);
+      const pressureBar = this._firstFinite(stream, ['pressureBar']);
+      const pressure = pressureKPa === null ? (pressureBar === null ? null : pressureBar * 100) : pressureKPa;
+      const composition = this._formatComposition(stream.composition);
+      const phase =
+        vaporFraction === null
+          ? 'Not supplied'
+          : vaporFraction === 0
+            ? 'Liquid'
+            : vaporFraction === 1
+              ? 'Vapor'
+              : vaporFraction > 0 && vaporFraction < 1
+                ? 'Two phase'
+                : 'Outside [0, 1]';
+      const values = [
+        typeof stream.id === 'string' ? stream.id : '—',
+        phase,
+        this._formatNumber(this._firstFinite(stream, ['temperatureC', 'T_C']), 1),
+        this._formatNumber(pressure, 2),
+        this._formatNumber(vaporFraction, 3),
+        this._formatNumber(this._firstFinite(stream, ['molarFlowKmolH', 'molarFlowKmolHr']), 2),
+        composition
+      ];
+      for (const value of values) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        cell.style.cssText = 'padding:6px 10px;';
+        row.append(cell);
+      }
+      body.append(row);
+    }
+    table.append(header, body);
+    wrapper.append(table);
+    return wrapper;
+  }
+
+  _renderUnitList(units) {
+    const section = document.createElement('section');
+    section.style.cssText = 'margin-top:14px;';
+    const heading = document.createElement('h3');
+    heading.textContent = 'Caller-provided unit operations';
+    heading.style.cssText = 'font-size:12px; color:var(--accent-cyan);';
+    const list = document.createElement('ul');
+    for (const unit of units) {
+      if (!unit || typeof unit !== 'object' || Array.isArray(unit)) continue;
+      const item = document.createElement('li');
+      const name =
+        typeof unit.name === 'string' ? unit.name : typeof unit.id === 'string' ? unit.id : 'Unnamed operation';
+      const type = typeof unit.type === 'string' ? ` (${unit.type})` : '';
+      item.textContent = `${name}${type}`;
+      list.append(item);
+    }
+    section.append(heading, list);
+    return section;
+  }
+
+  _firstFinite(record, keys) {
+    for (const key of keys) {
+      if (Number.isFinite(record[key])) return record[key];
+    }
+    return null;
+  }
+
+  _formatNumber(value, digits) {
+    return Number.isFinite(value) ? value.toFixed(digits) : '—';
+  }
+
+  _formatComposition(composition) {
+    if (!composition || typeof composition !== 'object' || Array.isArray(composition)) return '—';
+    const entries = Object.entries(composition).filter(([, fraction]) => Number.isFinite(fraction));
+    return entries.length > 0 ? entries.map(([name, fraction]) => `${name}: ${fraction.toFixed(3)}`).join(' / ') : '—';
   }
 }
 

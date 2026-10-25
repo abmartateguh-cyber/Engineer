@@ -1,257 +1,281 @@
 /**
- * OmniEng SPICE Oscilloscope UI
- * Standard: Virtual 4-Channel Mixed-Signal Digital Storage Oscilloscope (DSO)
- * Parity: Cadence Virtuoso ViVA / Keysight Infiniium / Altium SimData
- * Renders:
- * 1. Multi-channel time-domain waveforms V(t), I(t)
- * 2. Graticule grid with 10 horizontal divisions and 8 vertical divisions
- * 3. Interactive time tracking cursor with instantaneous voltage readout
- * 4. Signal metrics: Rise Time (10%-90%), Fall Time, Peak-to-Peak, Frequency, Cutoff
+ * Experimental waveform viewer for results returned by the local SPICE path.
+ * It does not create example traces or claim simulator or instrument conformance.
  */
 
+'use strict';
+
 class SpiceOscilloscopeUI {
-  constructor(containerId) {
+  constructor(containerId, solveCircuit) {
     this.container = document.getElementById(containerId);
+    this.solveCircuit = solveCircuit;
     this.canvas = null;
     this.ctx = null;
-    this.waveforms = []; // [{ name: 'Vin', color: '#facc15', points: [{ t, v }] }]
+    this.waveforms = [];
     this.hoverTime = null;
-    this.timeScale = 1.0; // multiplier
-    this.voltScale = 1.0;
+    this.maxTimeMs = 0;
   }
 
-  /**
-   * Initializes or updates the complete oscilloscope pane.
-   * @param {Object} data { waveforms, metrics, circuitName }
-   */
-  render(data = {}) {
+  render() {
     if (!this.container) return;
-    this.waveforms = data.waveforms || this._getDefaultWaveforms();
-    const metrics = data.metrics || this._computeMetrics(this.waveforms);
-    const circuitName = data.circuitName || 'RC Low-Pass Filter Step Response (R=1kΩ, C=1µF, τ=1.0ms)';
-
     this.container.innerHTML = `
-      <div class="oscilloscope-layout" style="display: flex; flex-direction: column; gap: 12px; color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <!-- Oscilloscope Top Bar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #0c1220; padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border-color);">
-          <div>
-            <div style="font-weight: 700; color: var(--accent-cyan); font-size: 13px; display: flex; align-items: center; gap: 6px;"><span class="icon-slot" data-omni-icon="oscilloscope"></span> ${circuitName}</div>
-            <div style="font-size: 10px; color: var(--text-muted);">MNA Engine Companion Matrix • Backward Euler Integration (dt = 50 µs)</div>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="ribbon-btn active" id="btn-scope-autoscale" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><span class="icon-slot" data-omni-icon="search"></span> Auto-Scale</button>
-            <button class="ribbon-btn" id="btn-scope-trigger" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><span class="icon-slot" data-omni-icon="bolt"></span> Single Trig</button>
-          </div>
+      <div class="oscilloscope-layout" style="display:flex;flex-direction:column;gap:12px;color:var(--text-main);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <div style="background:#0c1220;padding:10px 14px;border-radius:6px;border:1px solid var(--border-color);">
+          <div style="font-weight:700;color:var(--accent-cyan);font-size:13px;">Experimental SPICE waveform viewer</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">Provide an explicit transient request in SI units. This path is experimental and has not passed independent accuracy or convergence review.</div>
         </div>
-
-        <!-- Oscilloscope Screen (Screen Bezel) -->
-        <div style="background: #020408; border: 2px solid #1e293b; border-radius: 8px; padding: 10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); position: relative;">
-          <!-- Channel Badges -->
-          <div style="display: flex; gap: 14px; margin-bottom: 6px; font-size: 11px; font-weight: 600;">
-            <span style="color: #facc15;"><span style="display:inline-block; width:10px; height:3px; background:#facc15; margin-right:4px;"></span>CH1: V_in (1.0 V/div)</span>
-            <span style="color: #00e5ff;"><span style="display:inline-block; width:10px; height:3px; background:#00e5ff; margin-right:4px;"></span>CH2: V_out (1.0 V/div)</span>
-            <span style="color: #ec4899;"><span style="display:inline-block; width:10px; height:3px; background:#ec4899; margin-right:4px;"></span>CH3: I_cap (1.0 mA/div)</span>
-            <span style="color: var(--text-dim); margin-left: auto;">Timebase: 1.0 ms / div</span>
+        <form id="spice-request-form" style="display:flex;flex-direction:column;gap:8px;">
+          <label for="spice-request-json" style="font-size:12px;font-weight:600;">Circuit and analysis JSON</label>
+          <textarea id="spice-request-json" rows="9" spellcheck="false" aria-describedby="spice-request-help" style="width:100%;box-sizing:border-box;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#080d18;color:var(--text-main);border:1px solid var(--border-color);border-radius:5px;padding:10px;resize:vertical;"></textarea>
+          <div id="spice-request-help" style="font-size:11px;line-height:1.5;color:var(--text-muted);">
+            Required: <code>analysis</code> with <code>type</code>, <code>stopTimeS</code>, <code>stepS</code>, plus a <code>components</code> array. Supported components: <code>resistor</code> (id, n1, n2, resistanceOhm), <code>capacitor</code> (id, n1, n2, capacitanceF, initialVoltageV), <code>inductor</code> (id, n1, n2, inductanceH, initialCurrentA), <code>voltage_source</code> (id, nPlus, nMinus, dcVoltageV, optional waveform), and <code>current_source</code> (id, nFrom, nTo, currentA). Use node <code>0</code> for ground. Voltage waveforms require explicit STEP, SINE, or PULSE values. Limits: 24 components, 12 MNA unknowns, and 2,000 time steps.
           </div>
-
-          <canvas id="canvas-oscilloscope-screen" width="780" height="320" style="width: 100%; height: 320px; background: #030712; border-radius: 4px; display: block; cursor: crosshair;"></canvas>
-          
-          <!-- Hover Cursor Readout -->
-          <div id="scope-cursor-readout" style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); font-family: monospace;">
-            <span>T: 0.00 ms</span>
-            <span>CH1: 0.00 V</span>
-            <span>CH2: 0.00 V</span>
-            <span>CH3: 0.00 mA</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="submit" class="btn-primary" id="spice-run-button">Run experimental transient</button>
+            <span id="spice-run-status" role="status" aria-live="polite" style="font-size:11px;color:var(--text-muted);">No solve has been run.</span>
           </div>
+        </form>
+        <div id="spice-result-panel" hidden style="display:flex;flex-direction:column;gap:10px;">
+          <div id="spice-maturity-warning" class="status-indicator status-warn">Experimental solver output; no independent accuracy, convergence, or manufacturing validation is available.</div>
+          <div id="spice-node-legend" style="display:flex;flex-wrap:wrap;gap:12px;font-size:11px;font-weight:600;"></div>
+          <div style="background:#020408;border:2px solid #1e293b;border-radius:8px;padding:10px;">
+            <canvas id="canvas-oscilloscope-screen" width="780" height="320" style="width:100%;height:320px;background:#030712;border-radius:4px;display:block;cursor:crosshair;"></canvas>
+            <div id="scope-cursor-readout" style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-top:6px;font-size:11px;color:var(--text-muted);font-family:monospace;"></div>
+          </div>
+          <div id="spice-run-summary" style="font-size:11px;color:var(--text-muted);"></div>
+          <div id="spice-run-warnings" style="font-size:11px;color:var(--warn);"></div>
         </div>
+      </div>`;
 
-        <!-- Automated Signal Analysis Telemetry -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Rise Time (10% - 90%)</div>
-            <div style="font-size: 15px; font-weight: 700; color: var(--accent-cyan);">${metrics.riseTimeMs.toFixed(2)} ms</div>
-            <div style="font-size: 10px; color: var(--text-muted);">Theoretical 2.2·RC: ${(2.2 * 1.0).toFixed(2)} ms</div>
-          </div>
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Time Constant (τ = RC)</div>
-            <div style="font-size: 15px; font-weight: 700; color: #34d399;">${metrics.tauMs.toFixed(2)} ms</div>
-            <div style="font-size: 10px; color: var(--text-muted);">63.2% V_final: 3.16 V</div>
-          </div>
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">-3dB Cutoff Frequency</div>
-            <div style="font-size: 15px; font-weight: 700; color: #a78bfa;">${metrics.cutoffHz.toFixed(1)} Hz</div>
-            <div style="font-size: 10px; color: var(--text-muted);">f_c = 1 / (2·π·R·C)</div>
-          </div>
-          <div class="telemetry-card" style="margin-top: 0; background: #0c1220; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Peak-to-Peak (V_pp)</div>
-            <div style="font-size: 15px; font-weight: 700; color: #fbbf24;">${metrics.vpp.toFixed(2)} V</div>
-            <div style="font-size: 10px; color: var(--text-muted);">Final Steady-State: 5.00 V</div>
-          </div>
-        </div>
-      </div>
-    `;
+    this.canvas = this.container.querySelector('#canvas-oscilloscope-screen');
+    this.ctx = this.canvas?.getContext('2d') || null;
+    this._setupCanvas();
+    this.container
+      .querySelector('#spice-request-form')
+      ?.addEventListener('submit', (event) => this._submitRequest(event));
+  }
 
-    if (typeof window !== 'undefined' && window.OmniIcons) {
-      window.OmniIcons.hydrateAll(this.container);
+  async _submitRequest(event) {
+    event.preventDefault();
+    const status = this.container.querySelector('#spice-run-status');
+    const button = this.container.querySelector('#spice-run-button');
+    const input = this.container.querySelector('#spice-request-json');
+    if (!this.solveCircuit) {
+      status.textContent = 'The SPICE service is unavailable.';
+      return;
     }
 
-    this._setupCanvas();
+    let request;
+    try {
+      request = JSON.parse(input.value);
+    } catch (error) {
+      status.textContent = `Invalid JSON: ${error.message}`;
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'Running the experimental transient solver…';
+    try {
+      this.renderResult(await this.solveCircuit(request));
+    } catch (error) {
+      this._showFailure(error?.message || 'The SPICE service failed.');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  renderResult(result) {
+    if (!result?.success || !result.transient) {
+      this._showFailure(result?.error?.message || 'No transient result was returned.');
+      return;
+    }
+
+    const times = result.transient.time;
+    const nodeSamples = result.transient.nodes;
+    if (!Array.isArray(times) || !nodeSamples || typeof nodeSamples !== 'object') {
+      this._showFailure('The service returned a result with an unsupported waveform shape.');
+      return;
+    }
+
+    const colors = ['#facc15', '#00e5ff', '#ec4899', '#a78bfa', '#34d399', '#fb923c', '#60a5fa'];
+    this.waveforms = Object.entries(nodeSamples)
+      .filter(([node]) => node !== '0')
+      .map(([name, samples], index) => ({
+        name,
+        color: colors[index % colors.length],
+        points: Array.isArray(samples)
+          ? samples.slice(0, times.length).map((value, sampleIndex) => ({ t: times[sampleIndex], v: value }))
+          : []
+      }))
+      .filter(
+        (waveform) =>
+          waveform.points.length > 0 &&
+          waveform.points.every((point) => Number.isFinite(point.t) && Number.isFinite(point.v))
+      );
+    this.maxTimeMs = Math.max(0, ...times.filter(Number.isFinite));
+    if (this.waveforms.length === 0 || this.maxTimeMs <= 0) {
+      this._showFailure('The service returned no plottable non-ground node samples.');
+      return;
+    }
+
+    const status = this.container.querySelector('#spice-run-status');
+    status.textContent = 'Experimental result returned. Review the warning before interpreting it.';
+    this.container.querySelector('#spice-result-panel').hidden = false;
+    this._renderLegend();
+    this._renderSummary(result, times.length);
+    this._renderWarnings(result.warnings);
+    this._drawGraticuleAndTraces();
+    this._updateCursorReadout(this.hoverTime ?? 0);
+  }
+
+  _showFailure(message) {
+    const status = this.container.querySelector('#spice-run-status');
+    status.textContent = `No result: ${message}`;
+    this.container.querySelector('#spice-result-panel').hidden = true;
+    this.waveforms = [];
+    this.maxTimeMs = 0;
     this._drawGraticuleAndTraces();
   }
 
-  _setupCanvas() {
-    this.canvas = document.getElementById('canvas-oscilloscope-screen');
-    if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
+  _renderLegend() {
+    const legend = this.container.querySelector('#spice-node-legend');
+    legend.replaceChildren();
+    for (const waveform of this.waveforms) {
+      const label = document.createElement('span');
+      label.style.color = waveform.color;
+      label.textContent = `Node ${waveform.name} (V)`;
+      legend.append(label);
+    }
+  }
 
-    // Handle mouse move for interactive cursor
-    this.canvas.addEventListener('mousemove', (e) => {
+  _renderSummary(result, sampleCount) {
+    const stepMs = result.analysis?.stepS * 1000;
+    const summary = this.container.querySelector('#spice-run-summary');
+    const details = [
+      `${sampleCount} returned samples`,
+      `${this.waveforms.length} node voltage traces`,
+      `end time ${this.maxTimeMs.toFixed(4)} ms`
+    ];
+    if (Number.isFinite(stepMs)) details.push(`requested time step ${stepMs} ms`);
+    summary.textContent = details.join(' · ');
+  }
+
+  _renderWarnings(warnings) {
+    const warningContainer = this.container.querySelector('#spice-run-warnings');
+    const safeWarnings = Array.isArray(warnings) ? warnings.filter((warning) => typeof warning === 'string') : [];
+    warningContainer.textContent = safeWarnings.join(' ');
+  }
+
+  _setupCanvas() {
+    if (!this.canvas) return;
+    this.canvas.addEventListener('mousemove', (event) => {
       const rect = this.canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const frac = mouseX / rect.width;
-      const maxT = 6.0; // 6 ms total
-      this.hoverTime = frac * maxT;
+      const fraction = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0;
+      this.hoverTime = Math.max(0, Math.min(1, fraction)) * this.maxTimeMs;
       this._updateCursorReadout(this.hoverTime);
       this._drawGraticuleAndTraces();
     });
-
     this.canvas.addEventListener('mouseleave', () => {
       this.hoverTime = null;
+      this._updateCursorReadout(0);
       this._drawGraticuleAndTraces();
     });
   }
 
+  _valueAt(waveform, timeMs) {
+    const points = waveform.points;
+    if (points.length === 1 || timeMs <= points[0].t) return points[0].v;
+    for (let index = 1; index < points.length; index++) {
+      const right = points[index];
+      if (right.t >= timeMs) {
+        const left = points[index - 1];
+        const span = right.t - left.t;
+        if (span <= 0) return right.v;
+        const fraction = (timeMs - left.t) / span;
+        return left.v + fraction * (right.v - left.v);
+      }
+    }
+    return points[points.length - 1].v;
+  }
+
   _updateCursorReadout(timeMs) {
-    const el = document.getElementById('scope-cursor-readout');
-    if (!el) return;
-
-    // Interpolate channels at timeMs
-    let vIn = timeMs >= 0.5 ? 5.0 : 0.0;
-    let vOut = timeMs >= 0.5 ? 5.0 * (1.0 - Math.exp(-(timeMs - 0.5) / 1.0)) : 0.0;
-    let iCap = timeMs >= 0.5 ? 5.0 * Math.exp(-(timeMs - 0.5) / 1.0) : 0.0;
-
-    el.innerHTML = `
-      <span style="color: #ffffff;">T: ${timeMs.toFixed(3)} ms</span>
-      <span style="color: #facc15;">CH1 (Vin): ${vIn.toFixed(3)} V</span>
-      <span style="color: #00e5ff;">CH2 (Vout): ${vOut.toFixed(3)} V</span>
-      <span style="color: #ec4899;">CH3 (Icap): ${iCap.toFixed(3)} mA</span>
-    `;
+    const readout = this.container?.querySelector('#scope-cursor-readout');
+    if (!readout) return;
+    readout.replaceChildren();
+    const timeLabel = document.createElement('span');
+    timeLabel.textContent = `Time: ${timeMs.toFixed(4)} ms`;
+    readout.append(timeLabel);
+    for (const waveform of this.waveforms) {
+      const valueLabel = document.createElement('span');
+      valueLabel.style.color = waveform.color;
+      valueLabel.textContent = `${waveform.name}: ${this._valueAt(waveform, timeMs).toFixed(6)} V`;
+      readout.append(valueLabel);
+    }
   }
 
   _drawGraticuleAndTraces() {
     if (!this.canvas || !this.ctx) return;
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    // 1. Draw Oscilloscope Reticle / Graticule Grid (10 horizontal divs, 8 vertical divs)
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    ctx.clearRect(0, 0, width, height);
     ctx.strokeStyle = 'rgba(0, 229, 255, 0.08)';
     ctx.lineWidth = 1;
-
-    const numX = 10;
-    const numY = 8;
-    const dx = w / numX;
-    const dy = h / numY;
-
-    for (let i = 0; i <= numX; i++) {
+    for (let index = 0; index <= 10; index++) {
+      const x = (index * width) / 10;
       ctx.beginPath();
-      ctx.moveTo(i * dx, 0); ctx.lineTo(i * dx, h);
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
       ctx.stroke();
     }
-    for (let j = 0; j <= numY; j++) {
+    for (let index = 0; index <= 8; index++) {
+      const y = (index * height) / 8;
       ctx.beginPath();
-      ctx.moveTo(0, j * dy); ctx.lineTo(w, j * dy);
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
       ctx.stroke();
     }
 
-    // Center axes with tick marks
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.22)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
-    ctx.moveTo(0, h * 0.75); ctx.lineTo(w, h * 0.75); // Ground reference at 75% height
-    ctx.stroke();
-
-    // 2. Draw Waveform Channels
-    const groundY = h * 0.75;
-    const voltScalePx = (h * 0.55) / 5.0; // 5V spans 55% of height
-    const maxT = 6.0; // ms
-
-    const drawTrace = (wf, color, lineWidth = 2) => {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-
-      for (let i = 0; i < wf.points.length; i++) {
-        const pt = wf.points[i];
-        const px = (pt.t / maxT) * w;
-        const py = groundY - pt.v * voltScalePx;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-    };
-
-    for (const wf of this.waveforms) {
-      drawTrace(wf, wf.color || '#00e5ff', 2);
+    const points = this.waveforms.flatMap((waveform) => waveform.points);
+    if (points.length === 0 || this.maxTimeMs <= 0) return;
+    let minV = Math.min(...points.map((point) => point.v));
+    let maxV = Math.max(...points.map((point) => point.v));
+    if (maxV === minV) {
+      const padding = Math.max(1, Math.abs(maxV) * 0.1);
+      minV -= padding;
+      maxV += padding;
+    } else {
+      const padding = (maxV - minV) * 0.08;
+      minV -= padding;
+      maxV += padding;
     }
 
-    // 3. Draw Vertical Cursor if Hovering
+    for (const waveform of this.waveforms) {
+      ctx.strokeStyle = waveform.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      waveform.points.forEach((point, index) => {
+        const x = (point.t / this.maxTimeMs) * width;
+        const y = height - ((point.v - minV) / (maxV - minV)) * height;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
     if (this.hoverTime !== null) {
-      const cx = (this.hoverTime / maxT) * w;
+      const x = (this.hoverTime / this.maxTimeMs) * width;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
       ctx.stroke();
       ctx.setLineDash([]);
     }
   }
-
-  _getDefaultWaveforms() {
-    const pointsCH1 = [];
-    const pointsCH2 = [];
-    const pointsCH3 = [];
-
-    const tau = 1.0; // ms
-    const tStep = 5.0; // step at 0.5 ms
-    const V0 = 5.0;
-
-    for (let t = 0; t <= 6.0; t += 0.05) {
-      // CH1: Step voltage at t = 0.5 ms
-      const vin = t >= 0.5 ? V0 : 0.0;
-      pointsCH1.push({ t, v: vin });
-
-      // CH2: RC Low-pass filter capacitor voltage: V(t) = V0*(1 - e^(-(t-0.5)/tau))
-      const vout = t >= 0.5 ? V0 * (1.0 - Math.exp(-(t - 0.5) / tau)) : 0.0;
-      pointsCH2.push({ t, v: vout });
-
-      // CH3: Charging current i(t) = (V0/R)*e^(-(t-0.5)/tau) [in mA]
-      const icap = t >= 0.5 ? V0 * Math.exp(-(t - 0.5) / tau) : 0.0;
-      pointsCH3.push({ t, v: icap });
-    }
-
-    return [
-      { name: 'V_in', color: '#facc15', points: pointsCH1 },
-      { name: 'V_out', color: '#00e5ff', points: pointsCH2 },
-      { name: 'I_cap', color: '#ec4899', points: pointsCH3 }
-    ];
-  }
-
-  _computeMetrics(waveforms) {
-    const tauMs = 1.0;
-    const riseTimeMs = 2.197 * tauMs; // 10% to 90%
-    const cutoffHz = 1.0 / (2.0 * Math.PI * 1000.0 * 1e-6); // 159.2 Hz
-    const vpp = 5.0;
-    return { tauMs, riseTimeMs, cutoffHz, vpp };
-  }
 }
 
-if (typeof window !== 'undefined') {
-  window.SpiceOscilloscopeUI = SpiceOscilloscopeUI;
-}
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SpiceOscilloscopeUI };
-}
+if (typeof window !== 'undefined') window.SpiceOscilloscopeUI = SpiceOscilloscopeUI;
+if (typeof module !== 'undefined' && module.exports) module.exports = { SpiceOscilloscopeUI };

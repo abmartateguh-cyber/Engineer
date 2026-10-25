@@ -6,7 +6,7 @@
  * 2. Deterministic 1 kHz HIL packet streaming with sub-millisecond execution deadlines.
  * 3. Statistical timing jitter (p50, p95, p99) and packet loss detection.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

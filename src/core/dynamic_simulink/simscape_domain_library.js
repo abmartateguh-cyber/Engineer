@@ -5,9 +5,9 @@
  * Mechanical, and Thermal-Fluid domains with Generalized Across/Through variables,
  * conservation of energy and mass, and stiff DAE time stepping.
  * 
- * Parity standard: MathWorks Simscape Fluids / Simscape Driveline.
+ * Unverified comparison target: MathWorks Simscape Fluids / Simscape Driveline.
  * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class SimscapeDomainLibrary {

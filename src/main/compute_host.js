@@ -1,68 +1,96 @@
 /**
- * OmniEng Compute Host Process & Async Execution Manager
- * 
- * Provides an isolated, out-of-process / worker-backed compute host for high-DOF
- * finite element analysis, CFD iterations, sparse linear algebra, and optical optimization.
- * Prevents main process event loop blockage (> 100ms) and enables cancellation tokens.
- * 
- * Parity standard: ANSYS RSM (Remote Solve Manager) / Siemens Simcenter Distributed Solve.
- * 
- * 100% In-House Sovereign Implementation. Zero External Dependencies.
+ * Process-local asynchronous task queue for experimental calculations.
+ *
+ * Tasks are currently dispatched with setImmediate on the main JavaScript event loop.
+ * This class does not provide worker isolation, CPU parallelism, or remote compute.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
 
 const { EventEmitter } = require('events');
-const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
-const os = require('os');
+
+const COMPUTE_PRIORITIES = new Set(['HIGH', 'NORMAL', 'LOW']);
+
+function createUnsupportedOptionError(optionName, componentName) {
+  const error = new Error(
+    `${componentName} does not support '${optionName}' in its process-local event-loop implementation; the option was not applied.`
+  );
+  error.code = 'UNSUPPORTED';
+  return error;
+}
+
+function validateConstructorOptions(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    throw new TypeError('Compute host constructor options must be an object.');
+  }
+  const unsupported = Object.keys(options);
+  if (unsupported.length > 0) throw createUnsupportedOptionError(unsupported[0], 'Compute host');
+}
+
+function validateJobOptions(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    throw new TypeError('Compute job options must be an object.');
+  }
+  const unsupported = Object.keys(options).filter((key) => key !== 'priority');
+  if (unsupported.length > 0) throw createUnsupportedOptionError(unsupported[0], 'Compute host');
+  if (options.priority !== undefined && !COMPUTE_PRIORITIES.has(options.priority)) {
+    const error = new TypeError(`Unsupported compute priority '${options.priority}'.`);
+    error.code = 'INVALID_INPUT';
+    throw error;
+  }
+}
 
 class ComputeHostProcess extends EventEmitter {
   /**
    * @param {Object} options
-   * @param {number} [options.maxConcurrency] - Max parallel worker threads (default: CPU cores - 1)
-   * @param {number} [options.jobTimeoutMs=300000] - Job timeout in ms (default: 5 minutes)
+   * Jobs execute serially on the main JavaScript event loop. This queue provides
+   * asynchronous dispatch only; it does not isolate CPU work or enforce timeouts.
    */
   constructor(options = {}) {
     super();
-    this.maxConcurrency = options.maxConcurrency || Math.max(1, (os.cpus()?.length || 4) - 1);
-    this.jobTimeoutMs = options.jobTimeoutMs || 300000;
+    validateConstructorOptions(options);
+    this.executionMode = 'main-event-loop';
     this.activeJobs = new Map();
     this.pendingQueue = [];
-    this.workers = [];
-    this.workerPoolReady = false;
     this._nextJobId = 1;
-    this._initWorkerPool();
-  }
-
-  _initWorkerPool() {
-    this.workerPoolReady = true;
-    this.emit('ready', { concurrency: this.maxConcurrency });
+    this._nextQueueOrder = 1;
+    queueMicrotask(() => this.emit('ready', { concurrency: 1, executionMode: this.executionMode }));
   }
 
   /**
    * Dispatches a computationally intensive job asynchronously.
-   * 
+   *
    * @param {string} taskType - e.g. 'FEA_SOLVE', 'SPARSE_CHOLESKY', 'CFD_SIMPLE', 'OPTICAL_DLS'
    * @param {Object} payload - Task inputs, matrices, or mesh buffers
-   * @param {Object} [options] - Execution options: priority, timeout, cancellationToken
+   * @param {Object} [options] - Execution options: priority only. Timeout and cancellation options are unsupported.
    * @returns {Promise<Object>} Job execution result with compute telemetry
    */
   async submitJob(taskType, payload, options = {}) {
+    if (typeof taskType !== 'string' || !taskType.trim()) {
+      throw new TypeError('A compute task type is required.');
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new TypeError('A compute task payload object is required.');
+    }
+    validateJobOptions(options);
     const jobId = `job_${Date.now()}_${this._nextJobId++}`;
-    const priority = options.priority || 'NORMAL'; // 'HIGH', 'NORMAL', 'LOW'
+    const priority = options.priority ?? 'NORMAL'; // 'HIGH', 'NORMAL', 'LOW'
 
     const job = {
       id: jobId,
       taskType,
       payload,
-      options,
+      options: { priority },
       priority,
       status: 'QUEUED',
       createdAt: Date.now(),
+      queueOrder: this._nextQueueOrder++,
       startedAt: null,
       completedAt: null,
       progress: 0.0,
-      cancellationToken: options.cancellationToken || null
+      cancellationToken: null
     };
 
     return new Promise((resolve, reject) => {
@@ -75,30 +103,31 @@ class ComputeHostProcess extends EventEmitter {
   }
 
   _enqueue(job) {
-    if (job.priority === 'HIGH') {
-      this.pendingQueue.unshift(job);
-    } else {
-      this.pendingQueue.push(job);
-    }
+    this.pendingQueue.push(job);
+    const priorityWeight = { HIGH: 3, NORMAL: 2, LOW: 1 };
+    this.pendingQueue.sort(
+      (left, right) =>
+        priorityWeight[right.priority] - priorityWeight[left.priority] || left.queueOrder - right.queueOrder
+    );
+    this.emit('job:queued', { jobId: job.id, taskType: job.taskType });
     this._processNext();
   }
 
   _processNext() {
-    const runningCount = Array.from(this.activeJobs.values()).filter(j => j.status === 'RUNNING').length;
-    if (runningCount >= this.maxConcurrency || this.pendingQueue.length === 0) {
+    const running = Array.from(this.activeJobs.values()).some((j) => j.status === 'RUNNING');
+    if (running || this.pendingQueue.length === 0) {
       return;
     }
 
     const job = this.pendingQueue.shift();
-    if (!job || job.status === 'CANCELLED') {
-      return;
-    }
+    if (!job) return;
+    if (job.status === 'CANCELLED') return this._processNext();
 
     job.status = 'RUNNING';
     job.startedAt = Date.now();
     this.emit('job:started', { jobId: job.id, taskType: job.taskType });
 
-    // Execute compute kernel in non-blocking event-loop micro-task or thread
+    // Defer dispatch to the event loop; CPU work itself is not isolated.
     setImmediate(async () => {
       try {
         const result = await this._executeKernel(job);
@@ -110,8 +139,10 @@ class ComputeHostProcess extends EventEmitter {
           jobId: job.id,
           taskType: job.taskType,
           durationMs,
-          peakMemoryMb: (process.memoryUsage().heapUsed / (1024 * 1024)).toFixed(2),
-          status: 'COMPLETED'
+          heapUsedAtCompletionMb: Math.round((process.memoryUsage().heapUsed / (1024 * 1024)) * 100) / 100,
+          status: 'COMPLETED',
+          validationLevel: 'experimental',
+          executionMode: this.executionMode
         };
 
         this.emit('job:completed', { jobId: job.id, telemetry });
@@ -161,25 +192,34 @@ class ComputeHostProcess extends EventEmitter {
 
       case 'PDN_IR_DROP': {
         const { PowerGridIRDropAnalyzer } = require('../core/eda/power_grid_ir_drop');
-        const analyzer = new PowerGridIRDropAnalyzer(payload.options || {});
-        const mesh = analyzer.createGridMesh(payload.rows, payload.cols, payload.pitchX, payload.pitchY);
-        return analyzer.solveStaticIRDrop(mesh, payload.pads || [0], payload.loads || []);
+        const analyzer = new PowerGridIRDropAnalyzer(payload.options);
+        const mesh = analyzer.createGridMesh(
+          payload.rows,
+          payload.cols,
+          payload.pitchX,
+          payload.pitchY,
+          payload.sheetRho,
+          payload.wireWidth
+        );
+        return analyzer.solveStaticIRDrop(mesh, payload.pads, payload.loads);
       }
 
       case 'OPTICAL_DLS': {
         const { DampedLeastSquaresOptimizer } = require('../core/optics/damped_least_squares_optimizer');
-        const opt = new DampedLeastSquaresOptimizer(payload.options || {});
-        return opt.optimize(payload.variables, payload.meritFn);
+        const opt = new DampedLeastSquaresOptimizer(payload.options);
+        return opt.optimize(payload.system, payload.variables, payload.operands);
       }
 
       default: {
-        return { message: `Compute host executed task ${taskType} successfully`, timestamp: Date.now() };
+        const err = new Error(`Unsupported compute task type: ${taskType}`);
+        err.code = 'UNSUPPORTED';
+        throw err;
       }
     }
   }
 
   /**
-   * Cancels an active or queued job.
+   * Cancels a queued job. A running event-loop calculation cannot be interrupted.
    * @param {string} jobId
    * @returns {boolean} True if cancelled
    */
@@ -187,13 +227,20 @@ class ComputeHostProcess extends EventEmitter {
     const job = this.activeJobs.get(jobId);
     if (!job) return false;
 
+    if (job.status !== 'QUEUED') return false;
+
+    const queueIndex = this.pendingQueue.findIndex((queuedJob) => queuedJob.id === jobId);
+    if (queueIndex < 0) return false;
+
     job.status = 'CANCELLED';
     job.completedAt = Date.now();
     const err = new Error(`Job ${jobId} was cancelled by user`);
     err.code = 'ERR_JOB_CANCELLED';
     job.reject(err);
+    this.pendingQueue.splice(queueIndex, 1);
     this.activeJobs.delete(jobId);
     this.emit('job:cancelled', { jobId });
+    this._processNext();
     return true;
   }
 
@@ -201,10 +248,16 @@ class ComputeHostProcess extends EventEmitter {
    * Returns telemetry for all running/queued jobs.
    */
   getTelemetry() {
+    const runningCount = Array.from(this.activeJobs.values()).filter((job) => job.status === 'RUNNING').length;
     return {
-      concurrency: this.maxConcurrency,
+      concurrency: 1,
+      executionMode: this.executionMode,
+      cancellationSupported: 'queued-jobs-only',
+      timeoutEnforced: false,
+      runningCount,
       activeCount: this.activeJobs.size,
-      queuedCount: this.pendingQueue.length,
+      outstandingCount: this.activeJobs.size,
+      queuedCount: this.pendingQueue.filter((job) => job.status === 'QUEUED').length,
       heapUsedMb: (process.memoryUsage().heapUsed / (1024 * 1024)).toFixed(2)
     };
   }
@@ -213,8 +266,9 @@ class ComputeHostProcess extends EventEmitter {
 // Singleton compute host instance
 let defaultComputeHost = null;
 function getComputeHost(options) {
+  validateConstructorOptions(options ?? {});
   if (!defaultComputeHost) {
-    defaultComputeHost = new ComputeHostProcess(options);
+    defaultComputeHost = new ComputeHostProcess(options ?? {});
   }
   return defaultComputeHost;
 }

@@ -1,0 +1,21 @@
+{
+  "id": "POISSON_2D_SINE_MMS",
+  "formatVersion": 1,
+  "name": "Two-dimensional Poisson sine manufactured solution",
+  "referenceKind": "manufactured-analytic",
+  "source": "Analytical manufactured solution defined by this versioned reference artifact; not an external measurement dataset.",
+  "problem": {
+    "equation": "-Laplacian(u) = 2*pi^2*sin(pi*x)*sin(pi*y)",
+    "exactSolution": "u(x,y) = sin(pi*x)*sin(pi*y)",
+    "domain": "(0,1) x (0,1)",
+    "boundaryCondition": "u = 0 on the boundary",
+    "discretization": "Uniform five-point central-difference Laplacian with homogeneous Dirichlet boundaries",
+    "units": "dimensionless"
+  },
+  "gridSizes": [15, 31, 63],
+  "tolerances": {
+    "maximumRelativeResidual": 1e-8,
+    "observedOrderRange": [1.9, 2.1],
+    "requireDecreasingRmsError": true
+  }
+}

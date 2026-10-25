@@ -1,14 +1,14 @@
 /**
  * OmniEng CAD Feature Operations Engine
  * 
- * Implements industrial 3D parametric feature modeling operations:
+ * Experimental 3D feature-operation examples:
  * - Extrude (Linear Boss / Cut with draft angle)
  * - Revolve (Rotational solid around axis)
  * - Shell (Uniform thin-wall hollow body with open face)
  * - Fillet / Chamfer (Edge rounding and beveling)
  * - Linear & Circular Feature Patterning
  * 
- * Conforms to ISO 10303 B-Rep Euler-Poincaré topological invariants (V - E + F = 2).
+ * STEP interoperability and general topological validity have not been independently assessed.
  */
 
 const { Vector3 } = require('../math/linear_algebra');
@@ -22,13 +22,22 @@ class FeatureOperations {
    * @param {Object} options - { draftAngleDeg: 0, direction: Vector3(0,0,1) }
    * @returns {SolidBody}
    */
-  static extrude(profile, depth = 50.0, options = {}) {
+  static extrude(profile, depth, options) {
     if (!profile || profile.length < 3) {
       throw new Error('Extrude requires a closed profile of at least 3 points.');
     }
+    if (!profile.every(point => Number.isFinite(point?.x) && Number.isFinite(point?.y))) {
+      throw new Error('Extrude profile points must provide finite x and y coordinates.');
+    }
+    if (!Number.isFinite(depth) || depth <= 0) {
+      throw new Error('Extrude requires an explicit positive depth.');
+    }
+    if (!options || !Number.isFinite(options.draftAngleDeg) || Math.abs(options.draftAngleDeg) >= 89) {
+      throw new Error('Extrude requires an explicit finite draftAngleDeg between -89 and 89.');
+    }
 
     const n = profile.length;
-    const draftRad = ((options.draftAngleDeg || 0) * Math.PI) / 180.0;
+    const draftRad = (options.draftAngleDeg * Math.PI) / 180.0;
     const scaleTop = 1.0 - Math.tan(draftRad) * (depth / 100.0);
 
     const bottomVertices = [];
@@ -85,7 +94,7 @@ class FeatureOperations {
       feature: 'Extrude',
       depth,
       profileCount: n,
-      draftAngle: options.draftAngleDeg || 0,
+      draftAngle: options.draftAngleDeg,
       timestamp: Date.now()
     };
     return body;
@@ -99,13 +108,25 @@ class FeatureOperations {
    * @param {number} segments - Number of radial segments
    * @returns {SolidBody}
    */
-  static revolve(profile, angleDeg = 360, axis = 'Y', segments = 24) {
+  static revolve(profile, angleDeg, axis, segments) {
     if (!profile || profile.length < 2) {
       throw new Error('Revolve requires at least 2 profile points.');
     }
+    if (!profile.every(point => Number.isFinite(point?.x) && Number.isFinite(point?.y) && point.x >= 0)) {
+      throw new Error('Revolve profile points must provide finite x and y coordinates with non-negative radii.');
+    }
+    if (!Number.isFinite(angleDeg) || angleDeg < 10 || angleDeg > 360) {
+      throw new Error('Revolve requires an explicit angle from 10 to 360 degrees.');
+    }
+    if (!['Y', 'Z'].includes(axis)) {
+      throw new Error('Revolve requires an explicit supported axis: Y or Z.');
+    }
+    if (!Number.isInteger(segments) || segments < 3 || segments > 512) {
+      throw new Error('Revolve requires an integer segment count from 3 to 512.');
+    }
 
     const nPoints = profile.length;
-    const totalRad = (Math.min(360, Math.max(10, angleDeg)) * Math.PI) / 180.0;
+    const totalRad = (angleDeg * Math.PI) / 180.0;
     const isFull = Math.abs(angleDeg - 360) < 1e-4;
     const rings = isFull ? segments : segments + 1;
 
@@ -167,9 +188,15 @@ class FeatureOperations {
    * @param {number} openFaceIndex - Index of face to remove (opening)
    * @returns {SolidBody}
    */
-  static shell(solidBody, wallThickness = 2.0, openFaceIndex = 1) {
+  static shell(solidBody, wallThickness, openFaceIndex) {
     if (!solidBody || !solidBody.faces || solidBody.faces.length === 0) {
       throw new Error('Valid solid body required for shell operation.');
+    }
+    if (!Number.isFinite(wallThickness) || wallThickness <= 0) {
+      throw new Error('Shell requires an explicit positive wall thickness.');
+    }
+    if (!Number.isInteger(openFaceIndex) || openFaceIndex < 0 || openFaceIndex >= solidBody.faces.length) {
+      throw new Error('Shell requires an explicit valid open face index.');
     }
 
     const origFaces = solidBody.faces;

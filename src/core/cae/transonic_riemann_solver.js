@@ -7,8 +7,8 @@
  *  3. HLLC (Harten, Lax, van Leer with Contact wave) Solver
  *  4. 1D Sod Shock-Tube Benchmark Finite-Volume Integrator
  * 
- * Standards Parity: NASA FUN3D, SU2, ANSYS Fluent Compressible Transonic Flow.
- * 100% In-House Sovereign Implementation. Zero External Dependencies.
+ * Experimental implementation: NASA FUN3D, SU2, ANSYS Fluent Compressible Transonic Flow.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

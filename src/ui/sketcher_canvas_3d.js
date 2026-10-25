@@ -3,8 +3,8 @@
  * Projects 3D ray intersections onto active drafting planes (XY, XZ, YZ, or planar face),
  * manages rubber-band drafting gestures, and infers variational geometric constraints.
  *
- * Parity: Onshape / SolidWorks 2D Sketcher in 3D Viewport.
- * Zero external dependencies.
+ * Experimental viewport sketching helper. It does not claim compatibility or
+ * feature parity with other CAD products.
  */
 
 'use strict';

@@ -1,12 +1,7 @@
 /**
- * OmniEng Enterprise Keymap & Shortcut Manager
- * 
- * Provides customizable industry CAD/CAE shortcut profiles:
- *   - OmniEng Default (Modern browser/workstation hybrid)
- *   - Dassault Systèmes CATIA V5 (Compass orbit, F3 tree, Space pan)
- *   - Siemens NX (MB2 rotate, MB1+MB2 pan, Home fit)
- *   - Dassault SolidWorks (F fit, Ctrl+7 Isometric, Space orientation)
- *   - Blender 4.x (Numpad 1/3/7 views, G/R/S transforms)
+ * Local keyboard shortcut profiles for OmniEng workstation controls.
+ * Named presets map selected key combinations; they do not provide integration with the
+ * applications whose shortcut conventions they reference.
  */
 
 'use strict';

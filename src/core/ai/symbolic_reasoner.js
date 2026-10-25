@@ -1,7 +1,7 @@
 /**
  * OmniEng Proprietary Symbolic Multi-Physics Reasoning Engine & Dimensional Verifier
  * 
- * 100% In-House Intellectual Property: Zero open-source model weights, zero third-party cloud AI APIs.
+ * Experimental implementation; release maturity and provenance are not established.
  * Combines rigorous dimensional analysis ([M, L, T, Theta, I]), codified engineering laws,
  * non-linear parameter optimization (Nelder-Mead simplex), and deterministic intent compilation.
  */
@@ -401,24 +401,54 @@ class SymbolicPhysicsKnowledgeGraph {
   }
 
   // 6. Drone Hover Thrust & Actuator Disk Power (Aerospace & Robotics)
-  calculateDroneHoverAerodynamics(allUpWeightKg, rotorCount, propellerDiameterInches, figureOfMerit = 0.70) {
+  calculateDroneHoverAerodynamics(
+    allUpMassKg,
+    rotorCount,
+    propellerDiameterInches,
+    figureOfMerit,
+    airDensityKgM3,
+    gravityMPerS2
+  ) {
+    const validInputs = [allUpMassKg, propellerDiameterInches, figureOfMerit, airDensityKgM3, gravityMPerS2].every(
+      (value) => Number.isFinite(value) && value > 0
+    );
+    if (!validInputs || !Number.isInteger(rotorCount) || rotorCount < 1 || figureOfMerit > 1) {
+      throw new TypeError(
+        'Hover estimate requires positive mass, propeller diameter, figure of merit, air density, gravity, and a positive integer rotorCount.'
+      );
+    }
+
     const diameterM = propellerDiameterInches * 0.0254;
     const diskAreaSingleM2 = Math.PI * Math.pow(diameterM / 2.0, 2);
     const totalDiskAreaM2 = rotorCount * diskAreaSingleM2;
-    const totalThrustN = allUpWeightKg * this.constants.g;
+    const totalThrustN = allUpMassKg * gravityMPerS2;
     const thrustPerRotorN = totalThrustN / rotorCount;
 
     // Momentum theory ideal hover power: P_ideal = T^(3/2) / sqrt(2 * rho * A)
-    const idealPowerWatts = Math.pow(totalThrustN, 1.5) / Math.sqrt(2.0 * this.constants.rhoAir * totalDiskAreaM2);
+    const idealPowerWatts = Math.pow(totalThrustN, 1.5) / Math.sqrt(2.0 * airDensityKgM3 * totalDiskAreaM2);
     const actualHoverPowerWatts = idealPowerWatts / figureOfMerit;
     const powerPerRotorWatts = actualHoverPowerWatts / rotorCount;
+    const finiteResults = [
+      totalThrustN,
+      thrustPerRotorN,
+      totalDiskAreaM2,
+      idealPowerWatts,
+      actualHoverPowerWatts,
+      powerPerRotorWatts
+    ];
+    if (finiteResults.some((value) => !Number.isFinite(value) || value <= 0)) {
+      throw new RangeError('The supplied hover inputs exceed the finite numeric range.');
+    }
 
     return {
       totalWeightN: totalThrustN,
       thrustPerRotorN,
-      thrustPerRotorGrams: (thrustPerRotorN / this.constants.g) * 1e3,
+      thrustPerRotorGrams: (thrustPerRotorN / gravityMPerS2) * 1e3,
       totalDiskAreaM2,
-      inducedVelocityMs: Math.sqrt(totalThrustN / (2.0 * this.constants.rhoAir * totalDiskAreaM2)),
+      inducedVelocityMs: Math.sqrt(totalThrustN / (2.0 * airDensityKgM3 * totalDiskAreaM2)),
+      figureOfMerit,
+      airDensityKgM3,
+      gravityMPerS2,
       idealHoverPowerWatts: idealPowerWatts,
       actualHoverPowerWatts,
       powerPerRotorWatts
@@ -707,50 +737,84 @@ class SymbolicReasoner {
   }
 
   /**
-   * Autonomous Self-Healing: Finds optimal geometry parameter to satisfy structural yield limit
-   * @param {Object} currentDesign - { wallThicknessMm, loadN, lengthMm, widthMm, yieldStrengthMPa }
-   * @param {number} safetyFactor - Target safety factor (default: 1.5)
+   * Experimental Euler-Bernoulli cantilever thickness estimate. This is a
+   * formula screen, not an FEA result, safety-factor verification, or design edit.
+   * @param {Object} currentDesign Explicit dimensions, load, modulus, strength, and search bounds
+   * @param {number} safetyFactor User-supplied target used only to derive a comparison stress
    */
-  selfHealStructuralYield(currentDesign, safetyFactor = 1.5) {
-    const targetMaxStressPa = (currentDesign.yieldStrengthMPa * 1e6) / safetyFactor;
+  estimateCantileverThickness(currentDesign, safetyFactor) {
+    const required = [
+      'wallThicknessMm',
+      'loadN',
+      'lengthMm',
+      'widthMm',
+      'yieldStrengthMPa',
+      'youngsModulusGPa',
+      'minThicknessMm',
+      'maxThicknessMm'
+    ];
+    if (!currentDesign || typeof currentDesign !== 'object' || Array.isArray(currentDesign)) {
+      throw new TypeError('An explicit cantilever design object is required.');
+    }
+    const missing = required.filter((key) => !Number.isFinite(currentDesign[key]));
+    if (missing.length > 0 || !Number.isFinite(safetyFactor)) {
+      throw new TypeError(`Explicit finite design inputs and safetyFactor are required; missing or invalid: ${[...missing, ...(!Number.isFinite(safetyFactor) ? ['safetyFactor'] : [])].join(', ')}.`);
+    }
+    if (
+      required.some((key) => currentDesign[key] <= 0) ||
+      safetyFactor <= 0 ||
+      currentDesign.minThicknessMm >= currentDesign.maxThicknessMm ||
+      currentDesign.wallThicknessMm < currentDesign.minThicknessMm ||
+      currentDesign.wallThicknessMm > currentDesign.maxThicknessMm
+    ) {
+      throw new RangeError('Cantilever inputs and thickness bounds must be positive, ordered, and include the current wall thickness.');
+    }
+
+    const targetStressPa = (currentDesign.yieldStrengthMPa * 1e6) / safetyFactor;
     const lengthM = currentDesign.lengthMm * 1e-3;
     const widthM = currentDesign.widthMm * 1e-3;
     const loadN = currentDesign.loadN;
-    const E = (currentDesign.youngsModulusGPa || 70.0) * 1e9; // Aluminum default 70 GPa
-
-    // Objective: Minimize wall thickness while keeping stress <= targetMaxStressPa
-    const objective = (params) => {
-      const t = params[0]; // thickness in meters
-      if (t <= 1e-4) return 1e9;
-      const res = this.knowledgeGraph.calculateCantileverBeamBending(loadN, lengthM, widthM, t, E);
-      const stressDiff = Math.max(0, res.maxStressPa - targetMaxStressPa);
-      // Cost: penalize weight (thickness) + heavy penalty if stress exceeds limit
-      return t * 100.0 + (stressDiff / targetMaxStressPa) * 1000.0;
+    const youngsModulusPa = currentDesign.youngsModulusGPa * 1e9;
+    const objective = ([thicknessM]) => {
+      const response = this.knowledgeGraph.calculateCantileverBeamBending(
+        loadN,
+        lengthM,
+        widthM,
+        thicknessM,
+        youngsModulusPa
+      );
+      const excessStressPa = Math.max(0, response.maxStressPa - targetStressPa);
+      return thicknessM * 100 + (excessStressPa / targetStressPa) * 1000;
     };
 
-    const initialThickness = (currentDesign.wallThicknessMm || 1.0) * 1e-3;
-    const bounds = [{ min: 0.5e-3, max: 10.0e-3 }]; // 0.5mm to 10mm
-
-    const result = this.optimizer.minimize(objective, [initialThickness], bounds);
-    const optimalThicknessMm = result.optimalParams[0] * 1e3;
-    const finalStress = this.knowledgeGraph.calculateCantileverBeamBending(
-      loadN, lengthM, widthM, result.optimalParams[0], E
+    const bounds = [{ min: currentDesign.minThicknessMm * 1e-3, max: currentDesign.maxThicknessMm * 1e-3 }];
+    const result = this.optimizer.minimize(objective, [currentDesign.wallThicknessMm * 1e-3], bounds);
+    const candidateThicknessM = result.optimalParams[0];
+    const predictedResponse = this.knowledgeGraph.calculateCantileverBeamBending(
+      loadN,
+      lengthM,
+      widthM,
+      candidateThicknessM,
+      youngsModulusPa
     );
 
     return {
-      status: 'HEALED',
-      previousThicknessMm: currentDesign.wallThicknessMm,
-      recommendedThicknessMm: Math.round(optimalThicknessMm * 100) / 100,
-      predictedMaxStressMPa: Math.round(finalStress.maxStressMPa * 10) / 10,
-      targetStressLimitMPa: Math.round(targetMaxStressPa / 1e6 * 10) / 10,
-      safetyFactorAchieved: Math.round((currentDesign.yieldStrengthMPa / finalStress.maxStressMPa) * 100) / 100,
-      remediationText: `Increase wall thickness from ${currentDesign.wallThicknessMm} mm to ${Math.round(optimalThicknessMm * 10) / 10} mm to lower peak stress from yielding down to ${Math.round(finalStress.maxStressMPa)} MPa (Safety Factor: ${safetyFactor}).`,
-      actionPayload: {
-        feature: 'wallThickness',
-        value: Math.round(optimalThicknessMm * 10) / 10,
-        unit: 'mm'
-      }
+      status: 'ESTIMATE_ONLY',
+      validationLevel: 'experimental',
+      model: 'bounded Euler-Bernoulli cantilever formula with Nelder-Mead thickness search',
+      inputs: { ...currentDesign, safetyFactor },
+      estimate: {
+        candidateThicknessMm: Math.round(candidateThicknessM * 1e5) / 100,
+        predictedBendingStressMPa: Math.round(predictedResponse.maxStressMPa * 10) / 10,
+        targetStressMPa: Math.round(targetStressPa / 1e5) / 10
+      },
+      warning: 'No finite-element solve, material validation, safety-factor verification, failure assessment, or design change was performed.'
     };
+  }
+
+  /** @deprecated Compatibility alias; this method returns an estimate only and never heals or edits a design. */
+  selfHealStructuralYield(currentDesign, safetyFactor) {
+    return this.estimateCantileverThickness(currentDesign, safetyFactor);
   }
 }
 

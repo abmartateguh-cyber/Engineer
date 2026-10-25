@@ -1,53 +1,89 @@
 /**
- * OmniEng ASME BPVC Section VIII Division 2 Design-by-Analysis Engine
- * 
- * Implements Part 5 Design-by-Analysis stress categorization along Stress
- * Classification Lines (SCL) into General Primary Membrane (Pm), Bending (Pb),
- * Secondary Discontinuity (Q), and Peak (F) equivalent stresses with formal
- * code compliance verification.
- * 
- * Parity standard: ANSYS Mechanical ASME Section VIII Div 2 Post-Processor / AutoPIPE.
- * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental through-thickness stress integration and caller-limit screening.
+ * This legacy ASME-labeled API does not implement an ASME BPVC assessment.
  */
+
+function inputError(message, code = 'INVALID_INPUT') {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
 
 class ASMESectionVIIIDiv2Analyzer {
   /**
    * @param {Object} options
-   * @param {string} [options.material='SA-516 Grade 70'] - Material specification
-   * @param {number} [options.allowableStressS=138.0] - Allowable design stress S (MPa)
-   * @param {number} [options.yieldStrengthSy=260.0] - Material yield strength (MPa)
-   * @param {number} [options.ultimateStrengthSu=485.0] - Ultimate tensile strength (MPa)
-   * @param {number} [options.designPressureMpa=3.5] - Design internal pressure (MPa)
-   * @param {number} [options.designTemperatureC=150.0] - Design temperature (°C)
+   * @param {number} options.allowableStressS - Caller-supplied screening limit (MPa)
+   * @param {string} options.allowableStressSource - Caller-declared source of the screening limit
    */
   constructor(options = {}) {
-    this.material = options.material || 'SA-516 Grade 70';
-    this.S = options.allowableStressS !== undefined ? options.allowableStressS : 138.0; // MPa
-    this.Sy = options.yieldStrengthSy !== undefined ? options.yieldStrengthSy : 260.0;
-    this.Su = options.ultimateStrengthSu !== undefined ? options.ultimateStrengthSu : 485.0;
-    this.designPressure = options.designPressureMpa !== undefined ? options.designPressureMpa : 3.5;
-    this.designTemperatureC = options.designTemperatureC !== undefined ? options.designTemperatureC : 150.0;
+    const allowableStressS = options.allowableStressS;
+    const allowableStressSource = options.allowableStressSource;
+    if (!Number.isFinite(allowableStressS) || allowableStressS <= 0) {
+      throw inputError('A finite positive caller-supplied screening limit is required.');
+    }
+    if (
+      typeof allowableStressSource !== 'string' ||
+      allowableStressSource.trim().length === 0 ||
+      allowableStressSource.length > 500
+    ) {
+      throw inputError('A non-empty source label for the caller-supplied screening limit is required.');
+    }
+
+    this.S = allowableStressS;
+    this.allowableStressSource = allowableStressSource.trim();
   }
 
   /**
    * Performs Stress Linearization along a Stress Classification Line (SCL)
    * across vessel wall thickness t (from inner surface x = -t/2 to outer surface x = +t/2).
-   * 
+   *
    * Membrane Stress: sigma_m = (1 / t) * int_{-t/2}^{+t/2} sigma(x) dx
    * Bending Stress:  sigma_b = (6 / t^2) * int_{-t/2}^{+t/2} sigma(x) * x dx
    * Peak Stress:     sigma_F = sigma(x) - sigma_m - sigma_b(x)
-   * 
-   * @param {Array<{x: number, stressMpa: number}>} sclPoints - Discrete stress values along SCL
+   *
+   * @param {Array<{x: number, stressMpa: number}>} sclPoints - Ordered samples including both wall surfaces
    * @param {number} wallThicknessMm - Total wall thickness t (mm)
-   * @param {boolean} [isSecondaryThermal=false] - Whether stress contains secondary thermal gradient Q
-   * @returns {Object} Linearized stress categories Pm, Pb, Q, F and code limits
+   * @param {boolean} isSecondaryThermal - Must explicitly declare whether secondary thermal stress is present
+   * @returns {Object} Experimental stress integrals and comparisons with caller-derived limits
    */
-  linearizeStressClassificationLine(sclPoints, wallThicknessMm, isSecondaryThermal = false) {
+  linearizeStressClassificationLine(sclPoints, wallThicknessMm, isSecondaryThermal) {
     const t = wallThicknessMm;
+    if (!Number.isFinite(t) || t <= 0) {
+      throw inputError('Wall thickness must be finite and positive.');
+    }
+    if (!Array.isArray(sclPoints) || sclPoints.length < 2 || sclPoints.length > 10000) {
+      throw inputError('The stress line must contain between 2 and 10,000 samples.');
+    }
+    if (typeof isSecondaryThermal !== 'boolean') {
+      throw inputError('Explicitly declare whether secondary thermal stress is present.');
+    }
+    if (isSecondaryThermal) {
+      throw inputError(
+        'Secondary thermal stress screening is unavailable because this helper cannot derive Q from a single stress-line sample.',
+        'UNSUPPORTED'
+      );
+    }
+
     const n = sclPoints.length;
-    if (n < 2) {
-      throw new Error('SCL requires at least 2 through-thickness data points.');
+    const endpointToleranceMm = t * 1e-10;
+    const halfThickness = t / 2;
+    for (let i = 0; i < sclPoints.length; i++) {
+      const point = sclPoints[i];
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.stressMpa)) {
+        throw inputError(`Stress-line sample ${i} must contain finite x and stressMpa values.`);
+      }
+      if (point.x < -halfThickness - endpointToleranceMm || point.x > halfThickness + endpointToleranceMm) {
+        throw inputError(`Stress-line sample ${i} lies outside the supplied wall thickness.`);
+      }
+      if (i > 0 && point.x <= sclPoints[i - 1].x) {
+        throw inputError('Stress-line x coordinates must be strictly increasing.');
+      }
+    }
+    if (
+      Math.abs(sclPoints[0].x + halfThickness) > endpointToleranceMm ||
+      Math.abs(sclPoints[sclPoints.length - 1].x - halfThickness) > endpointToleranceMm
+    ) {
+      throw inputError('Stress-line samples must include both supplied wall surfaces.');
     }
 
     // Numerical integration via trapezoidal rule
@@ -59,21 +95,31 @@ class ASMESectionVIIIDiv2Analyzer {
       const p2 = sclPoints[i + 1];
       const dx = p2.x - p1.x;
 
-      const avgSigma = (p1.stressMpa + p2.stressMpa) / 2.0;
+      const avgSigma = p1.stressMpa / 2.0 + p2.stressMpa / 2.0;
       intSigma += avgSigma * dx;
 
-      const avgSigmaX = (p1.stressMpa * p1.x + p2.stressMpa * p2.x) / 2.0;
+      const avgSigmaX = (p1.stressMpa * p1.x) / 2.0 + (p2.stressMpa * p2.x) / 2.0;
       intSigmaX += avgSigmaX * dx;
+    }
+
+    if (!Number.isFinite(intSigma) || !Number.isFinite(intSigmaX)) {
+      throw inputError('Stress-line integration exceeded finite numeric range.', 'NUMERICAL_FAILURE');
     }
 
     const sigmaMembrane = intSigma / t; // Pm
     const sigmaBending = (6.0 / (t * t)) * intSigmaX; // Pb
+    if (!Number.isFinite(sigmaMembrane) || !Number.isFinite(sigmaBending)) {
+      throw inputError('Stress linearization exceeded finite numeric range.', 'NUMERICAL_FAILURE');
+    }
 
     // Peak stress F is the maximum local deviation from linearized (Pm + Pb)
     let maxPeak = 0.0;
     for (const p of sclPoints) {
-      const linearizedAtX = sigmaMembrane + (2.0 * p.x / t) * sigmaBending;
+      const linearizedAtX = sigmaMembrane + ((2.0 * p.x) / t) * sigmaBending;
       const deviation = Math.abs(p.stressMpa - linearizedAtX);
+      if (!Number.isFinite(linearizedAtX) || !Number.isFinite(deviation)) {
+        throw inputError('Stress residual exceeded finite numeric range.', 'NUMERICAL_FAILURE');
+      }
       if (deviation > maxPeak) {
         maxPeak = deviation;
       }
@@ -81,134 +127,92 @@ class ASMESectionVIIIDiv2Analyzer {
 
     const Pm = Math.abs(sigmaMembrane);
     const Pb = Math.abs(sigmaBending);
-    const Q = isSecondaryThermal ? Math.max(0.0, maxPeak * 0.5) : 0.0;
+    // Q is not inferable from one through-thickness sample. This branch only
+    // supports a caller's explicit declaration that no secondary thermal
+    // stress is being screened.
+    const Q = 0.0;
     const F = maxPeak;
 
-    // ASME Section VIII Div 2 Part 5 Criteria:
-    // 1. Primary Membrane: Pm <= S
-    // 2. Primary Membrane + Bending: Pm + Pb <= 1.5 * S
-    // 3. Primary + Secondary (Shakedown/Ratcheting): Pm + Pb + Q <= 3.0 * S
+    // Experimental screening multiples of the caller's supplied stress limit.
+    // These comparisons do not reproduce a complete code assessment.
     const limit_Pm = this.S;
     const limit_Pm_Pb = 1.5 * this.S;
     const limit_Pm_Pb_Q = 3.0 * this.S;
+    if (!Number.isFinite(limit_Pm_Pb) || !Number.isFinite(limit_Pm_Pb_Q)) {
+      throw inputError('Derived screening thresholds exceeded finite numeric range.', 'NUMERICAL_FAILURE');
+    }
 
-    const pass_Pm = Pm <= limit_Pm;
-    const pass_Pm_Pb = (Pm + Pb) <= limit_Pm_Pb;
-    const pass_Pm_Pb_Q = (Pm + Pb + Q) <= limit_Pm_Pb_Q;
-    const overallPass = pass_Pm && pass_Pm_Pb && pass_Pm_Pb_Q;
+    const withinPm = Pm <= limit_Pm;
+    const withinPmPb = Pm + Pb <= limit_Pm_Pb;
+    const withinPmPbQ = Pm + Pb + Q <= limit_Pm_Pb_Q;
 
-    // Safety factor
-    const sf_membrane = limit_Pm / (Pm || 1e-6);
-    const sf_combined = limit_Pm_Pb / ((Pm + Pb) || 1e-6);
+    const rawMembraneLimitRatio = Pm === 0 ? null : limit_Pm / Pm;
+    const rawCombinedLimitRatio = Pm + Pb === 0 ? null : limit_Pm_Pb / (Pm + Pb);
+    const membraneLimitRatio = Number.isFinite(rawMembraneLimitRatio) ? rawMembraneLimitRatio : null;
+    const combinedLimitRatio = Number.isFinite(rawCombinedLimitRatio) ? rawCombinedLimitRatio : null;
 
     return {
+      dataStatus: 'caller-supplied-unverified',
+      status: 'screening-only',
+      assessmentStatus: 'no-code-assessment',
+      limitBasis: 'caller-supplied-unverified',
+      allowableStressSource: this.allowableStressSource,
+      secondaryStressBasis: 'caller-declared-absent',
       wallThicknessMm: t,
       membraneStressPm: Pm,
       bendingStressPb: Pb,
       secondaryStressQ: Q,
       peakStressF: F,
-      totalStressIntensity: Pm + Pb + Q + F,
-      limits: {
-        allowable_S: limit_Pm,
-        allowable_1_5S: limit_Pm_Pb,
-        allowable_3S: limit_Pm_Pb_Q
+      screeningRule: 'experimental-threshold-multipliers-1x-1.5x-3x',
+      screeningLimitsMpa: {
+        suppliedThreshold: limit_Pm,
+        derived1_5xThreshold: limit_Pm_Pb,
+        derived3xThreshold: limit_Pm_Pb_Q
       },
-      evaluation: {
-        passMembrane: pass_Pm,
-        passMembraneBending: pass_Pm_Pb,
-        passShakedown: pass_Pm_Pb_Q,
-        overallConforms: overallPass
+      screening: {
+        withinSuppliedPmLimit: withinPm,
+        withinSuppliedPmPbLimit: withinPmPb,
+        withinSuppliedPmPbQLimit: withinPmPbQ,
+        withinAllSuppliedLimits: withinPm && withinPmPb && withinPmPbQ
       },
-      safetyFactors: {
-        membrane: sf_membrane,
-        combined: sf_combined
+      suppliedLimitRatios: {
+        membrane: membraneLimitRatio,
+        combined: combinedLimitRatio
       }
     };
   }
 
   /**
-   * Alias for linearizeStressClassificationLine providing direct overallConforms property.
-   * @param {Array<{x: number, stressMpa: number}>} sclPoints 
-   * @param {number} wallThicknessMm 
-   * @param {boolean} [isSecondaryThermal=false] 
+   * Compatibility alias for the experimental stress-line calculation.
+   * @param {Array<{x: number, stressMpa: number}>} sclPoints
+   * @param {number} wallThicknessMm
+   * @param {boolean} isSecondaryThermal
    * @returns {Object}
    */
-  evaluateStressClassificationLine(sclPoints, wallThicknessMm, isSecondaryThermal = false) {
+  evaluateStressClassificationLine(sclPoints, wallThicknessMm, isSecondaryThermal) {
     const res = this.linearizeStressClassificationLine(sclPoints, wallThicknessMm, isSecondaryThermal);
-    return {
-      ...res,
-      overallConforms: res.evaluation.overallConforms
-    };
+    return res;
   }
 
-  /**
-   * Generates a formal ASME Section VIII Div 2 Form A-1 compliance certificate.
-   * @param {string|Object} [equipmentTag='V-101 Separator']
-   * @returns {string}
-   */
-  generateComplianceCertificate(equipmentTag = 'V-101 Separator') {
-    const tag = typeof equipmentTag === 'string' ? equipmentTag : (equipmentTag.vesselTag || 'V-101 Separator');
-    return `# ASME BPVC SECTION VIII DIVISION 2
-## FORM A-1 MANUFACTURER'S DATA REPORT FOR PRESSURE VESSELS
-### Design-by-Analysis Alternative Rules (Part 5)
+  /** Deprecated compatibility method. It never emits an ASME certificate. */
+  generateComplianceCertificate(equipmentTag) {
+    const tag = typeof equipmentTag === 'string' ? equipmentTag : equipmentTag?.vesselTag || 'unspecified';
+    return `# Experimental Stress Screening
 
-- **Equipment Tag:** ${tag}
-- **Material Specification:** ${this.material}
-- **Design Pressure:** ${this.designPressure} MPa (${(this.designPressure * 145.038).toFixed(1)} psig)
-- **Design Temperature:** ${this.designTemperatureC} °C
-- **Allowable Stress Limit (S):** ${this.S.toFixed(1)} MPa
-- **Form A-1 Digital Seal:** VALIDATED & CERTIFIED
-- **Compliance Verdict:** CONFORMS TO ASME CODE
+Equipment tag: ${tag}
+
+This diagnostic is experimental and is not an ASME BPVC report, Form A-1, code assessment, or professional engineering approval.
 `;
   }
 
-  /**
-   * Generates a formal ASME BPVC Section VIII Division 2 Engineering Certification Document.
-   * 
-   * @param {Object} vesselData - Vessel parameters and SCL results
-   * @returns {string} Formatted Markdown compliance certificate
-   */
-  generateFormalCertificationDocument(vesselData) {
-    const scl = vesselData.sclAnalysis;
-    const conforms = scl.evaluation.overallConforms;
-
-    return `# ASME Boiler & Pressure Vessel Code (BPVC)
-## Section VIII Division 2: Alternative Rules — Design-by-Analysis Certification
-
-- **Document No:** \`ASME-VIII-DIV2-${Date.now().toString().slice(-6)}\`
-- **Equipment Tag:** ${vesselData.vesselTag || 'V-101 High-Pressure Gas Separator'}
-- **Construction Material:** ${this.material}
-- **Design Pressure:** ${this.designPressure} MPa (${(this.designPressure * 145.038).toFixed(1)} psig)
-- **Design Temperature:** ${this.designTemperatureC} °C
-- **Compliance Verdict:** **${conforms ? 'CONFORMS TO ASME CODE' : 'NON-CONFORMANCE / CODE REJECT'}**
-
----
-
-### 1. Material Allowable Stress Limits (ASME Section II Part D)
-
-- **Allowable Design Stress (S):** ${this.S.toFixed(1)} MPa
-- **Minimum Specified Yield Strength (Sy):** ${this.Sy.toFixed(1)} MPa
-- **Minimum Specified Tensile Strength (Su):** ${this.Su.toFixed(1)} MPa
-- **Primary Membrane + Bending Limit (1.5S):** ${(1.5 * this.S).toFixed(1)} MPa
-- **Secondary Stress Shakedown Limit (3.0S):** ${(3.0 * this.S).toFixed(1)} MPa
-
----
-
-### 2. Stress Categorization & Linearization (Part 5 Paragraph 5.2.2)
-
-| Stress Category | Symbol | Calculated (MPa) | Code Allowable (MPa) | Margin of Safety | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **General Primary Membrane** | $P_m$ | ${scl.membraneStressPm.toFixed(2)} | ${scl.limits.allowable_S.toFixed(2)} | +${((scl.safetyFactors.membrane - 1.0) * 100).toFixed(1)}% | ${scl.evaluation.passMembrane ? 'PASS' : 'FAIL'} |
-| **Primary Membrane + Bending** | $P_m + P_b$ | ${(scl.membraneStressPm + scl.bendingStressPb).toFixed(2)} | ${scl.limits.allowable_1_5S.toFixed(2)} | +${((scl.safetyFactors.combined - 1.0) * 100).toFixed(1)}% | ${scl.evaluation.passMembraneBending ? 'PASS' : 'FAIL'} |
-| **Primary + Secondary** | $P_m + P_b + Q$ | ${(scl.membraneStressPm + scl.bendingStressPb + scl.secondaryStressQ).toFixed(2)} | ${scl.limits.allowable_3S.toFixed(2)} | +${(((scl.limits.allowable_3S / (scl.membraneStressPm + scl.bendingStressPb + scl.secondaryStressQ)) - 1.0) * 100).toFixed(1)}% | ${scl.evaluation.passShakedown ? 'PASS' : 'FAIL'} |
-| **Peak Stress** | $F$ | ${scl.peakStressF.toFixed(2)} | Fatigue S-N curve | N/A | VERIFIED |
-
----
-
-### 3. Professional Engineering Certification
-
-The structural finite element stress analysis and stress linearization along critical Stress Classification Lines (SCL) confirms that all primary membrane, bending, and secondary discontinuity stress intensities reside within the allowable limits defined in ASME BPVC Section VIII Division 2 Part 5. Protection against plastic collapse and ratcheting is formally certified.
-`;
+  /** Deprecated compatibility method. This API returns an experimental warning, not an assessment. */
+  generateFormalCertificationDocument(vesselData = {}) {
+    const tag = vesselData.vesselTag || 'unspecified';
+    return (
+      '# Experimental Stress Screening\n\nEquipment tag: ' +
+      tag +
+      '\n\nNo released ASME assessment is available. This diagnostic is not code compliance evidence, a Form A-1, or a professional engineering certification.\n'
+    );
   }
 }
 

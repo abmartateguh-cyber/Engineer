@@ -1,10 +1,8 @@
 /**
  * OmniEng 3rd-Order Seidel Aberration Solver
  * Standard: Classical Conrady / Hopkins Primary Aberration Sums
- * Industrial Parity: Zemax OpticStudio / SYNOPSYS CODE V Seidel coefficients.
+ * Experimental implementation: Zemax OpticStudio / SYNOPSYS CODE V Seidel coefficients.
  */
-
-const { OpticalMaterials } = require('./optical_materials');
 
 class SeidelAberrations {
   /**
@@ -12,13 +10,18 @@ class SeidelAberrations {
    * @param {Object[]} surfaces Array of surfaces with:
    *   radius: Curvature radius (mm)
    *   thickness: Center distance to next surface (mm)
-   *   glassKey: Material name (e.g. 'Schott_NBK7', 'Air')
+   *   nIncident, nTransmitted, and the corresponding Fraunhofer F/C indices
    *   conic: Conic constant k (optional)
    *   asphericA4: 4th-order aspheric coefficient (optional)
    * @param {number} entrancePupilRadiusMm Clear semi-diameter of entrance pupil (y1)
    * @param {number} fieldAngleDeg Maximum semi-field angle (degrees)
    */
-  static computeSeidelCoefficients(surfaces, entrancePupilRadiusMm = 17.85, fieldAngleDeg = 23.4) {
+  static computeSeidelCoefficients(surfaces, entrancePupilRadiusMm, fieldAngleDeg) {
+    if (!Array.isArray(surfaces)) throw new TypeError('An explicit optical surface array is required.');
+    if (!Number.isFinite(entrancePupilRadiusMm) || entrancePupilRadiusMm <= 0) {
+      throw new TypeError('A finite positive entrance pupil radius is required.');
+    }
+    if (!Number.isFinite(fieldAngleDeg)) throw new TypeError('A finite field angle is required.');
     const K = surfaces.length;
     if (K === 0) return null;
 
@@ -30,15 +33,25 @@ class SeidelAberrations {
     const n = new Float64Array(K + 1);
     const deltaN = new Float64Array(K + 1);
 
-    // Populate refractive indices across surfaces
+    // Optical properties are explicit inputs; no catalog lookup or medium fallback is used.
     for (let i = 0; i < K; i++) {
-      const glass = surfaces[i].glassKey || 'Air';
-      const props = OpticalMaterials.getFraunhoferProperties(glass);
-      n[i] = props.nd;
-      deltaN[i] = props.nF - props.nC;
+      const surface = surfaces[i];
+      const opticalValues = [
+        surface.nIncident,
+        surface.nTransmitted,
+        surface.nIncidentF,
+        surface.nIncidentC,
+        surface.nTransmittedF,
+        surface.nTransmittedC
+      ];
+      if (!opticalValues.every((value) => Number.isFinite(value) && value > 0)) {
+        throw new TypeError(`Surface ${i} requires explicit positive d/F/C refractive indices.`);
+      }
+      n[i] = surface.nTransmitted;
+      deltaN[i] = surface.nTransmittedF - surface.nTransmittedC;
     }
-    n[K] = 1.0; // Image space air
-    deltaN[K] = 0.000007;
+    n[K] = surfaces[K - 1].nTransmitted;
+    deltaN[K] = surfaces[K - 1].nTransmittedF - surfaces[K - 1].nTransmittedC;
 
     // 1. Initial marginal and chief ray launch parameters
     const semiFieldRad = (fieldAngleDeg * Math.PI) / 180.0;
@@ -52,7 +65,7 @@ class SeidelAberrations {
     for (let i = 0; i < K; i++) {
       const R = surfaces[i].radius;
       const c = (R && Math.abs(R) < 1e8) ? 1.0 / R : 0.0;
-      const nIn = (i === 0) ? 1.0 : n[i - 1];
+      const nIn = surfaces[i].nIncident;
       const nOut = n[i];
 
       // Marginal ray refraction: n' u' = n u - y * c * (n' - n)
@@ -89,7 +102,7 @@ class SeidelAberrations {
     for (let i = 0; i < K; i++) {
       const R = surfaces[i].radius;
       const c = (R && Math.abs(R) < 1e8) ? 1.0 / R : 0.0;
-      const nIn = (i === 0) ? 1.0 : n[i - 1];
+      const nIn = surfaces[i].nIncident;
       const nOut = n[i];
 
       if (c === 0.0 && nIn === nOut) {
@@ -116,8 +129,8 @@ class SeidelAberrations {
       const surfSV = (A !== 0) ? (ABar / A) * (surfSIII + surfSIV) : 0.0;
 
       // Primary Chromatic Sums
-      const dnIn = (i === 0) ? 0.000007 : deltaN[i - 1];
-      const dnOut = deltaN[i];
+      const dnIn = surfaces[i].nIncidentF - surfaces[i].nIncidentC;
+      const dnOut = surfaces[i].nTransmittedF - surfaces[i].nTransmittedC;
       const delta_dispersion = (dnOut / nOut) - (dnIn / nIn);
 
       const surfCL = y[i] * A * delta_dispersion;

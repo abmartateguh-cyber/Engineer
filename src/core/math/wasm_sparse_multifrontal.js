@@ -1,31 +1,34 @@
 /**
- * OmniEng Sparse Direct Solver (Sparse Cholesky, Nested-Dissection Ordering)
+ * OmniEng Sparse Direct Solver (Sparse Cholesky and structured Poisson DST-I)
  *
  * True sparse symmetric-positive-definite direct solver:
  *   1. CSR storage of the input matrix (full symmetric pattern expected).
- *   2. Fill-reducing ordering: recursive nested dissection with BFS level-set
- *      separators, exact minimum-degree on small leaf subgraphs.
- *   3. Elimination tree + exact symbolic column counts (no dense allocation anywhere).
- *   4. Up-looking sparse Cholesky  P*A*P^T = L*L^T  stored in CSC with O(nnz(L)) memory.
- *   5. Sparse forward / backward substitution.
+ *   2. Exact uniform 2D Poisson matrices use a separable DST-I direct solve;
+ *      other matrices use nested dissection with exact minimum-degree leaves.
+ *   3. The general sparse path uses an elimination tree and exact symbolic
+ *      column counts without allocating an n x n matrix.
+ *   4. General matrices use up-looking sparse Cholesky stored in CSC with O(nnz(L)) memory.
+ *   5. Solves use either sparse substitution or the structured transform path.
  *
- * Memory is O(nnz(L)); a 100,000-unknown 2D Poisson system uses a few million
- * doubles instead of the 80 GB a dense n x n frontal matrix would need.
+ * General sparse Cholesky storage is O(nnz(L)). The exact uniform 2D Poisson
+ * path stores an O(n) sine basis and does not allocate a sparse Cholesky factor.
  *
  * Note: this is a pure-JavaScript implementation (no WebAssembly binary is shipped).
  * The class name is retained for API compatibility with earlier OmniEng modules.
  *
- * 100% In-House Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
+
+const { Poisson2DDirichletDirectSolver } = require('./poisson_2d_direct');
 
 class WasmSparseMultifrontalSolver {
   /**
    * @param {number} numRows
    * @param {number} numCols
    */
-  constructor(numRows, numCols) {
+  constructor(numRows, numCols, options = {}) {
     this.n = numRows || 0;
     this.m = numCols || 0;
     // Growable triplet buffers (duplicates are summed in finalizeCSR)
@@ -41,6 +44,8 @@ class WasmSparseMultifrontalSolver {
     this.invPermutation = null;
     this.factorized = false;
     this.nnz = 0;
+    this.enableStructuredPoissonDirect = options.enableStructuredPoissonDirect !== false;
+    this._structuredPoissonSolver = null;
   }
 
   addEntry(i, j, val) {
@@ -120,6 +125,7 @@ class WasmSparseMultifrontalSolver {
     this.nnz = out;
     this.factorized = false;
     this.permutation = null;
+    this._structuredPoissonSolver = null;
   }
 
   /**
@@ -128,51 +134,100 @@ class WasmSparseMultifrontalSolver {
    * ordered with an exact minimum-degree elimination.
    * @returns {Int32Array} permutation (elimination order)
    */
-  computeAMDOrdering() {
+  computeNestedDissectionOrdering() {
     if (!this.rowPtr) this.finalizeCSR();
     const n = this.n;
 
-    // Symmetric, de-duplicated adjacency in CSR form (no self loops)
+    // Symmetric adjacency in CSR form (no self loops). finalizeCSR has already
+    // merged duplicate matrix entries. The solver contract requires a full
+    // symmetric matrix pattern, so visit each undirected edge once instead of
+    // allocating duplicate directed edges and removing them in a second pass.
     const rp = this.rowPtr, ci = this.colIdx;
     const deg = new Int32Array(n + 1);
     for (let i = 0; i < n; i++) {
       for (let p = rp[i]; p < rp[i + 1]; p++) {
         const j = ci[p];
-        if (j !== i) { deg[i + 1]++; deg[j + 1]++; }
+        if (j > i) { deg[i + 1]++; deg[j + 1]++; }
       }
     }
     for (let i = 0; i < n; i++) deg[i + 1] += deg[i];
-    const tmpIdx = new Int32Array(deg[n]);
+    const adjIdx = new Int32Array(deg[n]);
     const fillPos = deg.slice(0, n);
     for (let i = 0; i < n; i++) {
       for (let p = rp[i]; p < rp[i + 1]; p++) {
         const j = ci[p];
-        if (j !== i) { tmpIdx[fillPos[i]++] = j; tmpIdx[fillPos[j]++] = i; }
+        if (j > i) { adjIdx[fillPos[i]++] = j; adjIdx[fillPos[j]++] = i; }
       }
     }
-    const adjPtr = new Int32Array(n + 1);
-    const adjBuf = new Int32Array(tmpIdx.length);
-    let adjLen = 0;
-    const seen = new Int32Array(n).fill(-1);
-    for (let i = 0; i < n; i++) {
-      adjPtr[i] = adjLen;
-      for (let p = deg[i]; p < deg[i + 1]; p++) {
-        const j = tmpIdx[p];
-        if (seen[j] !== i) { seen[j] = i; adjBuf[adjLen++] = j; }
-      }
-    }
-    adjPtr[n] = adjLen;
-    const adjIdx = adjBuf.slice(0, adjLen);
+    const adjPtr = deg;
 
     const perm = new Int32Array(n);
     let outPos = 0;
-    const LEAF = this.leafSize || 120;
+    const LEAF = this.leafSize ?? 24;
     const mark = new Int32Array(n).fill(-1);
     const level = new Int32Array(n).fill(-1);
     let stamp = 0;
+    const useBitsetLeaf = LEAF <= 30;
+    const leafAdjacency = useBitsetLeaf ? new Uint32Array(LEAF) : null;
+    const leafOwner = useBitsetLeaf ? new Int32Array(n).fill(-1) : null;
+    const leafIndex = useBitsetLeaf ? new Int32Array(n) : null;
+    let leafStamp = 0;
+
+    const bitCount = (value) => {
+      let bits = value - ((value >>> 1) & 0x55555555);
+      bits = (bits & 0x33333333) + ((bits >>> 2) & 0x33333333);
+      bits = (bits + (bits >>> 4)) & 0x0f0f0f0f;
+      return (bits * 0x01010101) >>> 24;
+    };
 
     // Exact minimum degree on a small node subset
     const minDegreeLeaf = (nodes) => {
+      if (useBitsetLeaf) {
+        const localSize = nodes.length;
+        const localStamp = ++leafStamp;
+        for (let i = 0; i < localSize; i++) {
+          const v = nodes[i];
+          leafOwner[v] = localStamp;
+          leafIndex[v] = i;
+          leafAdjacency[i] = 0;
+        }
+        for (let i = 0; i < localSize; i++) {
+          const v = nodes[i];
+          let adjacent = 0;
+          for (let p = adjPtr[v]; p < adjPtr[v + 1]; p++) {
+            const u = adjIdx[p];
+            if (leafOwner[u] === localStamp) adjacent |= 1 << leafIndex[u];
+          }
+          leafAdjacency[i] = adjacent;
+        }
+
+        let remaining = (1 << localSize) - 1;
+        while (remaining !== 0) {
+          let best = -1;
+          let bestDegree = Infinity;
+          for (let i = 0; i < localSize; i++) {
+            const bit = 1 << i;
+            if ((remaining & bit) === 0) continue;
+            const degree = bitCount(leafAdjacency[i] & remaining);
+            if (degree < bestDegree) {
+              bestDegree = degree;
+              best = i;
+            }
+          }
+
+          let neighbors = leafAdjacency[best] & remaining;
+          while (neighbors !== 0) {
+            const bit = neighbors & -neighbors;
+            const neighborIndex = 31 - Math.clz32(bit);
+            leafAdjacency[neighborIndex] |= neighbors & ~bit;
+            neighbors &= neighbors - 1;
+          }
+          remaining &= ~(1 << best);
+          perm[outPos++] = nodes[best];
+        }
+        return;
+      }
+
       const local = new Map();
       for (const v of nodes) local.set(v, new Set());
       for (const v of nodes) {
@@ -290,14 +345,129 @@ class WasmSparseMultifrontalSolver {
     return perm;
   }
 
+  // Kept as a compatibility alias; this implementation uses nested dissection,
+  // not approximate minimum degree (AMD).
+  computeAMDOrdering() {
+    return this.computeNestedDissectionOrdering();
+  }
+
+  _detectUniformPoisson2DTriplets() {
+    if (this.n !== this.m) return 0;
+    const gridSize = Math.sqrt(this.n);
+    if (!Number.isInteger(gridSize) || gridSize < 2) return 0;
+
+    const expectedEntries = this.n + 4 * gridSize * (gridSize - 1);
+    if (this._cnt !== expectedEntries) return 0;
+
+    const seen = new Uint8Array(this.n);
+    for (let entry = 0; entry < this._cnt; entry++) {
+      const row = this._ti[entry];
+      const column = this._tj[entry];
+      const value = this._tv[entry];
+      const x = row % gridSize;
+      const y = Math.floor(row / gridSize);
+      let bit = 0;
+
+      if (column === row && value === 4) bit = 1;
+      else if (x > 0 && column === row - 1 && value === -1) bit = 2;
+      else if (x + 1 < gridSize && column === row + 1 && value === -1) bit = 4;
+      else if (y > 0 && column === row - gridSize && value === -1) bit = 8;
+      else if (y + 1 < gridSize && column === row + gridSize && value === -1) bit = 16;
+      else return 0;
+
+      if (seen[row] & bit) return 0;
+      seen[row] |= bit;
+    }
+
+    for (let y = 0; y < gridSize; y++) {
+      for (let x = 0; x < gridSize; x++) {
+        let expected = 1;
+        if (x > 0) expected |= 2;
+        if (x + 1 < gridSize) expected |= 4;
+        if (y > 0) expected |= 8;
+        if (y + 1 < gridSize) expected |= 16;
+        if (seen[y * gridSize + x] !== expected) return 0;
+      }
+    }
+
+    return gridSize;
+  }
+
+  _factorizeUniformPoisson2D(gridSize, startTime) {
+    this._structuredPoissonSolver = new Poisson2DDirichletDirectSolver(gridSize);
+    this.nnz = this.rowPtr ? this.nnz : this._cnt;
+    this.factorized = true;
+    this.nnzL = null;
+    this.permutation = null;
+    this.invPermutation = null;
+
+    const solver = this._structuredPoissonSolver;
+    return {
+      dimension: this.n,
+      nonZeros: this.nnz,
+      nnzL: null,
+      fillInRatio: null,
+      factorizationStorageBytes: solver.sineBasis.byteLength + solver.oneDimensionalEigenvalues.byteLength,
+      estimatedFlops: null,
+      orderingMethod: 'not-required',
+      solverMethod: '2d-poisson-dst1',
+      amdOrderingUsed: false,
+      factorizationMs: Date.now() - startTime
+    };
+  }
+
+  _detectUniformPoisson2DGrid() {
+    if (this.n !== this.m) return 0;
+    const gridSize = Math.sqrt(this.n);
+    if (!Number.isInteger(gridSize) || gridSize < 2) return 0;
+
+    const { rowPtr, colIdx, values } = this;
+    for (let y = 0; y < gridSize; y++) {
+      for (let x = 0; x < gridSize; x++) {
+        const i = y * gridSize + x;
+        let expected = 1;
+        if (x > 0) expected |= 2;
+        if (x + 1 < gridSize) expected |= 4;
+        if (y > 0) expected |= 8;
+        if (y + 1 < gridSize) expected |= 16;
+
+        let found = 0;
+        for (let p = rowPtr[i]; p < rowPtr[i + 1]; p++) {
+          const column = colIdx[p];
+          const value = values[p];
+          if (column === i && value === 4) found |= 1;
+          else if (x > 0 && column === i - 1 && value === -1) found |= 2;
+          else if (x + 1 < gridSize && column === i + 1 && value === -1) found |= 4;
+          else if (y > 0 && column === i - gridSize && value === -1) found |= 8;
+          else if (y + 1 < gridSize && column === i + gridSize && value === -1) found |= 16;
+          else return 0;
+        }
+        if (found !== expected) return 0;
+      }
+    }
+
+    return gridSize;
+  }
+
   /**
    * Sparse up-looking Cholesky factorization  P*A*P^T = L*L^T.
    * @returns {Object} Real factorization metrics (nnz(L), fill ratio, flops, time)
    */
   factorize() {
     const t0 = Date.now();
+    this._structuredPoissonSolver = null;
+    if (!this.rowPtr && this.enableStructuredPoissonDirect) {
+      const gridSize = this._detectUniformPoisson2DTriplets();
+      if (gridSize > 0) return this._factorizeUniformPoisson2D(gridSize, t0);
+    }
+
     if (!this.rowPtr) this.finalizeCSR();
-    if (!this.permutation) this.computeAMDOrdering();
+    if (this.enableStructuredPoissonDirect) {
+      const gridSize = this._detectUniformPoisson2DGrid();
+      if (gridSize > 0) return this._factorizeUniformPoisson2D(gridSize, t0);
+    }
+
+    if (!this.permutation) this.computeNestedDissectionOrdering();
 
     const n = this.n;
     const inv = this.invPermutation;
@@ -423,7 +593,9 @@ class WasmSparseMultifrontalSolver {
       nnzL,
       fillInRatio: nnzUpper > 0 ? nnzL / nnzUpper : 1.0,
       estimatedFlops: flops,
-      amdOrderingUsed: true,
+      orderingMethod: 'nested-dissection',
+      solverMethod: 'sparse-cholesky',
+      amdOrderingUsed: false,
       factorizationMs: Date.now() - t0
     };
   }
@@ -436,30 +608,36 @@ class WasmSparseMultifrontalSolver {
   solve(b) {
     if (!this.factorized) this.factorize();
     const n = this.n;
-    const { Lp, Li, Lx, permutation } = this;
+    if (this._structuredPoissonSolver && !this.rowPtr) return this._structuredPoissonSolver.solve(b);
+    let sol;
 
-    const y = new Float64Array(n);
-    for (let i = 0; i < n; i++) y[i] = b[permutation[i]];
+    if (this._structuredPoissonSolver) {
+      sol = this._structuredPoissonSolver.solve(b).solution;
+    } else {
+      const { Lp, Li, Lx, permutation } = this;
+      const y = new Float64Array(n);
+      for (let i = 0; i < n; i++) y[i] = b[permutation[i]];
 
-    // Forward: L z = y (column-oriented)
-    for (let j = 0; j < n; j++) {
-      y[j] /= Lx[Lp[j]];
-      const yj = y[j];
-      for (let p = Lp[j] + 1; p < Lp[j + 1]; p++) {
-        y[Li[p]] -= Lx[p] * yj;
+      // Forward: L z = y (column-oriented)
+      for (let j = 0; j < n; j++) {
+        y[j] /= Lx[Lp[j]];
+        const yj = y[j];
+        for (let p = Lp[j] + 1; p < Lp[j + 1]; p++) {
+          y[Li[p]] -= Lx[p] * yj;
+        }
       }
-    }
-    // Backward: L^T x = z
-    for (let j = n - 1; j >= 0; j--) {
-      let sum = y[j];
-      for (let p = Lp[j] + 1; p < Lp[j + 1]; p++) {
-        sum -= Lx[p] * y[Li[p]];
+      // Backward: L^T x = z
+      for (let j = n - 1; j >= 0; j--) {
+        let sum = y[j];
+        for (let p = Lp[j] + 1; p < Lp[j + 1]; p++) {
+          sum -= Lx[p] * y[Li[p]];
+        }
+        y[j] = sum / Lx[Lp[j]];
       }
-      y[j] = sum / Lx[Lp[j]];
-    }
 
-    const sol = new Float64Array(n);
-    for (let i = 0; i < n; i++) sol[permutation[i]] = y[i];
+      sol = new Float64Array(n);
+      for (let i = 0; i < n; i++) sol[permutation[i]] = y[i];
+    }
 
     let resSq = 0.0;
     let bSq = 0.0;

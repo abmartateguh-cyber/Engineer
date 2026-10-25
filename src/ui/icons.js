@@ -1,10 +1,10 @@
 /**
  * OmniIcons — Native Precision Engineering SVG Icon System
- * 
+ *
  * Hand-crafted vector iconography tailored for CAD, CAE, CFD, EDA, Optics,
  * and Plant simulation workstations. Replaces all consumer emoji placeholders
  * with crisp, pixel-aligned vector graphics (1.75px optical stroke).
- * 
+ *
  * Zero external CDN dependencies. Pure inline SVG string catalog.
  */
 
@@ -22,9 +22,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const SVG_ATTRS = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
+  const SVG_ATTRS =
+    'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
 
-  const ICONS = {
+  const ICONS = Object.freeze({
     // ----------------------------------------------------
     // Engineering Studios
     // ----------------------------------------------------
@@ -153,7 +154,7 @@
     themeMoon: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
 
     // ----------------------------------------------------
-    // Production Parity & Missing UI Icons
+    // Production Experimental workflow & Missing UI Icons
     // ----------------------------------------------------
     checkCircle: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>`,
     circuit: `<svg ${SVG_ATTRS} class="icon-svg"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M4 9h5M15 9h5M4 15h5M15 15h5M9 4v5M9 15v5M15 4v5M15 15v5"/></svg>`,
@@ -189,14 +190,14 @@
     info: `<svg ${SVG_ATTRS} class="icon-svg"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
     satellite: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4Z"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg>`,
     download: `<svg ${SVG_ATTRS} class="icon-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
-  };
+  });
 
-  return {
+  const api = {
     get: function (name) {
-      return ICONS[name] || '';
+      return Object.hasOwn(ICONS, name) ? ICONS[name] : '';
     },
     has: function (name) {
-      return Boolean(ICONS[name]);
+      return Object.hasOwn(ICONS, name);
     },
     getAll: function () {
       return ICONS;
@@ -208,15 +209,16 @@
       const root = container || document;
       if (!root.querySelectorAll) return;
       const slots = root.querySelectorAll('[data-omni-icon]');
-      slots.forEach(slot => {
+      slots.forEach((slot) => {
         const iconKey = slot.getAttribute('data-omni-icon');
-        if (ICONS[iconKey]) {
+        if (Object.hasOwn(ICONS, iconKey)) {
           slot.innerHTML = ICONS[iconKey];
         }
       });
     },
     hydrateIcons: function (container) {
-      return this.hydrateAll(container);
+      return api.hydrateAll(container);
     }
   };
+  return Object.freeze(api);
 });

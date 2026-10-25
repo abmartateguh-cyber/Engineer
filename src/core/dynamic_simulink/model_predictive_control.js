@@ -2,8 +2,8 @@
  * OmniEng Constrained Model Predictive Control (MPC) Engine
  * Implements linear discrete-time state-space MPC with actuator limits, slew rate limits,
  * and state constraints solved via native Goldfarb-Idnani Dual Active-Set Quadratic Programming.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 /**
@@ -29,9 +29,12 @@ class GoldfarbIdnaniQPSolver {
     const Hinv = this._matrixMultiply(this._transpose(Linv), Linv);
 
     // Initial unconstrained minimizer x0 = -H^-1 * c
-    let x = this._matrixVectorMultiply(Hinv, c.map(v => -v));
+    let x = this._matrixVectorMultiply(
+      Hinv,
+      c.map((v) => -v)
+    );
     let activeSet = []; // Array of active constraint indices in A
-    let lambda = [];    // Multipliers for active constraints
+    let lambda = []; // Multipliers for active constraints
 
     // Tolerance for constraint satisfaction
     const tol = 1e-7;
@@ -302,26 +305,88 @@ class ModelPredictiveController {
    * @param {Array<number>} [options.uMax] Actuator upper limits (nu)
    * @param {Array<number>} [options.deltaUMax] Actuator slew rate limits (nu)
    */
-  constructor(options = {}) {
-    this.A = options.A || [[1.0, 0.1], [0.0, 0.95]];
-    this.B = options.B || [[0.005], [0.1]];
-    this.C = options.C || [[1.0, 0.0]];
+  constructor(options) {
+    const required = [
+      'A',
+      'B',
+      'C',
+      'predictionHorizon',
+      'controlHorizon',
+      'Q',
+      'R',
+      'Rdelta',
+      'uMin',
+      'uMax',
+      'deltaUMax',
+      'initialControl'
+    ];
+    const missing = required.filter((name) => options?.[name] === undefined || options[name] === null);
+    if (missing.length)
+      throw new TypeError(`ModelPredictiveController requires explicit inputs: ${missing.join(', ')}.`);
+    const matrixIsFinite = (matrix) =>
+      Array.isArray(matrix) &&
+      matrix.length > 0 &&
+      matrix.every(
+        (row) => Array.isArray(row) && row.length > 0 && row.length === matrix[0].length && row.every(Number.isFinite)
+      );
+    if (!matrixIsFinite(options.A) || !matrixIsFinite(options.B) || !matrixIsFinite(options.C)) {
+      throw new TypeError('ModelPredictiveController requires finite rectangular A, B, and C matrices.');
+    }
+    this.A = options.A;
+    this.B = options.B;
+    this.C = options.C;
     this.nx = this.A.length;
     this.nu = this.B[0].length;
     this.ny = this.C.length;
-
-    this.Np = options.predictionHorizon || 10;
-    this.Nc = Math.min(options.controlHorizon || 4, this.Np);
-
-    this.Q = options.Q || [10.0];
-    this.R = options.R || [0.1];
-    this.Rdelta = options.Rdelta || [0.5];
-
-    this.uMin = options.uMin || [-1.0];
-    this.uMax = options.uMax || [1.0];
-    this.deltaUMax = options.deltaUMax || [0.5];
-
-    this.lastU = new Float64Array(this.nu);
+    if (
+      this.A.some((row) => row.length !== this.nx) ||
+      this.B.length !== this.nx ||
+      this.C.some((row) => row.length !== this.nx)
+    ) {
+      throw new TypeError('ModelPredictiveController matrix dimensions must satisfy A:n×n, B:n×nu, and C:ny×n.');
+    }
+    this.Np = options.predictionHorizon;
+    this.Nc = options.controlHorizon;
+    if (
+      !Number.isInteger(this.Np) ||
+      this.Np < 1 ||
+      !Number.isInteger(this.Nc) ||
+      this.Nc < 1 ||
+      this.Nc > this.Np ||
+      this.Np * this.Nc * this.nu > 5000
+    ) {
+      throw new RangeError('MPC horizons are invalid or exceed the 5,000 decision-variable work limit.');
+    }
+    const vectors = ['Q', 'R', 'Rdelta', 'uMin', 'uMax', 'deltaUMax', 'initialControl'];
+    for (const name of vectors) {
+      const expectedLength = name === 'Q' ? this.ny : this.nu;
+      if (
+        !Array.isArray(options[name]) ||
+        options[name].length !== expectedLength ||
+        !options[name].every(Number.isFinite)
+      ) {
+        throw new TypeError(`ModelPredictiveController.${name} must contain ${expectedLength} finite values.`);
+      }
+    }
+    if (
+      options.Q.some((value) => value < 0) ||
+      options.R.some((value) => value <= 0) ||
+      options.Rdelta.some((value) => value < 0) ||
+      options.deltaUMax.some((value) => value <= 0) ||
+      options.uMin.some((value, index) => value > options.uMax[index])
+    ) {
+      throw new RangeError('MPC weights and actuator bounds are outside the supported ranges.');
+    }
+    this.Q = options.Q;
+    this.R = options.R;
+    this.Rdelta = options.Rdelta;
+    this.uMin = options.uMin;
+    this.uMax = options.uMax;
+    this.deltaUMax = options.deltaUMax;
+    this.lastU = new Float64Array(options.initialControl);
+    if (this.lastU.some((value, index) => value < this.uMin[index] || value > this.uMax[index])) {
+      throw new RangeError('initialControl must lie within the supplied actuator bounds.');
+    }
     this._precomputePredictionMatrices();
   }
 
@@ -413,12 +478,17 @@ class ModelPredictiveController {
    * @param {Array<number>} x0 Current state vector
    * @param {Array<number>|number} yRef Reference setpoint vector or scalar
    */
-  computeControlAction(x0, yRef = 1.0) {
+  computeControlAction(x0, yRef) {
+    if (!Array.isArray(x0) || x0.length !== this.nx || !x0.every(Number.isFinite)) {
+      throw new TypeError(`computeControlAction requires an ${this.nx}-value finite state vector.`);
+    }
+    const yRefVec = Array.isArray(yRef) ? yRef : [yRef];
+    if (yRefVec.length !== this.ny || !yRefVec.every(Number.isFinite)) {
+      throw new TypeError(`computeControlAction requires a ${this.ny}-value finite output reference.`);
+    }
     const nVar = this.Nc * this.nu;
     const Np = this.Np;
     const ny = this.ny;
-
-    const yRefVec = Array.isArray(yRef) ? yRef : [yRef];
 
     // Compute free response Y_free = Phi * x0
     const Y_free = GoldfarbIdnaniQPSolver._matrixVectorMultiply(this.Phi, x0);
@@ -508,6 +578,7 @@ class ModelPredictiveController {
     }
 
     return {
+      validationLevel: 'experimental',
       u: uOpt,
       optimalSequence: qpRes.x ? Array.from(qpRes.x) : [],
       qpConverged: qpRes.converged,

@@ -1,7 +1,7 @@
 /**
  * OmniEng CAM (Computer-Aided Manufacturing) 3-Axis CNC Toolpath Engine
  * 
- * Generates production-grade CNC milling toolpaths from 3D CAD B-Rep solid geometry:
+ * Generates experimental CNC milling toolpaths from 3D CAD B-Rep solid geometry:
  * - Constant-Z Planar Roughing (Pocketing with zig-zag clearing)
  * - Parallel Surface Finishing (Ball-end raster finishing)
  * - Post-Processor generating standardized ISO / Fanuc / Haas G-Code

@@ -1,7 +1,7 @@
 /**
  * OmniEng Nonlinear Hyperelastic Material Models
  * 
- * Implements finite-strain strain energy density potentials matching Abaqus / ANSYS:
+ * Implements experimental finite-strain strain-energy calculations:
  * 1. Mooney-Rivlin (2-parameter & 5-parameter):
  *    W = C10 * (I1_bar - 3) + C01 * (I2_bar - 3) + (1/D1) * (J - 1)^2
  * 2. Ogden Model:
@@ -9,7 +9,8 @@
  * 3. Yeoh 3rd-order reduced polynomial model for high-strain carbon-black rubbers.
  * 4. Engineering stress vs stretch evaluation under Uniaxial, Equibiaxial, and Pure Shear states.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No sourced material coefficients, independent constitutive validation, or solver comparison
+ * is included.
  */
 
 'use strict';

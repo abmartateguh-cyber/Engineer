@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "incremental": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "tsBuildInfoFile": "node_modules/.cache/omnieng.tsbuildinfo"
+  },
+  "include": ["main.js", "preload.js", "src/**/*.js", "test/**/*.js", "scripts/**/*.js"],
+  "exclude": ["node_modules", "src/vendor", "src/public"]
+}

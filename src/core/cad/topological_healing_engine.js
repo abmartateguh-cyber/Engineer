@@ -7,7 +7,7 @@
  * 3. Degenerate edge removal: Removes zero-length edges and collapses colinear consecutive segments.
  * 4. Watertight manifold verification: Validates Euler-Poincaré characteristic: V - E + F = 2 * (S - G).
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

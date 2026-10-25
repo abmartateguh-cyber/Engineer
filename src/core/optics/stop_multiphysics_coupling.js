@@ -1,11 +1,10 @@
 /**
- * OmniEng STOP (Structural-Thermal-Optical Performance) Multiphysics Coupling Engine
- * Implements rigorous Zemax OpticStudio + ANSYS Mechanical level optomechanical coupling:
+ * Experimental structural-thermal-optical calculation example.
  * 
  * 1. Finite Element nodal temperature fields T(x, y, z) mapped to refractive index deltas dn/dT
  * 2. Elastic structural displacement fields u(x, y, z) decomposed into 37 Fringe/Noll Zernike sag polynomials
  * 3. Degraded wavefront OPD (Optical Path Difference), Strehl ratio S, and thermal soak MTF contrast
- * 4. ISO 10110 environmental qualification certification
+ * 4. Illustrative environmental sensitivity calculations; no ISO 10110 qualification is provided.
  */
 
 'use strict';
@@ -69,30 +68,16 @@ class StopMultiphysicsCoupling {
     return coeffs;
   }
 
-  /**
-   * Computes thermo-optic index change dn/dT using Schott dispersion coefficients
-   * @param {string} glassName e.g. 'N-BK7', 'S-FPL53', 'FUSED_SILICA'
-   * @param {number} deltaT Temperature delta relative to 20°C (K)
-   * @param {number} wavelengthUm Wavelength in micrometers (default 0.5876 µm d-line)
-   */
-  static computeDnDt(glassName = 'N-BK7', deltaT = 0.0, wavelengthUm = 0.5876) {
-    // Standard Schott thermo-optic constants: D0, D1, D2, E0, E1, lambdaTK
-    const glassParams = {
-      'N-BK7': { D0: 1.86e-6, D1: 1.31e-8, D2: -1.37e-11, E0: 4.34e-7, E1: 6.27e-10, ltk: 0.170, n0: 1.5168 },
-      'S-FPL53': { D0: -3.85e-6, D1: 2.1e-8, D2: -2.0e-11, E0: 2.1e-7, E1: 3.5e-10, ltk: 0.150, n0: 1.4387 },
-      'FUSED_SILICA': { D0: 1.15e-5, D1: 1.2e-8, D2: -1.0e-11, E0: 8.5e-7, E1: 1.1e-9, ltk: 0.160, n0: 1.4585 }
-    };
-
-    const g = glassParams[glassName] || glassParams['N-BK7'];
-    const n = g.n0;
-    const l2 = wavelengthUm * wavelengthUm;
-    const ltk2 = g.ltk * g.ltk;
-
-    const term1 = (n * n - 1.0) / (2.0 * n);
-    const polyD = g.D0 * deltaT + g.D1 * deltaT * deltaT + g.D2 * Math.pow(deltaT, 3);
-    const polyE = (g.E0 * deltaT + g.E1 * deltaT * deltaT) / (l2 - ltk2);
-
-    return term1 * (polyD + polyE);
+  /** Compute thermo-optic index change from caller-supplied coefficients. */
+  static computeDnDt(thermalProperties, refractiveIndex, deltaT, wavelengthUm) {
+    const { OpticalThermalSoakEngine } = require('./thermal_soak');
+    return OpticalThermalSoakEngine.computeDn(
+      thermalProperties,
+      refractiveIndex,
+      deltaT,
+      wavelengthUm,
+      0
+    );
   }
 
   /**
@@ -100,73 +85,96 @@ class StopMultiphysicsCoupling {
    * @param {Object} lensSystem Optical system definition
    * @param {Object} environmentalConditions { ambientTempC: number, structuralLoadN: number }
    */
-  static solveStopCoupling(lensSystem, environmentalConditions = {}) {
-    const ambientTempC = typeof environmentalConditions.ambientTempC === 'number' ? environmentalConditions.ambientTempC : 65.0;
-    const deltaT = ambientTempC - 20.0; // Reference 20°C room temperature
-    const structuralLoadN = environmentalConditions.structuralLoadN || 50.0;
+  static solveStopCoupling(lensSystem, environmentalConditions) {
+    const requiredLensValues = [
+      lensSystem?.entrancePupilDiameterMm,
+      lensSystem?.baselineStrehl,
+      lensSystem?.refractiveIndexAtReferenceTemperature,
+      lensSystem?.glassCtePerK,
+      lensSystem?.structuralComplianceMmPerN,
+      lensSystem?.thermalSagCoefficientMmPerK
+    ];
+    const requiredEnvironmentValues = [
+      environmentalConditions?.ambientTempC,
+      environmentalConditions?.referenceTempC,
+      environmentalConditions?.structuralLoadN,
+      environmentalConditions?.wavelengthUm
+    ];
+    if (!requiredLensValues.every(Number.isFinite) || !requiredEnvironmentValues.every(Number.isFinite)
+      || lensSystem.entrancePupilDiameterMm <= 0
+      || lensSystem.baselineStrehl <= 0 || lensSystem.baselineStrehl > 1
+      || lensSystem.refractiveIndexAtReferenceTemperature <= 0
+      || lensSystem.structuralComplianceMmPerN < 0
+      || environmentalConditions.wavelengthUm <= 0) {
+      throw new TypeError('STOP estimate requires finite explicit optical, structural, and environmental inputs.');
+    }
+    if (typeof lensSystem.structuralPropertiesSource !== 'string' || !lensSystem.structuralPropertiesSource.trim()
+      || typeof lensSystem.thermalProperties?.source !== 'string' || !lensSystem.thermalProperties.source.trim()) {
+      throw new TypeError('STOP estimate requires provenance strings for its supplied properties.');
+    }
 
-    // 1. Synthesize FEA mechanical sag and thermal expansion points
+    const ambientTempC = environmentalConditions.ambientTempC;
+    const referenceTempC = environmentalConditions.referenceTempC;
+    const deltaT = ambientTempC - referenceTempC;
+    const structuralLoadN = environmentalConditions.structuralLoadN;
+    const wavelengthUm = environmentalConditions.wavelengthUm;
+
+    // The simplified structural surrogate remains experimental and is not an FEA solve.
     const sampledPoints = [];
-    const clearApertureR = lensSystem.entrancePupilDiameter ? lensSystem.entrancePupilDiameter * 0.5 : 25.0;
-    const cteGlass = 7.1e-6; // 1/K for N-BK7
-    const youngsModulusPa = 82e9; // 82 GPa
-
+    const clearApertureR = lensSystem.entrancePupilDiameterMm * 0.5;
     for (let rFrac = 0.1; rFrac <= 1.0; rFrac += 0.15) {
       const r = rFrac * clearApertureR;
       for (let p = 0; p < 12; p++) {
         const phi = (p / 12) * Math.PI * 2;
-        // Thermal expansion sag: dz = r^2 / (2*R) * cte * deltaT + structural bending
-        const bendingDeflection = (structuralLoadN / (youngsModulusPa * 1e-4)) * (1.0 - rFrac * rFrac) * Math.cos(2 * phi) * 1e-3;
-        const thermalExpansionSag = 0.0004 * (r / clearApertureR) * deltaT * 1e-3; // in mm
-        const uz = thermalExpansionSag + bendingDeflection;
-        sampledPoints.push({ r, phi, uz });
+        const bendingDeflection = structuralLoadN * lensSystem.structuralComplianceMmPerN
+          * (1.0 - rFrac * rFrac) * Math.cos(2 * phi);
+        const thermalExpansionSag = lensSystem.thermalSagCoefficientMmPerK * deltaT * rFrac;
+        sampledPoints.push({ r, phi, uz: thermalExpansionSag + bendingDeflection });
       }
     }
 
-    // 2. Fit Zernike polynomial expansion
     const zernikeCoeffs = this.fitZernikeCoefficients(sampledPoints, 16, clearApertureR);
-
-    // 3. Compute thermo-optic refractive index shift
-    const primaryGlass = lensSystem.glass || 'N-BK7';
-    const deltaN = this.computeDnDt(primaryGlass, deltaT);
-
-    // 4. Wavefront Aberration OPD & Strehl Ratio Degradation
-    // RMS WFE = sqrt(sum(c_j^2)) for normalized Zernikes
+    const deltaN = this.computeDnDt(
+      lensSystem.thermalProperties,
+      lensSystem.refractiveIndexAtReferenceTemperature,
+      deltaT,
+      wavelengthUm
+    );
     let sumSq = 0.0;
-    for (let j = 4; j <= 16; j++) {
-      sumSq += zernikeCoeffs[j] * zernikeCoeffs[j];
-    }
-    const wavelengthMm = 0.0005876; // 587.6 nm d-line in mm
-    const rmsWfeWaves = Math.sqrt(sumSq) / wavelengthMm; // in waves at 587.6 nm
-    const baselineStrehl = lensSystem.baselineStrehl || 0.96;
-    // Maréchal approximation: S = S0 * exp(-(2*pi*RMS)^2)
-    const degradedStrehl = Math.max(0.1, Math.min(1.0, baselineStrehl * Math.exp(-Math.pow(2 * Math.PI * rmsWfeWaves, 2))));
-
-    // 5. Thermal soak spatial MTF contrast curve
+    for (let j = 4; j <= 16; j++) sumSq += zernikeCoeffs[j] * zernikeCoeffs[j];
+    const wavelengthMm = wavelengthUm * 1e-3;
+    const rmsWfeWaves = Math.sqrt(sumSq) / wavelengthMm;
+    const baselineStrehl = lensSystem.baselineStrehl;
+    const degradedStrehl = Math.max(
+      0,
+      Math.min(1, baselineStrehl * Math.exp(-Math.pow(2 * Math.PI * rmsWfeWaves, 2)))
+    );
     const mtfDegradationFactor = Math.sqrt(degradedStrehl / baselineStrehl);
-    const mtfAt10 = Math.max(0.05, 0.92 * mtfDegradationFactor);
-    const mtfAt20 = Math.max(0.04, 0.84 * mtfDegradationFactor);
-    const mtfAt30 = Math.max(0.02, 0.74 * mtfDegradationFactor);
-    const mtfAt40 = Math.max(0.01, 0.62 * mtfDegradationFactor);
 
     return {
-      status: 'CONVERGED',
-      standards: 'ISO 10110-5 / ISO 9022 Environmental Optics',
+      status: 'EXPERIMENTAL_ESTIMATE',
+      validationLevel: 'experimental',
+      standardsAssessment: 'not-performed',
+      thermalPropertiesSource: lensSystem.thermalProperties.source,
+      structuralPropertiesSource: lensSystem.structuralPropertiesSource,
       ambientTempC,
+      referenceTempC,
       deltaT,
+      wavelengthUm,
       deltaN,
       zernikeCoeffs,
       rmsWfeWaves: Number(rmsWfeWaves.toFixed(4)),
       baselineStrehl,
       degradedStrehl: Number(degradedStrehl.toFixed(4)),
       thermalSoakMtf: {
-        lp10: Number(mtfAt10.toFixed(3)),
-        lp20: Number(mtfAt20.toFixed(3)),
-        lp30: Number(mtfAt30.toFixed(3)),
-        lp40: Number(mtfAt40.toFixed(3))
+        method: 'illustrative RMS wavefront approximation',
+        lp10: 0.92 * mtfDegradationFactor,
+        lp20: 0.84 * mtfDegradationFactor,
+        lp30: 0.74 * mtfDegradationFactor,
+        lp40: 0.62 * mtfDegradationFactor
       },
-      thermalDefocusMm: Number((zernikeCoeffs[4] || 0.0).toFixed(5)),
-      isAthermalized: Math.abs(zernikeCoeffs[4] || 0) < 0.002
+      thermalDefocusMm: Number((zernikeCoeffs[4] || 0).toFixed(5)),
+      warnings: ['Experimental surrogate only; no coupled structural solve, optical validation, or athermalization assessment was performed.']
     };
   }
 }

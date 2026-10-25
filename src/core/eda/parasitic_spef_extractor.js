@@ -1,19 +1,11 @@
 /**
- * OmniEng Standard Parasitic Exchange Format (SPEF) Extractor
- * IEEE 1481 Compliant RC Parasitic Modeling Engine for Sub-3nm & Sky130 Interconnects
- * 
- * Implements sign-off grade distributed parasitic extraction matching Synopsys StarRC / Cadence Quantus:
- * 1. IEEE 1481 SPEF Header, Name Mapping (*NAME_MAP), and Delimiters.
- * 2. Detailed Distributed Net (*D_NET) extraction:
- *    - Driver and load pin connections (*CONN) with pin directions (*I, *O, *B).
- *    - Ground and Area/Fringe Capacitance elements (*CAP).
- *    - Inter-Net Cross-Coupling Capacitances (*CAP c_cross) for crosstalk analysis.
- *    - Distributed Resistor segments (*RES) along multi-layer metal tracks and via stacks.
- * 3. Exact Elmore Delay Tree Solver for non-tree and RC ladder networks:
- *    - Calculates point-to-point interconnect flight time and 10%-90% slew degradation.
- * 4. Bidirectional IEEE 1481 SPEF Serializer and Deserializer.
- * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * OmniEng Experimental SPEF Parsing and RC Network Example
+ *
+ * Handles a limited set of SPEF records and illustrative RC network calculations.
+ * Format completeness, electrical accuracy, foundry correlation, and signoff use have not
+ * been independently assessed.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -22,26 +14,55 @@ const EPSILON_0 = 8.8541878128e-12; // F/m
 
 class SpefParasiticExtractor {
   /**
-   * Constructs an IEEE 1481 SPEF document string from routed net geometries
+   * Constructs an experimental SPEF-shaped document from explicit net geometries
    * @param {Object} pexInput
-   * @param {string} [pexInput.designName='omnieng_core'] - Top-level module name
-   * @param {Array<Object>} pexInput.nets - Array of routed net specifications
-   * @param {Object} [pexInput.techPdk] - Technology PDK parameters (e.g. Sky130 or FinFET 3nm)
+   * @param {string} pexInput.designName - Top-level module name
+   * @param {Array<Object>} pexInput.nets - Array of routed net specifications with explicit geometry
+   * @param {Object} pexInput.techPdk - Caller-supplied layer resistance and capacitance values
    * @returns {Object} SPEF formatted string and extraction summary metrics
    */
-  static extractDesignSPEF(pexInput = {}) {
-    const designName = pexInput.designName || 'omnieng_core';
-    const nets = pexInput.nets || [];
-    const pdk = pexInput.techPdk || {
-      name: 'Sky130_PDK',
-      layers: {
-        met1: { sheetResOhmSq: 0.125, capAreaFfUm2: 0.038, capFringeFfUm: 0.054, viaResOhm: 4.5 },
-        met2: { sheetResOhmSq: 0.125, capAreaFfUm2: 0.024, capFringeFfUm: 0.046, viaResOhm: 3.8 },
-        met3: { sheetResOhmSq: 0.047, capAreaFfUm2: 0.015, capFringeFfUm: 0.039, viaResOhm: 2.2 },
-        met4: { sheetResOhmSq: 0.047, capAreaFfUm2: 0.010, capFringeFfUm: 0.033, viaResOhm: 1.5 },
-        met5: { sheetResOhmSq: 0.028, capAreaFfUm2: 0.007, capFringeFfUm: 0.028, viaResOhm: 1.0 }
+  static extractDesignSPEF(pexInput) {
+    if (!pexInput || typeof pexInput !== 'object' || Array.isArray(pexInput)) {
+      throw new TypeError('An explicit SPEF extraction request object is required.');
+    }
+    const { designName, nets, techPdk: pdk } = pexInput;
+    if (typeof designName !== 'string' || designName.trim() === '') {
+      throw new TypeError('An explicit non-empty designName is required.');
+    }
+    if (!Array.isArray(nets)) throw new TypeError('An explicit nets array is required.');
+    if (!pdk || typeof pdk !== 'object' || Array.isArray(pdk)) {
+      throw new TypeError('Explicit layer property records are required in techPdk.');
+    }
+    if (typeof pdk.name !== 'string' || pdk.name.trim() === '') {
+      throw new TypeError('An explicit technology or dataset name is required.');
+    }
+    if (
+      !pdk.provenance ||
+      typeof pdk.provenance.source !== 'string' ||
+      pdk.provenance.source.trim() === '' ||
+      typeof pdk.provenance.license !== 'string' ||
+      pdk.provenance.license.trim() === ''
+    ) {
+      throw new TypeError('Explicit source and license labels are required for layer property records.');
+    }
+    if (!pdk.layers || typeof pdk.layers !== 'object' || Array.isArray(pdk.layers)) {
+      throw new TypeError('An explicit layer property map is required.');
+    }
+
+    const requireFinite = (value, label, { positive = false } = {}) => {
+      if (!Number.isFinite(value) || (positive ? value <= 0 : value < 0)) {
+        throw new RangeError(`${label} must be a finite ${positive ? 'positive' : 'non-negative'} number.`);
       }
     };
+    for (const [layerName, layer] of Object.entries(pdk.layers)) {
+      if (!layer || typeof layer !== 'object' || Array.isArray(layer)) {
+        throw new TypeError(`Layer '${layerName}' must have an explicit property record.`);
+      }
+      requireFinite(layer.sheetResOhmSq, `${layerName}.sheetResOhmSq`, { positive: true });
+      requireFinite(layer.capAreaFfUm2, `${layerName}.capAreaFfUm2`);
+      requireFinite(layer.capFringeFfUm, `${layerName}.capFringeFfUm`);
+      requireFinite(layer.viaResOhm, `${layerName}.viaResOhm`);
+    }
 
     const lines = [];
     const dateStr = new Date().toUTCString();
@@ -53,7 +74,6 @@ class SpefParasiticExtractor {
     lines.push('*VENDOR "OmniEng EDA Systems"');
     lines.push('*PROGRAM "OmniEng PEX Extractor"');
     lines.push('*VERSION "3.2.0"');
-    lines.push('*DESIGN_FLOW "ROUTED_SYNTHESIS"');
     lines.push('*DIVIDER /');
     lines.push('*DELIMITER :');
     lines.push('*BUS_DELIMITER []');
@@ -70,10 +90,16 @@ class SpefParasiticExtractor {
 
     // 2. Process each D_NET
     for (const net of nets) {
-      const netName = net.name || 'unnamed_net';
-      const pins = net.pins || [];
-      const segments = net.segments || [];
-      const crossCouplings = net.crossCouplings || [];
+      if (!net || typeof net !== 'object' || Array.isArray(net)) {
+        throw new TypeError('Each SPEF net must be an explicit record.');
+      }
+      const { name: netName, pins, segments, crossCouplings } = net;
+      if (typeof netName !== 'string' || netName.trim() === '') {
+        throw new TypeError('Each SPEF net requires an explicit non-empty name.');
+      }
+      if (!Array.isArray(pins) || !Array.isArray(segments) || !Array.isArray(crossCouplings)) {
+        throw new TypeError(`Net '${netName}' requires explicit pins, segments, and crossCouplings arrays.`);
+      }
 
       let netCapFf = 0;
       let netResOhms = 0;
@@ -85,57 +111,94 @@ class SpefParasiticExtractor {
 
       // Extract segment resistances and ground capacitances
       segments.forEach((seg, sIdx) => {
-        const layer = pdk.layers[seg.layer] || pdk.layers.met1;
-        const lenUm = seg.lengthUm || 10.0;
-        const widthUm = seg.widthUm || 0.14;
-        const fromNode = seg.fromNode || `${netName}:${sIdx + 1}`;
-        const toNode = seg.toNode || `${netName}:${sIdx + 2}`;
+        if (!seg || typeof seg !== 'object' || Array.isArray(seg)) {
+          throw new TypeError(`Net '${netName}' segment ${sIdx} must be an explicit record.`);
+        }
+        const layer = pdk.layers[seg.layer];
+        if (!layer) throw new TypeError(`Net '${netName}' segment ${sIdx} references an unknown layer.`);
+        const { lengthUm: lenUm, widthUm, fromNode, toNode, hasVia } = seg;
+        requireFinite(lenUm, `Net '${netName}' segment ${sIdx} lengthUm`, { positive: true });
+        requireFinite(widthUm, `Net '${netName}' segment ${sIdx} widthUm`, { positive: true });
+        if (
+          typeof fromNode !== 'string' ||
+          fromNode.trim() === '' ||
+          typeof toNode !== 'string' ||
+          toNode.trim() === ''
+        ) {
+          throw new TypeError(`Net '${netName}' segment ${sIdx} requires explicit fromNode and toNode names.`);
+        }
+        if (typeof hasVia !== 'boolean') {
+          throw new TypeError(`Net '${netName}' segment ${sIdx} requires an explicit hasVia boolean.`);
+        }
 
         // Segment resistance: R = sheetRes * (L / W) + viaRes
-        const segRes = (layer.sheetResOhmSq * (lenUm / widthUm)) + (seg.hasVia ? layer.viaResOhm : 0.0);
+        const segRes = layer.sheetResOhmSq * (lenUm / widthUm) + (seg.hasVia ? layer.viaResOhm : 0.0);
         netResOhms += segRes;
         resEntries.push(`${resIndex++} ${fromNode} ${toNode} ${segRes.toFixed(4)}`);
 
         // Area + Fringe Ground Capacitance: C = (area * C_area) + (2 * L * C_fringe)
         const areaUm2 = lenUm * widthUm;
-        const cGnd = (areaUm2 * layer.capAreaFfUm2) + (2.0 * lenUm * layer.capFringeFfUm);
+        const cGnd = areaUm2 * layer.capAreaFfUm2 + 2.0 * lenUm * layer.capFringeFfUm;
         netCapFf += cGnd;
         capEntries.push(`${capIndex++} ${fromNode} ${cGnd.toFixed(4)}`);
       });
 
       // Extract inter-wire cross-coupling capacitances (*CAP 1 netA:node1 netB:node2 c_val)
-      crossCouplings.forEach((cc) => {
-        const cValFf = cc.capFf || 0.15;
+      crossCouplings.forEach((cc, ccIdx) => {
+        if (!cc || typeof cc !== 'object' || Array.isArray(cc)) {
+          throw new TypeError(`Net '${netName}' cross-coupling ${ccIdx} must be an explicit record.`);
+        }
+        const { capFf: cValFf, nodeA, nodeB } = cc;
+        requireFinite(cValFf, `Net '${netName}' cross-coupling ${ccIdx} capFf`);
+        if (typeof nodeA !== 'string' || nodeA.trim() === '' || typeof nodeB !== 'string' || nodeB.trim() === '') {
+          throw new TypeError(`Net '${netName}' cross-coupling ${ccIdx} requires explicit nodeA and nodeB names.`);
+        }
         netCapFf += cValFf;
         totalCrossCapsFf += cValFf;
-        capEntries.push(`${capIndex++} ${cc.nodeA} ${cc.nodeB} ${cValFf.toFixed(4)}`);
+        capEntries.push(`${capIndex++} ${nodeA} ${nodeB} ${cValFf.toFixed(4)}`);
       });
 
       totalCapsFf += netCapFf;
       totalResOhms += netResOhms;
 
       // Calculate Elmore delay (tau = sum(R_k * C_k))
-      const elmoreDelayPs = (netResOhms * netCapFf * 1e-3); // Ohm * fF -> ps (1e-3 ps/Ohm*fF)
-      const slew90Ps = elmoreDelayPs * Math.log(9.0); // 10% to 90% slew rate
+      const lumpedRcTimeConstantPs = netResOhms * netCapFf * 1e-3; // Ohm * fF -> ps
+      const lumpedFirstOrderSlew90Ps = lumpedRcTimeConstantPs * Math.log(9.0);
 
       extractedNetsSummary.push({
         netName,
         totalCapFf: Number(netCapFf.toFixed(4)),
         totalResOhms: Number(netResOhms.toFixed(4)),
-        elmoreDelayPs: Number(elmoreDelayPs.toFixed(3)),
-        slew90Ps: Number(slew90Ps.toFixed(3)),
+        lumpedRcTimeConstantPs: Number(lumpedRcTimeConstantPs.toFixed(3)),
+        lumpedFirstOrderSlew90Ps: Number(lumpedFirstOrderSlew90Ps.toFixed(3)),
         pinCount: pins.length,
         segmentCount: segments.length
       });
 
       // Write *D_NET entry
       lines.push(`*D_NET ${netName} ${netCapFf.toFixed(4)}`);
-      
+
       // *CONN section
       lines.push('*CONN');
-      for (const pin of pins) {
+      for (const [pinIdx, pin] of pins.entries()) {
+        if (!pin || typeof pin !== 'object' || Array.isArray(pin)) {
+          throw new TypeError(`Net '${netName}' pin ${pinIdx} must be an explicit record.`);
+        }
+        if (typeof pin.name !== 'string' || pin.name.trim() === '') {
+          throw new TypeError(`Net '${netName}' pin ${pinIdx} requires an explicit name.`);
+        }
+        if (!['input', 'output', 'inout'].includes(pin.direction) || typeof pin.isPort !== 'boolean') {
+          throw new TypeError(`Net '${netName}' pin ${pinIdx} requires an explicit direction and isPort value.`);
+        }
+        if ((pin.x === undefined) !== (pin.y === undefined)) {
+          throw new TypeError(`Net '${netName}' pin ${pinIdx} must provide both coordinates or neither.`);
+        }
+        if (pin.x !== undefined) {
+          requireFinite(pin.x, `Net '${netName}' pin ${pinIdx} x`);
+          requireFinite(pin.y, `Net '${netName}' pin ${pinIdx} y`);
+        }
         // e.g. *P pin_name O or *I inst/pin I
-        const dir = pin.direction === 'output' ? 'O' : (pin.direction === 'inout' ? 'B' : 'I');
+        const dir = pin.direction === 'output' ? 'O' : pin.direction === 'inout' ? 'B' : 'I';
         const prefix = pin.isPort ? '*P' : '*I';
         let connLine = `${prefix} ${pin.name} ${dir}`;
         if (pin.x !== undefined && pin.y !== undefined) {
@@ -165,6 +228,9 @@ class SpefParasiticExtractor {
     return {
       success: true,
       designName,
+      technologyOrDatasetName: pdk.name,
+      dataStatus: 'caller-supplied-unverified',
+      provenance: { ...pdk.provenance },
       netCount: nets.length,
       totalDesignCapacitanceFf: Number(totalCapsFf.toFixed(4)),
       totalInterconnectResistanceOhms: Number(totalResOhms.toFixed(4)),
@@ -176,16 +242,22 @@ class SpefParasiticExtractor {
 
   /**
    * Fast parser for IEEE 1481 SPEF files
-   * @param {string} spefText
+   * @param {string} spefText - Non-empty SPEF text with a header
    * @returns {Object} Parsed nets, resistors, capacitors, and connections
    */
-  static parseSPEF(spefText = '') {
+  static parseSPEF(spefText) {
+    if (typeof spefText !== 'string' || spefText.trim() === '') {
+      throw new TypeError('Explicit non-empty SPEF text is required.');
+    }
     const lines = spefText.split(/\r?\n/);
+    if (!lines.some((line) => line.trim().startsWith('*SPEF'))) {
+      throw new TypeError('SPEF header is missing.');
+    }
     const parsedNets = [];
     let currentNet = null;
     let currentSection = null;
 
-    let design = 'unknown';
+    let design = null;
 
     for (let rawLine of lines) {
       const line = rawLine.trim();
@@ -199,9 +271,13 @@ class SpefParasiticExtractor {
 
       if (line.startsWith('*D_NET')) {
         const tokens = line.split(/\s+/);
+        const totalCap = Number(tokens[2]);
+        if (tokens.length < 3 || !Number.isFinite(totalCap) || totalCap < 0) {
+          throw new TypeError('SPEF D_NET record requires a name and non-negative finite capacitance.');
+        }
         currentNet = {
           name: tokens[1],
-          totalCap: parseFloat(tokens[2] || '0'),
+          totalCap,
           connections: [],
           caps: [],
           resistors: []
@@ -272,6 +348,7 @@ class SpefParasiticExtractor {
     return {
       success: true,
       design,
+      designStatus: design === null ? 'unavailable' : 'provided',
       nets: parsedNets
     };
   }

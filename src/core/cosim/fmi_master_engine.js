@@ -1,7 +1,7 @@
 /**
  * Functional Mock-up Interface (FMI 2.0 / 3.0) Co-Simulation Master Engine
  * 
- * Provides an industrial-grade cross-domain co-simulation master orchestrator:
+ * Provides an experimental cross-domain co-simulation master orchestrator:
  * - FMI 2.0 / 3.0 Co-Simulation slave FMU abstraction with state save/rollback
  * - FMI 3.0 fmi3DoStep, fmi3GetFloat64, fmi3SetFloat64 API support
  * - Gauss-Seidel and Jacobi slave synchronization schemes

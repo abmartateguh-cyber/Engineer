@@ -3,56 +3,12 @@
  * Calculates temperature-dependent refractive index shifts (dn/dT), barometric air index,
  * thermo-mechanical glass expansion, and optomechanical housing athermalization.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
-// Schott Glass Thermal Constants [D0, D1, D2, E0, E1, lambda_tk (um), CTE (1e-6 / K)]
-const SCHOTT_THERMAL_GLASS_CATALOG = {
-  'N-BK7': {
-    D0: 1.86e-6,
-    D1: 1.31e-8,
-    D2: -1.37e-11,
-    E0: 4.34e-7,
-    E1: 6.27e-10,
-    lambdaTk: 0.170, // um
-    cte: 7.1e-6      // 1/K
-  },
-  'N-SF11': {
-    D0: 4.21e-6,
-    D1: 1.54e-8,
-    D2: -1.82e-11,
-    E0: 9.85e-7,
-    E1: 1.25e-9,
-    lambdaTk: 0.215,
-    cte: 8.6e-6
-  },
-  'N-LAK9': {
-    D0: 2.45e-6,
-    D1: 1.12e-8,
-    D2: -1.15e-11,
-    E0: 5.60e-7,
-    E1: 7.10e-10,
-    lambdaTk: 0.185,
-    cte: 6.3e-6
-  },
-  'FUSED_SILICA': {
-    D0: 10.0e-6,
-    D1: 1.45e-8,
-    D2: -5.0e-12,
-    E0: 1.15e-6,
-    E1: 1.05e-9,
-    lambdaTk: 0.160,
-    cte: 0.52e-6
-  }
-};
-
-// Optomechanical Housing Materials CTE (1/K)
-const HOUSING_CTE = {
-  'ALUMINUM_6061': 23.1e-6,
-  'STAINLESS_304': 16.0e-6,
-  'TITANIUM_TI6AL4V': 8.6e-6,
-  'INVAR_36': 1.2e-6
-};
+// Compatibility exports remain empty until a source- and license-reviewed catalog is supplied.
+const SCHOTT_THERMAL_GLASS_CATALOG = Object.freeze({});
+const HOUSING_CTE = Object.freeze({});
 
 class OpticalThermalSoakEngine {
   /**
@@ -72,26 +28,29 @@ class OpticalThermalSoakEngine {
     return 1.0 + (nRefMinus1 * pRatio) / tFactor;
   }
 
-  /**
-   * Computes Schott glass refractive index thermal delta dn(T, lambda)
-   * @param {string} glassName Name of glass (e.g. 'N-BK7')
-   * @param {number} nBase Base refractive index at reference temperature 20°C
-   * @param {number} targetTempC Target temperature in Celsius
-   * @param {number} wavelengthUm Wavelength in micrometers
-   * @param {number} refTempC Reference temperature in Celsius (default 20°C)
-   * @returns {number} Thermal index increment dn
-   */
-  static computeDn(glassName, nBase, targetTempC, wavelengthUm = 0.550, refTempC = 20.0) {
-    const glass = SCHOTT_THERMAL_GLASS_CATALOG[glassName] || SCHOTT_THERMAL_GLASS_CATALOG['N-BK7'];
+  /** Computes thermal index change from an explicitly supplied coefficient record. */
+  static computeDn(properties, nBase, targetTempC, wavelengthUm, refTempC) {
+    const fields = ['D0PerK', 'D1PerK2', 'D2PerK3', 'E0Um2PerK', 'E1Um2PerK2', 'lambdaTkUm'];
+    if (!properties || typeof properties !== 'object' || fields.some((field) => !Number.isFinite(properties[field]))) {
+      throw new TypeError('Explicit finite thermal dispersion coefficients are required.');
+    }
+    if (typeof properties.source !== 'string' || !properties.source.trim()) {
+      throw new TypeError('A nonempty source is required for thermal dispersion coefficients.');
+    }
+    if (![nBase, targetTempC, wavelengthUm, refTempC].every(Number.isFinite)
+      || nBase <= 0 || wavelengthUm <= 0 || properties.lambdaTkUm <= 0) {
+      throw new TypeError('Thermal index calculation requires finite positive index and wavelength inputs.');
+    }
     const deltaT = targetTempC - refTempC;
 
-    const D0 = glass.D0;
-    const D1 = glass.D1;
-    const D2 = glass.D2;
-    const E0 = glass.E0;
-    const E1 = glass.E1;
-    const ltk2 = glass.lambdaTk * glass.lambdaTk;
+    const D0 = properties.D0PerK;
+    const D1 = properties.D1PerK2;
+    const D2 = properties.D2PerK3;
+    const E0 = properties.E0Um2PerK;
+    const E1 = properties.E1Um2PerK2;
+    const ltk2 = properties.lambdaTkUm * properties.lambdaTkUm;
     const l2 = wavelengthUm * wavelengthUm;
+    if (Math.abs(l2 - ltk2) < 1e-15) throw new RangeError('Wavelength is singular for the supplied thermal dispersion record.');
 
     const termD = D0 * deltaT + D1 * deltaT * deltaT + D2 * Math.pow(deltaT, 3);
     const termE = (E0 * deltaT + E1 * deltaT * deltaT) / (l2 - ltk2);
@@ -101,93 +60,198 @@ class OpticalThermalSoakEngine {
   }
 
   /**
-   * Evaluates full thermo-mechanical soak of an optical system across temperature range
-   * @param {Object} lensSpec
-   * @param {Array<Object>} lensSpec.elements Array of { radius1, radius2, thicknessMm, glass, airGapMm }
-   * @param {string} [lensSpec.housingMaterial='ALUMINUM_6061']
-   * @param {number} targetTempC
-   * @param {number} [refTempC=20.0]
-   * @param {number} [wavelengthUm=0.550]
+   * Evaluates a thin-lens thermal estimate from caller-supplied material data.
+   * No glass or housing catalog is selected by this method.
    */
-  static evaluateThermalSoak(lensSpec, targetTempC = 60.0, refTempC = 20.0, wavelengthUm = 0.550) {
-    const deltaT = targetTempC - refTempC;
-    const housingCte = HOUSING_CTE[lensSpec.housingMaterial || 'ALUMINUM_6061'] || HOUSING_CTE['ALUMINUM_6061'];
-    const elements = lensSpec.elements || [];
+  static evaluateThermalSoakFromProperties(lensSpec, targetTempC, refTempC, wavelengthUm, pressurePa) {
+    const invalidInput = (message) => ({
+      success: false,
+      status: 'invalid-input',
+      error: { code: 'INVALID_INPUT', message }
+    });
+    const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+    const thermalCoefficientNames = [
+      'D0PerK', 'D1PerK2', 'D2PerK3', 'E0Um2PerK', 'E1Um2PerK2', 'lambdaTkUm',
+      'glassCtePerK'
+    ];
 
-    const soakedElements = [];
+    if (!lensSpec || !Array.isArray(lensSpec.elements) || lensSpec.elements.length === 0) {
+      return invalidInput('At least one explicitly defined optical element is required.');
+    }
+    if (!finite(lensSpec.housingCtePerK) || typeof lensSpec.housingCteSource !== 'string'
+      || !lensSpec.housingCteSource.trim()) {
+      return invalidInput('A finite housing CTE and its nonempty source are required.');
+    }
+    if (![targetTempC, refTempC].every((value) => finite(value) && value > -273.15)) {
+      return invalidInput('Target and reference temperatures must be finite and above absolute zero.');
+    }
+    if (!finite(wavelengthUm) || wavelengthUm <= 0 || !finite(pressurePa) || pressurePa <= 0) {
+      return invalidInput('Wavelength and ambient pressure must be finite and positive.');
+    }
+    for (const [index, element] of lensSpec.elements.entries()) {
+      const properties = element?.thermalProperties;
+      if (!element || !properties
+        || ![
+          element.radius1Mm,
+          element.radius2Mm,
+          element.thicknessMm,
+          element.airGapMm,
+          element.refractiveIndexAtReferenceTemperature,
+          ...thermalCoefficientNames.map((name) => properties[name])
+        ].every(finite)
+        || element.radius1Mm === 0
+        || element.radius2Mm === 0
+        || element.thicknessMm <= 0
+        || element.airGapMm < 0
+        || element.refractiveIndexAtReferenceTemperature <= 0
+        || properties.lambdaTkUm <= 0
+        || typeof properties.source !== 'string'
+        || !properties.source.trim()) {
+        return invalidInput(`Optical element ${index} has invalid geometry, material properties, or provenance.`);
+      }
+      const wavelengthDelta = wavelengthUm * wavelengthUm - properties.lambdaTkUm * properties.lambdaTkUm;
+      if (!Number.isFinite(wavelengthDelta) || Math.abs(wavelengthDelta) < 1e-15) {
+        return invalidInput(`Optical element ${index} has a wavelength singularity in its thermal dispersion model.`);
+      }
+    }
+
+    const deltaT = targetTempC - refTempC;
     let cumulativeHousingDriftMm = 0.0;
     let thermalPowerSumRef = 0.0;
     let thermalPowerSumSoaked = 0.0;
+    const elements = [];
 
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
-      const glass = SCHOTT_THERMAL_GLASS_CATALOG[el.glass] || SCHOTT_THERMAL_GLASS_CATALOG['N-BK7'];
-      const glassCte = glass.cte;
+    for (let i = 0; i < lensSpec.elements.length; i++) {
+      const element = lensSpec.elements[i];
+      const properties = element.thermalProperties;
+      const { D0PerK, D1PerK2, D2PerK3, E0Um2PerK, E1Um2PerK2, lambdaTkUm, glassCtePerK } = properties;
+      const n0 = element.refractiveIndexAtReferenceTemperature;
+      const termD = D0PerK * deltaT
+        + D1PerK2 * deltaT * deltaT
+        + D2PerK3 * deltaT * deltaT * deltaT;
+      const wavelengthDelta = wavelengthUm * wavelengthUm - lambdaTkUm * lambdaTkUm;
+      const termE = (E0Um2PerK * deltaT + E1Um2PerK2 * deltaT * deltaT) / wavelengthDelta;
+      const dn = ((n0 * n0 - 1.0) / (2.0 * n0)) * (termD + termE);
 
-      // 1. Thermal expansion of glass radii and thickness
-      const r1_0 = el.radius1;
-      const r2_0 = el.radius2;
-      const t_0 = el.thicknessMm;
-      const gap_0 = el.airGapMm || 0.0;
+      const radius1SoakedMm = element.radius1Mm * (1.0 + glassCtePerK * deltaT);
+      const radius2SoakedMm = element.radius2Mm * (1.0 + glassCtePerK * deltaT);
+      const thicknessSoakedMm = element.thicknessMm * (1.0 + glassCtePerK * deltaT);
+      const airGapSoakedMm = element.airGapMm * (1.0 + lensSpec.housingCtePerK * deltaT);
+      const indexSoaked = n0 + dn;
 
-      const r1_soaked = r1_0 * (1.0 + glassCte * deltaT);
-      const r2_soaked = r2_0 * (1.0 + glassCte * deltaT);
-      const t_soaked = t_0 * (1.0 + glassCte * deltaT);
+      if (![radius1SoakedMm, radius2SoakedMm, thicknessSoakedMm, airGapSoakedMm, indexSoaked].every(finite)
+        || radius1SoakedMm === 0
+        || radius2SoakedMm === 0
+        || thicknessSoakedMm <= 0
+        || airGapSoakedMm < 0
+        || indexSoaked <= 0) {
+        return {
+          success: false,
+          status: 'numerical-failure',
+          error: { code: 'NUMERICAL_FAILURE', message: `Thermal expansion produced invalid optical element ${i}.` }
+        };
+      }
 
-      // 2. Thermal index shift dn
-      const n0 = el.refractiveIndex || 1.5168;
-      const dn = this.computeDn(el.glass || 'N-BK7', n0, targetTempC, wavelengthUm, refTempC);
-      const n_soaked = n0 + dn;
+      cumulativeHousingDriftMm += airGapSoakedMm - element.airGapMm;
+      cumulativeHousingDriftMm += thicknessSoakedMm - element.thicknessMm;
 
-      // 3. Housing thermal expansion of air gap
-      const gap_soaked = gap_0 * (1.0 + housingCte * deltaT);
-      cumulativeHousingDriftMm += (gap_soaked - gap_0) + (t_soaked - t_0);
+      const powerRef = (n0 - 1.0)
+        * (1.0 / (element.radius1Mm * 1e-3) - 1.0 / (element.radius2Mm * 1e-3));
+      const powerSoaked = (indexSoaked - 1.0)
+        * (1.0 / (radius1SoakedMm * 1e-3) - 1.0 / (radius2SoakedMm * 1e-3));
+      thermalPowerSumRef += powerRef;
+      thermalPowerSumSoaked += powerSoaked;
 
-      // Optical thin-lens power estimate phi = (n - 1) * (1/R1 - 1/R2)
-      const phi0 = (n0 - 1.0) * (1.0 / (r1_0 * 1e-3) - 1.0 / (r2_0 * 1e-3));
-      const phiSoaked = (n_soaked - 1.0) * (1.0 / (r1_soaked * 1e-3) - 1.0 / (r2_soaked * 1e-3));
-      thermalPowerSumRef += phi0;
-      thermalPowerSumSoaked += phiSoaked;
-
-      soakedElements.push({
+      elements.push({
         elementIndex: i,
-        glass: el.glass,
-        original: { r1: r1_0, r2: r2_0, thicknessMm: t_0, airGapMm: gap_0, index: n0 },
+        propertiesSource: properties.source,
+        original: {
+          radius1Mm: element.radius1Mm,
+          radius2Mm: element.radius2Mm,
+          thicknessMm: element.thicknessMm,
+          airGapMm: element.airGapMm,
+          refractiveIndex: n0
+        },
         soaked: {
-          r1: Math.round(r1_soaked * 10000) / 10000,
-          r2: Math.round(r2_soaked * 10000) / 10000,
-          thicknessMm: Math.round(t_soaked * 10000) / 10000,
-          airGapMm: Math.round(gap_soaked * 10000) / 10000,
-          refractiveIndex: Math.round(n_soaked * 1000000) / 1000000,
-          dn: Math.round(dn * 1e7) / 1e7
+          radius1Mm: radius1SoakedMm,
+          radius2Mm: radius2SoakedMm,
+          thicknessMm: thicknessSoakedMm,
+          airGapMm: airGapSoakedMm,
+          refractiveIndex: indexSoaked,
+          indexChange: dn
         }
       });
     }
 
-    // Thermal focal length shift df/dT
-    const f0Mm = thermalPowerSumRef !== 0 ? (1.0 / thermalPowerSumRef) * 1000.0 : 50.0;
-    const fSoakedMm = thermalPowerSumSoaked !== 0 ? (1.0 / thermalPowerSumSoaked) * 1000.0 : 50.0;
-    const dfMm = fSoakedMm - f0Mm;
-    const df_dT_um_per_K = deltaT !== 0 ? (dfMm * 1000.0) / deltaT : 0.0;
+    if (!Number.isFinite(thermalPowerSumRef) || Math.abs(thermalPowerSumRef) < 1e-12
+      || !Number.isFinite(thermalPowerSumSoaked) || Math.abs(thermalPowerSumSoaked) < 1e-12) {
+      return {
+        success: false,
+        status: 'numerical-failure',
+        error: { code: 'NUMERICAL_FAILURE', message: 'The supplied thin-lens powers do not define finite focal lengths.' }
+      };
+    }
 
-    // Thermal defocus distance relative to mechanical sensor plane
-    const thermalDefocusMm = dfMm - cumulativeHousingDriftMm;
+    const nominalFocalLengthMm = 1000.0 / thermalPowerSumRef;
+    const soakedFocalLengthMm = 1000.0 / thermalPowerSumSoaked;
+    const focalShiftMm = soakedFocalLengthMm - nominalFocalLengthMm;
+    const thermalDefocusMm = focalShiftMm - cumulativeHousingDriftMm;
 
-    return {
+    const result = {
+      targetTempC,
+      referenceTempC: refTempC,
+      deltaTempK: deltaT,
+      wavelengthUm,
+      ambientPressurePa: pressurePa,
+      housingCtePerK: lensSpec.housingCtePerK,
+      housingCteSource: lensSpec.housingCteSource,
+      ambientAirIndex: this.evaluateAirIndex(targetTempC, pressurePa, wavelengthUm),
+      nominalFocalLengthMm,
+      soakedFocalLengthMm,
+      focalShiftMm,
+      focalShiftPerKelvinUm: deltaT === 0 ? 0 : (focalShiftMm * 1000.0) / deltaT,
+      thermalDefocusMm,
+      elements
+    };
+    const numericValues = [
+      result.deltaTempK,
+      result.ambientAirIndex,
+      result.nominalFocalLengthMm,
+      result.soakedFocalLengthMm,
+      result.focalShiftMm,
+      result.focalShiftPerKelvinUm,
+      result.thermalDefocusMm,
+      ...result.elements.flatMap((element) => [
+        element.soaked.radius1Mm,
+        element.soaked.radius2Mm,
+        element.soaked.thicknessMm,
+        element.soaked.airGapMm,
+        element.soaked.refractiveIndex,
+        element.soaked.indexChange
+      ])
+    ];
+    if (!numericValues.every(finite)) {
+      return {
+        success: false,
+        status: 'numerical-failure',
+        error: { code: 'NUMERICAL_FAILURE', message: 'Thermal evaluation produced a non-finite result.' }
+      };
+    }
+    return result;
+  }
+
+  /**
+   * Compatibility alias for the explicit property-based thin-lens estimate.
+   * Legacy name-based catalog inputs are no longer accepted.
+   */
+  static evaluateThermalSoak(lensSpec, targetTempC, refTempC, wavelengthUm, pressurePa) {
+    return this.evaluateThermalSoakFromProperties(
+      lensSpec,
       targetTempC,
       refTempC,
-      deltaTC: deltaT,
-      housingMaterial: lensSpec.housingMaterial || 'ALUMINUM_6061',
-      housingCte,
-      ambientAirIndex: this.evaluateAirIndex(targetTempC),
-      nominalFocalLengthMm: Math.round(f0Mm * 100) / 100,
-      soakedFocalLengthMm: Math.round(fSoakedMm * 100) / 100,
-      focalShiftMm: Math.round(dfMm * 10000) / 10000,
-      df_dT_um_per_K: Math.round(df_dT_um_per_K * 100) / 100,
-      thermalDefocusMm: Math.round(thermalDefocusMm * 10000) / 10000,
-      athermalized: Math.abs(thermalDefocusMm) < 0.020, // Within 20 um depth of focus
-      elements: soakedElements
-    };
+      wavelengthUm,
+      pressurePa
+    );
   }
 }
 

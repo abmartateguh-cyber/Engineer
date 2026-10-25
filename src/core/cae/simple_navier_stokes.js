@@ -1,13 +1,13 @@
 /**
  * OmniEng Segregated SIMPLE / PISO Navier-Stokes Solver with Rhie-Chow Interpolation
  * 
- * Provides industrial CFD pressure-velocity coupling matching ANSYS Fluent / OpenFOAM:
+ * Experimental pressure-velocity coupling example:
  * 1. Semi-Implicit Method for Pressure-Linked Equations (SIMPLE).
  * 2. Rhie-Chow face momentum interpolation eliminating pressure checkerboarding on collocated grids.
  * 3. Pressure correction Poisson equation: div( d_f * grad(p') ) = div( u* ).
  * 4. Under-relaxation factors (alpha_u ~ 0.7, alpha_p ~ 0.3) for unconditional stability.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent CFD validation or comparison to a production solver is established.
  */
 
 'use strict';

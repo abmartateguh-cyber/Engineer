@@ -1,7 +1,7 @@
 /**
  * OmniEng Penalty Contact Search & Enforcement Engine
  * Standard: Node-to-Surface Penalty Method with Coulomb Friction
- * Industrial Parity: LS-DYNA *CONTACT_AUTOMATIC_SURFACE_TO_SURFACE / Ansys Mechanical Contact.
+ * Experimental implementation: LS-DYNA *CONTACT_AUTOMATIC_SURFACE_TO_SURFACE / Ansys Mechanical Contact.
  */
 
 class PenaltyContact {
@@ -179,7 +179,7 @@ class PenaltyContact {
   }
 
   /**
-   * Augmented Lagrangian Contact Enforcement (Abaqus / Ansys Parity).
+   * Augmented Lagrangian Contact Enforcement (Abaqus / Ansys Experimental workflow).
    * Iterates Lagrange multipliers lambda until penetration delta is driven to within numerical tolerance.
    * Completely eliminates penalty stiffness sensitivity.
    * @param {Object[]} slaveNodes

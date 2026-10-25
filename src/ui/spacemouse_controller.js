@@ -1,13 +1,7 @@
 /**
- * OmniEng 3Dconnexion SpaceMouse WebHID Controller
- * 
- * Provides native 6-DOF (Degrees of Freedom) hardware navigation for professional CAD/CAE:
- *   - Continuous simultaneous 3D translation (Pan X/Y, Zoom Z) and rotation (Pitch, Roll, Yaw).
- *   - Compatible with SpaceMouse Compact, SpaceMouse Pro, SpaceNavigator, and Enterprise.
- *   - Connects directly via standard WebHID API (zero proprietary drivers or bloatware needed).
- *   - Includes deterministic test mock interface for headless CI qualification.
- * 
- * 100% In-House Sovereign Implementation.
+ * Experimental WebHID input adapter for viewport navigation.
+ * It does not establish compatibility with a particular device model or workstation setup.
+ * The mock input path supports local tests; it is not device qualification evidence.
  */
 
 'use strict';

@@ -1,6 +1,6 @@
 /**
- * OmniEng Numerical ODE / DAE Solvers (MATLAB / Simulink Core Equivalent)
- * Implements standard explicit and stiff numerical differential equation integrators.
+ * Experimental numerical ODE / DAE solvers.
+ * Implements explicit and stiff differential equation integration methods.
  */
 
 class ODESolvers {
@@ -57,7 +57,7 @@ class ODESolvers {
   }
 
   /**
-   * Adaptive Dormand-Prince (RK45 / ode45 equivalent)
+   * Adaptive Dormand-Prince RK45 integration.
    */
   static solveRK45(f, arg2, arg3, arg4, arg5 = 1e-6, arg6 = 0.01) {
     let t0, y0, tEnd, tol, hInitial;

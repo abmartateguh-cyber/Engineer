@@ -1,9 +1,8 @@
 /**
  * OmniEng 20-Node Quadratic Serendipity Hexahedral Element (HEX20) Engine
  * 
- * Commercial FEA Standard: Quadratic 3D solid brick element matching ANSYS SOLID186
- * and Abaqus C3D20. Completely eliminates volumetric shear locking in bending-dominated
- * structural applications.
+ * Experimental quadratic 3D solid element formulation. This implementation has not been
+ * correlated with commercial elements or independently assessed for locking behavior.
  * 
  * 20 Nodes:
  *   Corners (0..7): (±1, ±1, ±1)
@@ -16,7 +15,7 @@
  * 60 DOFs per element (3 DOFs/node: u, v, w).
  * 60x60 element stiffness matrix Ke.
  * 
- * 100% In-House Proprietary Formulation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

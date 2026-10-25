@@ -6,9 +6,9 @@
  * using WebGPU compute shaders with parallel Jacobi/Red-Black relaxation
  * on structured and polyhedral CFD grids.
  * 
- * Parity standard: ANSYS Fluent GPGPU solver / OpenFOAM WebGPU acceleration.
+ * Unverified comparison target: ANSYS Fluent GPGPU solver / OpenFOAM WebGPU acceleration.
  * 
- * 100% In-House Sovereign Implementation. Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

@@ -1,13 +1,11 @@
 /**
- * OmniEng Interactive Simulink-Style Node-and-Wire Visual Canvas Engine
+ * OmniEng experimental node-and-wire visual canvas helper
  * 
- * Provides interactive visual block diagram manipulation matching MathWorks Simulink:
- * 1. Graphical block nodes with input/output connection ports and parameter dialogs.
- * 2. Manhattan/orthogonal auto-routing wires connecting ports with collision avoidance.
- * 3. Live animated signal probes displaying real-time numerical and sparkline traces.
- * 4. Topological algebraic cycle loop detection and visual highlighting.
+ * Supports block and port descriptors, midpoint-based orthogonal wire paths,
+ * and SVG rendering. It does not simulate signals, detect algebraic loops,
+ * route around obstacles, or calculate cycle-safe paths.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
@@ -23,7 +21,7 @@ class CanvasBlockNode {
     this.inputs = [];  // Array of port IDs
     this.outputs = []; // Array of port IDs
     this.parameters = {};
-    this.probedSignalValue = 0.0;
+    this.probedSignalValue = null;
   }
 
   addInputPort(name) {
@@ -62,7 +60,7 @@ class CanvasWireRoute {
     this.fromPort = fromPort;
     this.toPort = toPort;
     this.points = []; // Array of { x, y } waypoints for orthogonal routing
-    this.signalValue = 0.0;
+    this.signalValue = null;
   }
 }
 

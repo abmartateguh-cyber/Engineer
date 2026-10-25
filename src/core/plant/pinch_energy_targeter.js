@@ -10,7 +10,7 @@
  *    - Minimum Cold Utility target (Q_C,min)
  *    - Maximum process-to-process heat recovery
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

@@ -1,16 +1,16 @@
 /**
- * OmniEng Tier-1 Commercial Production Certification Suite 3.0
- * 30 Gold Regulatory & Industrial Parity Benchmarks
- * 
- * Verifies all 4 Pillars of the Tier-1 Commercial Master Plan:
- * - Pillar 1: High-Performance Native Compute & Large-Scale Sparse Direct/Iterative Solvers
+ * OmniEng Legacy Engineering Module Smoke Suite 3.0
+ * 30 internal calculation and module smoke checks
+ *
+ * Exercises legacy engineering examples; no independent validation is established:
+ * - Pillar 1: Structured and sparse numerical helper examples
  * - Pillar 2: 2D/3D Variational Geometric Constraint Solver, Topological Healing & Persistent Naming
  * - Pillar 3: Multi-Scale Physical Solvers (Explicit Crash, Hyperelastic, Fatigue, VOF, Turbomachinery,
  *             CCS Timing, Crosstalk, Power Grid IR Drop, OASIS Stream, DLS Optical Optimization,
  *             Tolerancing Yield, Optical Glasses, Stateflow FSM, Simscape Networks, Dynamic Flowsheet, eNRTL)
- * - Pillar 4: Git 3D CAD Visual Diff, Hierarchical eBOM, DO-178C/ISO 26262 Tool Qualification, ASME VIII Div 2
- * 
- * 100% In-House Sovereign Verification. Zero External Dependencies.
+ * - Pillar 4: CAD visual-diff and eBOM examples, a qualification-diagnostic helper, and experimental stress-line screening
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 const assert = require('assert');
@@ -30,11 +30,18 @@ const { VOFMultiphaseSolver } = require('../src/core/cae/vof_multiphase_solver')
 const { SlidingMeshTurbomachinery } = require('../src/core/cae/sliding_mesh_turbomachinery');
 const { CCSTimingModel } = require('../src/core/eda/ccs_timing_model');
 const { SignalIntegrityCrosstalk } = require('../src/core/eda/signal_integrity_crosstalk');
+const { SYNTHETIC_CROSSTALK_INPUTS } = require('./support/experimental_eda_formula_inputs');
 const { PowerGridIRDropAnalyzer } = require('../src/core/eda/power_grid_ir_drop');
+const {
+  createSyntheticPdnAnalyzer,
+  createSyntheticPdnMesh,
+  SYNTHETIC_BLACKS_MODEL
+} = require('./support/experimental_pdn_inputs');
 const { OasisStreamEngine } = require('../src/core/eda/oasis_stream_engine');
 const { DampedLeastSquaresOptimizer } = require('../src/core/optics/damped_least_squares_optimizer');
 const { TolerancingYieldCompensator } = require('../src/core/optics/tolerancing_yield_compensator');
 const { OpticalGlassCatalog } = require('../src/core/optics/optical_glass_catalog');
+const opticalExamples = require('./support/experimental_optics_examples');
 const { StateflowFSMEngine } = require('../src/core/dynamic_simulink/stateflow_fsm_engine');
 const { SimscapeDomainLibrary } = require('../src/core/dynamic_simulink/simscape_domain_library');
 const { DynamicFlowsheetSolver } = require('../src/core/plant/dynamic_flowsheet_solver');
@@ -42,6 +49,7 @@ const { ElectrolyteNRTLModel } = require('../src/core/plant/enrtl_electrolyte_th
 const { WebGPUCFDKernel } = require('../src/core/cae/webgpu_cfd_kernel');
 const { SFunctionPluginHost } = require('../src/core/dynamic_simulink/s_function_plugin_host');
 const { PetroleumAssayCharacterizer } = require('../src/core/plant/petroleum_assay_characterizer');
+const { measureStructuredPoissonBudget } = require('../src/core/vv/poisson_performance');
 
 // Import Pillar 4 Modules
 const { GitCADVisualDiffEngine } = require('../src/core/pdm/git_cad_visual_diff');
@@ -51,7 +59,7 @@ const { ASMESectionVIIIDiv2Analyzer } = require('../src/core/compliance/asme_sec
 
 function runGoldRegulatoryBenchmarks3() {
   console.log('\n================================================================');
-  console.log('   RUNNING 30 GOLD REGULATORY & INDUSTRIAL BENCHMARKS 3.0      ');
+  console.log('   RUNNING 30 EXPERIMENTAL LEGACY SMOKE CHECKS      ');
   console.log('================================================================\n');
 
   let passed = 0;
@@ -65,8 +73,8 @@ function runGoldRegulatoryBenchmarks3() {
     const solver = new VariationalConstraintSolver();
     // Add points for a right-angle triangle with dimension constraints
     solver.addPoint('P1', 0, 0, true); // Fixed origin
-    solver.addPoint('P2', 38.0, 2.0);  // Near (40, 0)
-    solver.addPoint('P3', 2.0, 28.0);  // Near (0, 30)
+    solver.addPoint('P2', 38.0, 2.0); // Near (40, 0)
+    solver.addPoint('P3', 2.0, 28.0); // Near (0, 30)
 
     solver.addConstraint({ type: 'HORIZONTAL', point1: 'P1', point2: 'P2' });
     solver.addConstraint({ type: 'VERTICAL', point1: 'P1', point2: 'P3' });
@@ -81,7 +89,9 @@ function runGoldRegulatoryBenchmarks3() {
     assert(Math.abs(res.points.P3.x - 0.0) < 1e-8, 'P3.x should be 0.0');
     assert(Math.abs(res.points.P3.y - 30.0) < 1e-8, 'P3.y should be 30.0');
 
-    console.log(`  ✓ PASSED: Solved 4 variational constraints in ${res.iterations} iterations, residual = ${res.residualNorm.toExponential(4)}`);
+    console.log(
+      `  ✓ PASSED: Solved 4 variational constraints in ${res.iterations} iterations, residual = ${res.residualNorm.toExponential(4)}`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 1: ${err.message}`);
@@ -114,7 +124,9 @@ function runGoldRegulatoryBenchmarks3() {
     assert.strictEqual(healed.collapsedSliverCount, 1, 'Sliver face must be collapsed');
     assert(healed.solid.faces.length === 1, 'Only clean manifold face f1 should remain');
 
-    console.log(`  ✓ PASSED: Stitched ${healed.stitchedVerticesCount} micro-gap vertices and collapsed ${healed.collapsedSliverCount} sliver faces`);
+    console.log(
+      `  ✓ PASSED: Stitched ${healed.stitchedVerticesCount} micro-gap vertices and collapsed ${healed.collapsedSliverCount} sliver faces`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 2: ${err.message}`);
@@ -146,25 +158,27 @@ function runGoldRegulatoryBenchmarks3() {
     assert(resolved.matchFound, 'Persistent naming must track modified entity');
     assert(resolved.similarityScore >= 0.85, 'Similarity score should be >= 0.85');
 
-    console.log(`  ✓ PASSED: Resolved persistent ID ${face1.persistentId.slice(0, 16)}... with similarity ${resolved.similarityScore.toFixed(3)}`);
+    console.log(
+      `  ✓ PASSED: Resolved persistent ID ${face1.persistentId.slice(0, 16)}... with similarity ${resolved.similarityScore.toFixed(3)}`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 3: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 4: Wasm Sparse Multifrontal Cholesky Solver
+  // Benchmark 4: Structured direct Poisson solve and generic sparse Cholesky
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 4] High-Performance Sparse Direct Solver with AMD Ordering...\n');
+    process.stdout.write('[BM 4] 2D Poisson DST-I direct path and generic sparse Cholesky...\n');
     const solver = new WasmSparseMultifrontalSolver();
     // 5x5 symmetric positive definite tridiagonal system
     const A = [
-      [4, -1,  0,  0,  0],
-      [-1, 4, -1,  0,  0],
-      [ 0,-1,  4, -1,  0],
-      [ 0, 0, -1,  4, -1],
-      [ 0, 0,  0, -1,  4]
+      [4, -1, 0, 0, 0],
+      [-1, 4, -1, 0, 0],
+      [0, -1, 4, -1, 0],
+      [0, 0, -1, 4, -1],
+      [0, 0, 0, -1, 4]
     ];
     const b = [3, 2, 2, 2, 3]; // Exact solution x = [1, 1, 1, 1, 1]
 
@@ -175,42 +189,111 @@ function runGoldRegulatoryBenchmarks3() {
       assert(Math.abs(x[i] - 1.0) < 1e-8, `Solution x[${i}] should be 1.0, got ${x[i]}`);
     }
 
-    // Production-scale check: 2D Poisson (5-point stencil) with ~100,000 unknowns
-    const G = 316;
-    const NN = G * G;
-    const big = new WasmSparseMultifrontalSolver(NN, NN);
-    for (let yy = 0; yy < G; yy++) {
-      for (let xx = 0; xx < G; xx++) {
-        const i = yy * G + xx;
-        big.addEntry(i, i, 4);
-        if (xx > 0) big.addEntry(i, i - 1, -1);
-        if (xx < G - 1) big.addEntry(i, i + 1, -1);
-        if (yy > 0) big.addEntry(i, i - G, -1);
-        if (yy < G - 1) big.addEntry(i, i + G, -1);
+    // Manufactured 2D Poisson solution checks the structured direct path against
+    // the assembled matrix, independently of the solver's internal residual.
+    const checkGrid = 5;
+    const checkN = checkGrid * checkGrid;
+    const checkMatrix = new WasmSparseMultifrontalSolver(checkN, checkN);
+    const checkExact = Float64Array.from({ length: checkN }, (_, i) => Math.sin((i + 1) * 0.3));
+    const checkRhs = new Float64Array(checkN);
+    for (let yy = 0; yy < checkGrid; yy++) {
+      for (let xx = 0; xx < checkGrid; xx++) {
+        const i = yy * checkGrid + xx;
+        checkMatrix.addEntry(i, i, 4);
+        if (xx > 0) checkMatrix.addEntry(i, i - 1, -1);
+        if (xx < checkGrid - 1) checkMatrix.addEntry(i, i + 1, -1);
+        if (yy > 0) checkMatrix.addEntry(i, i - checkGrid, -1);
+        if (yy < checkGrid - 1) checkMatrix.addEntry(i, i + checkGrid, -1);
+
+        let value = 4 * checkExact[i];
+        if (xx > 0) value -= checkExact[i - 1];
+        if (xx < checkGrid - 1) value -= checkExact[i + 1];
+        if (yy > 0) value -= checkExact[i - checkGrid];
+        if (yy < checkGrid - 1) value -= checkExact[i + checkGrid];
+        checkRhs[i] = value;
       }
     }
-    const tBig = performance.now();
-    big.finalizeCSR();
-    const fac = big.factorize();
-    const sol = big.solve(new Float64Array(NN).fill(1.0));
-    const bigMs = performance.now() - tBig;
-    assert(sol.relativeResidual < 1e-8, `100k-unknown relative residual ${sol.relativeResidual} must be < 1e-8`);
-    assert(fac.nnzL < NN * 40, `Fill (nnz(L)=${fac.nnzL}) must stay O(n log n), not dense`);
-    // Sanity ceiling only (the plan's <2.0 s target is NOT met in pure JS; measured time is reported below)
-    assert(bigMs < 60000, `100k-unknown direct solve took ${bigMs.toFixed(0)} ms`);
+    const checkMetrics = checkMatrix.factorize();
+    const checkResult = checkMatrix.solve(checkRhs);
+    assert.strictEqual(checkMetrics.solverMethod, '2d-poisson-dst1');
+    for (let i = 0; i < checkN; i++) {
+      assert(Math.abs(checkResult.solution[i] - checkExact[i]) < 1e-10);
+    }
 
-    console.log(`  ✓ PASSED: 5x5 exact; ${NN.toLocaleString()}-unknown 2D Poisson Cholesky: relRes=${sol.relativeResidual.toExponential(2)}, nnz(L)=${fac.nnzL.toLocaleString()} (fill ${fac.fillInRatio.toFixed(1)}x), ${(bigMs / 1000).toFixed(2)} s measured (plan target <2.0 s not met)`);
+    // Even grids exercise the DST symmetry path without a center sample and
+    // cross-check the structured result against generic sparse Cholesky.
+    const evenGrid = 4;
+    const evenN = evenGrid * evenGrid;
+    const evenExact = Float64Array.from({ length: evenN }, (_, i) => Math.cos(i * 0.17) - 0.2);
+    const evenRhs = new Float64Array(evenN);
+    const evenDst = new WasmSparseMultifrontalSolver(evenN, evenN);
+    const evenSparse = new WasmSparseMultifrontalSolver(evenN, evenN, { enableStructuredPoissonDirect: false });
+    for (let yy = 0; yy < evenGrid; yy++) {
+      for (let xx = 0; xx < evenGrid; xx++) {
+        const i = yy * evenGrid + xx;
+        const entries = [[i, 4]];
+        if (xx > 0) entries.push([i - 1, -1]);
+        if (xx < evenGrid - 1) entries.push([i + 1, -1]);
+        if (yy > 0) entries.push([i - evenGrid, -1]);
+        if (yy < evenGrid - 1) entries.push([i + evenGrid, -1]);
+
+        let value = 4 * evenExact[i];
+        for (const [column, coefficient] of entries.slice(1)) {
+          value += coefficient * evenExact[column];
+        }
+        evenRhs[i] = value;
+        for (const [column, coefficient] of entries) {
+          evenDst.addEntry(i, column, coefficient);
+          evenSparse.addEntry(i, column, coefficient);
+        }
+      }
+    }
+    const evenDstMetrics = evenDst.factorize();
+    const evenSparseMetrics = evenSparse.factorize();
+    const evenDstResult = evenDst.solve(evenRhs);
+    const evenSparseResult = evenSparse.solve(evenRhs);
+    assert.strictEqual(evenDstMetrics.solverMethod, '2d-poisson-dst1');
+    assert.strictEqual(evenSparseMetrics.solverMethod, 'sparse-cholesky');
+    assert(
+      evenDstResult.solution.every(
+        (value, i) => Math.abs(value - evenExact[i]) < 1e-10 && Math.abs(value - evenSparseResult.solution[i]) < 1e-10
+      ),
+      'Even-grid DST solution matches the manufactured vector and generic sparse Cholesky'
+    );
+
+    const poisson = measureStructuredPoissonBudget();
+    assert(
+      poisson.relativeResidual < 1e-8,
+      `100k-unknown relative residual ${poisson.relativeResidual} must be < 1e-8`
+    );
+    assert(poisson.independentResidualRms < 1e-8, 'Independent 2D Poisson residual must be below 1e-8');
+    assert.strictEqual(poisson.solverMethod, '2d-poisson-dst1');
+    assert.strictEqual(poisson.nnzL, null, 'The spectral path must not report sparse Cholesky fill');
+    assert(
+      poisson.factorizationStorageBytes < poisson.unknowns * 9,
+      'DST basis storage must remain linear in the unknown count'
+    );
+    const coverageMode = process.env.OMNI_COVERAGE_MODE === '1' && typeof process.env.NODE_V8_COVERAGE === 'string';
+
+    const timingSummary = coverageMode
+      ? `${poisson.elapsedMs.toFixed(0)} ms under V8 coverage instrumentation (performance budget not scored)`
+      : `${(poisson.elapsedMs / 1000).toFixed(2)} s measured (performance budget enforced by npm run test:poisson-budget)`;
+    console.log(
+      `  ✓ PASSED: 5x5 sparse Cholesky exact; manufactured DST solution exact; ${poisson.unknowns.toLocaleString()}-unknown 2D Poisson DST direct solve: relRes=${poisson.relativeResidual.toExponential(2)}, factor storage=${(poisson.factorizationStorageBytes / (1024 * 1024)).toFixed(2)} MiB, ${timingSummary}`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 4: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 5: GPU Parallel PCG Solver & SpMV Acceleration
+  // Case 5: Experimental serial CPU PCG solve
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 5] Parallel PCG Solver with SpMV & Jacobi Preconditioning...\n');
+    process.stdout.write('[CASE 5] Experimental serial CPU PCG with CSR SpMV and Jacobi preconditioning...\n');
     const pcg = new GPUParallelPCGSolver({ maxIterations: 100, tolerance: 1e-7 });
+    assert.throws(() => new GPUParallelPCGSolver({ useWebGPU: true }), /does not support the 'useWebGPU' option/);
+    assert.throws(() => pcg.solve({ n: 1, rowPtr: [0, 0], colIdx: [], values: [] }, [1]), /finite positive diagonal/);
     const N = 20;
     // Construct 1D Poisson matrix: diag = 2, sub/super = -1
     const A = Array.from({ length: N }, () => new Float64Array(N));
@@ -228,14 +311,18 @@ function runGoldRegulatoryBenchmarks3() {
     // Scale check: 2D Poisson 100x100 (10,000 unknowns) in CSR, cross-checked against the direct solver
     const G2 = 100;
     const N2 = G2 * G2;
-    const direct = new WasmSparseMultifrontalSolver(N2, N2);
+    const direct = new WasmSparseMultifrontalSolver(N2, N2, { enableStructuredPoissonDirect: false });
     const rowPtr = new Int32Array(N2 + 1);
     const cols = [];
     const vals = [];
     for (let yy = 0; yy < G2; yy++) {
       for (let xx = 0; xx < G2; xx++) {
         const i = yy * G2 + xx;
-        const push = (j, v) => { cols.push(j); vals.push(v); direct.addEntry(i, j, v); };
+        const push = (j, v) => {
+          cols.push(j);
+          vals.push(v);
+          direct.addEntry(i, j, v);
+        };
         if (yy > 0) push(i - G2, -1);
         if (xx > 0) push(i - 1, -1);
         push(i, 4);
@@ -251,16 +338,20 @@ function runGoldRegulatoryBenchmarks3() {
     const rBig = pcgBig.solve(csr2, b2);
     assert.strictEqual(rBig.converged, true, `10k-unknown PCG must converge (rel res ${rBig.relativeResidual})`);
     direct.finalizeCSR();
+    const directMetrics = direct.factorize();
+    assert.strictEqual(directMetrics.solverMethod, 'sparse-cholesky');
     const dSol = direct.solve(b2).solution;
     let maxDiff = 0;
     for (let i = 0; i < N2; i++) maxDiff = Math.max(maxDiff, Math.abs(dSol[i] - rBig.solution[i]));
     assert(maxDiff < 1e-6, `PCG vs direct solution mismatch ${maxDiff}`);
     assert.strictEqual(rBig.gpuSpeedupVerified, false, 'No unmeasured GPU speedup may be claimed');
 
-    console.log(`  ✓ PASSED: PCG 20x20 in ${res.iterations} it; ${N2.toLocaleString()}-unknown CSR in ${rBig.iterations} it (${rBig.elapsedMs.toFixed(0)} ms, CPU-JS, ${rBig.throughputGFlops} GFlop/s), max|PCG-direct| = ${maxDiff.toExponential(2)}; GPU speedup NOT verified`);
+    console.log(
+      `  ✓ PASSED: PCG 20x20 in ${res.iterations} iterations; ${N2.toLocaleString()}-unknown CSR in ${rBig.iterations} iterations (${rBig.elapsedMs.toFixed(0)} ms, serial CPU-JS, estimated ${rBig.estimatedThroughputGFlops} GFlop/s), max|PCG-direct| = ${maxDiff.toExponential(2)}; GPU speedup not verified`
+    );
     passed++;
   } catch (err) {
-    console.error(`  ✗ FAILED BM 5: ${err.message}`);
+    console.error(`  ✗ FAILED CASE 5: ${err.message}`);
   }
 
   // -------------------------------------------------------------
@@ -287,7 +378,9 @@ function runGoldRegulatoryBenchmarks3() {
     assert(impact.mushroomRadius > 0.005, 'Taylor bar must mushroom at impact interface');
     assert(impact.totalPlasticEnergyJ > 0, 'Plastic dissipation energy must be positive');
 
-    console.log(`  ✓ PASSED: Taylor bar impact shortened from 50.0mm to ${(impact.finalLength * 1000).toFixed(2)}mm, mushroom radius = ${(impact.mushroomRadius * 1000).toFixed(2)}mm`);
+    console.log(
+      `  ✓ PASSED: Taylor bar impact shortened from 50.0mm to ${(impact.finalLength * 1000).toFixed(2)}mm, mushroom radius = ${(impact.mushroomRadius * 1000).toFixed(2)}mm`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 6: ${err.message}`);
@@ -307,10 +400,12 @@ function runGoldRegulatoryBenchmarks3() {
 
     // Uniaxial tension at stretch lambda = 2.0 (100% strain)
     const curve = rubber.generateUniaxialTensionCurve(3.0, 20);
-    const midPoint = curve.find(p => Math.abs(p.stretch - 2.0) < 0.1);
+    const midPoint = curve.find((p) => Math.abs(p.stretch - 2.0) < 0.1);
     assert(midPoint && midPoint.nominalStressMpa > 0.5, 'Mooney-Rivlin nominal stress must be positive and realistic');
 
-    console.log(`  ✓ PASSED: Evaluated Mooney-Rivlin uniaxial curve up to stretch 3.0 (Nominal Stress @ lambda=2: ${midPoint.nominalStressMpa.toFixed(2)} MPa)`);
+    console.log(
+      `  ✓ PASSED: Evaluated Mooney-Rivlin uniaxial curve up to stretch 3.0 (Nominal Stress @ lambda=2: ${midPoint.nominalStressMpa.toFixed(2)} MPa)`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 7: ${err.message}`);
@@ -326,10 +421,12 @@ function runGoldRegulatoryBenchmarks3() {
     const cycles = fatigue.rainflowCounting(stressHistory);
     assert(cycles.length >= 2, 'Rainflow algorithm must extract closed hysteresis cycles');
 
-    const damage = fatigue.calculateMinerDamage(cycles, 1000.0, -0.10, 450.0);
+    const damage = fatigue.calculateMinerDamage(cycles, 1000.0, -0.1, 450.0);
     assert(damage.cumulativeDamageD > 0 && damage.cumulativeDamageD < 1.0, 'Miner damage must accumulate accurately');
 
-    console.log(`  ✓ PASSED: Rainflow extracted ${cycles.length} cycles, Miner cumulative damage D = ${damage.cumulativeDamageD.toExponential(3)}`);
+    console.log(
+      `  ✓ PASSED: Rainflow extracted ${cycles.length} cycles, Miner cumulative damage D = ${damage.cumulativeDamageD.toExponential(3)}`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 8: ${err.message}`);
@@ -341,11 +438,13 @@ function runGoldRegulatoryBenchmarks3() {
   try {
     process.stdout.write('[BM 9] Volume of Fluid (VOF) Free-Surface Tracking & PLIC Reconstruction...\n');
     const vof = new VOFMultiphaseSolver({ nx: 20, ny: 10 });
-    const damBreak = vof.simulateDamBreak(0.10); // 100 ms simulation
-    assert(damBreak.wavefrontPositionX > 0.40, 'Dam break wave front must propagate forward');
+    const damBreak = vof.simulateDamBreak(0.1); // 100 ms simulation
+    assert(damBreak.wavefrontPositionX > 0.4, 'Dam break wave front must propagate forward');
     assert(damBreak.massConservationErrorPercent < 0.01, 'VOF mass conservation error must be < 0.01%');
 
-    console.log(`  ✓ PASSED: Dam break wave front reached x = ${damBreak.wavefrontPositionX.toFixed(3)}m, mass conservation error = ${damBreak.massConservationErrorPercent.toFixed(4)}%`);
+    console.log(
+      `  ✓ PASSED: Dam break wave front reached x = ${damBreak.wavefrontPositionX.toFixed(3)}m, mass conservation error = ${damBreak.massConservationErrorPercent.toFixed(4)}%`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 9: ${err.message}`);
@@ -365,7 +464,9 @@ function runGoldRegulatoryBenchmarks3() {
     assert(pumpCurve.shutoffHeadM > 20.0, 'Shutoff head must match Euler head at Q=0');
     assert(pumpCurve.bepFlowM3H > 10.0, 'BEP flow must be positive');
 
-    console.log(`  ✓ PASSED: Pump Euler shutoff head = ${pumpCurve.shutoffHeadM.toFixed(2)}m, BEP flow = ${pumpCurve.bepFlowM3H.toFixed(1)} m³/h`);
+    console.log(
+      `  ✓ PASSED: Pump Euler shutoff head = ${pumpCurve.shutoffHeadM.toFixed(2)}m, BEP flow = ${pumpCurve.bepFlowM3H.toFixed(1)} m³/h`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 10: ${err.message}`);
@@ -378,47 +479,68 @@ function runGoldRegulatoryBenchmarks3() {
     process.stdout.write('[BM 11] Composite Current Source (CCS) Nanometer Timing Engine...\n');
     const ccs = new CCSTimingModel();
     // 7nm FinFET inverter driving 5 fF load
-    const sim = ccs.simulateDriverOutput(5e-15, 0.70);
+    const sim = ccs.simulateDriverOutput(5e-15, 0.7);
     assert(sim.delaySeconds > 0 && sim.delaySeconds < 1e-9, 'CCS stage delay must be sub-nanosecond');
     assert(sim.slewSeconds > 0, 'CCS transition slew must be positive');
 
-    console.log(`  ✓ PASSED: 7nm Inverter CCS delay = ${(sim.delaySeconds * 1e12).toFixed(2)} ps, slew = ${(sim.slewSeconds * 1e12).toFixed(2)} ps`);
+    console.log(
+      `  ✓ PASSED: 7nm Inverter CCS delay = ${(sim.delaySeconds * 1e12).toFixed(2)} ps, slew = ${(sim.slewSeconds * 1e12).toFixed(2)} ps`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 11: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 12: Signal Integrity Crosstalk Noise Glitch
+  // Case 12: Experimental caller-supplied crosstalk arithmetic
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 12] Signal Integrity Interconnect Crosstalk Glitch Amplitude...\n');
+    process.stdout.write('[CASE 12] Experimental caller-supplied crosstalk estimate...\n');
     const si = new SignalIntegrityCrosstalk();
-    const glitch = si.calculateGlitchAmplitude({
-      aggressorSlewRate: 20.0e9, // 20 V/ns
-      couplingCapacitance: 15.0e-15, // 15 fF
-      victimGroundCapacitance: 35.0e-15, // 35 fF
-      victimDriverResistance: 120.0,
-      vdd: 0.75
-    });
+    const inputs = SYNTHETIC_CROSSTALK_INPUTS;
+    const glitch = si.calculateGlitchAmplitude(inputs);
 
     assert(glitch.vPeakVolts > 0 && glitch.vPeakVolts < 0.75, 'Glitch peak must be positive and bounded');
-    assert(typeof glitch.noiseMarginSafe === 'boolean', 'Noise margin immunity must be evaluated');
+    assert.strictEqual(glitch.validationLevel, 'experimental');
+    assert.strictEqual(glitch.dataStatus, 'caller-supplied-unverified');
+    assert.match(glitch.pulseWidthSemantics, /caller-supplied factor estimate/);
+    assert(
+      typeof glitch.belowSuppliedNoiseThreshold === 'boolean',
+      'The supplied-threshold screen must return a boolean'
+    );
+    assert.match(glitch.thresholdComparison, /^(below|above)-supplied-threshold$/);
+    assert.throws(
+      () => si.calculateGlitchAmplitude({ ...inputs, noiseMarginThresholdV: undefined }),
+      /noiseMarginThresholdV/
+    );
+    assert.throws(
+      () => si.calculateGlitchAmplitude({ vdd: 0.75, noiseMarginThresholdV: 0.15 }),
+      /aggressorSlewRateVPerSecond/
+    );
+    assert.strictEqual(glitch.fwhmSeconds, null, 'The lumped estimate must not claim a waveform-derived FWHM');
+    const withoutWidthFactor = si.calculateGlitchAmplitude({
+      ...inputs,
+      pulseWidthTimeConstantFactor: undefined
+    });
+    assert.strictEqual(withoutWidthFactor.pulseWidthEstimateSeconds, null);
 
-    console.log(`  ✓ PASSED: Aggressor-victim crosstalk Vpeak = ${(glitch.vPeakVolts * 1000).toFixed(1)} mV, FWHM = ${(glitch.fwhmSeconds * 1e12).toFixed(1)} ps, Safe: ${glitch.noiseMarginSafe}`);
+    console.log(
+      `  ✓ PASSED: Synthetic inputs produced ${(glitch.vPeakVolts * 1000).toFixed(
+        1
+      )} mV and a ${glitch.pulseWidthEstimatePs.toFixed(1)} ps caller-factor width estimate; supplied-threshold comparison: ${glitch.thresholdComparison}`
+    );
     passed++;
   } catch (err) {
-    console.error(`  ✗ FAILED BM 12: ${err.message}`);
+    console.error(`  ✗ FAILED CASE 12: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 13: Power Grid Static IR-Drop (G * V = I)
+  // Case 13: Experimental synthetic lumped PDN calculation
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 13] Power Distribution Network (PDN) Mesh IR-Drop (G*V = I)...\n');
-    const pdn = new PowerGridIRDropAnalyzer({ vdd: 1.0, maxDropThresholdPercent: 3.0 });
-    const mesh = pdn.createGridMesh(6, 6, 10e-6, 10e-6, 0.05, 1e-6);
-    // Supply pad at node 0 and 35; sinks in the middle
+    process.stdout.write('[CASE 13] Synthetic caller-supplied lumped PDN arithmetic...\n');
+    const pdn = createSyntheticPdnAnalyzer({ vdd: 1.0 });
+    const mesh = createSyntheticPdnMesh(pdn, 6, 6);
     const pads = [0, 35];
     const sinks = [
       { nodeId: 14, current: 0.005 },
@@ -426,11 +548,14 @@ function runGoldRegulatoryBenchmarks3() {
     ];
 
     const irResult = pdn.solveStaticIRDrop(mesh, pads, sinks);
-    assert(irResult.minVoltage > 0.95, 'Min voltage must remain within allowable drop');
-    assert(irResult.dropPercent < 3.0, `IR drop percent ${irResult.dropPercent}% must be < 3.0%`);
-    assert.strictEqual(irResult.passesThreshold, true, 'IR drop must pass threshold');
+    assert(Number.isFinite(irResult.minVoltage), 'Synthetic lumped result must be finite');
+    assert.strictEqual(irResult.validationLevel, 'experimental');
+    assert.strictEqual(irResult.dataStatus, 'caller-supplied-unverified');
+    assert.strictEqual(typeof irResult.belowSuppliedThreshold, 'boolean');
 
-    console.log(`  ✓ PASSED: Max IR drop = ${(irResult.maxDrop * 1000).toFixed(2)} mV (${irResult.dropPercent.toFixed(2)}% of VDD) <= 3.0% target`);
+    console.log(
+      `  ✓ PASSED: Synthetic formula returned ${irResult.dropPercent.toFixed(4)}% of supplied VDD; threshold comparison: ${irResult.thresholdComparison}`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 13: ${err.message}`);
@@ -470,23 +595,41 @@ function runGoldRegulatoryBenchmarks3() {
     assert.strictEqual(parsed.cells[0].name, 'NAND2_X1', 'Cell name must match roundtrip');
     assert.strictEqual(parsed.cells[0].rectangles.length, 50, 'All 50 rectangles must be deserialized');
 
-    console.log(`  ✓ PASSED: Serialized 50 shapes into ${comp.oasisSizeBytes} bytes OASIS stream (${comp.reductionPercent.toFixed(1)}% reduction vs GDSII)`);
+    console.log(
+      `  ✓ PASSED: Serialized 50 shapes into ${comp.oasisSizeBytes} bytes OASIS stream (${comp.reductionPercent.toFixed(1)}% reduction vs GDSII)`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 14: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 15: Damped Least Squares (DLS) Optical Optimizer
+  // Experimental smoke check 15: explicit-input DLS optical optimizer
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 15] Damped Least Squares (DLS) Optical Merit Function Optimizer...\n');
-    const dls = new DampedLeastSquaresOptimizer({ maxIterations: 10 });
+    process.stdout.write('[SM 15] Experimental DLS optimizer with caller-supplied system and targets...\n');
+    const dls = new DampedLeastSquaresOptimizer({
+      initialDamping: 0.001,
+      minimumDamping: 1e-7,
+      maximumDamping: 1e5,
+      dampingReductionFactor: 2,
+      dampingIncreaseFactor: 4,
+      maxIterations: 10,
+      tolerance: 1e-7,
+      finiteDiffStep: 1e-5
+    });
     const lensSystem = {
+      initialRefractiveIndex: 1.0,
+      metricSampling: {
+        entrancePupilRadiusMm: 10.0,
+        paraxialRayHeightMm: 0.1,
+        zonalRayFraction: 0.7071067811865476,
+        chiefRayAngleRad: 0.05
+      },
       surfaces: [
-        { radius: 50.0, thickness: 5.0, refractiveIndex: 1.5168 }, // N-BK7
+        { radius: 50.0, thickness: 5.0, refractiveIndex: 1.5168 },
         { radius: -50.0, thickness: 45.0, refractiveIndex: 1.0 },
-        { radius: 0.0, thickness: 0.0, refractiveIndex: 1.0 }     // Image plane
+        { curvature: 0.0, thickness: 0.0, refractiveIndex: 1.0 }
       ]
     };
 
@@ -495,11 +638,19 @@ function runGoldRegulatoryBenchmarks3() {
       { surfaceIndex: 1, param: 'radius', min: -100.0, max: -20.0 }
     ];
 
-    const optResult = dls.optimize(lensSystem, vars);
+    const operands = [
+      { type: 'PARAXIAL_FOCAL_LENGTH', targetMm: 50.0, weight: 1.0 },
+      { type: 'TERMINAL_RAY_SPREAD', targetMm: 0.0, weight: 0.01 }
+    ];
+    const optResult = dls.optimize(lensSystem, vars, operands);
     assert(optResult.finalMerit <= optResult.initialMerit, 'Optimization must reduce or preserve merit function');
     assert(optResult.improvementPercent >= 0.0, 'Improvement must be non-negative');
+    assert.strictEqual(optResult.validationLevel, 'experimental');
+    assert.throws(() => new DampedLeastSquaresOptimizer().optimize(lensSystem, vars, operands), /option/);
 
-    console.log(`  ✓ PASSED: DLS optimizer improved merit from ${optResult.initialMerit.toFixed(3)} to ${optResult.finalMerit.toFixed(3)} (+${optResult.improvementPercent.toFixed(1)}% improvement)`);
+    console.log(
+      `  ✓ PASSED: Experimental algorithm smoke check; merit ${optResult.initialMerit.toPrecision(4)} → ${optResult.finalMerit.toPrecision(4)}. No optical correlation is implied.`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 15: ${err.message}`);
@@ -525,45 +676,52 @@ function runGoldRegulatoryBenchmarks3() {
     ];
 
     const yieldResult = tolEngine.runMonteCarloYield(nominalLens, tolerances, { targetRmsSpotUm: 150.0 });
-    assert(yieldResult.yieldPercent >= 70.0, 'Yield with focus compensator should be high');
+    assert(yieldResult.samplePassPercent >= 70.0, 'Synthetic sample pass fraction should meet the example threshold');
+    assert.strictEqual(yieldResult.validationLevel, 'experimental');
+    assert.match(yieldResult.interpretation, /not production yield/);
+    assert(!Object.hasOwn(yieldResult, 'yieldPercent'));
 
-    console.log(`  ✓ PASSED: 50-Trial Monte Carlo with detector refocus achieved ${yieldResult.yieldPercent.toFixed(1)}% production yield`);
+    console.log(
+      `  ✓ PASSED: Experimental 50-trial tolerance sweep had ${yieldResult.samplePassPercent.toFixed(1)}% of synthetic samples below the supplied spot-radius threshold; not a production-yield estimate`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 16: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 17: Commercial Optical Glass Catalog (Sellmeier Dispersion)
+  // Benchmark 17: Experimental Optical Glass Example (Sellmeier Dispersion)
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 17] Commercial Optical Glass Catalog & Sellmeier Dispersion...\n');
-    const cat = new OpticalGlassCatalog();
-    assert(cat.catalogSize >= 500, `Catalog size ${cat.catalogSize} must exceed 500 glasses`);
+    process.stdout.write('[BM 17] Experimental Optical Glass Example & Sellmeier Dispersion...\n');
+    const cat = new OpticalGlassCatalog(opticalExamples.opticalGlassExamples);
+    assert(cat.catalogSize === 15, `Expected 15 fixed examples, got ${cat.catalogSize}`);
 
     const nbk7Props = cat.getOpticalProperties('N-BK7');
-    // Certified nd for N-BK7 = 1.51680, Vd = 64.17
-    assert(Math.abs(nbk7Props.nd - 1.51680) < 1e-4, `N-BK7 nd ${nbk7Props.nd} must match 1.51680`);
+    assert.strictEqual(nbk7Props.dataStatus, 'experimental');
+    // SCHOTT N-BK7 official datasheet values; the local record's redistribution status is not reviewed.
+    assert(Math.abs(nbk7Props.nd - 1.5168) < 1e-4, `N-BK7 nd ${nbk7Props.nd} must match 1.51680`);
     assert(Math.abs(nbk7Props.Abbe_Vd - 64.17) < 0.2, `N-BK7 Vd ${nbk7Props.Abbe_Vd} must match 64.17`);
 
-    console.log(`  ✓ PASSED: Catalog verified across ${cat.catalogSize} glasses (N-BK7 nd = ${nbk7Props.nd.toFixed(5)}, Vd = ${nbk7Props.Abbe_Vd.toFixed(2)})`);
+    console.log(
+      `  ✓ PASSED: Experimental N-BK7 calculation (nd = ${nbk7Props.nd.toFixed(5)}, Vd = ${nbk7Props.Abbe_Vd.toFixed(2)})`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 17: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 18: Hierarchical Concurrent Stateflow FSM & MISRA-C
+  // Benchmark 18: Experimental Stateflow behavior and C code-generation example
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 18] Hierarchical Stateflow FSM & MISRA-C Autocoding...\n');
+    process.stdout.write('[BM 18] Experimental Stateflow FSM and C code-generation example...\n');
     const fsm = new StateflowFSMEngine({ name: 'FlightModeController' });
-    fsm.addState({ id: 'OFF', isInitial: true })
-       .addState({ id: 'STANDBY' })
-       .addState({ id: 'ENGAGED' });
+    fsm.addState({ id: 'OFF', isInitial: true }).addState({ id: 'STANDBY' }).addState({ id: 'ENGAGED' });
 
-    fsm.addTransition({ source: 'OFF', target: 'STANDBY', event: 'POWER_ON' })
-       .addTransition({ source: 'STANDBY', target: 'ENGAGED', afterSeconds: 0.1 });
+    fsm
+      .addTransition({ source: 'OFF', target: 'STANDBY', event: 'POWER_ON' })
+      .addTransition({ source: 'STANDBY', target: 'ENGAGED', afterSeconds: 0.1 });
 
     fsm.initialize();
     fsm.step(0.01, 'POWER_ON');
@@ -577,7 +735,9 @@ function runGoldRegulatoryBenchmarks3() {
     assert(code.header.includes('FlightModeController_State_t'), 'Header must contain typedef');
     assert(code.source.includes('switch (inst->currentState)'), 'Source must contain switch');
 
-    console.log(`  ✓ PASSED: Stateflow completed temporal transitions and generated MISRA-C:2012 code (${code.source.length} chars)`);
+    console.log(
+      `  ✓ PASSED: Stateflow example completed temporal transitions and emitted C source (${code.source.length} chars)`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 18: ${err.message}`);
@@ -592,13 +752,15 @@ function runGoldRegulatoryBenchmarks3() {
     const eha = simscape.simulateElectroHydraulicLoop({
       supplyPressure: 21e6, // 210 bar
       targetPosition: 0.08, // 80 mm
-      duration: 0.20
+      duration: 0.2
     });
 
     assert(eha.finalPosition > 0.05, 'Hydraulic cylinder must stroke forward');
     assert(eha.history.length > 0, 'Simulation history must be generated');
 
-    console.log(`  ✓ PASSED: Hydraulic cylinder stroking to ${(eha.finalPosition * 1000).toFixed(1)}mm under 210 bar supply pressure`);
+    console.log(
+      `  ✓ PASSED: Hydraulic cylinder stroking to ${(eha.finalPosition * 1000).toFixed(1)}mm under 210 bar supply pressure`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 19: ${err.message}`);
@@ -610,17 +772,22 @@ function runGoldRegulatoryBenchmarks3() {
   try {
     process.stdout.write('[BM 20] Dynamic Flowsheet & API 521 Separator Emergency Blowdown...\n');
     const plant = new DynamicFlowsheetSolver({ dt: 0.1 });
-    const blowdown = plant.simulateSeparatorBlowdown({
-      totalVolume: 15.0,
-      initialPressure: 50e5, // 50 bar
-      initialLiquidVolume: 4.0,
-      reliefOrificeDiameterMm: 50.0
-    }, 60.0);
+    const blowdown = plant.simulateSeparatorBlowdown(
+      {
+        totalVolume: 15.0,
+        initialPressure: 50e5, // 50 bar
+        initialLiquidVolume: 4.0,
+        reliefOrificeDiameterMm: 50.0
+      },
+      60.0
+    );
 
     assert(blowdown.finalPressureBar < blowdown.initialPressureBar, 'Pressure must decrease');
     assert(blowdown.finalPressureBar < 15.0, 'Emergency blowdown must depressurize vessel');
 
-    console.log(`  ✓ PASSED: Separator depressurized from ${blowdown.initialPressureBar.toFixed(1)} bar to ${blowdown.finalPressureBar.toFixed(1)} bar within 60s`);
+    console.log(
+      `  ✓ PASSED: Separator depressurized from ${blowdown.initialPressureBar.toFixed(1)} bar to ${blowdown.finalPressureBar.toFixed(1)} bar within 60s`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 20: ${err.message}`);
@@ -631,41 +798,48 @@ function runGoldRegulatoryBenchmarks3() {
   // -------------------------------------------------------------
   try {
     process.stdout.write('[BM 21] Electrolyte NRTL (eNRTL) Ionic Thermodynamics & CO2 Capture...\n');
-    const enrtl = new ElectrolyteNRTLModel({ temperatureK: 313.15, meaMassFraction: 0.30 });
+    const enrtl = new ElectrolyteNRTLModel({ temperatureK: 313.15, meaMassFraction: 0.3 });
     const vle = enrtl.calculateCO2VLE(0.35); // loading alpha = 0.35
-    assert(vle.pCO2_kPa > 0.1 && vle.pCO2_kPa < 5.0, `P_CO2 ${vle.pCO2_kPa} kPa must match experimental range (~0.75 kPa)`);
+    assert(
+      vle.pCO2_kPa > 0.1 && vle.pCO2_kPa < 5.0,
+      `P_CO2 ${vle.pCO2_kPa} kPa must match experimental range (~0.75 kPa)`
+    );
 
-    const cap = enrtl.evaluateCaptureCapacity(0.45, 0.20, 50000.0);
+    const cap = enrtl.evaluateCaptureCapacity(0.45, 0.2, 50000.0);
     assert(cap.co2CapturedTonsPerDay > 10.0, 'Net CO2 captured must be realistic');
 
-    console.log(`  ✓ PASSED: eNRTL evaluated CO2 VLE at alpha=0.35 (P_CO2 = ${vle.pCO2_kPa.toFixed(3)} kPa), capture = ${cap.co2CapturedTonsPerDay.toFixed(1)} tons/day`);
+    console.log(
+      `  ✓ PASSED: eNRTL evaluated CO2 VLE at alpha=0.35 (P_CO2 = ${vle.pCO2_kPa.toFixed(3)} kPa), capture = ${cap.co2CapturedTonsPerDay.toFixed(1)} tons/day`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 21: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 22: Git-Backed 3D CAD B-Rep Visual Diffing
+  // Benchmark 22: Experimental caller-supplied CAD centroid comparison
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 22] Git 3D CAD B-Rep Visual Diffing & Color Categorization...\n');
-    const diff = new GitCADVisualDiffEngine();
+    process.stdout.write('[BM 22] Experimental CAD Centroid Comparison & Face Categorization...\n');
+    const diff = new GitCADVisualDiffEngine({ toleranceMm: 0.01, modificationThresholdMm: 5 });
     const revA = {
       commitId: 'revA_hash',
-      volume: 10000.0,
+      units: { length: 'mm', volume: 'mm3' },
+      volumeMm3: 10000.0,
       faces: [
-        { id: 'f1', centroid: { x: 0, y: 0, z: 0 } },
-        { id: 'f2_wall', centroid: { x: 10, y: 0, z: 0 } },
-        { id: 'f3_old', centroid: { x: 50, y: 50, z: 50 } }
+        { id: 'f1', centroidMm: { x: 0, y: 0, z: 0 } },
+        { id: 'f2_wall', centroidMm: { x: 10, y: 0, z: 0 } },
+        { id: 'f3_old', centroidMm: { x: 50, y: 50, z: 50 } }
       ]
     };
     const revB = {
       commitId: 'revB_hash',
-      volume: 8500.0,
+      units: { length: 'mm', volume: 'mm3' },
+      volumeMm3: 8500.0,
       faces: [
-        { id: 'f1', centroid: { x: 0, y: 0, z: 0 } },
-        { id: 'f2_wall', centroid: { x: 8.5, y: 0, z: 0 } }, // 1.5mm wall reduction
-        { id: 'f4_new', centroid: { x: 100, y: 100, z: 100 } }
+        { id: 'f1', centroidMm: { x: 0, y: 0, z: 0 } },
+        { id: 'f2_wall', centroidMm: { x: 8.5, y: 0, z: 0 } },
+        { id: 'f4_new', centroidMm: { x: 100, y: 100, z: 100 } }
       ]
     };
 
@@ -674,9 +848,16 @@ function runGoldRegulatoryBenchmarks3() {
     assert.strictEqual(res.summary.removedCount, 1, '1 removed face');
     assert.strictEqual(res.summary.modifiedCount, 1, '1 modified face');
     assert.strictEqual(res.summary.unchangedCount, 1, '1 unchanged face');
-    assert(Math.abs(res.maxThicknessReductionMm - 1.5) < 0.05, `Detected 1.5mm reduction, got ${res.maxThicknessReductionMm}`);
+    assert(
+      Math.abs(res.maxCentroidDisplacementMm - 1.5) < 0.05,
+      `Detected 1.5mm maximum centroid displacement, got ${res.maxCentroidDisplacementMm}`
+    );
+    assert.strictEqual(res.maxThicknessReductionMm, null);
+    assert.strictEqual(res.validationLevel, 'experimental');
 
-    console.log(`  ✓ PASSED: Identified 1 added (green), 1 removed (red), 1 modified (yellow), and 1.5mm wall thickness reduction`);
+    console.log(
+      `  ✓ PASSED: Identified 1 added (green), 1 removed (red), 1 modified (yellow), and 1.5mm centroid displacement`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 22: ${err.message}`);
@@ -691,6 +872,7 @@ function runGoldRegulatoryBenchmarks3() {
     bom.setRootAssembly({
       partNumber: 'ASM-DRONE-001',
       name: 'Hexacopter Airframe Assembly',
+      quantity: 1,
       unitCostUsd: 150.0,
       unitMassKg: 1.2,
       children: [
@@ -705,7 +887,7 @@ function runGoldRegulatoryBenchmarks3() {
               partNumber: 'FAST-M3-10',
               name: 'M3x10 Titanium Screw',
               quantity: 4,
-              unitCostUsd: 0.50,
+              unitCostUsd: 0.5,
               unitMassKg: 0.002
             }
           ]
@@ -718,20 +900,22 @@ function runGoldRegulatoryBenchmarks3() {
     assert(rolled.rolledUpCostUsd > 300.0, 'Total rolled up cost should account for 6 arms + screws');
 
     const flat = bom.generateFlattenedBOM();
-    const screwEntry = flat.find(p => p.partNumber === 'FAST-M3-10');
+    const screwEntry = flat.find((p) => p.partNumber === 'FAST-M3-10');
     assert(screwEntry && screwEntry.totalQuantity === 24, 'Fastener quantity must consolidate to 6 x 4 = 24');
 
-    console.log(`  ✓ PASSED: eBOM rolled up assembly (Mass: ${rolled.rolledUpMassKg.toFixed(2)} kg, Cost: $${rolled.rolledUpCostUsd.toFixed(2)}), Consolidated screws: ${screwEntry.totalQuantity}`);
+    console.log(
+      `  ✓ PASSED: eBOM rolled up assembly (Mass: ${rolled.rolledUpMassKg.toFixed(2)} kg, Cost: $${rolled.rolledUpCostUsd.toFixed(2)}), Consolidated screws: ${screwEntry.totalQuantity}`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 23: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 24: DO-178C / DO-330 & ISO 26262 Tool Qualification
+  // Experimental diagnostic test helper; no tool qualification claim.
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 24] DO-178C / DO-330 TQL-4 & ISO 26262 TCL1 Qualification Kit...\n');
+    process.stdout.write('[BM 24] Experimental test-helper diagnostic...\n');
     const tqk = new ToolQualificationKit({ targetSafetyStandard: 'DO-178C_DAL_A' });
     tqk.registerTestCase({
       id: 'TC_CAE_001',
@@ -745,39 +929,46 @@ function runGoldRegulatoryBenchmarks3() {
     });
 
     const rep = tqk.executeQualificationSuite();
-    assert.strictEqual(rep.isCertified, true, 'Qualification suite must certify tool');
+    assert.strictEqual(rep.dataStatus, 'experimental');
+    assert.strictEqual(rep.status, 'diagnostic-only');
     assert.strictEqual(rep.passRatePercent, 100.0, 'Pass rate must be 100%');
 
     const mdReport = tqk.generateComplianceReport();
-    assert(mdReport.includes('DO-178C / DO-330'), 'Report must reference DO-330 standard');
+    assert(mdReport.includes('not tool qualification'), 'Report must deny qualification status');
 
-    console.log(`  ✓ PASSED: Executed ${rep.totalTests} qualification test vectors, 100% pass rate, TQL-4 & TCL1 certified`);
+    console.log(`  ✓ PASSED: Executed ${rep.totalTests} experimental diagnostic test vectors`);
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 24: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 25: ASME BPVC Section VIII Division 2 Stress Categorization
+  // Benchmark 25: Experimental stress-line screening helper
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 25] ASME Section VIII Div 2 Part 5 Design-by-Analysis (Pm, Pb, Q)...\n');
-    const asme = new ASMESectionVIIIDiv2Analyzer({ allowableStressS: 138.0 });
+    process.stdout.write('[BM 25] Experimental stress-line screen example (Pm, Pb, Q)...\n');
+    const asme = new ASMESectionVIIIDiv2Analyzer({
+      allowableStressS: 138.0,
+      allowableStressSource: 'experimental smoke fixture; not an approved material allowable'
+    });
     // Discrete stress points through 25mm cylinder wall
     const sclPoints = [
       { x: -12.5, stressMpa: 110.0 }, // Inside surface
       { x: -6.25, stressMpa: 98.0 },
-      { x: 0.0,   stressMpa: 90.0 },  // Mid-plane
-      { x: 6.25,  stressMpa: 84.0 },
-      { x: 12.5,  stressMpa: 80.0 }   // Outside surface
+      { x: 0.0, stressMpa: 90.0 }, // Mid-plane
+      { x: 6.25, stressMpa: 84.0 },
+      { x: 12.5, stressMpa: 80.0 } // Outside surface
     ];
 
-    const sclRes = asme.linearizeStressClassificationLine(sclPoints, 25.0);
-    assert(sclRes.membraneStressPm <= 138.0, 'Primary membrane Pm must satisfy allowable S');
-    assert((sclRes.membraneStressPm + sclRes.bendingStressPb) <= 1.5 * 138.0, 'Pm + Pb must satisfy 1.5S');
-    assert.strictEqual(sclRes.evaluation.overallConforms, true, 'Vessel section must conform to ASME code');
+    const sclRes = asme.linearizeStressClassificationLine(sclPoints, 25.0, false);
+    assert.strictEqual(sclRes.status, 'screening-only');
+    assert.strictEqual(typeof sclRes.screening.withinAllSuppliedLimits, 'boolean');
+    assert.strictEqual(sclRes.screening.withinSuppliedPmLimit, true);
+    assert.strictEqual(sclRes.screening.withinSuppliedPmPbLimit, true);
 
-    console.log(`  ✓ PASSED: Linearized SCL: Pm = ${sclRes.membraneStressPm.toFixed(2)} MPa (Limit: ${sclRes.limits.allowable_S} MPa), Pb = ${sclRes.bendingStressPb.toFixed(2)} MPa (CONFORMS)`);
+    console.log(
+      `  ✓ PASSED: Experimental linearization example returned Pm=${sclRes.membraneStressPm.toFixed(2)} MPa and Pb=${sclRes.bendingStressPb.toFixed(2)} MPa; its values are below the supplied screening limits (not a code assessment)`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 25: ${err.message}`);
@@ -797,24 +988,28 @@ function runGoldRegulatoryBenchmarks3() {
     const creep1000h = creepRatePerHour * 1000.0;
 
     assert(creepRatePerHour > 0 && creep1000h < 0.05, 'Creep strain must be positive and bounded');
-    console.log(`  ✓ PASSED: Norton creep strain rate @ 120 MPa: ${creepRatePerHour.toExponential(3)} /hr, 1000h accumulation = ${(creep1000h * 100).toFixed(4)}%`);
+    console.log(
+      `  ✓ PASSED: Norton creep strain rate @ 120 MPa: ${creepRatePerHour.toExponential(3)} /hr, 1000h accumulation = ${(creep1000h * 100).toFixed(4)}%`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 26: ${err.message}`);
   }
 
   // -------------------------------------------------------------
-  // Benchmark 27: Electromigration Mean Time to Failure (Black's Equation)
+  // Case 27: Caller-parameterized Black formula smoke check
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 27] Interconnect Electromigration Reliability (Black\'s MTTF)...\n');
-    const pdn = new PowerGridIRDropAnalyzer();
-    // Current density J = 5e5 A/cm^2 (standard copper interconnect limit at 105°C)
-    const em = pdn.evaluateBlacksEM(5.0e5, 105.0);
-    assert(em.mttfYears >= 10.0, `EM MTTF ${em.mttfYears} years must exceed 10-year commercial target`);
-    assert.strictEqual(em.status, 'SAFE', 'EM status must be SAFE');
+    process.stdout.write('[CASE 27] Caller-parameterized Black formula smoke check...\n');
+    const pdn = new PowerGridIRDropAnalyzer({});
+    const em = pdn.evaluateBlacksEM(5.0e5, 105.0, SYNTHETIC_BLACKS_MODEL);
+    assert(Number.isFinite(em.formulaEstimateHours) && em.formulaEstimateHours > 0);
+    assert.strictEqual(em.dataStatus, 'caller-supplied-unverified');
+    assert(!Object.hasOwn(em, 'status'), 'The formula does not assign a reliability verdict');
 
-    console.log(`  ✓ PASSED: Copper interconnect @ 5e5 A/cm², 105°C: MTTF = ${em.mttfYears.toFixed(1)} years (${Math.round(em.mttfHours).toLocaleString()} hours)`);
+    console.log(
+      `  ✓ PASSED: Synthetic coefficients returned an unverified formula estimate of ${em.formulaEstimateHours.toExponential(3)} hours`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 27: ${err.message}`);
@@ -836,7 +1031,9 @@ function runGoldRegulatoryBenchmarks3() {
     assert(maxRecovery === 240.0, 'Max heat recovery should be 240 kW');
     assert(hotUtility === 120.0, 'Hot utility required should be 120 kW');
 
-    console.log(`  ✓ PASSED: Pinch synthesis: Max process recovery = ${maxRecovery} kW, Minimum hot utility = ${hotUtility} kW`);
+    console.log(
+      `  ✓ PASSED: Pinch synthesis: Max process recovery = ${maxRecovery} kW, Minimum hot utility = ${hotUtility} kW`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 28: ${err.message}`);
@@ -853,22 +1050,31 @@ function runGoldRegulatoryBenchmarks3() {
 
     const piston = SimscapeDomainLibrary.evaluateHydraulicCylinder(
       { pistonAreaA: 1e-3, pistonAreaB: 1e-3, mass: 2.0, damping: 10.0 },
-      10e6, 2e6, 0.05
+      10e6,
+      2e6,
+      0.05
     );
 
     const deltaFocusMm = piston.acceleration * 0.001; // small displacement in 1ms
-    const optical = dls.traceMeridionalRay({
-      surfaces: [
-        { radius: 50.0, thickness: 5.0 + deltaFocusMm, refractiveIndex: 1.5168 },
-        { radius: -50.0, thickness: 45.0, refractiveIndex: 1.0 },
-        { radius: 0.0, thickness: 0.0, refractiveIndex: 1.0 }
-      ]
-    }, 10.0, 0.0);
+    const optical = dls.traceMeridionalRay(
+      {
+        initialRefractiveIndex: 1.0,
+        surfaces: [
+          { radius: 50.0, thickness: 5.0 + deltaFocusMm, refractiveIndex: 1.5168 },
+          { radius: -50.0, thickness: 45.0, refractiveIndex: 1.0 },
+          { curvature: 0.0, thickness: 0.0, refractiveIndex: 1.0 }
+        ]
+      },
+      10.0,
+      0.0
+    );
 
     assert(optical.finalY !== undefined, 'Optical ray must trace through displaced lens');
     assert(piston.fHydro > 0, 'Hydraulic force must be positive');
 
-    console.log(`  ✓ PASSED: Co-simulated 8.0 kN hydraulic actuator coupled to optical element (Focal spot Y: ${optical.finalY.toFixed(4)}mm)`);
+    console.log(
+      `  ✓ PASSED: Co-simulated 8.0 kN hydraulic actuator coupled to optical element (Focal spot Y: ${optical.finalY.toFixed(4)}mm)`
+    );
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 29: ${err.message}`);
@@ -878,7 +1084,7 @@ function runGoldRegulatoryBenchmarks3() {
   // Benchmark 30: End-to-End Headless Production Integration
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 30] End-to-End Industrial Production Architecture Verification...\n');
+    process.stdout.write('[BM 30] End-to-end legacy module wiring smoke check...\n');
     // Verify all module classes are instantiated and export correctly
     assert(typeof WasmSparseMultifrontalSolver === 'function');
     assert(typeof GPUParallelPCGSolver === 'function');
@@ -918,9 +1124,17 @@ function runGoldRegulatoryBenchmarks3() {
 
     const sfunc = new SFunctionPluginHost({ name: 'IntegratorBlock' });
     sfunc.registerDefinition({
-      mdlInitializeSizes: (ss) => { ss.numContStates = 1; ss.numInputs = 1; ss.numOutputs = 1; },
-      mdlDerivatives: (ss, t, u) => { u.derivatives[0] = u.inputs[0]; },
-      mdlOutputs: (ss, t, u) => { u.outputs[0] = u.continuousStates[0]; }
+      mdlInitializeSizes: (ss) => {
+        ss.numContStates = 1;
+        ss.numInputs = 1;
+        ss.numOutputs = 1;
+      },
+      mdlDerivatives: (ss, t, u) => {
+        u.derivatives[0] = u.inputs[0];
+      },
+      mdlOutputs: (ss, t, u) => {
+        u.outputs[0] = u.continuousStates[0];
+      }
     });
     sfunc.initialize();
     sfunc.setInputs([5.0]);
@@ -933,14 +1147,14 @@ function runGoldRegulatoryBenchmarks3() {
     assert(assayRes.pseudoComponents.length >= 4, 'Petroleum assay must split into cuts');
     assert(assayRes.watsonKw > 10.0, 'Watson Kw must be physical');
 
-    console.log(`  ✓ PASSED: All 28 Tier-1 commercial engineering engines validated with 0 errors`);
+    console.log(`  ✓ PASSED: Legacy module fixtures executed without assertion errors; this is not release validation`);
     passed++;
   } catch (err) {
     console.error(`  ✗ FAILED BM 30: ${err.message}`);
   }
 
   console.log('\n================================================================');
-  console.log(`  SUMMARY: ${passed} / ${total} GOLD REGULATORY BENCHMARKS 3.0 PASSED`);
+  console.log(`  SUMMARY: ${passed} / ${total} experimental legacy smoke assertions passed`);
   console.log('================================================================\n');
 
   return { passed, total, allPassed: passed === total };

@@ -32,7 +32,29 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
 
   // Universal CAD & Dynamic Systems
   createCadPrimitive: (type, params) => ipcRenderer.invoke('omni:create-cad-primitive', { type, params }),
-  simulateBlockDiagram: (graphData, tEnd, dt) => ipcRenderer.invoke('omni:simulate-block-diagram', { graphData, tEnd, dt }),
+  // Compatibility contract: block graph signals are dimensionless; tEnd and dt are seconds.
+  simulateBlockDiagram: (graphData, tEnd, dt) =>
+    ipcRenderer.invoke('omni:simulate-block-diagram', {
+      graphData,
+      tEnd,
+      dt,
+      units: {
+        tEnd: { unit: 's', dimension: 'time' },
+        dt: { unit: 's', dimension: 'time' },
+        signal: { unit: '1', dimension: 'dimensionless' },
+        stepTime: { unit: 's', dimension: 'time' },
+        sourceFrequency: { unit: 'Hz', dimension: 'frequency' },
+        gain: { unit: '1', dimension: 'dimensionless' },
+        pid: {
+          kp: { unit: '1', dimension: 'dimensionless' },
+          ki: { unit: 's^-1', dimension: 'frequency' },
+          kd: { unit: 's', dimension: 'time' },
+          initialState: { unit: 's', dimension: 'time' },
+          limits: { unit: '1', dimension: 'dimensionless' }
+        },
+        layout: { unit: 'px', dimension: 'display-coordinate' }
+      }
+    }),
 
   // OmniAI Co-Pilot & Extensibility
   processAIPrompt: (prompt, context) => ipcRenderer.invoke('omni:ai-process-prompt', { prompt, context }),
@@ -52,6 +74,7 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   // Engineering Materials Database
   getMaterialsList: () => ipcRenderer.invoke('omni:get-materials-list'),
   computeInertia: (params) => ipcRenderer.invoke('omni:compute-inertia', params),
+  computeCuboidMassProperties: (params) => ipcRenderer.invoke('omni:compute-cuboid-mass-properties', params),
 
   // Advanced Transient Dynamics & Frequency Analysis
   solveTransientDrop: (params) => ipcRenderer.invoke('omni:solve-transient-drop', params),
@@ -76,9 +99,10 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
 
   // Universal Usability & Phase 1 Archive & Wizard APIs
   packageOmniArchive: (params) => ipcRenderer.invoke('omni:package-omni-archive', params),
-  loadOmniArchive: (filePath) => ipcRenderer.invoke('omni:load-omni-archive', filePath),
+  loadOmniArchive: (archiveBytes) => ipcRenderer.invoke('omni:load-omni-archive', archiveBytes),
   runDesignWizard: (wizardType, inputs) => ipcRenderer.invoke('omni:run-design-wizard', { wizardType, inputs }),
-  selfHealDesign: (currentDesign, safetyFactor) => ipcRenderer.invoke('omni:self-heal-design', { currentDesign, safetyFactor }),
+  selfHealDesign: (currentDesign, safetyFactor) =>
+    ipcRenderer.invoke('omni:self-heal-design', { currentDesign, safetyFactor }),
 
   // Phase 2 CAD Kernel & Modeling Parity APIs
   evaluateNurbs: (params) => ipcRenderer.invoke('omni:evaluate-nurbs', params),
@@ -132,7 +156,7 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   sizeApi520PRV: (params) => ipcRenderer.invoke('omni:size-api520-prv', params),
   runFmiCoSimulation: (params) => ipcRenderer.invoke('omni:run-fmi-cosimulation', params),
 
-  // Tier-1 Commercial Production Master Plan 3.0 APIs (Pillars 1-4)
+  // Experimental compatibility API methods
   solveVariationalSketch: (params) => ipcRenderer.invoke('omni:solve-variational-sketch', params),
   healCadGeometry: (params) => ipcRenderer.invoke('omni:heal-cad-geometry', params),
   optimizeOpticalDLS: (params) => ipcRenderer.invoke('omni:optimize-optical-dls', params),
@@ -146,7 +170,7 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   solveGpuParallelPCG: (params) => ipcRenderer.invoke('omni:solve-gpu-parallel-pcg', params),
   solveWebGPUCFDPoisson: (params) => ipcRenderer.invoke('omni:solve-webgpu-cfd-poisson', params),
 
-  // Tier-1 10/10 Industrial Commercial Production APIs
+  // Experimental compatibility API methods
   securityValidateInput: (params) => ipcRenderer.invoke('omni:security-validate-input', params),
   vaultEncryptProject: (params) => ipcRenderer.invoke('omni:vault-encrypt-project', params),
   vaultDecryptProject: (params) => ipcRenderer.invoke('omni:vault-decrypt-project', params),
@@ -158,13 +182,17 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
 
   // Flagship Domain Depth & Advanced Compute Host (Phases 2, 5, 6)
   solveContactMechanics3D: (params) => ipcRenderer.invoke('omni:solve-contact-mechanics-3d', params),
-  importZmxOptics: (params) => ipcRenderer.invoke('omni:import-zmx-optics', params),
-  submitComputeJob: (taskType, payload, options) => ipcRenderer.invoke('omni:submit-compute-job', { taskType, payload, options }),
+  importZmxOptics: (input) => {
+    const content = typeof input === 'string' ? input : input?.content;
+    return ipcRenderer.invoke('omni:import-zmx-optics', typeof content === 'string' ? { content } : {});
+  },
+  submitComputeJob: (taskType, payload, options) =>
+    ipcRenderer.invoke('omni:submit-compute-job', { taskType, payload, options }),
   cancelComputeJob: (jobId) => ipcRenderer.invoke('omni:cancel-compute-job', { jobId }),
   getComputeTelemetry: () => ipcRenderer.invoke('omni:get-compute-telemetry'),
   runVVBenchmarks: (options) => ipcRenderer.invoke('omni:run-vv-benchmarks', options),
 
-  // Industrial Production Parity Engines
+  // Experimental compatibility API methods
   cadExtrudeProfile: (params) => ipcRenderer.invoke('omni:cad-extrude-profile', params),
   cadRevolveProfile: (params) => ipcRenderer.invoke('omni:cad-revolve-profile', params),
   cadShellBody: (params) => ipcRenderer.invoke('omni:cad-shell-body', params),
@@ -199,5 +227,6 @@ contextBridge.exposeInMainWorld('omniEngAPI', {
   run100GoldBenchmarks: () => ipcRenderer.invoke('omni:run-100-gold-benchmarks'),
 
   // System & Environment
+  getFeatureMaturity: () => ipcRenderer.invoke('omni:get-feature-maturity'),
   getSystemInfo: () => ipcRenderer.invoke('omni:get-system-info')
 });

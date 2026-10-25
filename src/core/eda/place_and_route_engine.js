@@ -1,19 +1,23 @@
 /**
- * OmniEng Semiconductor EDA Analytical Place & Route (P&R) Engine
- * 
- * Implements Cadence Innovus / Synopsys IC Compiler Parity:
- * - Analytical Global Placement minimizing Half-Perimeter Wire Length (HPWL)
- * - Multi-Layer Grid-Based A* Maze Routing (M1 Horizontal, M2 Vertical)
- * - Via insertion and DRC-compliant clearance verification
- * - Generates chip layout metrics: total wirelength, via count, density %
+ * Experimental placement and two-pin Manhattan routing for caller-supplied cells and nets.
+ * It does not check overlap, timing, foundry rules, or commercial place-and-route conformance.
  */
 
 class PlaceAndRouteEngine {
   constructor(options = {}) {
-    this.coreWidth = options.coreWidth || 200.0; // microns
-    this.coreHeight = options.coreHeight || 200.0; // microns
-    this.gridPitch = options.gridPitch || 2.0; // microns per grid unit
-    this.stdCellHeight = options.stdCellHeight || 10.0; // microns
+    const requiredDimensions = ['coreWidth', 'coreHeight', 'stdCellHeight'];
+    if (
+      !options ||
+      requiredDimensions.some((key) => !Number.isFinite(options[key]) || options[key] <= 0) ||
+      options.coreWidth <= 20 ||
+      options.stdCellHeight > options.coreHeight
+    ) {
+      throw new TypeError('Explicit positive coreWidth, coreHeight, and stdCellHeight values are required.');
+    }
+    this.coreWidth = options.coreWidth; // microns
+    this.coreHeight = options.coreHeight; // microns
+    this.gridPitch = options.gridPitch; // retained as caller metadata; unused by this placement estimate
+    this.stdCellHeight = options.stdCellHeight; // microns
   }
 
   /**
@@ -22,19 +26,24 @@ class PlaceAndRouteEngine {
    * @returns {Object} Placement coordinates, routing segments, and routing telemetry
    */
   runPlaceAndRoute(circuitData) {
-    const cells = circuitData.cells || [
-      { id: 'u_inv1', width: 4.0, height: 10.0 },
-      { id: 'u_nand2', width: 6.0, height: 10.0 },
-      { id: 'u_dff1', width: 12.0, height: 10.0 },
-      { id: 'u_mux2', width: 8.0, height: 10.0 },
-      { id: 'u_buf1', width: 4.0, height: 10.0 }
-    ];
-
-    const nets = circuitData.nets || [
-      { name: 'net_clk', pins: ['u_inv1', 'u_dff1'] },
-      { name: 'net_data', pins: ['u_nand2', 'u_mux2'] },
-      { name: 'net_out', pins: ['u_mux2', 'u_buf1'] }
-    ];
+    if (
+      !circuitData ||
+      !Array.isArray(circuitData.cells) ||
+      circuitData.cells.length === 0 ||
+      !Array.isArray(circuitData.nets)
+    ) {
+      return {
+        success: false,
+        status: 'unavailable',
+        validationLevel: 'experimental',
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'Explicit cell and net arrays are required for this experimental estimate.'
+        }
+      };
+    }
+    const cells = circuitData.cells;
+    const nets = circuitData.nets;
 
     // 1. Analytical Global Placement along rows
     const rowHeight = this.stdCellHeight;
@@ -102,12 +111,14 @@ class PlaceAndRouteEngine {
       });
     }
 
-    const totalCellArea = cells.reduce((sum, c) => sum + (c.width * c.height), 0);
+    const totalCellArea = cells.reduce((sum, c) => sum + c.width * c.height, 0);
     const coreArea = this.coreWidth * this.coreHeight;
     const coreUtilization = (totalCellArea / coreArea) * 100.0;
 
     return {
-      status: 'P&R Complete',
+      status: 'EXPERIMENTAL_LAYOUT_ESTIMATE',
+      validationLevel: 'experimental',
+      designRuleCheck: 'not-run',
       coreWidth: this.coreWidth,
       coreHeight: this.coreHeight,
       cellsPlacedCount: cells.length,
@@ -117,8 +128,7 @@ class PlaceAndRouteEngine {
       telemetry: {
         totalHpwlMicrons: Math.round(totalWirelength * 10) / 10,
         totalViaCount: totalVias,
-        coreUtilizationPercent: Math.round(coreUtilization * 100) / 100,
-        drcViolations: 0
+        coreUtilizationPercent: Math.round(coreUtilization * 100) / 100
       }
     };
   }

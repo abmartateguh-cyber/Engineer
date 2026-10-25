@@ -1,11 +1,11 @@
 /**
- * OmniEng Physical Phenomena WebGL Shaders
- * Inspired by wheresryan22/anatomy in-perspective shaders (Raptor rocket engine plume, caustics, glow).
+ * OmniEng Decorative WebGL Effects
+ * These shaders animate interface visuals; they do not simulate physical phenomena.
  * 
  * Provides:
- * - Supersonic reactive exhaust plume with Mach disks / shock diamonds
- * - Volumetric laser beam & optical caustic ray dispersion
- * - Thermal mirage & high-temperature gradient distortion
+ * - Animated plume-like visual effect
+ * - Decorative beam and color-fringe effect
+ * - Animated shimmer effect
  */
 
 (function (root, factory) {
@@ -27,24 +27,19 @@
     console.warn('PhenomenaShaders requires Three.js');
   }
 
-  /**
-   * 1. Supersonic Rocket & Process Jet Plume Shader
-   * Features periodic Mach shock diamonds, boundary shear turbulence, and soft edge fading
-   */
+  /** Create an animated plume-like effect for illustrative scenes. */
   function createSupersonicPlumeMaterial(options = {}) {
-    const machNumber = typeof options.machNumber === 'number' ? options.machNumber : 2.8;
-    const shockCount = typeof options.shockCount === 'number' ? options.shockCount : 4.0;
+    const legacyFrequency = typeof options.shockCount === 'number' ? options.shockCount : 4.0;
+    const visualFrequency = Number.isFinite(options.visualFrequency) ? options.visualFrequency : legacyFrequency;
     const uTime = { value: 0.0 };
 
     const uniforms = {
       uTime: uTime,
       u_time: uTime,
-      uMachNumber: { value: machNumber },
-      uShockCount: { value: shockCount },
       u_coreColor: { value: new THREE.Color(options.accentColor || options.coreColor || 0x38bdf8) },
       u_flameColor: { value: new THREE.Color(options.flameColor || 0x0284c7) },
       u_shockColor: { value: new THREE.Color(options.shockColor || 0xffffff) },
-      u_machFrequency: { value: options.machFrequency || shockCount },
+      u_visualFrequency: { value: options.visualFrequency || options.machFrequency || legacyFrequency },
       u_intensity: { value: options.intensity || 1.4 }
     };
 
@@ -67,7 +62,7 @@
       uniform vec3 u_coreColor;
       uniform vec3 u_flameColor;
       uniform vec3 u_shockColor;
-      uniform float u_machFrequency;
+      uniform float u_visualFrequency;
       uniform float u_intensity;
 
       varying vec2 vUv;
@@ -86,19 +81,19 @@
         // Axial fading envelope (soft entrance, smooth trailing fade)
         float axialFade = smoothstep(0.0, 0.08, axial) * smoothstep(1.0, 0.35, axial);
 
-        // Mach Shock Diamonds (periodic standing wave pressure nodes)
-        float shockWave = sin(axial * u_machFrequency * 6.28318 - u_time * 2.5);
-        float shockCore = pow(max(0.0, shockWave), 4.0) * (1.0 - radial);
+        // Repeating decorative bands
+        float bandWave = sin(axial * u_visualFrequency * 6.28318 - u_time * 2.5);
+        float bandCore = pow(max(0.0, bandWave), 4.0) * (1.0 - radial);
 
-        // Turbulent high-frequency shear jitter
+        // Decorative edge motion
         float jitter = sin(axial * 42.0 + u_time * 18.0) * 0.08 * axial;
         radialEnvelope = clamp(radialEnvelope + jitter, 0.0, 1.0);
 
         // Blend plume gradient
         vec3 col = mix(u_flameColor, u_coreColor, radialEnvelope * (1.0 - axial * 0.5));
-        col = mix(col, u_shockColor, shockCore * 0.9 * (1.0 - axial));
+        col = mix(col, u_shockColor, bandCore * 0.9 * (1.0 - axial));
 
-        float alpha = (radialEnvelope * 0.85 + shockCore * 0.6) * axialFade * u_intensity;
+        float alpha = (radialEnvelope * 0.85 + bandCore * 0.6) * axialFade * u_intensity;
         alpha = clamp(alpha, 0.0, 0.92);
 
         gl_FragColor = vec4(col, alpha);
@@ -116,11 +111,8 @@
     });
   }
 
-  /**
-   * Helper: createSupersonicPlume(options)
-   * Builds an active 3D supersonic exhaust plume mesh with shock diamonds
-   */
-  function createSupersonicPlume(options = {}) {
+  /** Builds synthetic plume-like geometry for interface visualization only. */
+  function createIllustrativePlume(options = {}) {
     const plumeLength = options.plumeLength || 100;
     const coreRadius = options.coreRadius || 16;
     const geom = new THREE.CylinderGeometry(coreRadius * 0.35, coreRadius, plumeLength, 32, 1, true);
@@ -129,12 +121,15 @@
     const mat = createSupersonicPlumeMaterial(options);
     const mesh = new THREE.Mesh(geom, mat);
     mesh.userData = {
-      type: 'Supersonic Plume Shock Diamonds',
-      machNumber: options.machNumber || 2.8,
-      shockCount: options.shockCount || 4.0
+      type: 'Illustrative Plume Visual Effect',
+      isSyntheticExample: true,
+      physicsSimulation: false
     };
     return mesh;
   }
+
+  // Backward-compatible alias; this does not calculate a supersonic flow.
+  const createSupersonicPlume = createIllustrativePlume;
 
   /**
    * 2. Volumetric Optical Laser Beam & Caustic Ray Dispersion Shader
@@ -265,6 +260,7 @@
   }
 
   return {
+    createIllustrativePlume,
     createSupersonicPlume,
     createSupersonicPlumeMaterial,
     createCausticBeamShaderMaterial,

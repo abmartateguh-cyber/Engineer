@@ -1,16 +1,16 @@
 /**
  * OmniEng Classical Laminated Plate Theory (CLPT) & 3D Composite Failure Engine
  * 
- * Provides aerospace-grade carbon fiber/epoxy laminate analysis matching Altair ESAComp / ANSYS Composite:
+ * Experimental classical-laminate arithmetic example:
  * 1. ABD Matrix Formulation: Extensional (A), Coupling (B), and Bending (D) stiffness matrices.
  * 2. Arbitrary ply layups with fiber orientation angles theta_k and thickness t_k.
- * 3. Exact layer-by-layer principal lamina stress/strain recovery.
+ * 3. Layer-by-layer lamina stress/strain calculations.
  * 4. Failure criteria:
  *    - Tsai-Wu tensor polynomial failure criterion.
  *    - Hashin 3D failure modes (fiber tension, fiber compression, matrix cracking).
  *    - First-Ply Failure (FPF) load envelope.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No sourced material properties, independent composite validation, or solver comparison is included.
  */
 
 'use strict';

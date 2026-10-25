@@ -1,7 +1,7 @@
 /**
  * OmniEng Constructive Solid Geometry (CSG) 3D Mesh Boolean Engine
  * Standard: Binary Space Partitioning (BSP) Tree Polygon Clipping
- * Industrial Parity: Boolean Union, Difference, and Intersection for CAD solids.
+ * Experimental implementation: Boolean Union, Difference, and Intersection for CAD solids.
  */
 
 class CSGVertex {

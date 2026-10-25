@@ -6,7 +6,7 @@
  * 2. Morphological Sizing (dilation / erosion, grow / shrink by delta nm).
  * 3. Enclosure and Overlap Geometric Verification.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

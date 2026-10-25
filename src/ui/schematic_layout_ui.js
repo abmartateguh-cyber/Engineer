@@ -1,7 +1,7 @@
 /**
- * OmniEng 2D EDA & Process Plant Schematic Canvas Engine
- * Supports TSMC Nanometer IC Layout, 4-Layer High-Density PCB Layout (Altium/Allegro),
- * ANSI/ISA-5.1 Refinery P&ID, Aspen HYSYS P-T Phase Envelope, and Column Tray Profiles.
+ * Experimental schematic canvas for layout and process illustration.
+ * The plant phase-envelope and column-profile views report unavailable until a validated
+ * calculation source and independent reference are configured.
  */
 
 var TactileSpringPhysics = (typeof window !== 'undefined' && window.TactileSpringPhysics)
@@ -27,7 +27,7 @@ class SchematicLayoutUI {
     this.pan = { x: 0, y: 0 };
     this.isPanning = false;
     this.lastMouse = { x: 0, y: 0 };
-    this.cursorCoords = { x: 0, y: 0, nmX: 0, nmY: 0 };
+    this.cursorCoords = { x: 0, y: 0, nmX: null, nmY: null, mmX: null, mmY: null, canvasX: 0, canvasY: 0 };
     this.hoveredEntity = null;
     this.selectedEntity = null;
 
@@ -46,35 +46,35 @@ class SchematicLayoutUI {
       silkscreen: true
     };
 
-    // Standard CMOS Library Cells (IC Wafer)
+    // Synthetic logic-cell geometry; no PDK timing or area data is configured.
     this.edaCells = [
-      { id: 'c1', name: 'NAND2_X1', x: 80, y: 140, w: 120, h: 220, type: '2-Input NAND Gate', delay: '6.4 ps', area: '18.2 nm²' },
-      { id: 'c2', name: 'INV_X1',   x: 240, y: 140, w: 80,  h: 220, type: 'Inverter Buffer', delay: '3.8 ps', area: '12.1 nm²' },
-      { id: 'c3', name: 'DFF_X1',   x: 360, y: 140, w: 170, h: 220, type: 'D-Flip-Flop Register', delay: '12.1 ps', area: '34.8 nm²' },
-      { id: 'c4', name: 'NOR2_X1',  x: 570, y: 140, w: 130, h: 220, type: '2-Input NOR Gate', delay: '7.1 ps', area: '19.5 nm²' },
-      { id: 'c5', name: 'AOI21_X1', x: 740, y: 140, w: 140, h: 220, type: 'And-Or-Invert Complex', delay: '8.9 ps', area: '22.0 nm²' }
+      { id: 'c1', name: 'LogicCell_Example_1', x: 80, y: 140, w: 120, h: 220, type: 'Synthetic logic-cell shape', delay: null, area: null },
+      { id: 'c2', name: 'LogicCell_Example_2', x: 240, y: 140, w: 80, h: 220, type: 'Synthetic logic-cell shape', delay: null, area: null },
+      { id: 'c3', name: 'LogicCell_Example_3', x: 360, y: 140, w: 170, h: 220, type: 'Synthetic logic-cell shape', delay: null, area: null },
+      { id: 'c4', name: 'LogicCell_Example_4', x: 570, y: 140, w: 130, h: 220, type: 'Synthetic logic-cell shape', delay: null, area: null },
+      { id: 'c5', name: 'LogicCell_Example_5', x: 740, y: 140, w: 140, h: 220, type: 'Synthetic logic-cell shape', delay: null, area: null }
     ];
 
-    // PCB Components (Altium Designer 4-Layer Board)
+    // Generic package shapes with no manufacturer or electrical specification data.
     this.pcbComponents = [
-      { id: 'U1', name: 'U1: Apple/Qualcomm 3nm SoC', x: 260, y: 160, w: 140, h: 140, type: 'BGA-153 Package', net: 'VDD_CORE / DDR5', val: 'Octa-Core 3.4 GHz' },
-      { id: 'U2', name: 'U2: Power Management PMIC', x: 460, y: 180, w: 80, h: 80, type: 'QFN-32 Exposed Pad', net: 'VBAT / BUCK1-4', val: 'TI LP8756' },
-      { id: 'J1', name: 'J1: USB-C Receptacle 24P', x: 60, y: 190, w: 90, h: 80, type: 'USB-C Type-C SMD/TH', net: 'USB3.2 DP/DN / VBUS', val: '100W PD 3.1' },
-      { id: 'C1', name: 'C1: Decoupling Cap', x: 220, y: 170, w: 22, h: 14, type: '0402 SMD Cap', net: 'VDD_0V75', val: '22 µF 6.3V X7R' },
-      { id: 'C2', name: 'C2: Decoupling Cap', x: 220, y: 200, w: 22, h: 14, type: '0402 SMD Cap', net: 'VDD_0V75', val: '22 µF 6.3V X7R' },
-      { id: 'C3', name: 'C3: Decoupling Cap', x: 220, y: 230, w: 22, h: 14, type: '0402 SMD Cap', net: 'VDD_0V75', val: '10 µF 10V X7R' },
-      { id: 'L1', name: 'L1: Power Choke Inductor', x: 570, y: 185, w: 45, h: 45, type: 'SMD Molded Choke', net: 'SW_BUCK1', val: '0.47 µH 18A' },
-      { id: 'ANT1', name: 'ANT1: Ceramic Wi-Fi 7 Antenna', x: 680, y: 120, w: 60, h: 25, type: 'Chip Antenna', net: 'RF_50_OHM', val: '2.4 / 5 / 6 GHz' }
+      { id: 'U1', name: 'U1: Synthetic IC Package', x: 260, y: 160, w: 140, h: 140, type: 'Illustrative package shape', net: 'not configured', val: 'not configured' },
+      { id: 'U2', name: 'U2: Synthetic Power Package', x: 460, y: 180, w: 80, h: 80, type: 'Illustrative package shape', net: 'not configured', val: 'not configured' },
+      { id: 'J1', name: 'J1: Synthetic Connector', x: 60, y: 190, w: 90, h: 80, type: 'Illustrative connector shape', net: 'not configured', val: 'not configured' },
+      { id: 'C1', name: 'C1: Capacitor Example', x: 220, y: 170, w: 22, h: 14, type: 'Illustrative component shape', net: 'not configured', val: 'not configured' },
+      { id: 'C2', name: 'C2: Capacitor Example', x: 220, y: 200, w: 22, h: 14, type: 'Illustrative component shape', net: 'not configured', val: 'not configured' },
+      { id: 'C3', name: 'C3: Capacitor Example', x: 220, y: 230, w: 22, h: 14, type: 'Illustrative component shape', net: 'not configured', val: 'not configured' },
+      { id: 'L1', name: 'L1: Inductor Example', x: 570, y: 185, w: 45, h: 45, type: 'Illustrative component shape', net: 'not configured', val: 'not configured' },
+      { id: 'ANT1', name: 'ANT1: Antenna Example', x: 680, y: 120, w: 60, h: 25, type: 'Illustrative component shape', net: 'not configured', val: 'not configured' }
     ];
 
-    // P&ID Process Stream Data Tags (ANSI/ISA-5.1)
+    // Illustrative stream labels; process conditions are not configured.
     this.pidStreams = [
-      { id: 'ST-101', name: 'Crude Feed', x: 60, y: 240, temp: '350.0 °C', press: '3.50 bar', flow: '50,000 BPD', phase: 'Liquid/Vapor' },
-      { id: 'ST-102', name: 'Overhead Naphtha', x: 450, y: 100, temp: '110.0 °C', press: '1.80 bar', flow: '12,500 BPD', phase: 'Vapor' },
-      { id: 'ST-103', name: 'Reflux Return', x: 420, y: 190, temp: '95.0 °C', press: '2.40 bar', flow: '15,200 BPD', phase: 'Liquid' },
-      { id: 'ST-104', name: 'Kerosene Side-Cut', x: 440, y: 275, temp: '185.0 °C', press: '2.10 bar', flow: '8,200 BPD', phase: 'Liquid' },
-      { id: 'ST-105', name: 'Diesel Fuel Cut', x: 440, y: 355, temp: '260.0 °C', press: '2.60 bar', flow: '14,300 BPD', phase: 'Liquid' },
-      { id: 'ST-106', name: 'Atmospheric Residue', x: 440, y: 440, temp: '360.0 °C', press: '3.20 bar', flow: '15,000 BPD', phase: 'Heavy Liquid' }
+      { id: 'ST-101', name: 'Example Stream 1', x: 60, y: 240, temp: 'not configured', press: 'not configured', flow: 'not configured', phase: 'unspecified' },
+      { id: 'ST-102', name: 'Example Stream 2', x: 450, y: 100, temp: 'not configured', press: 'not configured', flow: 'not configured', phase: 'unspecified' },
+      { id: 'ST-103', name: 'Example Stream 3', x: 420, y: 190, temp: 'not configured', press: 'not configured', flow: 'not configured', phase: 'unspecified' },
+      { id: 'ST-104', name: 'Example Stream 4', x: 440, y: 275, temp: 'not configured', press: 'not configured', flow: 'not configured', phase: 'unspecified' },
+      { id: 'ST-105', name: 'Example Stream 5', x: 440, y: 355, temp: 'not configured', press: 'not configured', flow: 'not configured', phase: 'unspecified' },
+      { id: 'ST-106', name: 'Example Stream 6', x: 440, y: 440, temp: 'not configured', press: 'not configured', flow: 'not configured', phase: 'unspecified' }
     ];
 
     this.init();
@@ -170,10 +170,12 @@ class SchematicLayoutUI {
       this.cursorCoords = {
         x: mouseX,
         y: mouseY,
-        nmX: Number((worldX * 2.5).toFixed(1)),
-        nmY: Number((worldY * 2.5).toFixed(1)),
-        mmX: Number((worldX * 0.1).toFixed(2)),
-        mmY: Number((worldY * 0.1).toFixed(2))
+        nmX: null,
+        nmY: null,
+        mmX: null,
+        mmY: null,
+        canvasX: Number(worldX.toFixed(1)),
+        canvasY: Number(worldY.toFixed(1))
       };
 
       if (this.isDraggingEntity && this.draggedEntity) {
@@ -271,14 +273,14 @@ class SchematicLayoutUI {
       const idx = this.edaCells.length + 1;
       const cell = {
         id: 'c' + idx,
-        name: type || 'AND2_X1',
+        name: type || 'Logic Cell Example',
         x: Math.round((-this.pan.x + 200) / this.zoom / 10) * 10,
         y: Math.round((-this.pan.y + 150) / this.zoom / 10) * 10,
         w: 110,
         h: 220,
-        type: 'Standard CMOS Gate',
-        delay: '5.2 ps',
-        area: '16.5 nm²'
+        type: 'Synthetic logic-cell shape',
+        delay: null,
+        area: null
       };
       this.edaCells.push(cell);
       newEntity = { type: 'cell', data: cell };
@@ -292,8 +294,8 @@ class SchematicLayoutUI {
         w: 70,
         h: 70,
         type: type || 'SMD IC',
-        net: 'VDD_3V3 / GND',
-        val: 'Active Component'
+        net: 'not configured',
+        val: 'not configured'
       };
       this.pcbComponents.push(comp);
       newEntity = { type: 'pcb', data: comp };
@@ -304,10 +306,10 @@ class SchematicLayoutUI {
         name: type || 'Product Stream',
         x: Math.round((-this.pan.x + 200) / this.zoom / 10) * 10,
         y: Math.round((-this.pan.y + 150) / this.zoom / 10) * 10,
-        temp: '160.0 °C',
-        press: '2.50 bar',
-        flow: '11,000 BPD',
-        phase: 'Liquid'
+        temp: 'not configured',
+        press: 'not configured',
+        flow: 'not configured',
+        phase: 'unspecified'
       };
       this.pidStreams.push(stream);
       newEntity = { type: 'stream', data: stream };
@@ -437,12 +439,12 @@ class SchematicLayoutUI {
 
     ctx.restore();
 
-    // Render Foreground HUD (Nanometer coordinates, Layer Bar, Info Tooltip)
+    // Render foreground HUD with display coordinates, layer controls, and selection details.
     this.renderHUD();
   }
 
   // =========================================================================
-  // 1. Nanometer IC Wafer Layout (TSMC 3nm FinFET / GAA-FET)
+  // 1. Synthetic silicon layout example; no PDK or physical scale is configured.
   // =========================================================================
 
   renderEdaLayout() {
@@ -464,21 +466,21 @@ class SchematicLayoutUI {
       ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
     }
 
-    // Power Rails (VDD Top & VSS Bottom in Metal 1)
+    // Decorative power and ground rail shapes; voltage and PDK are not configured.
     if (this.layers.metal1) {
       ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
       ctx.fillRect(40, 60, 900, 36);
       ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 12px monospace';
-      ctx.fillText('VDD Core Power Grid (Metal 1 • 0.75V VDD)', 60, 82);
+      ctx.fillText('Synthetic Power Rail Example (Metal 1)', 60, 82);
 
       ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
       ctx.fillRect(40, 420, 900, 36);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('VSS Ground Return Grid (Metal 1 • 0.0V GND)', 60, 442);
+      ctx.fillText('Synthetic Ground Rail Example (Metal 1)', 60, 442);
     }
 
-    // Standard Cells & CMOS Layers
+    // Illustrative layer shapes for synthetic cell geometry.
     for (const c of this.edaCells) {
       const isSelected = this.selectedEntity && this.selectedEntity.data.id === c.id;
 
@@ -548,22 +550,22 @@ class SchematicLayoutUI {
         ctx.setLineDash([]);
         ctx.fillStyle = '#f43f5e';
         ctx.font = 'bold 10px monospace';
-        ctx.fillText(`[DRC] ${v.type}`, v.location.x, v.location.y - 6);
+        ctx.fillText(`[Screening] ${v.type}`, v.location.x, v.location.y - 6);
       }
     }
   }
 
   // =========================================================================
-  // 2. Multi-Layer PCB ECAD Mode (Altium Designer / Cadence Allegro Parity)
+  // 2. Experimental multi-layer PCB layout example
   // =========================================================================
 
   renderPCBLayout() {
     const { ctx } = this;
 
-    // PCB Outer Edge (160mm x 100mm Board with Rounded Corners)
+    // Decorative board outline; physical dimensions and stackup are not configured.
     const bx = 40, by = 60, bw = 800, bh = 420;
-    ctx.fillStyle = '#064e3b'; // FR-4 Solder Mask Green
-    ctx.strokeStyle = '#eab308'; // Gold ENIG Board Edge
+    ctx.fillStyle = '#064e3b'; // Illustrative board color
+    ctx.strokeStyle = '#eab308'; // Illustrative outline color
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.roundRect(bx, by, bw, bh, 14);
@@ -608,7 +610,7 @@ class SchematicLayoutUI {
     for (const comp of this.pcbComponents) {
       const isSelected = this.selectedEntity && this.selectedEntity.data.id === comp.id;
 
-      // Solder Pads with Silver/ENIG Plating for SMT components
+      // Decorative pads for illustrative package shapes
       if (comp.type.includes('Cap') || comp.type.includes('Choke') || comp.type.includes('Antenna')) {
         const padW = 6, padH = comp.h;
         ctx.fillStyle = '#cbd5e1'; // Silver/tin solder
@@ -679,7 +681,7 @@ class SchematicLayoutUI {
   }
 
   // =========================================================================
-  // 3. ANSI/ISA-5.1 Refinery P&ID Flowsheet
+  // 3. Illustrative plant process diagram; no standard compliance is assessed.
   // =========================================================================
 
   renderPlantPID() {
@@ -893,125 +895,32 @@ class SchematicLayoutUI {
   }
 
   // =========================================================================
-  // 4. Aspen HYSYS Peng-Robinson VLE P-T Phase Envelope
+  // Experimental plant plots: no validated result is available.
   // =========================================================================
 
-  renderVLEPhaseEnvelope() {
+  renderUnavailableProcessPlot(title, reason) {
     const { ctx, canvas } = this;
-    const originX = 90, originY = canvas.height - 80;
-    const plotW = canvas.width - 160, plotH = canvas.height - 150;
-
-    // Coordinate Grid & Axes
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(originX, originY); ctx.lineTo(originX + plotW, originY);
-    ctx.moveTo(originX, originY); ctx.lineTo(originX, originY - plotH);
-    ctx.stroke();
-
-    // Axes Labels
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 11px system-ui';
+    ctx.font = 'bold 14px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('Temperature T (°C)', originX + plotW / 2, originY + 40);
-    ctx.save();
-    ctx.translate(originX - 50, originY - plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText('Pressure P (bar)', 0, 0);
-    ctx.restore();
-
-    // Saturated Liquid Bubble Point Curve (Blue)
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let i = 0; i <= 30; i++) {
-      const frac = i / 30;
-      const t = -20 + frac * 220;
-      const p = 1.0 + Math.pow(frac, 1.8) * 45;
-      const px = originX + (t + 40) / 300 * plotW;
-      const py = originY - (p / 60) * plotH;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-
-    // Saturated Vapor Dew Point Curve (Amber)
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let i = 0; i <= 30; i++) {
-      const frac = i / 30;
-      const t = 20 + frac * 220;
-      const p = 1.0 + Math.pow(frac, 1.8) * 45;
-      const px = originX + (t + 40) / 300 * plotW;
-      const py = originY - (p / 60) * plotH;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-
-    // Cricondenbar Marker (Peak Pressure)
-    ctx.fillStyle = '#f43f5e';
-    ctx.beginPath();
-    ctx.arc(originX + 220 / 300 * plotW, originY - (46 / 60) * plotH, 5, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText('Critical Point (Pc=46.2 bar, Tc=182°C)', originX + 220 / 300 * plotW + 10, originY - (46 / 60) * plotH);
-
-    // Two-Phase Region Label
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
-    ctx.font = 'bold 12px system-ui';
-    ctx.fillText('TWO-PHASE (V+L) COEXISTENCE ENVELOPE', originX + plotW * 0.45, originY - plotH * 0.35);
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 12);
+    ctx.font = '12px system-ui';
+    ctx.fillText(reason, canvas.width / 2, canvas.height / 2 + 16);
   }
 
-  // =========================================================================
-  // 5. Aspen HYSYS 30-Tray Column Thermal & Composition Profile
-  // =========================================================================
+  renderVLEPhaseEnvelope() {
+    this.renderUnavailableProcessPlot(
+      'VLE phase envelope unavailable',
+      'No independently reviewed phase-equilibrium reference is configured.'
+    );
+  }
 
   renderColumnTrayProfile() {
-    const { ctx, canvas } = this;
-    const originX = 90, originY = canvas.height - 80;
-    const plotW = canvas.width - 160, plotH = canvas.height - 150;
-
-    // Grid & Axes
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(originX, originY); ctx.lineTo(originX + plotW, originY);
-    ctx.moveTo(originX, originY); ctx.lineTo(originX, originY - plotH);
-    ctx.stroke();
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 11px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('Column Tray Position (Overhead Tray 1 ──> Bottoms Tray 30)', originX + plotW / 2, originY + 40);
-
-    // Plot Temperature S-Curve (110°C to 360°C)
-    ctx.strokeStyle = '#f43f5e';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let tray = 1; tray <= 30; tray++) {
-      const norm = (tray - 1) / 29;
-      const tempC = 110 + (360 - 110) * Math.pow(norm, 1.4);
-      const px = originX + norm * plotW;
-      const py = originY - ((tempC - 80) / 320) * plotH;
-      if (tray === 1) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-
-    ctx.fillStyle = '#f43f5e';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText('Temperature Profile T(j) [110°C - 360°C]', originX + plotW * 0.3, originY - plotH * 0.85);
-
-    // Flash Zone Marker at Tray 22
-    const flashX = originX + (21 / 29) * plotW;
-    ctx.strokeStyle = '#f59e0b';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(flashX, originY); ctx.lineTo(flashX, originY - plotH);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillText('Tray 22: Crude Feed Flash Zone', flashX, originY - plotH + 15);
+    this.renderUnavailableProcessPlot(
+      'Distillation column profile unavailable',
+      'No sourced crude assay, reviewed column model, or independent reference is configured.'
+    );
   }
 
   // =========================================================================
@@ -1035,11 +944,11 @@ class SchematicLayoutUI {
     ctx.textAlign = 'left';
 
     const bannerTitles = {
-      eda: 'TSMC N3P Silicon Wafer Mask Layout View',
-      pcb: 'Altium Designer 4-Layer High-Speed PCB Layout',
-      pid: 'ANSI/ISA-5.1 Refinery P&ID Flowsheet',
-      vle: 'Aspen HYSYS Peng-Robinson P-T Phase Envelope',
-      tray_profile: 'Aspen HYSYS 30-Tray Column Thermal Profile'
+      eda: 'Experimental Silicon Layout Example — No PDK',
+      pcb: 'Synthetic PCB Layout Example — No Stackup',
+      pid: 'Illustrative Process Diagram',
+      vle: 'VLE Phase Envelope — Unavailable',
+      tray_profile: 'Distillation Profile — Unavailable'
     };
 
     ctx.fillText(bannerTitles[this.mode] || 'Schematic Layout View', 24, 32);
@@ -1047,9 +956,9 @@ class SchematicLayoutUI {
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px monospace';
     if (this.mode === 'eda') {
-      ctx.fillText(`Cursor: X=${this.cursorCoords.nmX}nm  Y=${this.cursorCoords.nmY}nm | Zoom: ${(this.zoom * 100).toFixed(0)}%`, 24, 50);
+      ctx.fillText(`Cursor: X=${this.cursorCoords.canvasX} Y=${this.cursorCoords.canvasY} canvas units | no PDK scale`, 24, 50);
     } else if (this.mode === 'pcb') {
-      ctx.fillText(`PCB Board: X=${this.cursorCoords.mmX}mm  Y=${this.cursorCoords.mmY}mm | Zoom: ${(this.zoom * 100).toFixed(0)}%`, 24, 50);
+      ctx.fillText(`Cursor: X=${this.cursorCoords.canvasX} Y=${this.cursorCoords.canvasY} canvas units | no board scale`, 24, 50);
     } else {
       ctx.fillText(`Process Engineering Workspace | Zoom: ${(this.zoom * 100).toFixed(0)}%`, 24, 50);
     }
@@ -1076,9 +985,9 @@ class SchematicLayoutUI {
         ctx.fillText(`Cell: ${c.name} (${c.type})`, cardX + 12, cardY + 22);
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px monospace';
-        ctx.fillText(`Propagation Delay: ${c.delay}`, cardX + 12, cardY + 42);
-        ctx.fillText(`Silicon Footprint: ${c.area}`, cardX + 12, cardY + 60);
-        ctx.fillText(`Drive Strength: 1X • Fin Count: 4`, cardX + 12, cardY + 78);
+        ctx.fillText(`Propagation Delay: ${c.delay ?? 'unavailable'}`, cardX + 12, cardY + 42);
+        ctx.fillText(`Cell Area: ${c.area ?? 'unavailable'}`, cardX + 12, cardY + 60);
+        ctx.fillText('PDK timing and area data: unavailable', cardX + 12, cardY + 78);
       } else if (active.type === 'pcb') {
         const p = active.data;
         ctx.fillStyle = '#eab308';
@@ -1088,17 +997,17 @@ class SchematicLayoutUI {
         ctx.font = '11px monospace';
         ctx.fillText(`Package: ${p.type}`, cardX + 12, cardY + 42);
         ctx.fillText(`Netlist: ${p.net}`, cardX + 12, cardY + 60);
-        ctx.fillText(`Rating: ${p.val}`, cardX + 12, cardY + 78);
+        ctx.fillText(`Value: ${p.val}`, cardX + 12, cardY + 78);
       } else if (active.type === 'drc') {
         const d = active.data;
         ctx.fillStyle = '#f43f5e';
         ctx.font = 'bold 12px monospace';
-        ctx.fillText(`[DRC Violation] ${d.type}`, cardX + 12, cardY + 22);
+        ctx.fillText(`[Screening Finding] ${d.type}`, cardX + 12, cardY + 22);
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px monospace';
         ctx.fillText(`Measured: ${d.measured}nm < Limit: ${d.rule}nm`, cardX + 12, cardY + 42);
-        ctx.fillText(`Layer: Metal 1 Signal Track`, cardX + 12, cardY + 60);
-        ctx.fillText(`Status: Foundry Rule Error`, cardX + 12, cardY + 78);
+        ctx.fillText(`Layer: ${d.layer ?? 'not configured'}`, cardX + 12, cardY + 60);
+        ctx.fillText('No process-specific rule deck is configured', cardX + 12, cardY + 78);
       } else if (active.type === 'stream') {
         const s = active.data;
         ctx.fillStyle = '#38bdf8';

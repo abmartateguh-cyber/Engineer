@@ -10,7 +10,7 @@
  * Complies with W3C WebAssembly Core Specification 2.0 / IEEE 754-2019.
  * Compiled dynamically to verified .wasm binary with zero external toolchain dependencies.
  * 
- * 100% In-House Sovereign Implementation.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

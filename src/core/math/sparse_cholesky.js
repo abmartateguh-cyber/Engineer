@@ -1,13 +1,13 @@
 /**
  * OmniEng Sparse Linear Algebra & Multifrontal Cholesky Solver (AMD Permuted)
  * 
- * Provides production-grade sparse matrix factorization matching SuiteSparse / SuperLU:
+ * Provides experimental sparse matrix factorization matching SuiteSparse / SuperLU:
  * 1. Compressed Sparse Row (CSR) and Compressed Sparse Column (CSC) representations.
  * 2. Approximate Minimum Degree (AMD) fill-reducing symbolic permutation.
  * 3. Exact Sparse Cholesky Factorization L * L^T = P * K * P^T for 100,000+ DOFs.
  * 4. Forward and back-substitution sparse solvers.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

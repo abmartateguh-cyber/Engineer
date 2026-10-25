@@ -1,13 +1,13 @@
 /**
- * OmniEng Tier-1 10/10 Industrial Commercial Production Architecture Test Suite
- * 
- * Verifies the foundational modules of the 10/10 Master Plan:
+ * Experimental security and CAD helper smoke checks
+ *
+ * Exercises helper modules; this does not establish industrial readiness:
  *   [T10-1] IPC Security Validator (Prototype Pollution, Path Traversal, Finite Bounds)
  *   [T10-2] OmniVaultAES256 Encrypted Container & Zip Bomb Decompression Guards
  *   [T10-3] Immutable Audit Ledger with Merkle Hash Chaining & Tamper Detection
  *   [T10-4] Native Accelerator Interface with Tiled GEMM & SpMV
  *   [T10-5] Out-of-Core Hierarchical Spatial Octree Assembly Manager
- *   [T10-6] Standard Parts Library (ISO 4014 Fasteners & SKF 6200 Bearings)
+ *   [T10-6] Caller-dimensioned geometry helpers (standard catalogs unavailable)
  *   [T10-7] Enterprise Keymap & Shortcut Manager (CATIA, NX, SolidWorks, Blender)
  */
 
@@ -29,7 +29,7 @@ const { GeometryKernelAdapter } = require('../src/core/cad/kernel_adapter');
 
 function runTier1TenOutOfTenTests() {
   console.log('\n================================================================');
-  console.log('   RUNNING TIER-1 10/10 INDUSTRIAL COMMERCIAL PRODUCTION SUITE   ');
+  console.log('   RUNNING EXPERIMENTAL SECURITY AND CAD HELPER CHECKS   ');
   console.log('================================================================\n');
 
   let passed = 0;
@@ -50,7 +50,9 @@ function runTier1TenOutOfTenTests() {
   // [T10-1] IPC Security Validator
   runTest('[T10-1] Security IPC Validator & Prototype Pollution Stripper...', () => {
     // 1. Prototype Pollution Stripping
-    const maliciousPayload = JSON.parse('{"valid": 42, "__proto__": {"polluted": true}, "nested": {"constructor": "exploit", "ok": 100}}');
+    const maliciousPayload = JSON.parse(
+      '{"valid": 42, "__proto__": {"polluted": true}, "nested": {"constructor": "exploit", "ok": 100}}'
+    );
     const sanitized = IPCValidator.sanitize(maliciousPayload);
     assert.strictEqual(sanitized.valid, 42);
     assert.strictEqual(sanitized.nested.ok, 100);
@@ -62,6 +64,16 @@ function runTier1TenOutOfTenTests() {
     assert.throws(() => IPCValidator.validateFiniteNumbers({ x: NaN }, ['x']), /must be a finite number/);
     assert.throws(() => IPCValidator.validateFiniteNumbers({ x: Infinity }, ['x']), /must be a finite number/);
 
+    const inputBytes = Buffer.from([1, 2, 3]);
+    const cleanBytes = IPCValidator.sanitize(inputBytes);
+    assert(Buffer.isBuffer(cleanBytes), 'Binary IPC sanitizer must preserve Buffer payloads');
+    assert.deepStrictEqual(cleanBytes, inputBytes, 'Binary IPC sanitizer must preserve payload bytes');
+    assert.notStrictEqual(cleanBytes, inputBytes, 'Binary IPC sanitizer must copy Buffer payloads');
+    const inputArray = new Uint8Array([4, 5, 6]);
+    const cleanArray = IPCValidator.sanitize(inputArray);
+    assert(cleanArray instanceof Uint8Array, 'Binary IPC sanitizer must preserve Uint8Array payloads');
+    assert.deepStrictEqual([...cleanArray], [...inputArray], 'Binary IPC sanitizer must preserve typed-array bytes');
+
     // 3. Path Traversal Quarantine
     const baseDir = '/safe/workspace';
     const safePath = IPCValidator.sanitizePath('exports/model.step', baseDir);
@@ -70,12 +82,12 @@ function runTier1TenOutOfTenTests() {
   });
 
   // [T10-2] Industrial Encrypted Vault & Zip Bomb Guard
-  runTest('[T10-2] Industrial Encrypted Vault (AES-256-GCM) & Decompression Bomb Guard...', () => {
+  runTest('[T10-2] Experimental Encrypted Snapshot and Archive Size Limits...', () => {
     const archive = new OmniArchive({ projectName: 'Turbofan_Blade_Stage1' });
     archive.addSection('geometry', { mesh: 'TET10_Mesh_Data', elements: 15000 });
     archive.addSection('material', { name: 'Inconel 718', youngsModulusGpa: 205.0 });
 
-    const password = 'SuperSecretEnterprisePassword2026!';
+    const password = 'test-only snapshot password';
     const encryptedBuf = archive.saveToEncryptedBuffer(password);
     assert(encryptedBuf.length > 52, 'Encrypted buffer must include cryptographic headers');
 
@@ -94,7 +106,10 @@ function runTier1TenOutOfTenTests() {
   runTest('[T10-3] Immutable Audit Ledger (DO-178C DAL-A & ISO 26262 ASIL-D)...', () => {
     const ledger = new ImmutableAuditLedger('OmniEng_Aerospace_Seed');
     ledger.recordAction('Chief_Aerodynamicist', 'AIRFOIL_CONTOUR_LOCK', { profile: 'NACA 6412', mach: 0.78 });
-    ledger.recordAction('Lead_Structural_Engineer', 'FEA_MARGIN_SIGN_OFF', { minSafetyFactor: 1.54, status: 'CONFORMS' });
+    ledger.recordAction('Lead_Structural_Engineer', 'FEA_MARGIN_SIGN_OFF', {
+      minSafetyFactor: 1.54,
+      status: 'CONFORMS'
+    });
 
     const initialCheck = ledger.verifyChainIntegrity();
     assert.strictEqual(initialCheck.isValid, true);
@@ -114,19 +129,11 @@ function runTier1TenOutOfTenTests() {
 
   // [T10-4] Native Accelerator Interface
   runTest('[T10-4] Native Accelerator Interface (GEMM, SpMV, BLAS & SIMD)...', () => {
-    const M = 4, N = 4, K = 4;
-    const A = new Float64Array([
-      1, 2, 3, 4,
-      5, 6, 7, 8,
-      9, 1, 2, 3,
-      4, 5, 6, 7
-    ]);
-    const B = new Float64Array([
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1
-    ]); // Identity matrix
+    const M = 4,
+      N = 4,
+      K = 4;
+    const A = new Float64Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6, 7]);
+    const B = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]); // Identity matrix
     const C = new Float64Array(16);
 
     // C = 2.0 * A * I + 0.0 * C
@@ -166,44 +173,83 @@ function runTier1TenOutOfTenTests() {
     // Camera close to part 0
     const closeRes = manager.evaluateVisibleLODs([-400, -400, 50], [-500, -500, -100, -300, -300, 100]);
     assert(closeRes.visibleCount > 0);
-    const part0 = closeRes.activeRenderList.find(r => r.id === 'PART_ASM_0');
+    const part0 = closeRes.activeRenderList.find((r) => r.id === 'PART_ASM_0');
     assert(part0 !== undefined);
     assert.strictEqual(part0.lodLevel, 'HIGH_BREP');
 
     // Camera far away
     const farRes = manager.evaluateVisibleLODs([0, 0, 900], [-1000, -1000, -100, 1000, 1000, 100]);
     assert(farRes.visibleCount > 0);
-    assert(farRes.activeRenderList.every(r => r.lodLevel === 'MEDIUM_MESH' || r.lodLevel === 'PROXY_BBOX'));
+    assert(farRes.activeRenderList.every((r) => r.lodLevel === 'MEDIUM_MESH' || r.lodLevel === 'PROXY_BBOX'));
   });
 
-  // [T10-6] Standard Parts Library
-  runTest('[T10-6] Standard Parts Library (ISO 4014 Fasteners & SKF 6200 Bearings)...', () => {
-    const bolt = StandardPartsLibrary.generateHexBolt(8, 40, '8.8');
-    assert.strictEqual(bolt.nominalDiameterMm, 8);
-    assert.strictEqual(bolt.pitchMm, 1.25);
-    assert.strictEqual(bolt.lengthMm, 40);
-    assert.strictEqual(bolt.headWidthAcrossFlatsMm, 13.0);
-    assert(bolt.tensileStressAreaMm2 > 35.0 && bolt.tensileStressAreaMm2 < 38.0);
-    assert(bolt.proofLoadKn > 18.0 && bolt.proofLoadKn < 22.0);
+  // [T10-6] Standard-parts records fail closed without provenance
+  runTest('[T10-6] Standard-Parts Catalog Availability...', () => {
+    const records = [
+      StandardPartsLibrary.getAvailability(),
+      StandardPartsLibrary.generateHexBolt(8, 40, '8.8'),
+      StandardPartsLibrary.generateHexNut(8, '8'),
+      StandardPartsLibrary.generateBallBearing('6204'),
+      StandardPartsLibrary.generateHoleCallout(8, 20, true)
+    ];
 
-    const nut = StandardPartsLibrary.generateHexNut(8, '8');
-    assert.strictEqual(nut.nominalDiameterMm, 8);
-    assert.strictEqual(nut.widthAcrossFlatsMm, 13.0);
+    for (const result of records) {
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.status, 'UNAVAILABLE');
+      assert.strictEqual(result.error.code, 'UNSUPPORTED');
+    }
+    assert.match(records[0].error.message, /source, revision, applicability, and redistribution review/);
 
-    const bearing = StandardPartsLibrary.generateBallBearing('6204');
-    assert.strictEqual(bearing.boreDiameterMm, 20);
-    assert.strictEqual(bearing.outerDiameterMm, 47);
-    assert.strictEqual(bearing.widthMm, 14);
-    assert.strictEqual(bearing.ballCount, 8);
-    assert.strictEqual(bearing.dynamicLoadRatingC_kN, 13.5);
+    const bolt = StandardPartsLibrary.generateHexBolt({
+      shankDiameterMm: 8,
+      shankLengthMm: 25,
+      headAcrossFlatsMm: 14,
+      headHeightMm: 4
+    });
+    assert.strictEqual(bolt.success, true);
+    assert.strictEqual(bolt.validationLevel, 'experimental');
+    assert.strictEqual(bolt.units, 'mm');
+    assert.strictEqual(bolt.headVerticesMm.length, 6);
+    assert.ok(Math.abs(bolt.boundingBoxMm[3] - bolt.boundingBoxMm[0] - 14) < 1e-10);
+    assert.strictEqual(Object.hasOwn(bolt, 'standard'), false);
+    assert.strictEqual(Object.hasOwn(bolt, 'propertyClass'), false);
 
-    const callout = StandardPartsLibrary.generateHoleCallout(8, 20, true);
-    assert(callout.callout.includes('M8x1.25-6H'));
-    assert(callout.callout.includes('Tap Drill ⌀6.75'));
+    const nut = StandardPartsLibrary.generateHexNut({
+      outerAcrossFlatsMm: 15,
+      thicknessMm: 5,
+      boreDiameterMm: 8
+    });
+    assert.strictEqual(nut.success, true);
+    assert.strictEqual(nut.outerVerticesMm.length, 6);
+
+    const bearing = StandardPartsLibrary.generateBallBearing({
+      boreDiameterMm: 20,
+      outerDiameterMm: 47,
+      widthMm: 14,
+      rollingElementCount: 8,
+      rollingElementDiameterMm: 5,
+      pitchDiameterMm: 33
+    });
+    assert.strictEqual(bearing.success, true);
+    assert.strictEqual(bearing.rollingElementCentersMm.length, 8);
+    assert.strictEqual(bearing.racewayGeometry, 'not generated');
+    assert.strictEqual(bearing.loadRatings, 'not calculated');
+
+    const callout = StandardPartsLibrary.generateHoleCallout({
+      nominalDiameterMm: 8,
+      pitchMm: 1.2,
+      tapDrillDiameterMm: 6.5,
+      tapDepthMm: 18,
+      counterboreDiameterMm: 13,
+      counterboreDepthMm: 3
+    });
+    assert.strictEqual(callout.success, true);
+    assert.match(callout.callout, /pitch 1\.2 mm/);
+    assert.strictEqual(/ISO|ASME|DIN|SKF/.test(callout.callout), false);
   });
 
-  // [T10-7] Enterprise Keymap & Shortcut Manager
-  runTest('[T10-7] Enterprise Keymap & Shortcut Manager (CATIA, NX, SolidWorks, Blender)...', () => {
+  // [T10-7] CAD keymap profile selection
+  runTest('[T10-7] CAD Keymap Profiles...', () => {
     const km = new KeymapManager('OMNIENG_DEFAULT');
     assert.strictEqual(km.getBinding('KeyF'), 'ACTION_FIT_VIEWPORT');
     assert.strictEqual(km.getBinding('Ctrl+KeyK'), 'ACTION_OPEN_COMMAND_PALETTE');
@@ -291,12 +337,12 @@ function runTier1TenOutOfTenTests() {
     assert.strictEqual(props.boundingBox.dz, 30);
 
     const info = adapter.getKernelInfo();
-    assert.strictEqual(info.ap242Compliance, true);
-    assert.strictEqual(info.nistValidationPropsSupported, true);
+    assert.strictEqual(info.ap242Compliance, false);
+    assert.strictEqual(info.validationProperties, 'experimental');
   });
 
   console.log(`\n================================================================`);
-  console.log(`  SUMMARY: ${passed} / ${total} TIER-1 10/10 PRODUCTION TESTS PASSED`);
+  console.log(`  SUMMARY: ${passed} / ${total} experimental helper assertions passed`);
   console.log('================================================================\n');
 
   return { passed, total };

@@ -1,12 +1,12 @@
 /**
  * OmniEng Discrete Ordinates Method (DOM) & Surface Radiation View Factor Engine
  * 
- * Provides thermal radiation modeling matching ANSYS Fluent / COMSOL Heat Transfer:
+ * Experimental thermal radiation calculation example:
  * 1. Discrete Ordinates Method (DOM) solving the Radiative Transfer Equation (RTE) across discrete angles s_m.
  * 2. Stefan-Boltzmann law (sigma = 5.670374e-8 W/(m^2*K^4)) surface emission and absorption.
  * 3. Enclosure radiosity equations with diffuse-gray surface view factors F_ij.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent radiation validation or comparison to a production solver is established.
  */
 
 'use strict';

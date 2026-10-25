@@ -1,12 +1,12 @@
 /**
  * OmniEng Hierarchical Engineering Bill of Materials (eBOM) Manager
- * 
+ *
  * Provides automated multi-level indented BOM generation, material mass roll-up,
  * manufacturing and vendor procurement cost estimation, and flattened part consolidation.
- * 
- * Parity standard: Siemens Teamcenter eBOM / PTC Windchill / Dassault ENOVIA BOM.
- * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ *
+ * Unverified comparison target: Siemens Teamcenter eBOM / PTC Windchill / Dassault ENOVIA BOM.
+ *
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class EngineeringBOMManager {
@@ -16,38 +16,93 @@ class EngineeringBOMManager {
 
   /**
    * Sets or creates the root assembly of the engineering hierarchy.
-   * 
+   *
    * @param {Object} rootItem - Top level assembly item
    */
   setRootAssembly(rootItem) {
-    this.rootAssembly = this._normalizeItem(rootItem, 0);
+    this.rootAssembly = this._normalizeItem(rootItem, 0, new Set(), { count: 0 });
     return this;
   }
 
-  _normalizeItem(item, level = 0) {
+  _normalizeItem(item, level, activeItems, nodeCount) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new TypeError('Every eBOM node must be an object.');
+    }
+    if (activeItems.has(item)) throw new TypeError('Cyclic eBOM hierarchies are not supported.');
+    if (level > 64) throw new RangeError('eBOM hierarchy depth cannot exceed 64 levels.');
+    nodeCount.count++;
+    if (nodeCount.count > 10000) throw new RangeError('eBOM hierarchies cannot exceed 10,000 nodes.');
+
+    const allowedKeys = new Set([
+      'partNumber',
+      'name',
+      'revision',
+      'quantity',
+      'unitMassKg',
+      'unitCostUsd',
+      'material',
+      'supplier',
+      'children'
+    ]);
+    const unexpectedKeys = Object.keys(item).filter((key) => !allowedKeys.has(key));
+    if (unexpectedKeys.length > 0) {
+      throw new TypeError(`Unexpected eBOM node properties: ${unexpectedKeys.join(', ')}.`);
+    }
+
+    if (typeof item.partNumber !== 'string' || !item.partNumber.trim() || item.partNumber.length > 200) {
+      throw new TypeError('Every eBOM node requires an explicit partNumber.');
+    }
+    if (typeof item.name !== 'string' || !item.name.trim() || item.name.length > 500) {
+      throw new TypeError('Every eBOM node requires an explicit name.');
+    }
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      throw new TypeError('Every eBOM node requires a finite positive quantity.');
+    }
+    if (!Number.isFinite(item.unitMassKg) || item.unitMassKg < 0) {
+      throw new TypeError('Every eBOM node requires an explicit finite nonnegative unitMassKg.');
+    }
+    if (!Number.isFinite(item.unitCostUsd) || item.unitCostUsd < 0) {
+      throw new TypeError('Every eBOM node requires an explicit finite nonnegative unitCostUsd.');
+    }
+    for (const field of ['revision', 'material', 'supplier']) {
+      const maxLength = field === 'revision' ? 100 : 200;
+      if (
+        item[field] !== undefined &&
+        item[field] !== null &&
+        (typeof item[field] !== 'string' || !item[field].trim() || item[field].length > maxLength)
+      ) {
+        throw new TypeError(`Optional eBOM ${field} must be a nonempty string when supplied.`);
+      }
+    }
+    if (item.children !== undefined && !Array.isArray(item.children)) {
+      throw new TypeError('eBOM children must be an array when supplied.');
+    }
+
+    activeItems.add(item);
     const norm = {
-      partNumber: item.partNumber || `PRT-${Math.floor(Math.random() * 10000)}`,
-      name: item.name || 'Unnamed Component',
-      revision: item.revision || 'A',
+      partNumber: item.partNumber,
+      name: item.name,
+      revision: item.revision ?? null,
       level,
-      quantity: item.quantity !== undefined ? item.quantity : 1,
-      unitMassKg: item.unitMassKg !== undefined ? item.unitMassKg : 0.0,
-      unitCostUsd: item.unitCostUsd !== undefined ? item.unitCostUsd : 0.0,
-      material: item.material || 'Standard',
-      supplier: item.supplier || 'In-House',
+      quantity: item.quantity,
+      unitMassKg: item.unitMassKg,
+      unitCostUsd: item.unitCostUsd,
+      material: item.material ?? null,
+      supplier: item.supplier ?? null,
       children: []
     };
 
-    if (item.children && Array.isArray(item.children)) {
-      norm.children = item.children.map(child => this._normalizeItem(child, level + 1));
-    }
+    norm.children = (item.children || []).map((child) => this._normalizeItem(child, level + 1, activeItems, nodeCount));
+    activeItems.delete(item);
 
     return norm;
   }
 
   /**
-   * Recursively computes mass and cost roll-ups across all hierarchy levels.
-   * 
+   * Recursively computes mass and cost roll-ups for one instance of a node.
+   * A parent's quantity multiplies its child; the route applies the root
+   * quantity to its requested-order summary.
+   *
    * @param {Object} [node=this.rootAssembly]
    * @returns {Object} Rolled up item with totalMassKg and totalCostUsd
    */
@@ -72,6 +127,9 @@ class EngineeringBOMManager {
 
     const rolledUpMassKg = node.unitMassKg + subMass;
     const rolledUpCostUsd = node.unitCostUsd + subCost;
+    if (![rolledUpMassKg, rolledUpCostUsd, totalPartCount].every(Number.isFinite)) {
+      throw new RangeError('eBOM roll-up exceeded the finite numeric range for supplied quantities, masses, or costs.');
+    }
 
     node.rolledUpMassKg = rolledUpMassKg;
     node.rolledUpCostUsd = rolledUpCostUsd;
@@ -90,7 +148,7 @@ class EngineeringBOMManager {
 
   /**
    * Generates a multi-level indented eBOM table.
-   * 
+   *
    * @returns {Array<Object>} Linearized array of indented BOM rows
    */
   generateIndentedBOM() {
@@ -129,8 +187,9 @@ class EngineeringBOMManager {
   }
 
   /**
-   * Generates a consolidated flattened single-level BOM (all identical parts combined).
-   * 
+   * Generates a consolidated flattened leaf-part BOM.
+   * Lines combine only when all caller-supplied identity and property fields match.
+   *
    * @returns {Array<Object>} Sorted list of unique parts with aggregated quantities
    */
   generateFlattenedBOM() {
@@ -141,7 +200,15 @@ class EngineeringBOMManager {
 
       if (!item.children || item.children.length === 0) {
         // Leaf part
-        const key = item.partNumber;
+        const key = JSON.stringify([
+          item.partNumber,
+          item.revision,
+          item.name,
+          item.material,
+          item.supplier,
+          item.unitMassKg,
+          item.unitCostUsd
+        ]);
         if (partMap.has(key)) {
           const entry = partMap.get(key);
           entry.totalQuantity += currentMultiplier;
@@ -150,6 +217,7 @@ class EngineeringBOMManager {
         } else {
           partMap.set(key, {
             partNumber: item.partNumber,
+            revision: item.revision,
             name: item.name,
             material: item.material,
             supplier: item.supplier,
@@ -181,21 +249,40 @@ class EngineeringBOMManager {
    */
   exportToCSV() {
     const flat = this.generateFlattenedBOM();
-    const headers = ['Part Number', 'Description', 'Material', 'Supplier', 'Qty', 'Unit Cost ($)', 'Ext Cost ($)', 'Unit Mass (kg)', 'Ext Mass (kg)'];
+    const headers = [
+      'Part Number',
+      'Description',
+      'Material',
+      'Supplier',
+      'Qty',
+      'Unit Cost ($)',
+      'Ext Cost ($)',
+      'Unit Mass (kg)',
+      'Ext Mass (kg)',
+      'Revision'
+    ];
     const lines = [headers.join(',')];
+    const escapeText = (value) => {
+      let text = String(value ?? '');
+      if (/^[\s\uFEFF]*[=+\-@]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
 
     for (const r of flat) {
-      lines.push([
-        `"${r.partNumber}"`,
-        `"${r.name}"`,
-        `"${r.material}"`,
-        `"${r.supplier}"`,
-        r.totalQuantity,
-        r.unitCostUsd.toFixed(2),
-        r.extendedCostUsd.toFixed(2),
-        r.unitMassKg.toFixed(4),
-        r.extendedMassKg.toFixed(4)
-      ].join(','));
+      lines.push(
+        [
+          escapeText(r.partNumber),
+          escapeText(r.name),
+          escapeText(r.material),
+          escapeText(r.supplier),
+          r.totalQuantity,
+          r.unitCostUsd.toFixed(2),
+          r.extendedCostUsd.toFixed(2),
+          r.unitMassKg.toFixed(4),
+          r.extendedMassKg.toFixed(4),
+          escapeText(r.revision)
+        ].join(',')
+      );
     }
 
     return lines.join('\n');

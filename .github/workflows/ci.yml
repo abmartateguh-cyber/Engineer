@@ -1,0 +1,45 @@
+name: R0 checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    name: ${{ matrix.runner }} / Node 24.22.1
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - windows-2025
+          - macos-15-intel
+          - macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+          cache: npm
+      - run: npm ci
+        id: install
+      - run: npm run check:syntax
+      - run: npm run check:renderer-sinks
+      - run: npm run check:ipc
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - run: npm run dependency:audit
+      - name: Enforce structured 2D Poisson performance and residual budget
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:poisson-budget
+      - run: npm test
+      - run: npm run test:vv
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - run: npm run test:experimental
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      - name: Enforce loaded-source function coverage floor
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run coverage -- --output-dir "${{ runner.temp }}/omnieng-coverage"

@@ -1,13 +1,13 @@
 /**
- * OmniEng Full Liberty (.lib) Parser & Non-Linear Delay Model (NLDM/CCS) Engine
+ * OmniEng Experimental Liberty (.lib) Parser & NLDM Table Interpolation Example
  * 
- * Provides sign-off timing characterization matching Synopsys PrimeTime / Cadence Tempus:
+ * Parses and interpolates selected Liberty timing data:
  * 1. Liberty (.lib) cell library representation (pin capacitances, leakage power, 2D lookups).
  * 2. Non-Linear Delay Model (NLDM) bi-cubic/bilinear table interpolation:
  *    Delay = f(input_transition_slew, output_load_capacitance).
  * 3. Output transition slew interpolation for downstream stage propagation.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Parser completeness, library coverage, and timing accuracy have not been independently assessed.
  */
 
 'use strict';

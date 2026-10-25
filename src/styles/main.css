@@ -43,6 +43,12 @@
   color: var(--fg-1);
   margin-bottom: 2px;
 }
+.sample-status {
+  color: var(--warning, #fbbf24);
+  font-size: 10px;
+  font-weight: 600;
+  margin: 3px 0;
+}
 .sample-desc {
   font-size: 11px;
   color: var(--fg-2);
@@ -433,6 +439,11 @@
 }
 
 /* Bode Frequency Response SVG Styles */
+.bode-plot-svg {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px;
+}
 .bode-grid-line {
   stroke: var(--line);
   stroke-dasharray: 2, 2;
@@ -456,6 +467,26 @@
   stroke: var(--warn);
   stroke-dasharray: 4, 3;
   stroke-width: 1.5;
+}
+.bode-metrics-card {
+  margin-top: 0;
+}
+.bode-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.bode-metric-row {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.bode-metric-value {
+  color: var(--fg-1);
+  font-size: 13px;
+}
+.bode-metrics-note {
+  margin-top: 8px;
+  font-size: 9px;
 }
 
 /* NASA WBS Explorer Subsystem Cards */
@@ -534,9 +565,14 @@
   color: var(--accent);
 }
 
-/* ==========================================================================
+/* ===========================================================================
    4. Accessibility Focus & Utilities
    ========================================================================== */
+
+button {
+  min-width: 24px;
+  min-height: 24px;
+}
 
 button:focus-visible,
 input:focus-visible,

@@ -1,5 +1,5 @@
 /**
- * OmniEng 2D/3D Variational Geometric Constraint Solver (D-Cubed 2D DCM Parity)
+ * OmniEng 2D/3D Variational Geometric Constraint Solver (D-Cubed 2D DCM Experimental workflow)
  * 
  * Implements simultaneous non-linear parametric sketch constraint solving:
  * 1. Entities: Points (x,y), Line segments, Circles/Arcs.
@@ -14,7 +14,7 @@
  *    F(X) = 0, delta = -(J^T * J + lambda * I)^(-1) * J^T * F(X).
  * 4. Degrees-of-Freedom (DOF) status: under-constrained, fully-constrained, over-constrained.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';

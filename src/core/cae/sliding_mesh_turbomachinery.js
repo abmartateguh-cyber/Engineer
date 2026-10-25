@@ -1,15 +1,15 @@
 /**
  * OmniEng Sliding Mesh & Moving Reference Frame (MRF) Turbomachinery Engine
  * 
- * Implements rotating flow physics matching ANSYS Fluent / Siemens Star-CCM+:
+ * Experimental rotating-flow calculation example:
  * 1. Moving Reference Frame (MRF) Navier-Stokes formulation:
  *    u_r = u - Omega x r
  *    Momentum source terms: F_coriolis = -2 * rho * (Omega x u_r), F_centrifugal = -rho * Omega x (Omega x r)
  * 2. Sliding mesh interface (SMI): Conservative interpolation of mass, momentum, and turbulent fluxes.
  * 3. Euler Turbomachinery Equation: Theoretical head H_th = (u2 * c_u2 - u1 * c_u1) / g.
- * 4. Centrifugal pump & axial drone propeller H(Q) performance curve generation.
+ * 4. Illustrative turbomachinery head calculations from the Euler relation.
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * No independent turbomachinery validation or comparison to a production solver is established.
  */
 
 'use strict';
@@ -158,4 +158,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.SlidingMeshTurbomachinery = SlidingMeshTurbomachinery;
 }
-

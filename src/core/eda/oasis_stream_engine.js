@@ -6,9 +6,9 @@
  * Employs modal variable state machines, variable-length integer encoding (vint),
  * and geometric primitives (RECTANGLE, POLYGON, PATH, PLACEMENT).
  * 
- * Parity standard: Synopsys IC Compiler II / Cadence Innovus / Mentor Calibre.
+ * Unverified comparison target: Synopsys IC Compiler II / Cadence Innovus / Mentor Calibre.
  * 
- * 100% In-House Sovereign Implementation. Zero Cloud Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 class OasisStreamEngine {

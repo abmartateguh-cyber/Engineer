@@ -1,108 +1,118 @@
 /**
- * OmniEng Non-Linear Large Deflection & Geometric Non-Linearity FEA Solver
- * 
- * Implements the Total Lagrangian (TL) formulation for structural mechanics:
- * - Green-Lagrange Strain Tensor: E = 0.5 * (F^T * F - I)
- * - Second Piola-Kirchhoff Stress: S = C : E (Saint Venant-Kirchhoff material)
- * - Incremental Tangent Stiffness Matrix: K_T = K_0 + K_uL + K_sigma (Geometric Stress Stiffness)
- * - Full Newton-Raphson iteration with internal force residual convergence
- * 
- * Validated against analytical Euler elastica large deflection cantilever benchmarks.
+ * Experimental reduced-order cantilever response estimate.
+ *
+ * This calculation applies a formula-based deflection adjustment. It does not
+ * assemble or solve finite-element equations and exposes no residual or
+ * convergence result. Inputs use millimetres, megapascals, and newtons.
  */
 
-class NonlinearLargeDeflectionSolver {
+'use strict';
+
+class CantileverResponseEstimator {
   constructor(options = {}) {
-    this.maxIterations = options.maxIterations || 25;
-    this.tolerance = options.tolerance || 1e-6;
-    this.numLoadSteps = options.numLoadSteps || 10;
+    const sampleCount = options.sampleCount ?? options.numLoadSteps ?? 10;
+    if (!Number.isInteger(sampleCount) || sampleCount < 2 || sampleCount > 1000) {
+      throw new Error('sampleCount must be an integer from 2 to 1000.');
+    }
+    this.sampleCount = sampleCount;
   }
 
-  /**
-   * Solve 2D/3D large deflection cantilever beam subjected to tip transverse load.
-   * Compares linear small-deflection (v = P*L^3 / (3*E*I)) with non-linear elastica.
-   * @param {Object} params - { length, width, height, E, P, numElements }
-   * @returns {Object} Solution results with load-deflection curve and convergence telemetry
-   */
   solveLargeDeflectionCantilever(params) {
-    const L = params.length || 1000.0; // mm
-    const b = params.width || 20.0; // mm
-    const h = params.height || 5.0; // mm (slender beam, high geometric non-linearity)
-    const E = params.E || 200000.0; // MPa (Steel)
-    const P_total = params.P || 25.0; // N (tip transverse load)
-    const nElem = params.numElements || 20;
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      throw new Error('Explicit beam dimensions, material modulus, load, and units are required.');
+    }
 
-    const I = (b * Math.pow(h, 3)) / 12.0; // mm^4
-    const A = b * h; // mm^2
-    const linearTipDeflection = (P_total * Math.pow(L, 3)) / (3.0 * E * I);
+    const required = ['length', 'width', 'height', 'E', 'P', 'lengthUnit', 'modulusUnit', 'forceUnit'];
+    const missing = required.filter(key => params[key] === undefined || params[key] === null);
+    if (missing.length > 0) {
+      throw new Error(`Explicit length, width, height, E, P, and units are required; missing: ${missing.join(', ')}.`);
+    }
 
-    // Multi-step incremental Newton-Raphson
-    const loadSteps = [];
-    let currentTipW = 0.0; // Vertical deflection
-    let currentTipU = 0.0; // Axial shortening due to rotation (large rotation effect)
+    const unexpected = Object.keys(params).filter(key => !required.includes(key));
+    if (unexpected.length > 0) {
+      throw new Error(`Unexpected cantilever estimate inputs: ${unexpected.join(', ')}.`);
+    }
 
-    for (let step = 1; step <= this.numLoadSteps; step++) {
-      const lambda = step / this.numLoadSteps;
-      const P_step = lambda * P_total;
+    if (params.lengthUnit !== 'mm' || params.modulusUnit !== 'MPa' || params.forceUnit !== 'N') {
+      throw new Error('Cantilever estimate units must be mm, MPa, and N.');
+    }
 
-      // Analytical Euler elastica non-linear approximation for slender cantilever:
-      // alpha = P * L^2 / (2 * E * I)
-      const alpha = (P_step * Math.pow(L, 2)) / (2.0 * E * I);
-      
-      // Large rotation vertical tip displacement: w/L = (1/alpha) * sin(theta_0) approx
-      // For moderate to large deflection:
-      // theta_tip approx alpha * (1 - 0.25 * alpha^2)
-      // w_tip approx (P * L^3 / (3*E*I)) / (1 + 0.3 * (w_lin / L)^2)
-      const wLinStep = (P_step * Math.pow(L, 3)) / (3.0 * E * I);
-      const nonLinRatio = 1.0 / Math.sqrt(1.0 + 0.45 * Math.pow(wLinStep / L, 2));
-      const wNonlinear = wLinStep * nonLinRatio;
+    const { length, width, height, E, P } = params;
+    const values = { length, width, height, E, P };
+    const invalid = Object.entries(values).filter(([, value]) => !Number.isFinite(value) || value <= 0);
+    if (invalid.length > 0) {
+      throw new Error(`Cantilever estimate inputs must be finite and positive: ${invalid.map(([key]) => key).join(', ')}.`);
+    }
 
-      // Axial geometric shortening (stretching effect u = integral 0.5*(dw/dx)^2 dx)
-      const uShortening = (Math.pow(wNonlinear, 2) / (2.5 * L));
+    const secondMomentMm4 = (width * height ** 3) / 12;
+    const linearTipDeflectionMm = (P * length ** 3) / (3 * E * secondMomentMm4);
+    if (!Number.isFinite(secondMomentMm4) || secondMomentMm4 <= 0 || !Number.isFinite(linearTipDeflectionMm)) {
+      throw new Error('Cantilever inputs exceed the finite range of the estimate formula.');
+    }
+    const loadSamples = [];
 
-      // Newton-Raphson residual check
-      let residualNorm = 1.0;
-      let iter = 0;
-      while (iter < this.maxIterations && residualNorm > this.tolerance) {
-        iter++;
-        // Tangent stiffness K_T stiffens with rotation
-        const kLinear = (3.0 * E * I) / Math.pow(L, 3);
-        const kGeometricStiffening = kLinear * (1.0 + 1.2 * Math.pow(wNonlinear / L, 2));
-        const internalForce = kGeometricStiffening * wNonlinear;
-        const R = Math.abs(P_step - internalForce);
-        residualNorm = R / Math.max(1.0, P_step);
-        if (residualNorm < this.tolerance) break;
+    for (let sample = 1; sample <= this.sampleCount; sample++) {
+      const loadFraction = sample / this.sampleCount;
+      const appliedLoadN = loadFraction * P;
+      const linearDeflectionMm = (appliedLoadN * length ** 3) / (3 * E * secondMomentMm4);
+      const adjustment = 1 / Math.sqrt(1 + 0.45 * (linearDeflectionMm / length) ** 2);
+      const estimateMm = linearDeflectionMm * adjustment;
+      const axialShorteningMm = estimateMm ** 2 / (2.5 * length);
+      if (![linearDeflectionMm, adjustment, estimateMm, axialShorteningMm].every(Number.isFinite)) {
+        throw new Error('Cantilever inputs exceed the finite range of the estimate formula.');
       }
 
-      currentTipW = wNonlinear;
-      currentTipU = uShortening;
-
-      loadSteps.push({
-        step,
-        loadFraction: lambda,
-        appliedLoadN: Math.round(P_step * 100) / 100,
-        tipDeflectionMm: Math.round(currentTipW * 100) / 100,
-        axialShorteningMm: Math.round(currentTipU * 100) / 100,
-        linearDeflectionMm: Math.round(wLinStep * 100) / 100,
-        stiffeningFactor: Math.round((wLinStep / currentTipW) * 1000) / 1000,
-        iterations: iter,
-        converged: residualNorm <= this.tolerance
+      loadSamples.push({
+        loadFraction,
+        appliedLoadN: Math.round(appliedLoadN * 100) / 100,
+        linearDeflectionMm: Math.round(linearDeflectionMm * 100) / 100,
+        estimatedDeflectionMm: Math.round(estimateMm * 100) / 100,
+        estimatedAxialShorteningMm: Math.round(axialShorteningMm * 100) / 100
       });
     }
 
+    const finalSample = loadSamples.at(-1);
+    const nonlinearTipDeflectionMm = finalSample.estimatedDeflectionMm;
+    const formulaAdjustmentPercent =
+      Math.round(((linearTipDeflectionMm - nonlinearTipDeflectionMm) / linearTipDeflectionMm) * 1000) / 10;
+    const compatibilityLoadSteps = loadSamples.map((sample, index) => ({
+      step: index + 1,
+      loadFraction: sample.loadFraction,
+      appliedLoadN: sample.appliedLoadN,
+      tipDeflectionMm: sample.estimatedDeflectionMm,
+      axialShorteningMm: sample.estimatedAxialShorteningMm,
+      linearDeflectionMm: sample.linearDeflectionMm,
+      stiffeningFactor: sample.linearDeflectionMm / sample.estimatedDeflectionMm
+    }));
+
     return {
-      name: 'Nonlinear Large Deflection Cantilever Beam',
-      theory: 'Total Lagrangian (Green-Lagrange Strain & 2nd Piola-Kirchhoff)',
-      linearTipDeflectionMm: Math.round(linearTipDeflection * 100) / 100,
-      nonlinearTipDeflectionMm: Math.round(currentTipW * 100) / 100,
-      geometricStiffeningPercent: Math.round(((linearTipDeflection - currentTipW) / linearTipDeflection) * 1000) / 10,
-      loadSteps,
-      summary: {
-        totalSteps: this.numLoadSteps,
-        finalResidual: 8.4e-8,
-        status: 'CONVERGED'
-      }
+      validationLevel: 'experimental',
+      status: 'ESTIMATE_ONLY',
+      model: 'Formula-based reduced-order cantilever response estimate',
+      units: { length: 'mm', force: 'N', modulus: 'MPa' },
+      inputs: { ...params },
+      assumptions: [
+        'Straight prismatic cantilever with a rectangular cross-section.',
+        'Homogeneous isotropic linear-elastic material represented by one Young’s modulus.',
+        'Transverse point load applied at the free end.',
+        'Nonlinear response is an unvalidated formula adjustment to the linear beam estimate.'
+      ],
+      linearTipDeflectionMm: Math.round(linearTipDeflectionMm * 100) / 100,
+      formulaAdjustedTipDeflectionMm: nonlinearTipDeflectionMm,
+      formulaAdjustmentPercent,
+      // Deprecated names retained for existing callers; both describe formula estimates only.
+      nonlinearTipDeflectionMm,
+      geometricStiffeningPercent: formulaAdjustmentPercent,
+      loadSamples,
+      // Legacy result shape retained; the former iteration/convergence fields were fabricated.
+      loadSteps: compatibilityLoadSteps,
+      summary: { status: 'ESTIMATE_ONLY', sampleCount: this.sampleCount, totalSteps: this.sampleCount }
     };
   }
 }
 
-module.exports = { NonlinearLargeDeflectionSolver };
+module.exports = {
+  CantileverResponseEstimator,
+  // Compatibility name retained for existing callers; this is not a finite-element solver.
+  NonlinearLargeDeflectionSolver: CantileverResponseEstimator
+};

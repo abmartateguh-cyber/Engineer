@@ -1,7 +1,7 @@
 /**
  * OmniEng Static Timing Analysis (STA) & Parasitic RC Extraction (PEX) Engine
- * Standard: Elmore Delay Model & Setup/Hold Timing Closure
- * Industrial Parity: Synopsys PrimeTime / Cadence Tempus timing verification.
+ * Experimental Elmore-style delay and path screening utilities.
+ * This is not signoff STA and is not correlated to a foundry timing library or routed design.
  */
 
 class StaticTimingAnalysis {
@@ -134,7 +134,7 @@ class StaticTimingAnalysis {
    *
    * @param {Object} pathData Base path configuration
    * @param {Array<Object>} [corners] Array of PVT corner specs
-   * @returns {Object} MCMM signoff report
+   * @returns {Object} Experimental MCMM-style screening result
    */
   static evaluateMCMM(pathData = {}, customCorners = null) {
     const defaultCorners = [
@@ -216,6 +216,8 @@ class StaticTimingAnalysis {
     }
 
     return {
+      validationLevel: 'experimental',
+      model: 'illustrative PVT and OCV delay scaling',
       pathName: pathData.name || 'Critical_Path_0',
       cornerCount: corners.length,
       worstNegativeSlackSetupNs: Number(worstSetupSlackNs.toFixed(3)),
@@ -224,7 +226,7 @@ class StaticTimingAnalysis {
       worstNegativeSlackHoldPs: Number((worstHoldSlackNs * 1000).toFixed(1)),
       worstSetupCorner,
       worstHoldCorner,
-      isTimingClosed: worstSetupSlackNs >= 0 && worstHoldSlackNs >= 0,
+      screeningPassed: worstSetupSlackNs >= 0 && worstHoldSlackNs >= 0,
       cornerReports
     };
   }

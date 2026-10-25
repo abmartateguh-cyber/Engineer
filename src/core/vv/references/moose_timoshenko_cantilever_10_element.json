@@ -1,0 +1,41 @@
+{
+  "id": "MOOSE_TIMOSHENKO_CANTILEVER_10_ELEMENT",
+  "formatVersion": 1,
+  "name": "Small strain Timoshenko cantilever bending, ten elements",
+  "referenceKind": "published cross-solver finite-element result",
+  "source": {
+    "organization": "Idaho National Laboratory MOOSE Framework",
+    "documentTitle": "Beams — Verification and Validation",
+    "url": "https://mooseframework.inl.gov/releases/moose/2022-06-10/modules/tensor_mechanics/beam_vandv.html",
+    "modelInput": "modules/tensor_mechanics/test/tests/beam/static/timoshenko_small_strain_y.i",
+    "originalStudy": "Prathap and Bhashyam (1982), International Journal for Numerical Methods in Engineering, volume 18, pages 195–210",
+    "retrieved": "2026-10-24"
+  },
+  "case": {
+    "model": "straight cantilever, clamped at x=0, transverse tip load in local y",
+    "elementCount": 10,
+    "length": 4,
+    "lengthUnits": "m",
+    "youngsModulus": 2.60072400269,
+    "shearModulus": 1.00027846257,
+    "poissonRatio": 0.3,
+    "shearCorrectionFactor": 0.85,
+    "area": 0.554256,
+    "secondMomentIy": 0.0141889,
+    "secondMomentIz": 0.0141889,
+    "tipLoad": 0.0001,
+    "tipLoadUnits": "N",
+    "reportedTipDeflection": 0.05852,
+    "deflectionUnits": "m"
+  },
+  "tolerances": {
+    "maximumRelativeTipDeflectionError": 0.01,
+    "maximumIndependentlyComputedRelativeResidual": 1e-10
+  },
+  "limitations": [
+    "The source page's displayed analytical deflection exponent is inconsistent with its separately reported ten-element finite-element result. This check compares only with the published finite-element result.",
+    "The public TimoshenkoBeam3D implementation provides an element stiffness matrix, not a beam-mesh assembler. The verification harness assembles the documented straight, uniform mesh and uses the production sparse solver.",
+    "The source does not report torsional constant J. The harness supplies a positive explicit value for the uncoupled torsion block; the checked y-plane response is independent of J for this linear model.",
+    "This is experimental cross-solver correlation for one linear beam case. It does not establish beam workflow validation, mesh convergence, or release maturity."
+  ]
+}

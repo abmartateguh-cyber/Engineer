@@ -7,7 +7,7 @@
  * 3. Exact computation of reflected (R_m) and transmitted (T_m) diffraction order efficiencies.
  * 4. Verifies grating equation: sin(theta_m) = sin(theta_in) + m * (lambda / Lambda).
  * 
- * 100% In-House Proprietary Implementation - Zero External Dependencies.
+ * Experimental implementation; release maturity and provenance are not established.
  */
 
 'use strict';
