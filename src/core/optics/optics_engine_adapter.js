@@ -30,7 +30,7 @@ class OpticsEngineAdapter extends EngineAdapter {
         'calculate_refractive_index',
         'trace_polarization'
       ],
-      maturity: ValidationMaturity.CORRELATED,
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -40,7 +40,13 @@ class OpticsEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting optics operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({
+        jobId,
+        type: JobEventType.STARTED,
+        message: `Starting optics operation "${jobRequest.operation}"`
+      })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -52,7 +58,14 @@ class OpticsEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'trace_skew_rays': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Validating optical surfaces and ray bundle' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Validating optical surfaces and ray bundle'
+            })
+          );
           const surfaces = params.surfaces || [];
           let rays = params.rays || [];
 
@@ -66,20 +79,32 @@ class OpticsEngineAdapter extends EngineAdapter {
             );
           } else {
             // Normalize custom input rays
-            rays = rays.map(r => SkewRayTracer.createRay(r.origin, r.direction, r.wavelengthUm, r.intensity));
+            rays = rays.map((r) => SkewRayTracer.createRay(r.origin, r.direction, r.wavelengthUm, r.intensity));
           }
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: `Tracing ${rays.length} skew rays through ${surfaces.length} surfaces` }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: `Tracing ${rays.length} skew rays through ${surfaces.length} surfaces`
+            })
+          );
           const sensorZ = params.sensorZ !== undefined ? Number(params.sensorZ) : undefined;
           const tracedRays = SkewRayTracer.traceOpticalSystem(surfaces, rays, sensorZ);
 
-          const activeCount = tracedRays.filter(r => !r.isTerminated).length;
-          const tirCount = tracedRays.filter(r => r.isTIR).length;
+          const activeCount = tracedRays.filter((r) => !r.isTerminated).length;
+          const tirCount = tracedRays.filter((r) => r.isTIR).length;
 
           // Spot coordinates at image plane
           const spotDiagram = tracedRays
-            .filter(r => !r.isTerminated)
-            .map(r => ({ x: Number(r.x.toFixed(4)), y: Number(r.y.toFixed(4)), z: Number(r.z.toFixed(4)), intensity: r.intensity }));
+            .filter((r) => !r.isTerminated)
+            .map((r) => ({
+              x: Number(r.x.toFixed(4)),
+              y: Number(r.y.toFixed(4)),
+              z: Number(r.z.toFixed(4)),
+              intensity: r.intensity
+            }));
 
           outputData = {
             totalRays: tracedRays.length,
@@ -92,7 +117,14 @@ class OpticsEngineAdapter extends EngineAdapter {
         }
 
         case 'generate_pupil_rays': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: 'Generating circular pupil ray mesh' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: 'Generating circular pupil ray mesh'
+            })
+          );
           const rays = SkewRayTracer.generatePupilRayGrid(
             params.pupilRadiusMm || 10.0,
             params.numRings || 4,
@@ -105,7 +137,14 @@ class OpticsEngineAdapter extends EngineAdapter {
         }
 
         case 'calculate_refractive_index': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Evaluating dispersion equation' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Evaluating dispersion equation'
+            })
+          );
           let catalog = this.catalog;
           if (params.customGlassRecord) {
             catalog = new OpticalGlassCatalog([params.customGlassRecord]);
@@ -129,7 +168,14 @@ class OpticsEngineAdapter extends EngineAdapter {
         }
 
         case 'trace_polarization': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Evaluating polarization state, Jones matrix, and Stokes parameters' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Evaluating polarization state, Jones matrix, and Stokes parameters'
+            })
+          );
           if (params.crystal) {
             // Birefringent crystal walk-off and splitting calculation
             outputData = PolarizationRayTracer.splitBirefringentRay(
@@ -145,7 +191,10 @@ class OpticsEngineAdapter extends EngineAdapter {
             );
           } else {
             // Jones vector transmission through optical polarizers and retarders
-            let jv = new JonesVector(params.Ex !== undefined ? params.Ex : 1.0, params.Ey !== undefined ? params.Ey : 0.0);
+            let jv = new JonesVector(
+              params.Ex !== undefined ? params.Ex : 1.0,
+              params.Ey !== undefined ? params.Ey : 0.0
+            );
             const stokesIn = jv.toStokes();
 
             if (Array.isArray(params.elements)) {
@@ -191,10 +240,15 @@ class OpticsEngineAdapter extends EngineAdapter {
         }
 
         default:
-          throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented in OpticsEngineAdapter`);
+          throw new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Operation "${jobRequest.operation}" not implemented in OpticsEngineAdapter`
+          );
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Optics operation complete' }));
+      onEvent(
+        new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Optics operation complete' })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

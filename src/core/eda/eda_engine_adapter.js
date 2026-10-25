@@ -30,7 +30,7 @@ class EDAEngineAdapter extends EngineAdapter {
         'extract_wire_parasitics',
         'run_drc'
       ],
-      maturity: ValidationMaturity.CORRELATED,
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -40,7 +40,9 @@ class EDAEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting EDA operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting EDA operation "${jobRequest.operation}"` })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -52,7 +54,14 @@ class EDAEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'simulate_spice_dc': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Parsing circuit netlist components' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Parsing circuit netlist components'
+            })
+          );
           const engine = new SpiceEngine();
 
           if (Array.isArray(params.components)) {
@@ -85,13 +94,27 @@ class EDAEngineAdapter extends EngineAdapter {
             }
           }
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 60, message: 'Solving DC operating point via Newton-Raphson MNA' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 60,
+              message: 'Solving DC operating point via Newton-Raphson MNA'
+            })
+          );
           outputData = engine.runDCOperatingPoint(params.maxIter || 50, params.tol || 1e-6);
           break;
         }
 
         case 'simulate_spice_transient': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Configuring transient MNA matrices' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Configuring transient MNA matrices'
+            })
+          );
           const engine = new SpiceEngine();
 
           if (Array.isArray(params.components)) {
@@ -121,34 +144,67 @@ class EDAEngineAdapter extends EngineAdapter {
           const tStop = Number(params.tStop || 0.005);
           const dt = Number(params.dt || 1e-5);
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: `Running Backward Euler time-marching to t=${tStop}s` }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: `Running Backward Euler time-marching to t=${tStop}s`
+            })
+          );
           outputData = engine.runTransient(tStop, dt);
           break;
         }
 
         case 'static_timing_analysis': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Tracing setup and hold paths with gate and wire delays' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Tracing setup and hold paths with gate and wire delays'
+            })
+          );
           outputData = StaticTimingAnalysis.evaluatePathTiming(params);
           break;
         }
 
         case 'extract_wire_parasitics': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Extracting Palmer/Sakurai fringe and parallel plate capacitance' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Extracting Palmer/Sakurai fringe and parallel plate capacitance'
+            })
+          );
           outputData = StaticTimingAnalysis.extractParasitics(params);
           break;
         }
 
         case 'run_drc': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: 'Screening 2D rectangular shapes against DRC rules' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: 'Screening 2D rectangular shapes against DRC rules'
+            })
+          );
           outputData = DRCEngine.runDRC(params.shapes, params.rules);
           break;
         }
 
         default:
-          throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented in EDAEngineAdapter`);
+          throw new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Operation "${jobRequest.operation}" not implemented in EDAEngineAdapter`
+          );
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'EDA operation complete' }));
+      onEvent(
+        new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'EDA operation complete' })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

@@ -31,7 +31,7 @@ class ControlsEngineAdapter extends EngineAdapter {
         'solve_mpc',
         'estimate_ekf'
       ],
-      maturity: ValidationMaturity.CORRELATED,
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -41,7 +41,13 @@ class ControlsEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting controls operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({
+        jobId,
+        type: JobEventType.STARTED,
+        message: `Starting controls operation "${jobRequest.operation}"`
+      })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -53,7 +59,14 @@ class ControlsEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'simulate_block_diagram': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Constructing dynamic block diagram graph' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Constructing dynamic block diagram graph'
+            })
+          );
           const graph = new BlockDiagramGraph();
 
           if (Array.isArray(params.blocks)) {
@@ -71,13 +84,27 @@ class ControlsEngineAdapter extends EngineAdapter {
           const tEnd = Number(params.tEnd || 10.0);
           const dt = Number(params.dt || 0.01);
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: `Simulating block graph to t=${tEnd}s (dt=${dt}s)` }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: `Simulating block graph to t=${tEnd}s (dt=${dt}s)`
+            })
+          );
           outputData = graph.simulate(tEnd, dt);
           break;
         }
 
         case 'solve_state_space': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 25, message: 'Initializing continuous state-space matrices (A, B, C, D)' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 25,
+              message: 'Initializing continuous state-space matrices (A, B, C, D)'
+            })
+          );
           const { A, B, C, D, initialX, tEnd = 5.0, dt = 0.01, u = [1.0] } = params;
 
           if (!A || !B || !C || !D) {
@@ -114,7 +141,14 @@ class ControlsEngineAdapter extends EngineAdapter {
 
             if (step % Math.max(1, Math.floor(steps / 5)) === 0) {
               const pct = Math.round(25 + (step / steps) * 70);
-              onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: pct, message: `Integrated to t=${t.toFixed(2)}s` }));
+              onEvent(
+                new JobEvent({
+                  jobId,
+                  type: JobEventType.PROGRESS,
+                  progressPercent: pct,
+                  message: `Integrated to t=${t.toFixed(2)}s`
+                })
+              );
             }
           }
 
@@ -129,7 +163,14 @@ class ControlsEngineAdapter extends EngineAdapter {
         }
 
         case 'fmi_cosimulation': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Setting up FMI 2.0/3.0 co-simulation master' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Setting up FMI 2.0/3.0 co-simulation master'
+            })
+          );
           const master = new FmiMasterEngine({
             stepSize: params.stepSize || 0.01,
             maxIterations: params.maxIterations || 50
@@ -143,7 +184,14 @@ class ControlsEngineAdapter extends EngineAdapter {
           }
 
           const hasLoop = master.hasAlgebraicLoop();
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 70, message: `Algebraic loop check: ${hasLoop ? 'DETECTED' : 'NONE'}` }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 70,
+              message: `Algebraic loop check: ${hasLoop ? 'DETECTED' : 'NONE'}`
+            })
+          );
 
           let loopResolution = null;
           if (hasLoop) {
@@ -160,7 +208,14 @@ class ControlsEngineAdapter extends EngineAdapter {
         }
 
         case 'solve_mpc': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Formulating QP active-set constrained MPC problem' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Formulating QP active-set constrained MPC problem'
+            })
+          );
           const nx = params.A.length;
           const nu = params.B[0].length;
           const ny = params.C.length;
@@ -180,8 +235,18 @@ class ControlsEngineAdapter extends EngineAdapter {
             initialControl: Array.isArray(params.initialControl) ? params.initialControl : new Array(nu).fill(0.0)
           });
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 70, message: 'Solving dual active-set Goldfarb-Idnani QP' }));
-          const sol = mpc.computeControlAction(params.x0 || new Array(nx).fill(0), params.reference || new Array(ny).fill(1));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 70,
+              message: 'Solving dual active-set Goldfarb-Idnani QP'
+            })
+          );
+          const sol = mpc.computeControlAction(
+            params.x0 || new Array(nx).fill(0),
+            params.reference || new Array(ny).fill(1)
+          );
           outputData = {
             optimalControl: sol.u,
             optimalSequence: sol.optimalSequence,
@@ -192,7 +257,14 @@ class ControlsEngineAdapter extends EngineAdapter {
         }
 
         case 'estimate_ekf': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Initializing 10-state quaternion Extended Kalman Filter' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Initializing 10-state quaternion Extended Kalman Filter'
+            })
+          );
           const ekf = new ExtendedKalmanFilter();
           if (params.initialState && Array.isArray(params.initialState)) {
             for (let i = 0; i < Math.min(10, params.initialState.length); i++) {
@@ -200,7 +272,9 @@ class ControlsEngineAdapter extends EngineAdapter {
             }
           }
 
-          const steps = Array.isArray(params.steps) ? params.steps : [{ dt: params.dt || 0.01, gyro: params.gyro, accel: params.accel }];
+          const steps = Array.isArray(params.steps)
+            ? params.steps
+            : [{ dt: params.dt || 0.01, gyro: params.gyro, accel: params.accel }];
           const trajectory = [];
 
           for (let i = 0; i < steps.length; i++) {
@@ -238,10 +312,20 @@ class ControlsEngineAdapter extends EngineAdapter {
         }
 
         default:
-          throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented in ControlsEngineAdapter`);
+          throw new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Operation "${jobRequest.operation}" not implemented in ControlsEngineAdapter`
+          );
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Controls operation complete' }));
+      onEvent(
+        new JobEvent({
+          jobId,
+          type: JobEventType.PROGRESS,
+          progressPercent: 100,
+          message: 'Controls operation complete'
+        })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

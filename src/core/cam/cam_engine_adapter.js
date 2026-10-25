@@ -21,11 +21,8 @@ class CAMEngineAdapter extends EngineAdapter {
       domain: 'cam',
       name: this.name,
       version: this.version,
-      supportedOperations: [
-        'plan_roughing_toolpath',
-        'generate_gcode'
-      ],
-      maturity: ValidationMaturity.CORRELATED,
+      supportedOperations: ['plan_roughing_toolpath', 'generate_gcode'],
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -35,7 +32,9 @@ class CAMEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting CAM operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting CAM operation "${jobRequest.operation}"` })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -48,18 +47,39 @@ class CAMEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'plan_roughing_toolpath': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Generating multi-layer constant-Z roughing passes' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Generating multi-layer constant-Z roughing passes'
+            })
+          );
           const bounds = params.bounds || { minX: 0, maxX: 100, minY: 0, maxY: 100, minZ: 0, maxZ: 20 };
           outputData = engine.planRoughingToolpath(bounds);
           break;
         }
 
         case 'generate_gcode': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Planning toolpaths for G-Code post-processing' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Planning toolpaths for G-Code post-processing'
+            })
+          );
           const bounds = params.bounds || { minX: 0, maxX: 100, minY: 0, maxY: 100, minZ: 0, maxZ: 20 };
           const toolpaths = params.toolpaths || engine.planRoughingToolpath(bounds);
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 75, message: 'Post-processing toolpath coordinates to ISO/Fanuc G-Code' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 75,
+              message: 'Post-processing toolpath coordinates to ISO/Fanuc G-Code'
+            })
+          );
           const gcode = engine.generateGCode(toolpaths, params.programNumber || 'O1001');
 
           outputData = {
@@ -71,10 +91,15 @@ class CAMEngineAdapter extends EngineAdapter {
         }
 
         default:
-          throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented in CAMEngineAdapter`);
+          throw new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Operation "${jobRequest.operation}" not implemented in CAMEngineAdapter`
+          );
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'CAM operation complete' }));
+      onEvent(
+        new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'CAM operation complete' })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

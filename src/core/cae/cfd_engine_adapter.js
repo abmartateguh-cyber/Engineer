@@ -21,11 +21,8 @@ class CFDEngineAdapter extends EngineAdapter {
       domain: 'cfd',
       name: this.name,
       version: this.version,
-      supportedOperations: [
-        'fvm_navier_stokes_3d',
-        'incompressible_flow'
-      ],
-      maturity: ValidationMaturity.CORRELATED,
+      supportedOperations: ['fvm_navier_stokes_3d', 'incompressible_flow'],
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -35,7 +32,9 @@ class CFDEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting CFD solve "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting CFD solve "${jobRequest.operation}"` })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -45,7 +44,14 @@ class CFDEngineAdapter extends EngineAdapter {
       const params = jobRequest.parameters || {};
       const fvm = new FVMNavierStokes3D(params.options || {});
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Discretizing 3D polyhedral domain' }));
+      onEvent(
+        new JobEvent({
+          jobId,
+          type: JobEventType.PROGRESS,
+          progressPercent: 20,
+          message: 'Discretizing 3D polyhedral domain'
+        })
+      );
       fvm.createBoxDomain(
         params.nx || 10,
         params.ny || 10,
@@ -59,7 +65,14 @@ class CFDEngineAdapter extends EngineAdapter {
       const inletVel = params.inletVelocity !== undefined ? params.inletVelocity : 15.0;
       const convergenceHistory = [];
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Solving Navier-Stokes flux balances' }));
+      onEvent(
+        new JobEvent({
+          jobId,
+          type: JobEventType.PROGRESS,
+          progressPercent: 40,
+          message: 'Solving Navier-Stokes flux balances'
+        })
+      );
 
       // Solve in increments to emit residual and progress events
       const chunk = Math.max(1, Math.floor(steps / 3));
@@ -88,7 +101,9 @@ class CFDEngineAdapter extends EngineAdapter {
         });
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'CFD solve completed' }));
+      onEvent(
+        new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'CFD solve completed' })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

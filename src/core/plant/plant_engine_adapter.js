@@ -31,7 +31,7 @@ class PlantEngineAdapter extends EngineAdapter {
         'calculate_water_hammer',
         'generate_vle_envelope'
       ],
-      maturity: ValidationMaturity.CORRELATED,
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -41,7 +41,9 @@ class PlantEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting plant operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting plant operation "${jobRequest.operation}"` })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -53,7 +55,14 @@ class PlantEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'solve_vle_flash': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 25, message: 'Configuring Peng-Robinson EOS multicomponent flash' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 25,
+              message: 'Configuring Peng-Robinson EOS multicomponent flash'
+            })
+          );
           const components = params.components || ['methane', 'ethane', 'propane'];
           const eos = new PengRobinsonEOS(components, params.k_ij);
 
@@ -61,16 +70,23 @@ class PlantEngineAdapter extends EngineAdapter {
           const P = Number(params.pressurePa || 3.0e6);
           const z = params.feedComposition || params.z || new Array(components.length).fill(1 / components.length);
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 60, message: `Solving Rachford-Rice isothermal-isobaric flash at T=${T}K, P=${(P / 1e5).toFixed(1)}bar` }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 60,
+              message: `Solving Rachford-Rice isothermal-isobaric flash at T=${T}K, P=${(P / 1e5).toFixed(1)}bar`
+            })
+          );
           const flash = eos.flashPT(z, T, P, params.maxIter || 60, params.tol || 1e-6);
 
           outputData = {
             temperatureK: T,
             pressurePa: P,
             vaporFraction: Number(flash.beta.toFixed(5)),
-            liquidComposition: Array.from(flash.x).map(v => Number(v.toFixed(5))),
-            vaporComposition: Array.from(flash.y).map(v => Number(v.toFixed(5))),
-            equilibriumConstantsK: Array.from(flash.K).map(v => Number(v.toFixed(5))),
+            liquidComposition: Array.from(flash.x).map((v) => Number(v.toFixed(5))),
+            vaporComposition: Array.from(flash.y).map((v) => Number(v.toFixed(5))),
+            equilibriumConstantsK: Array.from(flash.K).map((v) => Number(v.toFixed(5))),
             compressibilityLiquid: Number(flash.Z_L.toFixed(4)),
             compressibilityVapor: Number(flash.Z_V.toFixed(4)),
             converged: flash.converged
@@ -79,52 +95,90 @@ class PlantEngineAdapter extends EngineAdapter {
         }
 
         case 'calculate_nrtl_activity': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: 'Calculating NRTL liquid activity coefficients' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: 'Calculating NRTL liquid activity coefficients'
+            })
+          );
           const x = params.liquidComposition || [0.5, 0.5];
           const T = Number(params.temperatureK || 298.15);
-          const delta_g = params.delta_g || [[0, 2000], [1500, 0]];
-          const alpha = params.alpha || [[0, 0.3], [0.3, 0]];
+          const delta_g = params.delta_g || [
+            [0, 2000],
+            [1500, 0]
+          ];
+          const alpha = params.alpha || [
+            [0, 0.3],
+            [0.3, 0]
+          ];
 
           const gamma = PengRobinsonEOS.calculateNRTL(x, T, delta_g, alpha);
           outputData = {
             temperatureK: T,
             liquidComposition: x,
-            activityCoefficients: Array.from(gamma).map(v => Number(v.toFixed(5)))
+            activityCoefficients: Array.from(gamma).map((v) => Number(v.toFixed(5)))
           };
           break;
         }
 
         case 'solve_distillation_mesh': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Formulating simultaneous MESH equations for column' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Formulating simultaneous MESH equations for column'
+            })
+          );
           outputData = NaphtaliSandholmColumnSolver.solve(params);
           break;
         }
 
         case 'calculate_water_hammer': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Evaluating Korteweg wave speed and Joukowsky surge' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Evaluating Korteweg wave speed and Joukowsky surge'
+            })
+          );
           const conduit = {
             fluidDensity: params.fluidDensity || 998.2,
             fluidBulkModulus: params.fluidBulkModulus || 2.19e9,
             pipeElasticModulus: params.pipeElasticModulus || 2.0e11,
-            pipeInnerDiameter: params.pipeDiameter || params.pipeInnerDiameter || 0.30,
+            pipeInnerDiameter: params.pipeDiameter || params.pipeInnerDiameter || 0.3,
             pipeWallThickness: params.pipeWallThickness || 0.008,
             restraintFactor: params.restraintFactor || 1.0
           };
 
           const waveSpeed = TransientWaterHammerSolver.calculateWaveSpeed(conduit);
-          const v0 = params.steadyVelocity || (params.steadyFlowRate ? params.steadyFlowRate / (Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2)) : 2.0);
+          const v0 =
+            params.steadyVelocity ||
+            (params.steadyFlowRate
+              ? params.steadyFlowRate / (Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2))
+              : 2.0);
           const surge = TransientWaterHammerSolver.joukowskySurge(waveSpeed, v0, conduit.fluidDensity);
 
           let moc = null;
           if (params.runMOC) {
-            onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 65, message: 'Executing 1D Method of Characteristics transient solver' }));
+            onEvent(
+              new JobEvent({
+                jobId,
+                type: JobEventType.PROGRESS,
+                progressPercent: 65,
+                message: 'Executing 1D Method of Characteristics transient solver'
+              })
+            );
             const mocParams = {
               pipeLength: params.pipeLength || 1000.0,
               pipeDiameter: conduit.pipeInnerDiameter,
               pipeWallThickness: conduit.pipeWallThickness,
               darcyFrictionFactor: params.darcyFrictionFactor || 0.018,
               reservoirHead: params.reservoirHead || 100.0,
-              steadyFlowRate: params.steadyFlowRate || (v0 * Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2)),
+              steadyFlowRate: params.steadyFlowRate || v0 * Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2),
               valveClosureTime: params.valveClosureTime || 0.5,
               valveClosureLaw: params.valveClosureLaw || 'linear',
               simulationDuration: params.simulationDuration || 3.0,
@@ -148,7 +202,14 @@ class PlantEngineAdapter extends EngineAdapter {
         }
 
         case 'generate_vle_envelope': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Calculating multicomponent VLE P-T envelope' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Calculating multicomponent VLE P-T envelope'
+            })
+          );
           const composition = params.composition || { methane: 0.7, ethane: 0.2, propane: 0.1 };
           const pMinBar = Number(params.pMinBar || 1.0);
           const pMaxBar = Number(params.pMaxBar || 50.0);
@@ -171,20 +232,31 @@ class PlantEngineAdapter extends EngineAdapter {
             propane: {
               criticalTemperatureK: 369.83,
               criticalPressurePa: 42.48e5,
-              molecularWeightKgPerMol: 0.04410,
+              molecularWeightKgPerMol: 0.0441,
               acentricFactor: 0.1523,
               provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
             }
           };
-          outputData = VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, pMinBar, pMaxBar, points, componentProperties);
+          outputData = VLEPhaseEnvelopeEngine.generatePTEnvelope(
+            composition,
+            pMinBar,
+            pMaxBar,
+            points,
+            componentProperties
+          );
           break;
         }
 
         default:
-          throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented in PlantEngineAdapter`);
+          throw new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Operation "${jobRequest.operation}" not implemented in PlantEngineAdapter`
+          );
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Plant operation complete' }));
+      onEvent(
+        new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Plant operation complete' })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

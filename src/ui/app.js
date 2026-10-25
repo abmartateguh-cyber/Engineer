@@ -3055,7 +3055,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const res = await window.omni?.openProject?.();
         if (res?.success && res.project) {
           updateProjectHistoryUI(res.project);
-          addAiMessage(`[Project Storage] Opened project: ${res.project.projectName} (Revision ${res.project.revision}, ${res.project.blobCount} artifacts)`);
+          addAiMessage(
+            `[Project Storage] Opened project: ${res.project.projectName} (Revision ${res.project.revision}, ${res.project.blobCount} artifacts)`
+          );
         } else if (res?.cancelled) {
           // User cancelled file dialog
         } else if (res?.error) {

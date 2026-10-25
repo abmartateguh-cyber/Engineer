@@ -359,7 +359,10 @@ function registerSystemIpc(deps = {}) {
         targetPath = activeProjectManager.currentFilePath;
       }
       if (!targetPath) {
-        return { success: false, error: { code: 'INVALID_INPUT', message: 'No target file path provided or selected' } };
+        return {
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'No target file path provided or selected' }
+        };
       }
       try {
         const saveRes = activeProjectManager.saveProject(targetPath);

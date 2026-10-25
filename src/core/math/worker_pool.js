@@ -224,9 +224,10 @@ class PersistentWorkerPool {
   constructor(options = {}) {
     const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : 4;
     const requestedWorkers = Number(options.maxWorkers);
-    this.maxWorkers = Number.isInteger(requestedWorkers) && requestedWorkers >= 1
-      ? requestedWorkers
-      : Math.min(Math.max(cpuCount, 1), 8);
+    this.maxWorkers =
+      Number.isInteger(requestedWorkers) && requestedWorkers >= 1
+        ? requestedWorkers
+        : Math.min(Math.max(cpuCount, 1), 8);
 
     this.defaultTimeoutMs = Math.max(500, Number(options.defaultTimeoutMs) || 60000);
     this.taskQueue = [];
@@ -336,10 +337,7 @@ class PersistentWorkerPool {
     const task = slot.currentTask;
     if (task) {
       if (slot.timer) clearTimeout(slot.timer);
-      const omniErr = new OmniError(
-        OmniErrorCode.RESOURCE_EXHAUSTED,
-        `Worker exited unexpectedly with code ${code}`
-      );
+      const omniErr = new OmniError(OmniErrorCode.RESOURCE_EXHAUSTED, `Worker exited unexpectedly with code ${code}`);
       this._failTask(slot, task, omniErr);
     }
     if (!this._closing) {

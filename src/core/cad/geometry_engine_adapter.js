@@ -34,7 +34,7 @@ class GeometryEngineAdapter extends EngineAdapter {
         'solve_variational_sketch',
         'export_step'
       ],
-      maturity: ValidationMaturity.CORRELATED,
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -44,7 +44,9 @@ class GeometryEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting CAD operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting CAD operation "${jobRequest.operation}"` })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -56,7 +58,14 @@ class GeometryEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'evaluate_nurbs': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Evaluating surface point and normal' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Evaluating surface point and normal'
+            })
+          );
           const surfParams = params.surface || params;
           const surface = new NurbsSurface(surfParams);
           const u = params.u !== undefined ? params.u : 0.5;
@@ -73,20 +82,46 @@ class GeometryEngineAdapter extends EngineAdapter {
         }
 
         case 'intersect_nurbs_ssi': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Tracing surface-surface intersection' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Tracing surface-surface intersection'
+            })
+          );
           const ssiEngine = new SurfaceSurfaceIntersectionEngine();
           outputData = ssiEngine.intersectSurfaces(params.surfA, params.surfB, params.options || {});
           break;
         }
 
         case 'apply_edge_blend': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Generating rolling-ball fillet' }));
-          outputData = EdgeBlender.applyFillet(params.solid, params.targetEdge, params.radius || 5.0, params.options || {});
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Generating rolling-ball fillet'
+            })
+          );
+          outputData = EdgeBlender.applyFillet(
+            params.solid,
+            params.targetEdge,
+            params.radius || 5.0,
+            params.options || {}
+          );
           break;
         }
 
         case 'solve_assembly_mates': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: 'Relaxing kinematic mate constraints' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: 'Relaxing kinematic mate constraints'
+            })
+          );
           const solver = new AssemblyMateSolver();
           if (Array.isArray(params.components)) {
             for (const c of params.components) {
@@ -103,8 +138,18 @@ class GeometryEngineAdapter extends EngineAdapter {
         }
 
         case 'export_step': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 60, message: 'Translating B-Rep to AP214 STEP format' }));
-          const stepContent = StepTranslator.exportSTEP(params.solid || params.body || params, params.modelName || 'Part');
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 60,
+              message: 'Translating B-Rep to AP214 STEP format'
+            })
+          );
+          const stepContent = StepTranslator.exportSTEP(
+            params.solid || params.body || params,
+            params.modelName || 'Part'
+          );
           outputData = {
             stepContent,
             sizeBytes: Buffer.byteLength(stepContent, 'utf8'),
@@ -114,7 +159,14 @@ class GeometryEngineAdapter extends EngineAdapter {
         }
 
         case 'solve_variational_sketch': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 30, message: 'Solving 2D geometric constraints via Levenberg-Marquardt' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 30,
+              message: 'Solving 2D geometric constraints via Levenberg-Marquardt'
+            })
+          );
           const solver = new ConstraintSolver2D();
           if (Array.isArray(params.points)) {
             for (const p of params.points) {
@@ -156,7 +208,9 @@ class GeometryEngineAdapter extends EngineAdapter {
           throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented`);
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Operation complete' }));
+      onEvent(
+        new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Operation complete' })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({

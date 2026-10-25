@@ -23,12 +23,8 @@ class FEAEngineAdapter extends EngineAdapter {
       domain: 'cae',
       name: this.name,
       version: this.version,
-      supportedOperations: [
-        'linear_elastic_3d',
-        'continuum_plasticity_3d',
-        'drop_test'
-      ],
-      maturity: ValidationMaturity.CORRELATED,
+      supportedOperations: ['linear_elastic_3d', 'continuum_plasticity_3d', 'drop_test'],
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -38,7 +34,9 @@ class FEAEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting FEA solve "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting FEA solve "${jobRequest.operation}"` })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -51,7 +49,14 @@ class FEAEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'linear_elastic_3d': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Assembling global stiffness matrix K' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Assembling global stiffness matrix K'
+            })
+          );
           const solver = new FEASolver();
 
           // Add nodes
@@ -74,16 +79,37 @@ class FEAEngineAdapter extends EngineAdapter {
             }
           }
 
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 60, message: 'Inverting stiffness equation K * u = F' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 60,
+              message: 'Inverting stiffness equation K * u = F'
+            })
+          );
           outputData = solver.solve();
           convergenceHistory.push({ iteration: 1, residual: 0.0 });
           break;
         }
 
         case 'continuum_plasticity_3d': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 20, message: 'Initializing J2 von Mises plasticity solver' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 20,
+              message: 'Initializing J2 von Mises plasticity solver'
+            })
+          );
           const plasticity = new ContinuumPlasticity3D(params.mesh || params);
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: 'Running radial return mapping iterations' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: 'Running radial return mapping iterations'
+            })
+          );
           outputData = plasticity.solve(params.steps || 10);
           if (outputData?.convergence) {
             convergenceHistory = outputData.convergence;
@@ -92,7 +118,14 @@ class FEAEngineAdapter extends EngineAdapter {
         }
 
         case 'drop_test': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 25, message: 'Simulating transient handset impact' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 25,
+              message: 'Simulating transient handset impact'
+            })
+          );
           const sim = new DropTestSimulator(params);
           outputData = sim.simulate();
           break;

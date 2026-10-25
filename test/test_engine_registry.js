@@ -4,6 +4,8 @@ const assert = require('assert');
 const { defaultEngineRegistry } = require('../src/core/contracts/engine_registry');
 const { JobRequest } = require('../src/core/contracts/JobRequest');
 const { JobStatus } = require('../src/core/contracts/JobResult');
+const { ValidationMaturity } = require('../src/core/contracts/ValidationRecord');
+const { getFeatureMaturity } = require('../src/core/maturity/feature_maturity');
 
 (async () => {
   console.log('================================================================');
@@ -27,6 +29,13 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
   for (const domain of domains) {
     assert(allCaps[domain], `Capabilities must exist for domain ${domain}`);
     assert(allCaps[domain].supportedOperations.length > 0, `Supported operations must exist for ${domain}`);
+    assert.strictEqual(
+      allCaps[domain].maturity,
+      ValidationMaturity.EXPERIMENTAL,
+      `${domain} adapter must remain experimental until its own independent validation evidence exists`
+    );
+    assert.strictEqual(getFeatureMaturity(domain).state, 'experimental');
+    assert.strictEqual(getFeatureMaturity(domain).releaseApproved, false);
   }
   console.log('  ✓ PASSED: All 9 domain capabilities verified\n');
 
@@ -38,9 +47,21 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
     parameters: {
       surface: {
         controlPoints: [
-          [[0, 0, 0], [10, 0, 2], [20, 0, 0]],
-          [[0, 10, 2], [10, 10, 8], [20, 10, 2]],
-          [[0, 20, 0], [10, 20, 2], [20, 20, 0]]
+          [
+            [0, 0, 0],
+            [10, 0, 2],
+            [20, 0, 0]
+          ],
+          [
+            [0, 10, 2],
+            [10, 10, 8],
+            [20, 10, 2]
+          ],
+          [
+            [0, 20, 0],
+            [10, 20, 2],
+            [20, 20, 0]
+          ]
         ],
         degreeU: 2,
         degreeV: 2
@@ -72,7 +93,9 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
   const edaRes = await defaultEngineRegistry.dispatch(edaReq);
   assert.strictEqual(edaRes.status, JobStatus.SUCCEEDED);
   assert.strictEqual(Math.round(edaRes.outputData.nodeVoltages['2']), 8); // 12V * (4/(2+4)) = 8V
-  console.log(`  ✓ PASSED: EDA job dispatched successfully via registry: V(2) = ${edaRes.outputData.nodeVoltages['2']} V\n`);
+  console.log(
+    `  ✓ PASSED: EDA job dispatched successfully via registry: V(2) = ${edaRes.outputData.nodeVoltages['2']} V\n`
+  );
 
   console.log('================================================================');
   console.log('   ALL ENGINE REGISTRY DISPATCH TESTS PASSED!                   ');

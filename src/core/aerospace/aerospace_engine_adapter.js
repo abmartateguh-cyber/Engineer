@@ -29,7 +29,7 @@ class AerospaceEngineAdapter extends EngineAdapter {
         'calculate_staging_deltav',
         'calculate_isogrid_buckling'
       ],
-      maturity: ValidationMaturity.CORRELATED,
+      maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
   }
@@ -39,7 +39,13 @@ class AerospaceEngineAdapter extends EngineAdapter {
     const tStart = Date.now();
     const jobId = jobRequest.jobId;
 
-    onEvent(new JobEvent({ jobId, type: JobEventType.STARTED, message: `Starting aerospace operation "${jobRequest.operation}"` }));
+    onEvent(
+      new JobEvent({
+        jobId,
+        type: JobEventType.STARTED,
+        message: `Starting aerospace operation "${jobRequest.operation}"`
+      })
+    );
 
     if (signal?.aborted) {
       throw new OmniError(OmniErrorCode.CANCELLED, 'Job cancelled before execution');
@@ -51,7 +57,14 @@ class AerospaceEngineAdapter extends EngineAdapter {
 
       switch (jobRequest.operation) {
         case 'calculate_engine_performance': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Calculating rocket engine chamber and nozzle performance' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Calculating rocket engine chamber and nozzle performance'
+            })
+          );
           const engineParams = {
             ...params,
             ambientPressureBar: params.ambientPressureBar !== undefined ? params.ambientPressureBar : 1.01325
@@ -61,7 +74,14 @@ class AerospaceEngineAdapter extends EngineAdapter {
         }
 
         case 'evaluate_combustion': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Evaluating propellant combustion temperature and characteristic velocity' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Evaluating propellant combustion temperature and characteristic velocity'
+            })
+          );
           outputData = this.propulsion.evaluateCombustionEquilibrium(
             params.propellantType || 'LOX_LCH4',
             params.chamberPressureBar || 100.0,
@@ -71,28 +91,59 @@ class AerospaceEngineAdapter extends EngineAdapter {
         }
 
         case 'simulate_ascent_trajectory': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 50, message: 'Simulating ascent launch trajectory through 1976 Standard Atmosphere' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 50,
+              message: 'Simulating ascent launch trajectory through 1976 Standard Atmosphere'
+            })
+          );
           outputData = this.propulsion.simulateAscentTrajectory(params);
           break;
         }
 
         case 'calculate_staging_deltav': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Evaluating Tsiolkovsky multi-stage delta-V budget' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Evaluating Tsiolkovsky multi-stage delta-V budget'
+            })
+          );
           outputData = this.propulsion.calculateStagingDeltaV(params);
           break;
         }
 
         case 'calculate_isogrid_buckling': {
-          onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 40, message: 'Screening triangular isogrid skin and rib instability' }));
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Screening triangular isogrid skin and rib instability'
+            })
+          );
           outputData = this.propulsion.calculateIsogridTankBuckling(params);
           break;
         }
 
         default:
-          throw new OmniError(OmniErrorCode.UNSUPPORTED, `Operation "${jobRequest.operation}" not implemented in AerospaceEngineAdapter`);
+          throw new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Operation "${jobRequest.operation}" not implemented in AerospaceEngineAdapter`
+          );
       }
 
-      onEvent(new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Aerospace operation complete' }));
+      onEvent(
+        new JobEvent({
+          jobId,
+          type: JobEventType.PROGRESS,
+          progressPercent: 100,
+          message: 'Aerospace operation complete'
+        })
+      );
 
       const durationMs = Date.now() - tStart;
       const result = new JobResult({
