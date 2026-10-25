@@ -24,6 +24,9 @@ console.log('================================================================\n'
 // -----------------------------------------------------------------------------
 console.log('[P6-1] Jones Vector Polarization & Stokes Parameters (S0..S3)...');
 
+assert.throws(() => new Complex(), /explicit finite real and imaginary/i);
+assert.throws(() => new JonesVector(), /explicit finite Ex and Ey/i);
+
 const linH = JonesVector.LinearHorizontal();
 const stokesH = linH.toStokes();
 assert.strictEqual(stokesH.S0, 1.0);
@@ -61,6 +64,7 @@ const nGlass = 1.5168; // N-BK7 at 587.6 nm
 
 // At normal incidence (theta = 0)
 const normalFresnel = PolarizationRayTracer.evaluateFresnel(nAir, nGlass, 0.0);
+assert.throws(() => PolarizationRayTracer.evaluateFresnel(0, nGlass, 0), /positive incident and transmitted indices/i);
 const expectedR0 = Math.pow((nGlass - nAir) / (nGlass + nAir), 2); // ~ 0.04218
 assert(Math.abs(normalFresnel.Rs - expectedR0) < 1e-4, 'Normal reflectance must match Fresnel formula');
 assert(Math.abs(normalFresnel.Rp - expectedR0) < 1e-4);

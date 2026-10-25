@@ -9,11 +9,26 @@ class SkewRayTracer {
    * Creates a 3D ray.
    * @param {number[]} origin [x, y, z]
    * @param {number[]} direction [L, M, N]
-   * @param {number} wavelengthUm Wavelength in microns (default 0.5876 d-line)
+   * @param {number} wavelengthUm Wavelength in microns
    * @param {number} intensity Ray relative intensity
    */
-  static createRay(origin = [0, 0, 0], direction = [0, 0, 1], wavelengthUm = 0.5875618, intensity = 1.0) {
-    const dirNorm = Math.sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]) || 1.0;
+  static createRay(origin, direction, wavelengthUm, intensity) {
+    if (!Array.isArray(origin) || origin.length !== 3 || !origin.every(Number.isFinite)) {
+      throw new TypeError('Ray origin must contain three finite millimeter coordinates.');
+    }
+    if (!Array.isArray(direction) || direction.length !== 3 || !direction.every(Number.isFinite)) {
+      throw new TypeError('Ray direction must contain three finite components.');
+    }
+    if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
+      throw new TypeError('Ray wavelength must be a finite positive value in micrometers.');
+    }
+    if (typeof intensity !== 'number' || !Number.isFinite(intensity) || intensity < 0) {
+      throw new TypeError('Ray relative intensity must be a finite nonnegative value.');
+    }
+    const dirNorm = Math.hypot(direction[0], direction[1], direction[2]);
+    if (!Number.isFinite(dirNorm) || dirNorm === 0) {
+      throw new TypeError('Ray direction must have nonzero magnitude.');
+    }
     return {
       x: origin[0],
       y: origin[1],
@@ -24,6 +39,7 @@ class SkewRayTracer {
       wavelengthUm,
       intensity,
       opl: 0.0, // Optical Path Length
+      currentRefractiveIndex: null,
       isTerminated: false,
       isTIR: false,
       path: [[origin[0], origin[1], origin[2]]]
@@ -32,33 +48,70 @@ class SkewRayTracer {
 
   /**
    * Intersects a ray with a spherical surface and refracts/reflects.
-   * @param {Object} ray 
+   * @param {Object} ray
    * @param {Object} surface Surface definition:
    *   radius: Curvature radius (mm). + for center to the right (+z), - for left. 0 or Infinity for flat.
    *   zVertex: z-coordinate of surface vertex (mm).
    *   clearRadius: Maximum radial aperture (mm).
    *   nIncident: Refractive index before surface.
    *   nTransmitted: Refractive index after surface.
-   *   conic: Conic constant k (default 0 for sphere).
+   *   conic: Explicit conic constant k.
    *   asphericCoeffs: Array [A4, A6, A8, A10] for polynomial deformation.
    */
   static traceRayThroughSurface(ray, surface) {
+    if (
+      !ray ||
+      ![ray.x, ray.y, ray.z, ray.L, ray.M, ray.N, ray.wavelengthUm, ray.intensity, ray.opl].every(Number.isFinite) ||
+      ray.wavelengthUm <= 0 ||
+      ray.intensity < 0 ||
+      (ray.currentRefractiveIndex !== null &&
+        ray.currentRefractiveIndex !== undefined &&
+        (typeof ray.currentRefractiveIndex !== 'number' ||
+          !Number.isFinite(ray.currentRefractiveIndex) ||
+          ray.currentRefractiveIndex <= 0)) ||
+      Math.abs(Math.hypot(ray.L, ray.M, ray.N) - 1) > 1e-9 ||
+      !Array.isArray(ray.path)
+    ) {
+      throw new TypeError(
+        'Ray tracing requires explicit finite position, direction, positive wavelength, nonnegative intensity, optical path length, and path data.'
+      );
+    }
+    if (!surface || typeof surface !== 'object') throw new TypeError('An explicit optical surface is required.');
     if (ray.isTerminated) return ray;
 
     const R = surface.radius;
     const zV = surface.zVertex;
-    const conic = surface.conic || 0.0;
-    const A = surface.asphericCoeffs || [0, 0, 0, 0];
-    const n1 = surface.nIncident || 1.0;
-    const n2 = surface.nTransmitted || 1.0;
-    const clearRad = surface.clearRadius || 1e6;
+    const conic = surface.conic;
+    const A = surface.asphericCoeffs;
+    const n1 = surface.nIncident;
+    const n2 = surface.nTransmitted;
+    const clearRad = surface.clearRadius;
+    if (typeof R !== 'number' || !Number.isFinite(R))
+      throw new TypeError('Surface radius must be finite and explicit.');
+    if (typeof zV !== 'number' || !Number.isFinite(zV))
+      throw new TypeError('Surface zVertex must be finite and explicit.');
+    if (typeof conic !== 'number' || !Number.isFinite(conic))
+      throw new TypeError('Surface conic must be finite and explicit.');
+    if (!Array.isArray(A) || A.length !== 4 || !A.every(Number.isFinite)) {
+      throw new TypeError('Surface asphericCoeffs must contain four finite, explicit values.');
+    }
+    if (![n1, n2].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)) {
+      throw new TypeError('Surface incident and transmitted indices must be finite positive explicit values.');
+    }
+    if (typeof clearRad !== 'number' || !Number.isFinite(clearRad) || clearRad <= 0) {
+      throw new TypeError('Surface clearRadius must be a finite positive explicit value in millimeters.');
+    }
 
     let t = 0;
-    let hitX = 0, hitY = 0, hitZ = 0;
-    let normX = 0, normY = 0, normZ = 1;
+    let hitX = 0,
+      hitY = 0,
+      hitZ = 0;
+    let normX = 0,
+      normY = 0,
+      normZ = 1;
 
     // 1. Plane Surface (R === 0 or Infinity)
-    if (!R || Math.abs(R) > 1e8) {
+    if (R === 0 || Math.abs(R) > 1e8) {
       if (Math.abs(ray.N) < 1e-12) {
         ray.isTerminated = true;
         return ray;
@@ -74,7 +127,7 @@ class SkewRayTracer {
       hitZ = zV;
       normX = 0;
       normY = 0;
-      normZ = (ray.N > 0) ? -1 : 1;
+      normZ = ray.N > 0 ? -1 : 1;
     } else {
       // 2. Spherical / Conic / Aspheric Surface
       // Sphere center: (0, 0, zC) where zC = zV + R
@@ -102,9 +155,9 @@ class SkewRayTracer {
       let t2 = (-b + sqrtDisc) / a;
 
       if (R > 0) {
-        t = (t1 > 1e-9) ? t1 : t2;
+        t = t1 > 1e-9 ? t1 : t2;
       } else {
-        t = (t2 > 1e-9) ? t2 : t1;
+        t = t2 > 1e-9 ? t2 : t1;
       }
 
       if (t <= 1e-9) {
@@ -117,7 +170,7 @@ class SkewRayTracer {
       hitZ = ray.z + t * ray.N;
 
       // If aspheric deformation exists, refine using Newton-Raphson
-      const isAspheric = conic !== 0 || (A[0] !== 0 || A[1] !== 0 || A[2] !== 0);
+      const isAspheric = conic !== 0 || A[0] !== 0 || A[1] !== 0 || A[2] !== 0;
       if (isAspheric) {
         const cur = 1.0 / R;
         for (let iter = 0; iter < 4; iter++) {
@@ -131,7 +184,7 @@ class SkewRayTracer {
 
           // Derivative dz/dr
           const dzdr = (cur * 2 * Math.sqrt(r2)) / (denom || 1.0);
-          const fPrime = ray.N - dzdr * (hitX * ray.L + hitY * ray.M) / (Math.sqrt(r2) || 1.0);
+          const fPrime = ray.N - (dzdr * (hitX * ray.L + hitY * ray.M)) / (Math.sqrt(r2) || 1.0);
           if (Math.abs(fPrime) > 1e-8) {
             t -= fVal / fPrime;
             hitX = ray.x + t * ray.L;
@@ -145,7 +198,9 @@ class SkewRayTracer {
       normX = (hitX - 0) / R;
       normY = (hitY - 0) / R;
       normZ = (hitZ - zC) / R;
-      const nLen = Math.sqrt(normX * normX + normY * normY + normZ * normZ) || 1.0;
+      const nLen = Math.hypot(normX, normY, normZ);
+      if (!Number.isFinite(nLen) || nLen === 0)
+        throw new RangeError('Surface intersection produced an invalid normal.');
       normX /= nLen;
       normY /= nLen;
       normZ /= nLen;
@@ -168,6 +223,7 @@ class SkewRayTracer {
 
     // Update ray position and optical path length
     ray.opl += t * n1;
+    if (ray.currentRefractiveIndex === null) ray.currentRefractiveIndex = n1;
     ray.x = hitX;
     ray.y = hitY;
     ray.z = hitZ;
@@ -182,6 +238,7 @@ class SkewRayTracer {
     if (sinT2 > 1.0) {
       // Total Internal Reflection (TIR)
       ray.isTIR = true;
+      ray.currentRefractiveIndex = n1;
       // Reflection: S' = S + 2*cosI*N
       ray.L = ray.L + 2.0 * cosI * normX;
       ray.M = ray.M + 2.0 * cosI * normY;
@@ -197,10 +254,12 @@ class SkewRayTracer {
     ray.N = mu * ray.N + gamma * normZ;
 
     // Normalize direction vector
-    const sLen = Math.sqrt(ray.L * ray.L + ray.M * ray.M + ray.N * ray.N) || 1.0;
+    const sLen = Math.hypot(ray.L, ray.M, ray.N);
+    if (!Number.isFinite(sLen) || sLen === 0) throw new RangeError('Refraction produced an invalid ray direction.');
     ray.L /= sLen;
     ray.M /= sLen;
     ray.N /= sLen;
+    ray.currentRefractiveIndex = n2;
 
     return ray;
   }
@@ -212,12 +271,42 @@ class SkewRayTracer {
    * @param {number} sensorZ z-plane position of sensor/image plane
    */
   static traceOpticalSystem(surfaces, rays, sensorZ) {
+    if (!Array.isArray(surfaces) || surfaces.length === 0) {
+      throw new TypeError('At least one explicit optical surface is required.');
+    }
+    if (!Array.isArray(rays) || rays.length === 0) {
+      throw new TypeError('At least one explicit ray is required.');
+    }
+    if (typeof sensorZ !== 'number' || !Number.isFinite(sensorZ)) {
+      throw new TypeError('An explicit finite sensor z position in millimeters is required.');
+    }
+
     const results = [];
 
     for (let i = 0; i < rays.length; i++) {
+      const inputRay = rays[i];
+      if (
+        !inputRay ||
+        ![inputRay.x, inputRay.y, inputRay.z, inputRay.L, inputRay.M, inputRay.N].every(Number.isFinite) ||
+        Math.abs(Math.hypot(inputRay.L, inputRay.M, inputRay.N) - 1) > 1e-9 ||
+        typeof inputRay.wavelengthUm !== 'number' ||
+        !Number.isFinite(inputRay.wavelengthUm) ||
+        inputRay.wavelengthUm <= 0 ||
+        typeof inputRay.intensity !== 'number' ||
+        !Number.isFinite(inputRay.intensity) ||
+        inputRay.intensity < 0 ||
+        !Number.isFinite(inputRay.opl) ||
+        inputRay.opl < 0 ||
+        !Array.isArray(inputRay.path) ||
+        !inputRay.path.every((point) => Array.isArray(point) && point.length === 3 && point.every(Number.isFinite))
+      ) {
+        throw new TypeError(
+          `Ray ${i} must carry explicit finite position, direction, wavelength, intensity, and path data.`
+        );
+      }
       const ray = {
-        ...rays[i],
-        path: [...rays[i].path]
+        ...inputRay,
+        path: [...inputRay.path]
       };
 
       for (let s = 0; s < surfaces.length; s++) {
@@ -226,15 +315,23 @@ class SkewRayTracer {
       }
 
       // Propagate remaining active ray to sensor plane
-      if (!ray.isTerminated && sensorZ !== undefined) {
-        const sensorSurface = {
-          radius: 0,
-          zVertex: sensorZ,
-          nIncident: 1.0,
-          nTransmitted: 1.0,
-          clearRadius: 1e6
-        };
-        this.traceRayThroughSurface(ray, sensorSurface);
+      if (!ray.isTerminated) {
+        if (Math.abs(ray.N) < 1e-12) {
+          ray.isTerminated = true;
+        } else {
+          const sensorDistanceMm = (sensorZ - ray.z) / ray.N;
+          if (sensorDistanceMm < 1e-9) {
+            ray.isTerminated = true;
+          } else if (!Number.isFinite(ray.currentRefractiveIndex) || ray.currentRefractiveIndex <= 0) {
+            throw new TypeError('Ray tracing could not determine an explicit image-space refractive index.');
+          } else {
+            ray.x += sensorDistanceMm * ray.L;
+            ray.y += sensorDistanceMm * ray.M;
+            ray.z = sensorZ;
+            ray.opl += sensorDistanceMm * ray.currentRefractiveIndex;
+            ray.path.push([ray.x, ray.y, ray.z]);
+          }
+        }
       }
 
       results.push(ray);
@@ -250,15 +347,39 @@ class SkewRayTracer {
    * @param {number} raysPerRing Number of angular rays per ring
    * @param {number} fieldAngleDeg Field angle (0 for on-axis, e.g. 10 deg for off-axis)
    * @param {number} wavelengthUm Wavelength in microns
+   * @param {number} pupilPlaneZMm Entrance pupil plane position (mm)
    */
-  static generatePupilRayGrid(pupilRadiusMm = 15.0, numRings = 5, raysPerRing = 12, fieldAngleDeg = 0.0, wavelengthUm = 0.5875618) {
+  static generatePupilRayGrid(pupilRadiusMm, numRings, raysPerRing, fieldAngleDeg, wavelengthUm, pupilPlaneZMm) {
+    if (typeof pupilRadiusMm !== 'number' || !Number.isFinite(pupilRadiusMm) || pupilRadiusMm <= 0) {
+      throw new TypeError('Pupil radius must be a finite positive value in millimeters.');
+    }
+    if (!Number.isInteger(numRings) || numRings < 1 || numRings > 20) {
+      throw new TypeError('Pupil ring count must be an explicit integer from 1 through 20.');
+    }
+    if (!Number.isInteger(raysPerRing) || raysPerRing < 1 || raysPerRing > 64) {
+      throw new TypeError('Rays per ring must be an explicit integer from 1 through 64.');
+    }
+    if (
+      typeof fieldAngleDeg !== 'number' ||
+      !Number.isFinite(fieldAngleDeg) ||
+      fieldAngleDeg < -89 ||
+      fieldAngleDeg > 89
+    ) {
+      throw new TypeError('Field angle must be an explicit finite value from -89 through 89 degrees.');
+    }
+    if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
+      throw new TypeError('Wavelength must be a finite positive value in micrometers.');
+    }
+    if (typeof pupilPlaneZMm !== 'number' || !Number.isFinite(pupilPlaneZMm)) {
+      throw new TypeError('Entrance pupil plane z position must be finite and explicit in millimeters.');
+    }
     const rays = [];
     const radAngle = (fieldAngleDeg * Math.PI) / 180.0;
     const sinField = Math.sin(radAngle);
     const cosField = Math.cos(radAngle);
 
     // Chief ray (center of pupil)
-    rays.push(this.createRay([0, 0, -10.0], [0, sinField, cosField], wavelengthUm, 1.0));
+    rays.push(this.createRay([0, 0, pupilPlaneZMm], [0, sinField, cosField], wavelengthUm, 1.0));
 
     // Marginal and zonal rings
     for (let r = 1; r <= numRings; r++) {
@@ -270,8 +391,8 @@ class SkewRayTracer {
         const xPupil = rho * Math.cos(theta);
         const yPupil = rho * Math.sin(theta);
 
-        // Ray starts at z = -10mm pointing towards pupil with field angle tilt
-        rays.push(this.createRay([xPupil, yPupil, -10.0], [0, sinField, cosField], wavelengthUm, 1.0));
+        // The caller supplies the pupil plane; generated samples use normalized equal relative weights.
+        rays.push(this.createRay([xPupil, yPupil, pupilPlaneZMm], [0, sinField, cosField], wavelengthUm, 1.0));
       }
     }
 
@@ -305,7 +426,8 @@ class SkewRayTracer {
     }
 
     // 1. Centroid
-    let sumX = 0, sumY = 0;
+    let sumX = 0,
+      sumY = 0;
     for (let i = 0; i < validPoints.length; i++) {
       sumX += validPoints[i].x;
       sumY += validPoints[i].y;
@@ -348,7 +470,19 @@ class SkewRayTracer {
    * @param {number} fStop Lens numerical aperture f-number
    * @param {number} maxLpMm Max spatial frequency (lp/mm)
    */
-  static computeMTFCurve(rmsSpotRadiusMm = 0.015, fStop = 1.4, maxLpMm = 120, wavelengthNm = 550) {
+  static computeMTFCurve(rmsSpotRadiusMm, fStop, maxLpMm, wavelengthNm) {
+    if (typeof rmsSpotRadiusMm !== 'number' || !Number.isFinite(rmsSpotRadiusMm) || rmsSpotRadiusMm < 0) {
+      throw new TypeError('RMS spot radius must be a finite nonnegative value in millimeters.');
+    }
+    if (typeof fStop !== 'number' || !Number.isFinite(fStop) || fStop <= 0) {
+      throw new TypeError('F-number must be a finite positive explicit value.');
+    }
+    if (typeof maxLpMm !== 'number' || !Number.isFinite(maxLpMm) || maxLpMm <= 0) {
+      throw new TypeError('Maximum spatial frequency must be a finite positive explicit value in lp/mm.');
+    }
+    if (typeof wavelengthNm !== 'number' || !Number.isFinite(wavelengthNm) || wavelengthNm <= 0) {
+      throw new TypeError('Wavelength must be a finite positive explicit value in nanometers.');
+    }
     const lambdaMm = wavelengthNm * 1e-6;
     const cutoffFreqLpMm = 1.0 / (lambdaMm * fStop); // Diffraction cutoff = 1 / (λ * N)
 
@@ -412,29 +546,58 @@ class SkewRayTracer {
    * Traces a single ray and returns point segments.
    */
   static traceRay(surfaces, rayInput) {
-    const o = rayInput.origin ? [rayInput.origin.x, rayInput.origin.y, rayInput.origin.z] : [rayInput.x || 0, rayInput.y || 0, rayInput.z || 0];
-    const d = rayInput.dir ? [rayInput.dir.x, rayInput.dir.y, rayInput.dir.z] : [rayInput.L || 0, rayInput.M || 0, rayInput.N || 1];
-    const wl = rayInput.wavelength || rayInput.wavelengthUm || 0.5875618;
-    const ray = this.createRay(o, d, wl, 1.0);
+    if (!rayInput || typeof rayInput !== 'object') throw new TypeError('Explicit ray inputs are required.');
+    if (!Array.isArray(surfaces) || surfaces.length === 0)
+      throw new TypeError('Explicit optical surfaces are required.');
+    const point = rayInput.origin;
+    const direction = rayInput.dir;
+    const o = Array.isArray(point)
+      ? point
+      : point && typeof point === 'object'
+        ? [point.x, point.y, point.z]
+        : [rayInput.x, rayInput.y, rayInput.z];
+    const d = Array.isArray(direction)
+      ? direction
+      : direction && typeof direction === 'object'
+        ? [direction.x, direction.y, direction.z]
+        : [rayInput.L, rayInput.M, rayInput.N];
+    const wl = rayInput.wavelengthUm ?? rayInput.wavelength;
+    const ray = this.createRay(o, d, wl, rayInput.intensity);
 
-    let currentZ = 0;
     const normSurfaces = surfaces.map((s, idx) => {
-      const radius = s.radius !== undefined ? s.radius : (s.radiusMm || 0);
-      const thickness = s.thickness !== undefined ? s.thickness : (s.thicknessMm || 0);
-      const zVertex = s.zVertex !== undefined ? s.zVertex : currentZ;
-      currentZ += thickness;
+      const radius = s.radius ?? s.radiusMm;
+      const zVertex = s.zVertex;
+      if (radius === undefined || !Number.isFinite(radius))
+        throw new TypeError(`Surface ${idx} needs a finite explicit radius.`);
+      if (!Number.isFinite(zVertex)) throw new TypeError(`Surface ${idx} zVertex must be finite.`);
       const { nIncident, nTransmitted } = s;
-      if (![nIncident, nTransmitted].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)) {
+      if (
+        ![nIncident, nTransmitted].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)
+      ) {
         throw new TypeError(`Surface ${idx} requires explicit positive incident and transmitted refractive indices.`);
+      }
+      const clearRadius = s.clearRadius ?? (s.clearAperture !== undefined ? s.clearAperture / 2 : undefined);
+      if (typeof clearRadius !== 'number' || !Number.isFinite(clearRadius) || clearRadius <= 0) {
+        throw new TypeError(`Surface ${idx} requires an explicit positive clear aperture or clear radius.`);
+      }
+      if (typeof s.conic !== 'number' || !Number.isFinite(s.conic)) {
+        throw new TypeError(`Surface ${idx} requires an explicit finite conic constant.`);
+      }
+      if (
+        !Array.isArray(s.asphericCoeffs) ||
+        s.asphericCoeffs.length !== 4 ||
+        !s.asphericCoeffs.every(Number.isFinite)
+      ) {
+        throw new TypeError(`Surface ${idx} requires four explicit finite aspheric coefficients.`);
       }
       return {
         radius,
         zVertex,
-        clearRadius: s.clearRadius || (s.clearAperture ? s.clearAperture / 2 : 100),
+        clearRadius,
         nIncident,
         nTransmitted,
-        conic: s.conic || 0,
-        asphericCoeffs: s.asphericCoeffs || [0, 0, 0, 0]
+        conic: s.conic,
+        asphericCoeffs: s.asphericCoeffs
       };
     });
 
@@ -447,17 +610,27 @@ class SkewRayTracer {
     return segments;
   }
 
-  static traceRayBundle(surfaces, rays, sensorZ = 75.0) {
+  static traceRayBundle(surfaces, rays, sensorZ) {
+    if (typeof sensorZ !== 'number' || !Number.isFinite(sensorZ)) {
+      throw new TypeError('An explicit finite sensor z position in millimeters is required.');
+    }
     return this.traceOpticalSystem(surfaces, rays, sensorZ);
   }
 
-  static generateEntrancePupilRayGrid(epRadius = 15.0, wavelength = 0.5875618, numRings = 3, numArms = 8) {
-    return this.generatePupilRayGrid(epRadius, numRings, numArms, 0.0, wavelength);
+  static generateEntrancePupilRayGrid(epRadius, wavelength, numRings, numArms, fieldAngleDeg, pupilPlaneZMm) {
+    return this.generatePupilRayGrid(epRadius, numRings, numArms, fieldAngleDeg, wavelength, pupilPlaneZMm);
   }
 
-  static computeMTF(spotData, maxSpatialFreqLpMm = 100.0, steps = 10) {
-    const rms = spotData.rmsSpotRadiusMm !== undefined ? spotData.rmsSpotRadiusMm : (spotData.rmsRadiusMm || 0.015);
-    const mtfRes = this.computeMTFCurve(rms, 1.4, maxSpatialFreqLpMm);
+  static computeMTF(spotData, fStop, maxSpatialFreqLpMm, steps, wavelengthNm) {
+    if (!spotData || typeof spotData !== 'object') throw new TypeError('Explicit spot data is required.');
+    const rms = spotData.rmsSpotRadiusMm ?? spotData.rmsRadiusMm;
+    if (typeof rms !== 'number' || !Number.isFinite(rms) || rms < 0) {
+      throw new TypeError('Spot data must contain a finite nonnegative RMS radius in millimeters.');
+    }
+    if (!Number.isInteger(steps) || steps < 1 || steps > 30) {
+      throw new TypeError('MTF sample count must be an explicit integer from 1 through 30.');
+    }
+    const mtfRes = this.computeMTFCurve(rms, fStop, maxSpatialFreqLpMm, wavelengthNm);
     const mtfArray = [];
     const delta = Math.floor(mtfRes.frequencies.length / steps) || 1;
     for (let i = 0; i < mtfRes.frequencies.length; i += delta) {

@@ -37,6 +37,7 @@ const SKEW_RAY_TRACE_SCHEMA = Object.freeze({
   required: [
     'surfaces',
     'entrancePupilRadiusMm',
+    'pupilPlaneZMm',
     'wavelengthUm',
     'numRings',
     'raysPerRing',
@@ -46,6 +47,7 @@ const SKEW_RAY_TRACE_SCHEMA = Object.freeze({
   properties: {
     surfaces: { type: 'array', minItems: 2, maxItems: 128, items: OPTICAL_SURFACE_SCHEMA },
     entrancePupilRadiusMm: { type: 'number', min: Number.MIN_VALUE },
+    pupilPlaneZMm: { type: 'number' },
     wavelengthUm: { type: 'number', min: Number.MIN_VALUE },
     numRings: { type: 'number', integer: true, min: 1, max: 20 },
     raysPerRing: { type: 'number', integer: true, min: 1, max: 64 },
@@ -487,6 +489,9 @@ function runPolarizationTrace(params) {
   if (params.action === 'birefringent-split') {
     if (
       !params.crystalProps ||
+      ![params.crystalProps.no, params.crystalProps.ne].every(
+        (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
+      ) ||
       !params.rayDir ||
       !params.surfaceNorm ||
       !vectorHasMagnitude(params.crystalProps.opticAxis) ||
@@ -595,13 +600,14 @@ function runZmxImport(params = {}) {
   };
 }
 
-function runSkewRayTrace(params) {
+function traceValidatedSkewRayTrace(params) {
   const rays = SkewRayTracer.generatePupilRayGrid(
     params.entrancePupilRadiusMm,
     params.numRings,
     params.raysPerRing,
     params.fieldAngleDeg,
-    params.wavelengthUm
+    params.wavelengthUm,
+    params.pupilPlaneZMm
   );
   const tracedRays = SkewRayTracer.traceOpticalSystem(params.surfaces, rays, params.sensorZMm);
   return {
@@ -615,8 +621,16 @@ function runSkewRayTrace(params) {
   };
 }
 
+function runSkewRayTrace(params) {
+  const invalid = validateOpticalInput(params, SKEW_RAY_TRACE_SCHEMA);
+  if (invalid) return invalid;
+  return traceValidatedSkewRayTrace(params);
+}
+
 function runSkewOptics(params) {
-  const trace = runSkewRayTrace(params);
+  const invalid = validateOpticalInput(params, SKEW_OPTICS_SCHEMA);
+  if (invalid) return invalid;
+  const trace = traceValidatedSkewRayTrace(params);
   const spotData = SkewRayTracer.computeSpotDiagram(trace.rays);
   if (spotData.count === 0) {
     return {

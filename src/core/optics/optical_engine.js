@@ -67,7 +67,7 @@ class OpticalEngine {
     let surrounding = objectSpace;
     let skipFront = false;
 
-    const appendSurface = (element, id, radius, zVertex, nextMedium, properties, coefficients = [0, 0, 0, 0]) => {
+    const appendSurface = (element, id, radius, zVertex, nextMedium, properties, conic, coefficients) => {
       surfaces.push({
         id,
         radius,
@@ -80,9 +80,9 @@ class OpticalEngine {
         nIncidentC: properties.nC,
         nTransmittedF: nextMedium.nF,
         nTransmittedC: nextMedium.nC,
-        conic: element.conicFront || 0,
+        conic,
         asphericCoeffs: coefficients,
-        asphericA4: coefficients[0] || 0
+        asphericA4: coefficients[0]
       });
     };
 
@@ -93,18 +93,34 @@ class OpticalEngine {
         element?.radiusRearMm,
         element?.centerThicknessMm,
         element?.clearApertureMm,
-        element?.zPosMm
+        element?.zPosMm,
+        element?.conicFront,
+        element?.conicRear
       ];
-      if (!element || !element.opticalMaterial || !requiredNumbers.every(Number.isFinite)
-        || element.centerThicknessMm <= 0 || element.clearApertureMm <= 0) {
-        throw new TypeError(`Prescription element ${index} has incomplete geometry or material data.`);
+      if (
+        !element ||
+        !element.opticalMaterial ||
+        !requiredNumbers.every(Number.isFinite) ||
+        element.centerThicknessMm <= 0 ||
+        element.clearApertureMm <= 0
+      ) {
+        throw new TypeError(`Prescription element ${index} has incomplete geometry, material, or explicit conic data.`);
       }
 
       const material = this._materialProperties(element.opticalMaterial);
-      const frontCoefficients = element.asphericCoeffsFront || [0, 0, 0, 0];
-      if (!Array.isArray(frontCoefficients) || frontCoefficients.length !== 4
-        || !frontCoefficients.every(Number.isFinite)) {
-        throw new TypeError(`Prescription element ${index} has invalid aspheric coefficients.`);
+      const frontCoefficients = element.asphericCoeffsFront;
+      const rearCoefficients = element.asphericCoeffsRear;
+      if (
+        !Array.isArray(frontCoefficients) ||
+        frontCoefficients.length !== 4 ||
+        !frontCoefficients.every(Number.isFinite) ||
+        !Array.isArray(rearCoefficients) ||
+        rearCoefficients.length !== 4 ||
+        !rearCoefficients.every(Number.isFinite)
+      ) {
+        throw new TypeError(
+          `Prescription element ${index} requires four explicit finite aspheric coefficients for both surfaces.`
+        );
       }
       if (!skipFront) {
         appendSurface(
@@ -114,6 +130,7 @@ class OpticalEngine {
           element.zPosMm,
           material,
           surrounding,
+          element.conicFront,
           frontCoefficients
         );
       }
@@ -121,7 +138,8 @@ class OpticalEngine {
       const nextElement = rx.elements[index + 1];
       const cemented = Boolean(element.cementedToNext);
       if (cemented) {
-        if (!nextElement) throw new TypeError('The final prescription element cannot be cemented to a following element.');
+        if (!nextElement)
+          throw new TypeError('The final prescription element cannot be cemented to a following element.');
         if (!nextElement.opticalMaterial) throw new TypeError('A cemented element needs explicit material data.');
         const nextMaterial = this._materialProperties(nextElement.opticalMaterial);
         appendSurface(
@@ -130,7 +148,9 @@ class OpticalEngine {
           element.radiusRearMm,
           element.zPosMm + element.centerThicknessMm,
           nextMaterial,
-          material
+          material,
+          element.conicRear,
+          rearCoefficients
         );
         surrounding = nextMaterial;
         skipFront = true;
@@ -142,7 +162,9 @@ class OpticalEngine {
           element.radiusRearMm,
           element.zPosMm + element.centerThicknessMm,
           outgoingMedium,
-          material
+          material,
+          element.conicRear,
+          rearCoefficients
         );
         surrounding = outgoingMedium;
         skipFront = false;
@@ -253,23 +275,26 @@ class OpticalEngine {
 
   static traceExactSkewRays(prescription, options = {}) {
     const rx = this._requirePrescription(prescription);
-    const {
-      fStop,
-      fieldAngleDeg,
-      numRings,
-      raysPerRing,
-      wavelengthUm,
-      sensorZMm,
-      maxFrequencyLpMm
-    } = options;
-    if (!Number.isFinite(fStop) || fStop <= 0
-      || !Number.isFinite(fieldAngleDeg)
-      || !Number.isInteger(numRings) || numRings < 1
-      || !Number.isInteger(raysPerRing) || raysPerRing < 1
-      || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0
-      || !Number.isFinite(sensorZMm)
-      || !Number.isFinite(maxFrequencyLpMm) || maxFrequencyLpMm <= 0) {
-      throw new TypeError('Ray tracing requires explicit aperture, field, pupil sampling, wavelength, sensor, and frequency inputs.');
+    const { fStop, fieldAngleDeg, numRings, raysPerRing, wavelengthUm, pupilPlaneZMm, sensorZMm, maxFrequencyLpMm } =
+      options;
+    if (
+      !Number.isFinite(fStop) ||
+      fStop <= 0 ||
+      !Number.isFinite(fieldAngleDeg) ||
+      !Number.isInteger(numRings) ||
+      numRings < 1 ||
+      !Number.isInteger(raysPerRing) ||
+      raysPerRing < 1 ||
+      !Number.isFinite(wavelengthUm) ||
+      wavelengthUm <= 0 ||
+      !Number.isFinite(pupilPlaneZMm) ||
+      !Number.isFinite(sensorZMm) ||
+      !Number.isFinite(maxFrequencyLpMm) ||
+      maxFrequencyLpMm <= 0
+    ) {
+      throw new TypeError(
+        'Ray tracing requires explicit aperture, field, pupil sampling, entrance pupil plane position, wavelength, sensor, and frequency inputs.'
+      );
     }
 
     const entrancePupilRadius = rx.focalLengthMm / fStop / 2;
@@ -279,15 +304,22 @@ class OpticalEngine {
       numRings,
       raysPerRing,
       fieldAngleDeg,
-      wavelengthUm
+      wavelengthUm,
+      pupilPlaneZMm
     );
     const tracedRays = SkewRayTracer.traceOpticalSystem(surfaces, pupilRays, sensorZMm);
     const spotDiagram = SkewRayTracer.computeSpotDiagram(tracedRays, sensorZMm);
-    const mtf = SkewRayTracer.computeMTFCurve(spotDiagram.rmsSpotRadiusMm, fStop, maxFrequencyLpMm);
+    const mtf = SkewRayTracer.computeMTFCurve(
+      spotDiagram.rmsSpotRadiusMm,
+      fStop,
+      maxFrequencyLpMm,
+      wavelengthUm * 1000
+    );
     return {
       fStop,
       fieldAngleDeg,
       wavelengthUm,
+      pupilPlaneZMm,
       entrancePupilRadiusMm: entrancePupilRadius,
       rayCount: tracedRays.length,
       spotDiagram,

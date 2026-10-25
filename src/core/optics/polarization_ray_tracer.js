@@ -16,7 +16,10 @@
 'use strict';
 
 class Complex {
-  constructor(re = 0, im = 0) {
+  constructor(re, im) {
+    if (![re, im].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+      throw new TypeError('Complex values require explicit finite real and imaginary components.');
+    }
     this.re = re;
     this.im = im;
   }
@@ -34,10 +37,7 @@ class Complex {
   }
 
   mul(c) {
-    return new Complex(
-      this.re * c.re - this.im * c.im,
-      this.re * c.im + this.im * c.re
-    );
+    return new Complex(this.re * c.re - this.im * c.im, this.re * c.im + this.im * c.re);
   }
 
   scale(s) {
@@ -54,9 +54,15 @@ class JonesVector {
    * @param {Complex|number} Ex - Horizontal electric field amplitude / complex
    * @param {Complex|number} Ey - Vertical electric field amplitude / complex
    */
-  constructor(Ex = 1.0, Ey = 0.0) {
-    this.Ex = (typeof Ex === 'number') ? new Complex(Ex, 0) : Ex;
-    this.Ey = (typeof Ey === 'number') ? new Complex(Ey, 0) : Ey;
+  constructor(Ex, Ey) {
+    const validComponent = (value) =>
+      (typeof value === 'number' && Number.isFinite(value)) ||
+      (value instanceof Complex && Number.isFinite(value.re) && Number.isFinite(value.im));
+    if (!validComponent(Ex) || !validComponent(Ey)) {
+      throw new TypeError('Jones vectors require explicit finite Ex and Ey field components.');
+    }
+    this.Ex = typeof Ex === 'number' ? new Complex(Ex, 0) : Ex;
+    this.Ey = typeof Ey === 'number' ? new Complex(Ey, 0) : Ey;
   }
 
   /**
@@ -153,7 +159,12 @@ class PolarizationRayTracer {
    * @param {number} thetaI - Angle of incidence (radians)
    */
   static evaluateFresnel(n1, n2, thetaI) {
-    if (thetaI < 0 || thetaI > Math.PI / 2) throw new Error('thetaI must be in [0, pi/2]');
+    if (![n1, n2].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)) {
+      throw new TypeError('Fresnel evaluation requires explicit finite positive incident and transmitted indices.');
+    }
+    if (typeof thetaI !== 'number' || !Number.isFinite(thetaI) || thetaI < 0 || thetaI >= Math.PI / 2) {
+      throw new TypeError('Incidence angle must be explicit, finite, and in [0, pi/2).');
+    }
 
     // Snell's Law: sin(thetaT) = (n1 / n2) * sin(thetaI)
     const sinThetaT = (n1 / n2) * Math.sin(thetaI);
@@ -161,8 +172,9 @@ class PolarizationRayTracer {
     // Total Internal Reflection check
     if (sinThetaT >= 1.0) {
       // TIR: Rs = 1, Rp = 1 with Goos-Hänchen phase shifts
-      const deltaS = 2.0 * Math.atan(Math.sqrt(sinThetaT * sinThetaT - 1.0) / (Math.cos(thetaI)));
-      const deltaP = 2.0 * Math.atan((n1 * n1 / (n2 * n2)) * Math.sqrt(sinThetaT * sinThetaT - 1.0) / (Math.cos(thetaI)));
+      const deltaS = 2.0 * Math.atan(Math.sqrt(sinThetaT * sinThetaT - 1.0) / Math.cos(thetaI));
+      const deltaP =
+        2.0 * Math.atan((((n1 * n1) / (n2 * n2)) * Math.sqrt(sinThetaT * sinThetaT - 1.0)) / Math.cos(thetaI));
       return {
         isTIR: true,
         thetaT: Math.PI / 2,
@@ -192,8 +204,8 @@ class PolarizationRayTracer {
     // Reflectance and Transmittance (power fractions)
     const Rs = rs * rs;
     const Rp = rp * rp;
-    const Ts = (n2 * cosT) / (n1 * cosI) * (ts * ts);
-    const Tp = (n2 * cosT) / (n1 * cosI) * (tp * tp);
+    const Ts = ((n2 * cosT) / (n1 * cosI)) * (ts * ts);
+    const Tp = ((n2 * cosT) / (n1 * cosI)) * (tp * tp);
 
     return {
       isTIR: false,
@@ -223,6 +235,25 @@ class PolarizationRayTracer {
    * @param {Array<number>} surfaceNormal - Interface normal [nx, ny, nz]
    */
   static splitBirefringentRay(crystalProps, rayDir, surfaceNormal) {
+    const validVector = (value) =>
+      Array.isArray(value) &&
+      value.length === 3 &&
+      value.every((component) => typeof component === 'number' && Number.isFinite(component)) &&
+      Math.hypot(...value) > 0;
+    if (
+      !crystalProps ||
+      typeof crystalProps !== 'object' ||
+      ![crystalProps.no, crystalProps.ne].every(
+        (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
+      ) ||
+      !validVector(crystalProps.opticAxis) ||
+      !validVector(rayDir) ||
+      !validVector(surfaceNormal)
+    ) {
+      throw new TypeError(
+        'Crystal splitting requires positive explicit no/ne indices and finite nonzero optic-axis, ray-direction, and surface-normal vectors.'
+      );
+    }
     const { no, ne, opticAxis } = crystalProps;
 
     // Normalizing inputs
@@ -284,9 +315,9 @@ class PolarizationRayTracer {
       extraordinaryIndex: Number(neTheta.toFixed(6)),
       birefringenceDeltaN: Number((neTheta - no).toFixed(6)),
       walkOffAngleRad: Number(walkOffAngleRad.toFixed(6)),
-      walkOffAngleDeg: Number((walkOffAngleRad * 180 / Math.PI).toFixed(4)),
+      walkOffAngleDeg: Number(((walkOffAngleRad * 180) / Math.PI).toFixed(4)),
       separationAngleRad: Number(separationAngleRad.toFixed(6)),
-      separationAngleDeg: Number((separationAngleRad * 180 / Math.PI).toFixed(4)),
+      separationAngleDeg: Number(((separationAngleRad * 180) / Math.PI).toFixed(4)),
       ordinaryRay: {
         direction: oRayDir,
         polarization: 'TE (Perpendicular to principal plane)'

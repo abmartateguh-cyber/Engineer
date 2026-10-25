@@ -1479,6 +1479,7 @@ function runAnatomyCraftParityTests() {
         }
       ],
       entrancePupilRadiusMm: 1,
+      pupilPlaneZMm: -10,
       wavelengthUm: 0.55,
       numRings: 1,
       raysPerRing: 4,
@@ -1553,6 +1554,7 @@ function runAnatomyCraftParityTests() {
           }
         ],
         entrancePupilRadiusMm: 1,
+        pupilPlaneZMm: -10,
         wavelengthUm: 0.55,
         numRings: 1,
         raysPerRing: 4,
@@ -1564,6 +1566,7 @@ function runAnatomyCraftParityTests() {
       const formValues = {
         'optical-surfaces-input': JSON.stringify(input.surfaces),
         'optical-pupil-radius': String(input.entrancePupilRadiusMm),
+        'optical-pupil-plane': String(input.pupilPlaneZMm),
         'optical-wavelength': String(input.wavelengthUm),
         'optical-ring-count': String(input.numRings),
         'optical-rays-per-ring': String(input.raysPerRing),

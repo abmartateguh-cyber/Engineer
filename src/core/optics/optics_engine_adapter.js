@@ -10,6 +10,69 @@ const { SkewRayTracer } = require('./skew_ray_tracer');
 const { OpticalGlassCatalog } = require('./optical_glass_catalog');
 const { PolarizationRayTracer, JonesVector, Complex } = require('./polarization_ray_tracer');
 
+function requirePupilGenerationInputs(params) {
+  const pupilRadiusMm = params.pupilRadiusMm ?? params.entrancePupilRadiusMm;
+  const { numRings, raysPerRing, fieldAngleDeg, wavelengthUm, pupilPlaneZMm } = params;
+  if (typeof pupilRadiusMm !== 'number' || !Number.isFinite(pupilRadiusMm) || pupilRadiusMm <= 0) {
+    throw new OmniError(OmniErrorCode.INVALID_INPUT, 'A finite positive pupil radius in millimeters is required.');
+  }
+  if (!Number.isInteger(numRings) || numRings < 1 || numRings > 20) {
+    throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Pupil ring count must be an integer from 1 through 20.');
+  }
+  if (!Number.isInteger(raysPerRing) || raysPerRing < 1 || raysPerRing > 64) {
+    throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Rays per ring must be an integer from 1 through 64.');
+  }
+  if (
+    typeof fieldAngleDeg !== 'number' ||
+    !Number.isFinite(fieldAngleDeg) ||
+    fieldAngleDeg < -89 ||
+    fieldAngleDeg > 89
+  ) {
+    throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Field angle must be finite and between -89 and 89 degrees.');
+  }
+  if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
+    throw new OmniError(OmniErrorCode.INVALID_INPUT, 'A finite positive wavelength in micrometers is required.');
+  }
+  if (typeof pupilPlaneZMm !== 'number' || !Number.isFinite(pupilPlaneZMm)) {
+    throw new OmniError(
+      OmniErrorCode.INVALID_INPUT,
+      'An explicit finite entrance pupil plane position in millimeters is required.'
+    );
+  }
+  return { pupilRadiusMm, numRings, raysPerRing, fieldAngleDeg, wavelengthUm, pupilPlaneZMm };
+}
+
+function validateOpticalSurfaces(surfaces) {
+  if (!Array.isArray(surfaces) || surfaces.length < 1 || surfaces.length > 128) {
+    throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Supply between 1 and 128 optical surfaces.');
+  }
+  for (const [index, surface] of surfaces.entries()) {
+    if (
+      !surface ||
+      typeof surface.radius !== 'number' ||
+      !Number.isFinite(surface.radius) ||
+      typeof surface.zVertex !== 'number' ||
+      !Number.isFinite(surface.zVertex) ||
+      typeof surface.clearRadius !== 'number' ||
+      !Number.isFinite(surface.clearRadius) ||
+      surface.clearRadius <= 0 ||
+      ![surface.nIncident, surface.nTransmitted].every(
+        (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
+      ) ||
+      typeof surface.conic !== 'number' ||
+      !Number.isFinite(surface.conic) ||
+      !Array.isArray(surface.asphericCoeffs) ||
+      surface.asphericCoeffs.length !== 4 ||
+      !surface.asphericCoeffs.every(Number.isFinite)
+    ) {
+      throw new OmniError(
+        OmniErrorCode.INVALID_INPUT,
+        `Optical surface ${index} requires explicit finite geometry, aperture, indices, conic, and aspheric coefficients.`
+      );
+    }
+  }
+}
+
 /**
  * OpticsEngineAdapter: Standard EngineAdapter for 3D Skew Ray Tracing, Polarization Optics, and Glass Dispersion
  */
@@ -66,20 +129,32 @@ class OpticsEngineAdapter extends EngineAdapter {
               message: 'Validating optical surfaces and ray bundle'
             })
           );
-          const surfaces = params.surfaces || [];
-          let rays = params.rays || [];
+          const surfaces = params.surfaces;
+          validateOpticalSurfaces(surfaces);
+          if (params.rays !== undefined && !Array.isArray(params.rays)) {
+            throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Caller-supplied rays must be an array.');
+          }
 
-          if (rays.length === 0 && params.pupilRadiusMm) {
-            rays = SkewRayTracer.generatePupilRayGrid(
-              params.pupilRadiusMm,
-              params.numRings || 4,
-              params.raysPerRing || 8,
-              params.fieldAngleDeg || 0,
-              params.wavelengthUm || 0.5875618
-            );
+          let rays;
+          let rayGeneration = null;
+          if (params.rays?.length) {
+            rays = params.rays.map((ray, index) => {
+              try {
+                return SkewRayTracer.createRay(ray.origin, ray.direction, ray.wavelengthUm, ray.intensity);
+              } catch (error) {
+                throw new OmniError(OmniErrorCode.INVALID_INPUT, `Ray ${index}: ${error.message}`);
+              }
+            });
           } else {
-            // Normalize custom input rays
-            rays = rays.map((r) => SkewRayTracer.createRay(r.origin, r.direction, r.wavelengthUm, r.intensity));
+            rayGeneration = requirePupilGenerationInputs(params);
+            rays = SkewRayTracer.generatePupilRayGrid(
+              rayGeneration.pupilRadiusMm,
+              rayGeneration.numRings,
+              rayGeneration.raysPerRing,
+              rayGeneration.fieldAngleDeg,
+              rayGeneration.wavelengthUm,
+              rayGeneration.pupilPlaneZMm
+            );
           }
 
           onEvent(
@@ -90,7 +165,13 @@ class OpticsEngineAdapter extends EngineAdapter {
               message: `Tracing ${rays.length} skew rays through ${surfaces.length} surfaces`
             })
           );
-          const sensorZ = params.sensorZ !== undefined ? Number(params.sensorZ) : undefined;
+          const sensorZ = params.sensorZ;
+          if (typeof sensorZ !== 'number' || !Number.isFinite(sensorZ)) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              'An explicit finite sensor z position in millimeters is required.'
+            );
+          }
           const tracedRays = SkewRayTracer.traceOpticalSystem(surfaces, rays, sensorZ);
 
           const activeCount = tracedRays.filter((r) => !r.isTerminated).length;
@@ -111,7 +192,8 @@ class OpticsEngineAdapter extends EngineAdapter {
             activeRays: activeCount,
             tirRays: tirCount,
             spotDiagram,
-            rays: tracedRays
+            rays: tracedRays,
+            rayGeneration
           };
           break;
         }
@@ -125,14 +207,16 @@ class OpticsEngineAdapter extends EngineAdapter {
               message: 'Generating circular pupil ray mesh'
             })
           );
+          const rayGeneration = requirePupilGenerationInputs(params);
           const rays = SkewRayTracer.generatePupilRayGrid(
-            params.pupilRadiusMm || 10.0,
-            params.numRings || 4,
-            params.raysPerRing || 8,
-            params.fieldAngleDeg || 0.0,
-            params.wavelengthUm || 0.5875618
+            rayGeneration.pupilRadiusMm,
+            rayGeneration.numRings,
+            rayGeneration.raysPerRing,
+            rayGeneration.fieldAngleDeg,
+            rayGeneration.wavelengthUm,
+            rayGeneration.pupilPlaneZMm
           );
-          outputData = { rayCount: rays.length, rays };
+          outputData = { rayCount: rays.length, rays, rayGeneration };
           break;
         }
 
@@ -204,55 +288,97 @@ class OpticsEngineAdapter extends EngineAdapter {
               message: 'Evaluating polarization state, Jones matrix, and Stokes parameters'
             })
           );
-          if (params.crystal) {
+          if (Object.hasOwn(params, 'crystal')) {
             // Birefringent crystal walk-off and splitting calculation
-            outputData = PolarizationRayTracer.splitBirefringentRay(
-              params.crystal,
-              params.rayDirection || [0, 0, 1],
-              params.surfaceNormal || [0, 0, 1]
-            );
-          } else if (params.fresnel) {
-            outputData = PolarizationRayTracer.evaluateFresnel(
-              params.fresnel.n1 || 1.0,
-              params.fresnel.n2 || 1.5,
-              params.fresnel.thetaI || 0.0
-            );
+            const crystal = params.crystal;
+            const rayDirection = params.rayDirection;
+            const surfaceNormal = params.surfaceNormal;
+            const validVector = (value) =>
+              Array.isArray(value) && value.length === 3 && value.every(Number.isFinite) && Math.hypot(...value) > 0;
+            if (
+              !crystal ||
+              typeof crystal !== 'object' ||
+              ![crystal.no, crystal.ne].every(
+                (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
+              ) ||
+              !validVector(crystal.opticAxis) ||
+              !validVector(rayDirection) ||
+              !validVector(surfaceNormal)
+            ) {
+              throw new OmniError(
+                OmniErrorCode.INVALID_INPUT,
+                'Crystal splitting requires positive no/ne values and explicit nonzero optic-axis, ray-direction, and surface-normal vectors.'
+              );
+            }
+            outputData = PolarizationRayTracer.splitBirefringentRay(crystal, rayDirection, surfaceNormal);
+          } else if (Object.hasOwn(params, 'fresnel')) {
+            const { n1, n2, thetaI } = params.fresnel || {};
+            if (
+              ![n1, n2].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0) ||
+              typeof thetaI !== 'number' ||
+              !Number.isFinite(thetaI) ||
+              thetaI < 0 ||
+              thetaI >= Math.PI / 2
+            ) {
+              throw new OmniError(
+                OmniErrorCode.INVALID_INPUT,
+                'Fresnel evaluation requires positive incident/transmitted indices and an explicit incidence angle in radians from 0 inclusive to π/2 exclusive.'
+              );
+            }
+            outputData = PolarizationRayTracer.evaluateFresnel(n1, n2, thetaI);
           } else {
             // Jones vector transmission through optical polarizers and retarders
-            let jv = new JonesVector(
-              params.Ex !== undefined ? params.Ex : 1.0,
-              params.Ey !== undefined ? params.Ey : 0.0
-            );
+            if (
+              typeof params.Ex !== 'number' ||
+              !Number.isFinite(params.Ex) ||
+              typeof params.ExImag !== 'number' ||
+              !Number.isFinite(params.ExImag) ||
+              typeof params.Ey !== 'number' ||
+              !Number.isFinite(params.Ey) ||
+              typeof params.EyImag !== 'number' ||
+              !Number.isFinite(params.EyImag) ||
+              !Array.isArray(params.elements)
+            ) {
+              throw new OmniError(
+                OmniErrorCode.INVALID_INPUT,
+                'Jones propagation requires explicit finite real and imaginary Ex/Ey field components and an elements array.'
+              );
+            }
+            let jv = new JonesVector(new Complex(params.Ex, params.ExImag), new Complex(params.Ey, params.EyImag));
             const stokesIn = jv.toStokes();
 
-            if (Array.isArray(params.elements)) {
-              for (const el of params.elements) {
-                switch (el.type) {
-                  case 'linear_polarizer': {
-                    const theta = ((el.angleDeg || 0.0) * Math.PI) / 180;
-                    const c = Math.cos(theta);
-                    const s = Math.sin(theta);
-                    const J = [
-                      [new Complex(c * c, 0), new Complex(c * s, 0)],
-                      [new Complex(c * s, 0), new Complex(s * s, 0)]
-                    ];
-                    jv = jv.applyMatrix(J);
-                    break;
-                  }
-                  case 'rotator': {
-                    const theta = ((el.angleDeg || 0.0) * Math.PI) / 180;
-                    const c = Math.cos(theta);
-                    const s = Math.sin(theta);
-                    const J = [
-                      [new Complex(c, 0), new Complex(-s, 0)],
-                      [new Complex(s, 0), new Complex(c, 0)]
-                    ];
-                    jv = jv.applyMatrix(J);
-                    break;
-                  }
-                  default:
-                    break;
+            for (const [index, el] of params.elements.entries()) {
+              if (!el || typeof el !== 'object' || !Number.isFinite(el.angleDeg)) {
+                throw new OmniError(
+                  OmniErrorCode.INVALID_INPUT,
+                  `Polarization element ${index} needs an explicit finite angle in degrees.`
+                );
+              }
+              const theta = (el.angleDeg * Math.PI) / 180;
+              const c = Math.cos(theta);
+              const s = Math.sin(theta);
+              switch (el.type) {
+                case 'linear_polarizer': {
+                  const J = [
+                    [new Complex(c * c, 0), new Complex(c * s, 0)],
+                    [new Complex(c * s, 0), new Complex(s * s, 0)]
+                  ];
+                  jv = jv.applyMatrix(J);
+                  break;
                 }
+                case 'rotator': {
+                  const J = [
+                    [new Complex(c, 0), new Complex(-s, 0)],
+                    [new Complex(s, 0), new Complex(c, 0)]
+                  ];
+                  jv = jv.applyMatrix(J);
+                  break;
+                }
+                default:
+                  throw new OmniError(
+                    OmniErrorCode.UNSUPPORTED,
+                    `Polarization element type '${el.type}' is unsupported.`
+                  );
               }
             }
 

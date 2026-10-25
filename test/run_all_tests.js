@@ -2045,11 +2045,27 @@ endmodule
       numRings: 1,
       raysPerRing: 5,
       wavelengthUm: 0.58756,
+      pupilPlaneZMm: -10,
       sensorZMm: 75,
       maxFrequencyLpMm: 120
     });
     assert(trace.rayCount > 0);
+    assert.strictEqual(trace.pupilPlaneZMm, -10);
+    assert.strictEqual(trace.mtf.cutoffFreqLpMm, 1216);
     assert.strictEqual(trace.validationLevel, 'experimental');
+    const missingPupilPlaneOptions = {
+      fStop: 1.4,
+      fieldAngleDeg: 0,
+      numRings: 1,
+      raysPerRing: 5,
+      wavelengthUm: 0.58756,
+      sensorZMm: 75,
+      maxFrequencyLpMm: 120
+    };
+    assert.throws(
+      () => OpticalEngine.traceExactSkewRays(opticalExamples.illustrativePrescription, missingPupilPlaneOptions),
+      /pupil plane/i
+    );
     assert.throws(() => OpticalEngine.traceRays(), /explicit optical prescription/);
   });
 

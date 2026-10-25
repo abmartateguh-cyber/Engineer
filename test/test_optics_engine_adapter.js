@@ -25,14 +25,32 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
     parameters: {
       surfaces: [
         // S1: Convex front surface (R = 50mm, thickness = 5mm, n = 1.5168 N-BK7)
-        { radius: 50.0, zVertex: 10.0, clearRadius: 20.0, nIncident: 1.0, nTransmitted: 1.5168 },
+        {
+          radius: 50.0,
+          zVertex: 10.0,
+          clearRadius: 20.0,
+          nIncident: 1.0,
+          nTransmitted: 1.5168,
+          conic: 0,
+          asphericCoeffs: [0, 0, 0, 0]
+        },
         // S2: Flat rear surface
-        { radius: 0.0, zVertex: 15.0, clearRadius: 20.0, nIncident: 1.5168, nTransmitted: 1.0 }
+        {
+          radius: 0.0,
+          zVertex: 15.0,
+          clearRadius: 20.0,
+          nIncident: 1.5168,
+          nTransmitted: 1.0,
+          conic: 0,
+          asphericCoeffs: [0, 0, 0, 0]
+        }
       ],
       pupilRadiusMm: 8.0,
+      pupilPlaneZMm: -10.0,
       numRings: 3,
       raysPerRing: 6,
       fieldAngleDeg: 0.0,
+      wavelengthUm: 0.58756,
       sensorZ: 105.0 // Approximate focal plane: f ~ R/(n-1) = 50/0.5168 ~ 96.7mm from rear
     }
   });
@@ -43,8 +61,63 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
   assert(traceRes.outputData.totalRays > 10, 'Must generate and trace rays');
   assert(traceRes.outputData.activeRays > 0, 'Active rays must reach sensor');
   assert(traceRes.outputData.spotDiagram.length === traceRes.outputData.activeRays);
+  assert.strictEqual(traceRes.outputData.rayGeneration.pupilPlaneZMm, -10.0);
   console.log(
     `  ✓ PASSED: Traced ${traceRes.outputData.activeRays}/${traceRes.outputData.totalRays} rays to sensor. Spot size: ${traceRes.outputData.spotDiagram.length} points\n`
+  );
+
+  const missingPupilPlaneParameters = { ...traceReq.parameters };
+  delete missingPupilPlaneParameters.pupilPlaneZMm;
+  const missingPupilPlaneReq = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_skew_rays',
+    parameters: missingPupilPlaneParameters
+  });
+  await assert.rejects(
+    adapter.execute(missingPupilPlaneReq),
+    (error) => error.code === 'INVALID_INPUT',
+    'Pupil ray generation must not assume an entrance plane position'
+  );
+
+  const missingSensorParameters = { ...traceReq.parameters };
+  delete missingSensorParameters.sensorZ;
+  const missingSensorReq = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_skew_rays',
+    parameters: missingSensorParameters
+  });
+  await assert.rejects(
+    adapter.execute(missingSensorReq),
+    (error) => error.code === 'INVALID_INPUT',
+    'Ray tracing must not omit the image plane'
+  );
+
+  const zeroPupilPlaneReq = new JobRequest({
+    domain: 'optics',
+    operation: 'generate_pupil_rays',
+    parameters: {
+      pupilRadiusMm: 5.0,
+      pupilPlaneZMm: 0.0,
+      numRings: 1,
+      raysPerRing: 2,
+      fieldAngleDeg: 0.0,
+      wavelengthUm: 0.55
+    }
+  });
+  const zeroPupilPlaneResult = await adapter.execute(zeroPupilPlaneReq);
+  assert.strictEqual(zeroPupilPlaneResult.outputData.rays[0].z, 0.0);
+
+  const missingWavelengthParameters = { ...zeroPupilPlaneReq.parameters };
+  delete missingWavelengthParameters.wavelengthUm;
+  const missingWavelengthReq = new JobRequest({
+    domain: 'optics',
+    operation: 'generate_pupil_rays',
+    parameters: missingWavelengthParameters
+  });
+  await assert.rejects(
+    adapter.execute(missingWavelengthReq),
+    (error) => error.code === 'INVALID_INPUT',
+    'Pupil ray generation must not select an implicit wavelength'
   );
 
   // 2. Sellmeier Dispersion & Refractive Index Calculation
@@ -151,6 +224,8 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
     parameters: {
       Ex: 1.0,
       Ey: 0.0, // Horizontal linearly polarized light (Intensity = 1.0)
+      ExImag: 0.0,
+      EyImag: 0.0,
       elements: [
         { type: 'linear_polarizer', angleDeg: 45.0 } // Linear polarizer oriented at 45°
       ]
@@ -163,6 +238,58 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
   const finalIntensity = polRes.outputData.intensity;
   assert(Math.abs(finalIntensity - 0.5) < 1e-4, `Expected intensity 0.5 by Malus Law, got ${finalIntensity}`);
   console.log(`  ✓ PASSED: Polarization verified: I_in=1.0 -> Polarizer(45°) -> I_out=${finalIntensity.toFixed(4)}\n`);
+
+  const missingJonesInput = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_polarization',
+    parameters: { elements: [] }
+  });
+  await assert.rejects(
+    adapter.execute(missingJonesInput),
+    (error) => error.code === 'INVALID_INPUT',
+    'Jones propagation must not invent an input field'
+  );
+
+  const missingJonesQuadrature = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_polarization',
+    parameters: { Ex: 1, Ey: 0, elements: [] }
+  });
+  await assert.rejects(
+    adapter.execute(missingJonesQuadrature),
+    (error) => error.code === 'INVALID_INPUT',
+    'Jones propagation must not assume omitted quadrature components are zero'
+  );
+
+  const zeroJonesInput = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_polarization',
+    parameters: { Ex: 0, Ey: 0, ExImag: 0, EyImag: 0, elements: [] }
+  });
+  const zeroJonesResult = await adapter.execute(zeroJonesInput);
+  assert.strictEqual(zeroJonesResult.outputData.intensity, 0);
+
+  const zeroIndexFresnelInput = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_polarization',
+    parameters: { fresnel: { n1: 0, n2: 1.5, thetaI: 0 } }
+  });
+  await assert.rejects(
+    adapter.execute(zeroIndexFresnelInput),
+    (error) => error.code === 'INVALID_INPUT',
+    'A zero refractive index must not be replaced by air'
+  );
+
+  const missingCrystalDirection = new JobRequest({
+    domain: 'optics',
+    operation: 'trace_polarization',
+    parameters: { crystal: { no: 1.5, ne: 1.6, opticAxis: [0, 0, 1] } }
+  });
+  await assert.rejects(
+    adapter.execute(missingCrystalDirection),
+    (error) => error.code === 'INVALID_INPUT',
+    'Crystal splitting must require explicit incident direction and interface normal'
+  );
 
   console.log('================================================================');
   console.log('   ALL OPTICS ENGINE ADAPTER TESTS PASSED!                      ');

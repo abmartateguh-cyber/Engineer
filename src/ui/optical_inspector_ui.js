@@ -23,6 +23,7 @@ class OpticalInspectorUI {
     this.inputRequest = {
       surfaces: Array.isArray(request?.surfaces) ? request.surfaces : [],
       entrancePupilRadiusMm: request?.entrancePupilRadiusMm,
+      pupilPlaneZMm: request?.pupilPlaneZMm,
       wavelengthUm: request?.wavelengthUm,
       numRings: request?.numRings,
       raysPerRing: request?.raysPerRing,
@@ -57,6 +58,7 @@ class OpticalInspectorUI {
     return {
       surfaces,
       entrancePupilRadiusMm: readNumber('optical-pupil-radius', 'entrance pupil radius'),
+      pupilPlaneZMm: readNumber('optical-pupil-plane', 'entrance pupil plane position'),
       wavelengthUm: readNumber('optical-wavelength', 'wavelength'),
       numRings: readNumber('optical-ring-count', 'ring count', true),
       raysPerRing: readNumber('optical-rays-per-ring', 'rays per ring', true),
@@ -83,7 +85,7 @@ class OpticalInspectorUI {
     return `
       <section aria-label="Optical prescription inputs" style="background:#060911; border:1px solid var(--border-color); border-radius:6px; padding:12px;">
         <div style="font-size:12px; font-weight:600; margin-bottom:6px; color:var(--accent-cyan);">Caller-Supplied Optical System</div>
-        <p style="font-size:10px; color:var(--text-muted); line-height:1.5; margin:0 0 10px;">Enter your own sequential surfaces and trace settings. No prescription is preloaded. Surfaces require radius, zVertex, clearRadius, nIncident, nTransmitted, conic, and four asphericCoeffs values. Lengths use mm; wavelength uses µm; field angle uses degrees.</p>
+        <p style="font-size:10px; color:var(--text-muted); line-height:1.5; margin:0 0 10px;">Enter your own sequential surfaces and trace settings, including the entrance pupil plane. No prescription is preloaded. Surfaces require radius, zVertex, clearRadius, nIncident, nTransmitted, conic, and four asphericCoeffs values. Lengths use mm; wavelength uses µm; field angle uses degrees.</p>
         <details style="font-size:10px; color:var(--text-muted); margin-bottom:10px;">
           <summary style="cursor:pointer;">Surface input fields</summary>
           <p style="line-height:1.5;">Paste a JSON array of surface objects. Each object must provide <code>radius</code>, <code>zVertex</code>, <code>clearRadius</code>, <code>nIncident</code>, <code>nTransmitted</code>, <code>conic</code>, and <code>asphericCoeffs</code> as a four-number array. Use radius 0 for a plane surface.</p>
@@ -91,6 +93,7 @@ class OpticalInspectorUI {
         <label style="display:block; font-size:11px; color:var(--text-muted);">Surface array JSON<textarea id="optical-surfaces-input" rows="7" spellcheck="false" aria-label="Optical surface array JSON" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; background:#030712; color:var(--fg-1); border:1px solid var(--border-color); border-radius:6px; padding:8px; font:11px monospace; resize:vertical;">${surfaces}</textarea></label>
         <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; margin-top:9px;">
           ${numberInput('optical-pupil-radius', 'Entrance pupil radius (mm)', 'entrancePupilRadiusMm', Number.MIN_VALUE)}
+          ${numberInput('optical-pupil-plane', 'Entrance pupil plane z (mm)', 'pupilPlaneZMm')}
           ${numberInput('optical-wavelength', 'Wavelength (µm)', 'wavelengthUm', Number.MIN_VALUE)}
           ${numberInput('optical-ring-count', 'Pupil rings (1–20)', 'numRings', 1, '1')}
           ${numberInput('optical-rays-per-ring', 'Rays per ring (1–64)', 'raysPerRing', 1, '1')}
@@ -115,8 +118,13 @@ class OpticalInspectorUI {
     if (!this.container) return;
     if (!data || data.success !== true || !data.spotData || !data.mtfData || !Array.isArray(data.surfaces)) {
       const message = String(
-        data?.error?.message || 'No optical prescription is loaded. Supply explicit surface data to run the experimental ray trace.'
-      ).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        data?.error?.message ||
+          'No optical prescription is loaded. Supply explicit surface data to run the experimental ray trace.'
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
       this.container.innerHTML = `
         <div class="optical-inspector-layout" style="display:flex; flex-direction:column; gap:14px; color:var(--text-main);">
           ${this._renderInputForm()}
@@ -240,15 +248,16 @@ class OpticalInspectorUI {
       return `<tr><td colspan="8" style="padding: 12px; text-align: center; color: var(--text-dim);">No optical surfaces loaded.</td></tr>`;
     }
 
-    return this.currentSurfaces.map((s, idx) => {
-      const radius = Number.isFinite(s.radius) ? (s.radius === 0 ? 'Flat' : s.radius.toFixed(2)) : 'Unavailable';
-      const thick = Number.isFinite(s.thickness) ? s.thickness.toFixed(2) : '—';
-      const glass = 'User-supplied';
-      const nd = Number.isFinite(s.nTransmitted) ? s.nTransmitted.toFixed(4) : 'Unavailable';
-      const vd = '—';
-      const clearDia = Number.isFinite(s.clearRadius) ? (s.clearRadius * 2).toFixed(1) : 'Unavailable';
+    return this.currentSurfaces
+      .map((s, idx) => {
+        const radius = Number.isFinite(s.radius) ? (s.radius === 0 ? 'Flat' : s.radius.toFixed(2)) : 'Unavailable';
+        const thick = Number.isFinite(s.thickness) ? s.thickness.toFixed(2) : '—';
+        const glass = 'User-supplied';
+        const nd = Number.isFinite(s.nTransmitted) ? s.nTransmitted.toFixed(4) : 'Unavailable';
+        const vd = '—';
+        const clearDia = Number.isFinite(s.clearRadius) ? (s.clearRadius * 2).toFixed(1) : 'Unavailable';
 
-      return `
+        return `
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-main);">
           <td style="padding: 5px 8px; font-weight: 600; color: var(--accent-cyan);">${idx + 1}</td>
           <td style="padding: 5px 8px;">Surface ${idx + 1}</td>
@@ -260,7 +269,8 @@ class OpticalInspectorUI {
           <td style="padding: 5px 8px; font-family: monospace;">${clearDia}</td>
         </tr>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   _drawSpotDiagram() {
@@ -278,8 +288,10 @@ class OpticalInspectorUI {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cX, 0); ctx.lineTo(cX, h);
-    ctx.moveTo(0, cY); ctx.lineTo(w, cY);
+    ctx.moveTo(cX, 0);
+    ctx.lineTo(cX, h);
+    ctx.moveTo(0, cY);
+    ctx.lineTo(w, cY);
     ctx.stroke();
 
     // Concentric coordinate rings (10, 25, 50 microns)
@@ -317,7 +329,7 @@ class OpticalInspectorUI {
     }
 
     // Plot ray intersection points
-    const spots = (this.currentSpotData && this.currentSpotData.spots) ? this.currentSpotData.spots : [];
+    const spots = this.currentSpotData && this.currentSpotData.spots ? this.currentSpotData.spots : [];
     if (spots.length > 0) {
       const centX = this.currentSpotData.centroidX || 0;
       const centY = this.currentSpotData.centroidY || 0;
@@ -337,8 +349,10 @@ class OpticalInspectorUI {
     ctx.strokeStyle = '#f43f5e';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cX - 5, cY); ctx.lineTo(cX + 5, cY);
-    ctx.moveTo(cX, cY - 5); ctx.lineTo(cX, cY + 5);
+    ctx.moveTo(cX - 5, cY);
+    ctx.lineTo(cX + 5, cY);
+    ctx.moveTo(cX, cY - 5);
+    ctx.lineTo(cX, cY + 5);
     ctx.stroke();
   }
 
@@ -350,7 +364,10 @@ class OpticalInspectorUI {
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
-    const padL = 35, padR = 15, padT = 15, padB = 25;
+    const padL = 35,
+      padR = 15,
+      padT = 15,
+      padB = 25;
     const plotW = w - padL - padR;
     const plotH = h - padT - padB;
 
@@ -360,7 +377,8 @@ class OpticalInspectorUI {
     for (let m = 0; m <= 1.0; m += 0.2) {
       const y = padT + plotH * (1.0 - m);
       ctx.beginPath();
-      ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y);
+      ctx.moveTo(padL, y);
+      ctx.lineTo(padL + plotW, y);
       ctx.stroke();
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
@@ -372,8 +390,16 @@ class OpticalInspectorUI {
     const tang = this.currentMTFData?.tangentialMTF;
     const sagi = this.currentMTFData?.sagittalMTF;
     const diff = this.currentMTFData?.diffractionLimitMTF;
-    if (!Array.isArray(freqs) || !Array.isArray(tang) || !Array.isArray(sagi) || !Array.isArray(diff) ||
-        freqs.length === 0 || tang.length !== freqs.length || sagi.length !== freqs.length || diff.length !== freqs.length) {
+    if (
+      !Array.isArray(freqs) ||
+      !Array.isArray(tang) ||
+      !Array.isArray(sagi) ||
+      !Array.isArray(diff) ||
+      freqs.length === 0 ||
+      tang.length !== freqs.length ||
+      sagi.length !== freqs.length ||
+      diff.length !== freqs.length
+    ) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.font = '12px sans-serif';
       ctx.fillText('No calculated MTF data', padL + 8, padT + 18);
@@ -384,7 +410,8 @@ class OpticalInspectorUI {
     for (let f = 0; f <= maxFreq; f += 30) {
       const x = padL + (f / maxFreq) * plotW;
       ctx.beginPath();
-      ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH);
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, padT + plotH);
       ctx.stroke();
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';

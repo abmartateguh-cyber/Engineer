@@ -47,6 +47,8 @@ const {
 const {
   getOpticalGlassCatalogUnavailableResult,
   getOpticalTolerancingUnavailableResult,
+  runSkewRayTrace,
+  runSkewOptics,
   runAsphericOptics,
   runThinFilmCoating,
   runOpticalThermalSoak,
@@ -466,6 +468,8 @@ function runIndustrialGapClosureTests() {
   });
 
   runTest('Optical asphere, coating, thermal, wavefront, and polarization routes require explicit inputs', () => {
+    assert.strictEqual(runSkewRayTrace({}).error.code, 'INVALID_INPUT');
+    assert.strictEqual(runSkewOptics({}).error.code, 'INVALID_INPUT');
     assert.strictEqual(runAsphericOptics({}).error.code, 'INVALID_INPUT');
     const asphereInputs = {
       curvaturePerMm: 1 / 50,
@@ -582,6 +586,15 @@ function runIndustrialGapClosureTests() {
     assert.strictEqual(fresnel.success, true);
     assert(Math.abs(fresnel.Rs - 0.04) < 1e-6);
     assert.strictEqual(runPolarizationTrace({ action: 'birefringent-split' }).error.code, 'INVALID_INPUT');
+    assert.strictEqual(
+      runPolarizationTrace({
+        action: 'birefringent-split',
+        crystalProps: { opticAxis: [0, 0, 1] },
+        rayDir: [0, 0, -1],
+        surfaceNorm: [0, 0, 1]
+      }).error.code,
+      'INVALID_INPUT'
+    );
     const stokes = runPolarizationTrace({ action: 'stokes', Ex: 1, Ey: 0, ExImag: 0, EyImag: 0 });
     assert.strictEqual(stokes.success, true);
     assert.strictEqual(stokes.stokes.DOP, 1);

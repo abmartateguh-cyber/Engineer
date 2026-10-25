@@ -156,19 +156,69 @@ test('Optical dispersion requires explicit wavelength and temperature inputs', (
   );
 });
 
+test('Optical prescriptions require explicit conics and aspheric coefficients for both surfaces', () => {
+  const prescription = opticalExamples.illustrativePrescription;
+  const missingConic = {
+    ...prescription,
+    elements: prescription.elements.map((element, index) =>
+      index === 0 ? { ...element, conicFront: undefined } : element
+    )
+  };
+  assert.throws(() => OpticalEngine.getOpticalSurfaces(missingConic), /explicit conic/i);
+
+  const missingRearCoefficients = {
+    ...prescription,
+    elements: prescription.elements.map((element, index) =>
+      index === 0 ? { ...element, asphericCoeffsRear: undefined } : element
+    )
+  };
+  assert.throws(() => OpticalEngine.getOpticalSurfaces(missingRearCoefficients), /four explicit finite aspheric/i);
+});
+
 test('SkewRayTracer: Exact 3D vector refraction through spherical surfaces & TIR detection', () => {
   // Doublet lens surfaces
   const surfaces = [
-    { radius: 50.0, thickness: 8.0, glass: 'N-BK7', clearAperture: 36.0, nIncident: 1, nTransmitted: 1.5168 },
-    { radius: -40.0, thickness: 3.0, glass: 'N-SF11', clearAperture: 36.0, nIncident: 1.5168, nTransmitted: 1.7847 },
-    { radius: -150.0, thickness: 50.0, glass: 'Air', clearAperture: 36.0, nIncident: 1.7847, nTransmitted: 1 }
+    {
+      radius: 50.0,
+      zVertex: 0.0,
+      thickness: 8.0,
+      glass: 'N-BK7',
+      clearAperture: 36.0,
+      nIncident: 1,
+      nTransmitted: 1.5168,
+      conic: 0,
+      asphericCoeffs: [0, 0, 0, 0]
+    },
+    {
+      radius: -40.0,
+      zVertex: 8.0,
+      thickness: 3.0,
+      glass: 'N-SF11',
+      clearAperture: 36.0,
+      nIncident: 1.5168,
+      nTransmitted: 1.7847,
+      conic: 0,
+      asphericCoeffs: [0, 0, 0, 0]
+    },
+    {
+      radius: -150.0,
+      zVertex: 11.0,
+      thickness: 50.0,
+      glass: 'Air',
+      clearAperture: 36.0,
+      nIncident: 1.7847,
+      nTransmitted: 1,
+      conic: 0,
+      asphericCoeffs: [0, 0, 0, 0]
+    }
   ];
 
   // Trace marginal ray parallel to Z axis at y = 10mm
   const ray = {
     origin: { x: 0, y: 10, z: -10 },
     dir: { x: 0, y: 0, z: 1 },
-    wavelength: 0.5875618
+    wavelength: 0.5875618,
+    intensity: 1.0
   };
 
   const traced = SkewRayTracer.traceRay(surfaces, ray);
@@ -185,11 +235,30 @@ test('SkewRayTracer: Spot Diagram & MTF calculation across spatial frequencies (
   const surfaces = OpticalEngine.getOpticalSurfaces(opticalExamples.illustrativePrescription);
   assert(surfaces.length >= 10, `Expected at least 10 optical surfaces, got ${surfaces.length}`);
 
-  const bundle = SkewRayTracer.generateEntrancePupilRayGrid(10.0, 0.5875618, 3, 8);
+  const bundle = SkewRayTracer.generateEntrancePupilRayGrid(10.0, 0.5875618, 3, 8, 0.0, -10.0);
   assert(bundle.length >= 24, `Expected pupil grid >= 24 rays, got ${bundle.length}`);
 
-  const tracedRays = SkewRayTracer.traceRayBundle(surfaces, bundle);
+  const tracedRays = SkewRayTracer.traceRayBundle(surfaces, bundle, 75.0);
   assert.strictEqual(tracedRays.length, bundle.length);
+  assert.throws(() => SkewRayTracer.traceOpticalSystem(surfaces, bundle), /sensor z position/i);
+
+  const uniformIndexRay = SkewRayTracer.createRay([0, 0, 0], [0, 0, 1], 0.55, 1);
+  const uniformIndexTrace = SkewRayTracer.traceOpticalSystem(
+    [
+      {
+        radius: 0,
+        zVertex: 1,
+        clearRadius: 10,
+        nIncident: 1.5,
+        nTransmitted: 1.5,
+        conic: 0,
+        asphericCoeffs: [0, 0, 0, 0]
+      }
+    ],
+    [uniformIndexRay],
+    3
+  );
+  assert.strictEqual(uniformIndexTrace[0].opl, 4.5, 'Image-plane propagation must use the explicit image-space index.');
 
   // Image plane at focal distance ~75mm
   const spotData = SkewRayTracer.computeSpotDiagram(tracedRays, 75.0);
@@ -198,13 +267,17 @@ test('SkewRayTracer: Spot Diagram & MTF calculation across spatial frequencies (
   assert(spotData.spots.length === bundle.length);
 
   // MTF calculation
-  const mtf = SkewRayTracer.computeMTF(spotData, 100.0, 10);
+  const mtf = SkewRayTracer.computeMTF(spotData, 1.4, 100.0, 10, 587.5618);
   assert.strictEqual(mtf.length, 11);
   assert.strictEqual(mtf[0].freq, 0);
   assert.strictEqual(mtf[0].tangential, 1.0); // MTF at 0 lp/mm is 1.0
   assert.strictEqual(mtf[0].sagittal, 1.0);
   // MTF should decrease at higher spatial frequencies
   assert(mtf[mtf.length - 1].tangential < 1.0);
+  assert.throws(() => SkewRayTracer.generatePupilRayGrid(), /pupil radius/i);
+  assert.throws(() => SkewRayTracer.generatePupilRayGrid(10, 3, 8, 0, 0.55), /pupil plane/i);
+  assert.throws(() => SkewRayTracer.traceRayBundle(surfaces, bundle), /sensor z position/i);
+  assert.throws(() => SkewRayTracer.computeMTFCurve(0.02, 1.4, 100), /wavelength/i);
 });
 
 test('SeidelAberrations: Third-order primary aberration coefficients for 50mm f/1.4 system', () => {

@@ -90,6 +90,10 @@ function runCameraLensMasterTests() {
         centerThicknessMm: 5,
         clearApertureMm: 10,
         zPosMm: 0,
+        conicFront: 0,
+        conicRear: 0,
+        asphericCoeffsFront: [0, 0, 0, 0],
+        asphericCoeffsRear: [0, 0, 0, 0],
         opticalMaterial: { nd: 1.5, nF: 1.51, nC: 1.49 }
       }
     ]
@@ -114,6 +118,7 @@ function runCameraLensMasterTests() {
     numRings: 2,
     raysPerRing: 4,
     wavelengthUm: 0.55,
+    pupilPlaneZMm: -10,
     sensorZMm: 54.4,
     maxFrequencyLpMm: 100
   });
