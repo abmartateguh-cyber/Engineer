@@ -52,6 +52,14 @@ console.log('================================================================');
     pool.dispatch('ECHO_TEST', { message: 'warmup-3', delayMs: 10 })
   ]);
 
+  await assert.rejects(
+    pool.dispatch('ECHO_TEST', { callback: () => 'not-cloneable' }),
+    (error) => error.code === OmniErrorCode.INVALID_INPUT,
+    'A structured-clone failure must reject the task without leaving the worker busy'
+  );
+  const afterCloneFailure = await pool.dispatch('ECHO_TEST', { message: 'after-clone-failure' });
+  assert.strictEqual(afterCloneFailure.result.echo, 'after-clone-failure');
+
   // 2. Concurrent execution across workers
   console.log('\n[2] Parallel task execution across isolated worker threads...');
   const t0 = performance.now();
@@ -131,11 +139,33 @@ console.log('================================================================');
   assert.ok(timeoutElapsed < 2200, `Timeout handling took ${timeoutElapsed} ms, must terminate worker within 2s`);
   console.log(`  ✓ PASSED: Task timed out and worker terminated within ${timeoutElapsed.toFixed(1)} ms`);
 
-  // 6. Pool recovery after worker crash/termination
-  console.log('\n[6] Pool stability and subsequent task execution after termination...');
-  const recoveryResult = await pool.dispatch('ECHO_TEST', { message: 'post-recovery-task', delayMs: 20 });
-  assert.strictEqual(recoveryResult.result.echo, 'post-recovery-task');
-  console.log('  ✓ PASSED: Worker pool automatically spawned replacement worker and processed next task');
+  // 6. Pool recovery after an unexpected worker exit while work is queued
+  console.log('\n[6] Pool recovery after an unexpected worker exit...');
+  const crashedTask = pool.dispatch('ECHO_TEST', { message: 'crashed-task', delayMs: 10000 });
+  const crashedTaskOutcome = crashedTask.then(
+    () => null,
+    (error) => error
+  );
+  const blockerTasks = [
+    pool.dispatch('ECHO_TEST', { message: 'crash-blocker-1', delayMs: 250 }),
+    pool.dispatch('ECHO_TEST', { message: 'crash-blocker-2', delayMs: 250 })
+  ];
+  const queuedRecoveryTask = pool.dispatch('ECHO_TEST', { message: 'queued-through-crash', delayMs: 10 });
+  const crashedSlot = pool.workers.find((slot) => slot.currentTask?.payload?.message === 'crashed-task');
+  assert.ok(crashedSlot, 'The task selected for forced worker exit must be active');
+  assert.strictEqual(pool.taskQueue.length, 1, 'One task must be queued while the other workers are occupied');
+  await crashedSlot.worker.terminate();
+
+  const crashedTaskError = await crashedTaskOutcome;
+  assert.strictEqual(crashedTaskError?.code, OmniErrorCode.RESOURCE_EXHAUSTED);
+  const [blockerResult1, blockerResult2, queuedRecoveryResult] = await Promise.all([
+    ...blockerTasks,
+    queuedRecoveryTask
+  ]);
+  assert.strictEqual(blockerResult1.result.echo, 'crash-blocker-1');
+  assert.strictEqual(blockerResult2.result.echo, 'crash-blocker-2');
+  assert.strictEqual(queuedRecoveryResult.result.echo, 'queued-through-crash');
+  console.log('  ✓ PASSED: Dead worker was replaced and queued work ran without dispatching to the exited thread');
 
   // 7. Clean termination
   console.log('\n[7] Clean shutdown...');
@@ -164,6 +194,37 @@ console.log('================================================================');
     'A terminated worker pool must reject new work'
   );
   console.log('  ✓ PASSED: All worker threads terminated cleanly');
+
+  // 8. Fail closed when a failed worker cannot be replaced
+  console.log('\n[8] Fail closed when worker replacement is unavailable...');
+  const failedPool = new PersistentWorkerPool({ maxWorkers: 1 });
+  const failedTask = failedPool.dispatch('ECHO_TEST', { message: 'replacement-failure', delayMs: 10000 });
+  const failedTaskOutcome = failedTask.then(
+    () => null,
+    (error) => error
+  );
+  const failedSlot = failedPool.workers[0];
+  const originalModuleLoadForReplacement = Module._load;
+  try {
+    Module._load = function (request, parent, isMain) {
+      if (request === 'worker_threads') throw new Error('replacement worker unavailable for test');
+      return originalModuleLoadForReplacement.call(this, request, parent, isMain);
+    };
+    await failedSlot.worker.terminate();
+  } finally {
+    Module._load = originalModuleLoadForReplacement;
+  }
+  const failedTaskError = await failedTaskOutcome;
+  assert.strictEqual(failedTaskError?.code, OmniErrorCode.RESOURCE_EXHAUSTED);
+  assert.strictEqual(failedPool.getTelemetry().executionMode, 'failed');
+  await assert.rejects(
+    failedPool.dispatch('ECHO_TEST', { message: 'after-failed-replacement' }),
+    (error) => error.code === OmniErrorCode.RESOURCE_EXHAUSTED,
+    'An unrecoverable worker pool must reject new work with its terminal failure'
+  );
+  await failedPool.terminateAll();
+  assert.strictEqual(failedPool.workers.length, 0);
+  console.log('  ✓ PASSED: Failed replacement settled work and prevented future dispatches');
 
   console.log('\n================================================================');
   console.log('   ALL WORKER POOL CONCURRENCY ASSERTIONS PASSED!               ');

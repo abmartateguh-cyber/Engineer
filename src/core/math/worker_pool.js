@@ -16,6 +16,7 @@ const os = require('os');
 const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 const TASK_PRIORITIES = Object.freeze(new Set(['HIGH', 'NORMAL', 'BATCH', 'BACKGROUND']));
+const MAX_WORKER_RESTARTS_WITHOUT_SUCCESS = 3;
 
 function unsupportedQueueOption(optionName) {
   const error = new Error(
@@ -248,6 +249,7 @@ class PersistentWorkerPool {
     this._workerScript = path.join(__dirname, 'worker_thread_kernel.js');
     this._closing = false;
     this._terminationPromise = null;
+    this._terminalError = null;
 
     if (this.useThreads) {
       this._initWorkers();
@@ -277,7 +279,7 @@ class PersistentWorkerPool {
     }
   }
 
-  _spawnWorker(slotIndex) {
+  _spawnWorker(slotIndex, restartCount = 0) {
     const { Worker } = require('worker_threads');
     const worker = new Worker(this._workerScript);
     const workerSlot = {
@@ -285,7 +287,8 @@ class PersistentWorkerPool {
       worker,
       busy: false,
       currentTask: null,
-      timer: null
+      timer: null,
+      restartCount
     };
 
     worker.on('message', (msg) => this._onWorkerMessage(workerSlot, msg));
@@ -301,13 +304,77 @@ class PersistentWorkerPool {
     return workerSlot;
   }
 
-  _replaceWorker(slot) {
-    if (this._closing) return;
+  _replaceWorker(slot, countRestart = false) {
+    if (this._closing) return false;
+
     try {
-      slot.worker.terminate();
+      slot.worker?.terminate();
     } catch (_) {}
-    this._spawnWorker(slot.id);
-    this._drainQueue();
+
+    const restartCount = slot.restartCount + Number(countRestart);
+    if (restartCount > MAX_WORKER_RESTARTS_WITHOUT_SUCCESS) {
+      this._failPool(
+        new Error(
+          `Worker ${slot.id} exceeded ${MAX_WORKER_RESTARTS_WITHOUT_SUCCESS} restarts without a successful task.`
+        )
+      );
+      return false;
+    }
+
+    try {
+      this._spawnWorker(slot.id, restartCount);
+      this._drainQueue();
+      return true;
+    } catch (error) {
+      this._failPool(error);
+      return false;
+    }
+  }
+
+  _failPool(cause) {
+    if (this._closing) return;
+
+    this._closing = true;
+    this.executionMode = 'failed';
+    this._terminalError = new OmniError(
+      OmniErrorCode.RESOURCE_EXHAUSTED,
+      'PersistentWorkerPool could not recover a failed worker.',
+      { maxWorkers: this.maxWorkers },
+      cause
+    );
+
+    this.taskQueue.forEach((task) => task.reject(this._terminalError));
+    this.taskQueue = [];
+
+    const terminations = this.workers.filter(Boolean).map((slot) => {
+      if (slot.timer) clearTimeout(slot.timer);
+      slot.timer = null;
+      if (slot.currentTask) {
+        slot.currentTask.reject(this._terminalError);
+        slot.currentTask = null;
+      }
+      slot.busy = false;
+      try {
+        return slot.worker ? slot.worker.terminate() : Promise.resolve();
+      } catch (_) {
+        return Promise.resolve();
+      }
+    });
+
+    this.workers = [];
+    this.activeTasks = 0;
+    this._terminationPromise = Promise.allSettled(terminations).then(() => {});
+  }
+
+  _failWorker(slot, error, countRestart = false) {
+    if (this._closing || this.workers[slot.id] !== slot) return;
+
+    if (slot.timer) clearTimeout(slot.timer);
+    slot.timer = null;
+    this.workers[slot.id] = null;
+
+    if (slot.currentTask) this._failTask(slot, slot.currentTask, error);
+    this._replaceWorker(slot, countRestart);
   }
 
   _onWorkerMessage(slot, message) {
@@ -341,32 +408,21 @@ class PersistentWorkerPool {
   }
 
   _onWorkerError(slot, error) {
-    const task = slot.currentTask;
-    if (task) {
-      if (slot.timer) clearTimeout(slot.timer);
-      const omniErr = new OmniError(OmniErrorCode.INTERNAL, `Worker thread error: ${error.message}`);
-      this._failTask(slot, task, omniErr);
-    }
-    this._replaceWorker(slot);
+    const omniErr = new OmniError(OmniErrorCode.INTERNAL, `Worker thread error: ${error.message}`);
+    this._failWorker(slot, omniErr, true);
   }
 
   _onWorkerExit(slot, code) {
-    const task = slot.currentTask;
-    if (task) {
-      if (slot.timer) clearTimeout(slot.timer);
-      const omniErr = new OmniError(OmniErrorCode.RESOURCE_EXHAUSTED, `Worker exited unexpectedly with code ${code}`);
-      this._failTask(slot, task, omniErr);
-    }
-    if (!this._closing) {
-      this._spawnWorker(slot.id);
-      this._drainQueue();
-    }
+    const omniErr = new OmniError(OmniErrorCode.RESOURCE_EXHAUSTED, `Worker exited unexpectedly with code ${code}`);
+    this._failWorker(slot, omniErr, true);
   }
 
   _completeTask(slot, task, resolution) {
+    if (slot.currentTask !== task) return;
     slot.busy = false;
     slot.currentTask = null;
     slot.timer = null;
+    slot.restartCount = 0;
     this.activeTasks = Math.max(0, this.activeTasks - 1);
     this.completedTasksCount++;
     this.totalExecutionTimeMs += resolution.computeTimeMs || 0;
@@ -375,6 +431,7 @@ class PersistentWorkerPool {
   }
 
   _failTask(slot, task, error) {
+    if (slot.currentTask !== task) return;
     slot.busy = false;
     slot.currentTask = null;
     slot.timer = null;
@@ -391,7 +448,10 @@ class PersistentWorkerPool {
       throw new TypeError('A task payload object is required.');
     }
     if (this._closing) {
-      throw new OmniError(OmniErrorCode.CANCELLED, 'Worker pool is terminated and cannot accept new tasks.');
+      throw (
+        this._terminalError ||
+        new OmniError(OmniErrorCode.CANCELLED, 'Worker pool is terminated and cannot accept new tasks.')
+      );
     }
 
     const priorityWeight = { HIGH: 3, NORMAL: 2, BATCH: 1, BACKGROUND: 1 }[options.priority ?? 'NORMAL'] || 2;
@@ -418,7 +478,7 @@ class PersistentWorkerPool {
     if (this._closing || this.taskQueue.length === 0) return;
 
     if (this.useThreads) {
-      const idleSlot = this.workers.find((w) => !w.busy);
+      const idleSlot = this.workers.find((w) => w && !w.busy);
       if (!idleSlot) return;
 
       const task = this.taskQueue.shift();
@@ -432,12 +492,32 @@ class PersistentWorkerPool {
         this._handleTaskTimeout(idleSlot, task);
       }, task.timeoutMs);
 
-      idleSlot.worker.postMessage({
-        type: 'EXECUTE',
-        taskId: task.id,
-        taskType: task.taskType,
-        payload: task.payload
-      });
+      try {
+        idleSlot.worker.postMessage({
+          type: 'EXECUTE',
+          taskId: task.id,
+          taskType: task.taskType,
+          payload: task.payload
+        });
+      } catch (error) {
+        if (error.code === 'ERR_WORKER_NOT_RUNNING') {
+          this._failWorker(
+            idleSlot,
+            new OmniError(OmniErrorCode.INTERNAL, `Worker thread rejected task ${task.id}.`, {}, error),
+            true
+          );
+        } else {
+          if (idleSlot.timer) clearTimeout(idleSlot.timer);
+          const inputError = new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            `Task ${task.id} payload could not be cloned for worker execution.`,
+            {},
+            error
+          );
+          this._failTask(idleSlot, task, inputError);
+        }
+        return;
+      }
 
       if (this.taskQueue.length > 0) {
         this._drainQueue();
@@ -451,8 +531,7 @@ class PersistentWorkerPool {
       OmniErrorCode.TIMEOUT,
       `Task ${task.id} exceeded maximum execution limit of ${task.timeoutMs} ms`
     );
-    this._replaceWorker(slot);
-    this._failTask(slot, task, timeoutErr);
+    this._failWorker(slot, timeoutErr);
   }
 
   async cancel(taskId) {
@@ -463,15 +542,12 @@ class PersistentWorkerPool {
       return true;
     }
 
-    const activeSlot = this.workers.find((w) => w.busy && w.currentTask?.id === taskId);
+    const activeSlot = this.workers.find((w) => w && w.busy && w.currentTask?.id === taskId);
     if (!activeSlot) return false;
 
     const task = activeSlot.currentTask;
-    if (activeSlot.timer) clearTimeout(activeSlot.timer);
-
     const cancelErr = new OmniError(OmniErrorCode.CANCELLED, `Task ${taskId} cancelled`);
-    this._replaceWorker(activeSlot);
-    this._failTask(activeSlot, task, cancelErr);
+    this._failWorker(activeSlot, cancelErr);
     return true;
   }
 
