@@ -236,8 +236,14 @@ class PersistentWorkerPool {
     this.completedTasksCount = 0;
     this.totalExecutionTimeMs = 0;
     this.isNode = typeof process !== 'undefined' && Boolean(process.versions?.node);
-    this.useThreads = options.useThreads !== false && this.isNode;
-    this.executionMode = this.useThreads ? 'worker-threads' : 'main-event-loop';
+    if (!this.isNode || options.useThreads === false) {
+      throw new OmniError(
+        OmniErrorCode.UNSUPPORTED,
+        'PersistentWorkerPool requires Node.js worker_threads; use ExperimentalCalculationQueue for event-loop execution.'
+      );
+    }
+    this.useThreads = true;
+    this.executionMode = 'worker-threads';
     this._nextTaskId = 1;
     this._workerScript = path.join(__dirname, 'worker_thread_kernel.js');
     this._closing = false;
@@ -253,10 +259,20 @@ class PersistentWorkerPool {
       for (let i = 0; i < this.maxWorkers; i++) {
         this._spawnWorker(i);
       }
-    } catch (_) {
-      this.useThreads = false;
-      this.executionMode = 'main-event-loop';
-      this.maxWorkers = 1;
+    } catch (error) {
+      this._closing = true;
+      const partialWorkers = this.workers.splice(0);
+      for (const slot of partialWorkers) {
+        try {
+          Promise.resolve(slot.worker.terminate()).catch(() => {});
+        } catch (_) {}
+      }
+      throw new OmniError(
+        OmniErrorCode.RESOURCE_EXHAUSTED,
+        'PersistentWorkerPool could not start its required worker threads.',
+        { requestedWorkers: this.maxWorkers },
+        error
+      );
     }
   }
 

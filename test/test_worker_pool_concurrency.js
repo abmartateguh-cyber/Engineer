@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const Module = require('module');
 const { PersistentWorkerPool, getGlobalWorkerPool } = require('../src/core/math/worker_pool');
 const { OmniError, OmniErrorCode } = require('../src/core/contracts/OmniError');
 
@@ -9,6 +10,30 @@ console.log('   TESTING MULTI-THREADED WORKER POOL & 2S CANCELLATION        ');
 console.log('================================================================');
 
 (async () => {
+  assert.throws(
+    () => new PersistentWorkerPool({ useThreads: false }),
+    (error) => error instanceof OmniError && error.code === OmniErrorCode.UNSUPPORTED,
+    'PersistentWorkerPool must reject event-loop execution instead of leaving dispatched tasks pending'
+  );
+
+  const originalModuleLoad = Module._load;
+  try {
+    Module._load = function (request, parent, isMain) {
+      if (request === 'worker_threads') throw new Error('worker_threads unavailable for test');
+      return originalModuleLoad.call(this, request, parent, isMain);
+    };
+    assert.throws(
+      () => new PersistentWorkerPool({ maxWorkers: 1 }),
+      (error) =>
+        error instanceof OmniError &&
+        error.code === OmniErrorCode.RESOURCE_EXHAUSTED &&
+        error.cause?.message === 'worker_threads unavailable for test',
+      'PersistentWorkerPool must report worker startup failures instead of switching to event-loop execution'
+    );
+  } finally {
+    Module._load = originalModuleLoad;
+  }
+
   const pool = new PersistentWorkerPool({ maxWorkers: 3 });
 
   // 1. Telemetry verification
@@ -53,9 +78,11 @@ console.log('================================================================');
   const blocker = pool.dispatch('ECHO_TEST', { message: 'blocker', delayMs: 100 });
 
   // Now dispatch BATCH and HIGH while all slots are temporarily saturated or queued
-  const pBatch = pool.dispatch('ECHO_TEST', { message: 'batch-task', delayMs: 10 }, { priority: 'BATCH' })
+  const pBatch = pool
+    .dispatch('ECHO_TEST', { message: 'batch-task', delayMs: 10 }, { priority: 'BATCH' })
     .then((r) => execOrder.push(r.result.echo));
-  const pHigh = pool.dispatch('ECHO_TEST', { message: 'high-priority-task', delayMs: 10 }, { priority: 'HIGH' })
+  const pHigh = pool
+    .dispatch('ECHO_TEST', { message: 'high-priority-task', delayMs: 10 }, { priority: 'HIGH' })
     .then((r) => execOrder.push(r.result.echo));
 
   await Promise.all([blocker, pBatch, pHigh]);
@@ -69,8 +96,9 @@ console.log('================================================================');
 
   // Cancel immediately
   // Find task id from pool
-  const activeTask = pool.workers.find((w) => w.busy && w.currentTask?.payload?.message === 'long-run')?.currentTask
-    || pool.taskQueue.find((t) => t.payload?.message === 'long-run');
+  const activeTask =
+    pool.workers.find((w) => w.busy && w.currentTask?.payload?.message === 'long-run')?.currentTask ||
+    pool.taskQueue.find((t) => t.payload?.message === 'long-run');
 
   assert.ok(activeTask, 'Target task must exist');
   const cancelResult = await pool.cancel(activeTask.id);
