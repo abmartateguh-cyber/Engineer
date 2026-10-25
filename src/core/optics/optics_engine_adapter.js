@@ -150,12 +150,40 @@ class OpticsEngineAdapter extends EngineAdapter {
             catalog = new OpticalGlassCatalog([params.customGlassRecord]);
           }
 
-          const glass = params.glass || params.customGlassRecord?.name;
-          const wavelengthUm = params.wavelengthUm || 0.58756;
-          const temperatureC = params.temperatureC || 20.0;
+          const glass = params.glass ?? params.customGlassRecord?.name;
+          const wavelengthUm = params.wavelengthUm;
+          const temperatureC = params.temperatureC;
+          if (typeof glass !== 'string' || !glass.trim()) {
+            throw new OmniError(OmniErrorCode.INVALID_INPUT, 'An optical material name is required.');
+          }
+          if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              'A finite positive wavelength in micrometers is required.'
+            );
+          }
+          if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC) || temperatureC <= -273.15) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              'A finite temperature above absolute zero in degrees Celsius is required.'
+            );
+          }
+          const glassRecord = catalog.getGlass(glass);
+          if (!glassRecord) {
+            throw new OmniError(
+              OmniErrorCode.UNSUPPORTED,
+              `Optical material '${glass}' is unavailable; supply an explicit material record.`
+            );
+          }
+          if (temperatureC !== glassRecord.referenceTemperatureC && glassRecord.dndTPerK === undefined) {
+            throw new OmniError(
+              OmniErrorCode.UNSUPPORTED,
+              'A caller-supplied dndTPerK coefficient is required for non-reference temperatures.'
+            );
+          }
 
           const n = catalog.calculateIndex(glass, wavelengthUm, temperatureC);
-          const properties = catalog.getOpticalProperties(glass);
+          const properties = catalog.getOpticalProperties(glass, temperatureC);
 
           outputData = {
             glass,

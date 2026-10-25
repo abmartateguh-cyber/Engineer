@@ -43,24 +43,30 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
   assert(traceRes.outputData.totalRays > 10, 'Must generate and trace rays');
   assert(traceRes.outputData.activeRays > 0, 'Active rays must reach sensor');
   assert(traceRes.outputData.spotDiagram.length === traceRes.outputData.activeRays);
-  console.log(`  ✓ PASSED: Traced ${traceRes.outputData.activeRays}/${traceRes.outputData.totalRays} rays to sensor. Spot size: ${traceRes.outputData.spotDiagram.length} points\n`);
+  console.log(
+    `  ✓ PASSED: Traced ${traceRes.outputData.activeRays}/${traceRes.outputData.totalRays} rays to sensor. Spot size: ${traceRes.outputData.spotDiagram.length} points\n`
+  );
 
   // 2. Sellmeier Dispersion & Refractive Index Calculation
   console.log('[2] Testing Sellmeier Dispersion Equation...');
   // Standard N-BK7 Schott Sellmeier coefficients:
   // B = [1.03961212, 0.231792344, 1.01046945]
   // C = [0.00600069867, 0.0200179144, 103.560653]
+  const customGlassRecord = {
+    name: 'N-BK7',
+    formula: 'sellmeier1',
+    referenceTemperatureC: 20.0,
+    B: [1.03961212, 0.231792344, 1.01046945],
+    C: [0.00600069867, 0.0200179144, 103.560653],
+    dndTPerK: 0.000003
+  };
   const indexReq = new JobRequest({
     domain: 'optics',
     operation: 'calculate_refractive_index',
     parameters: {
-      customGlassRecord: {
-        name: 'N-BK7',
-        formula: 'sellmeier1',
-        B: [1.03961212, 0.231792344, 1.01046945],
-        C: [0.00600069867, 0.0200179144, 103.560653]
-      },
-      wavelengthUm: 0.58756 // Helium d-line
+      customGlassRecord,
+      wavelengthUm: 0.58756, // Helium d-line
+      temperatureC: 20.0
     }
   });
 
@@ -71,7 +77,71 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
   assert(Math.abs(nd - 1.5168) < 0.001, `N-BK7 index expected ~1.5168, got ${nd}`);
   const vd = indexRes.outputData.properties.Abbe_Vd;
   assert(vd > 60 && vd < 70, `N-BK7 Abbe number vd should be ~64.17, got ${vd}`);
+  assert.strictEqual(indexRes.outputData.properties.temperatureC, 20.0);
+  assert.strictEqual(indexRes.outputData.properties.dataReferenceTemperatureC, 20.0);
   console.log(`  ✓ PASSED: Sellmeier evaluated: nd = ${nd}, Abbe number vd = ${vd.toFixed(2)}\n`);
+
+  const missingTemperatureReq = new JobRequest({
+    domain: 'optics',
+    operation: 'calculate_refractive_index',
+    parameters: { customGlassRecord, wavelengthUm: 0.58756 }
+  });
+  await assert.rejects(
+    adapter.execute(missingTemperatureReq),
+    (error) => error.code === 'INVALID_INPUT',
+    'The dispersion adapter must reject a missing temperature instead of supplying 20 C'
+  );
+
+  const zeroTemperatureReq = new JobRequest({
+    domain: 'optics',
+    operation: 'calculate_refractive_index',
+    parameters: { customGlassRecord, wavelengthUm: 0.58756, temperatureC: 0.0 }
+  });
+  const zeroTemperatureResult = await adapter.execute(zeroTemperatureReq);
+  assert.strictEqual(zeroTemperatureResult.outputData.temperatureC, 0.0);
+  assert.strictEqual(zeroTemperatureResult.outputData.properties.temperatureC, 0.0);
+  assert.strictEqual(zeroTemperatureResult.outputData.properties.dataReferenceTemperatureC, 20.0);
+  assert.notStrictEqual(zeroTemperatureResult.outputData.refractiveIndex, nd);
+
+  const zeroWavelengthReq = new JobRequest({
+    domain: 'optics',
+    operation: 'calculate_refractive_index',
+    parameters: { customGlassRecord, wavelengthUm: 0.0, temperatureC: 20.0 }
+  });
+  await assert.rejects(
+    adapter.execute(zeroWavelengthReq),
+    (error) => error.code === 'INVALID_INPUT',
+    'A zero wavelength must be rejected instead of replaced by the Fraunhofer d-line'
+  );
+
+  const missingThermoOpticReq = new JobRequest({
+    domain: 'optics',
+    operation: 'calculate_refractive_index',
+    parameters: {
+      customGlassRecord: { ...customGlassRecord, dndTPerK: undefined },
+      wavelengthUm: 0.58756,
+      temperatureC: 60.0
+    }
+  });
+  await assert.rejects(
+    adapter.execute(missingThermoOpticReq),
+    (error) => error.code === 'UNSUPPORTED',
+    'A non-reference temperature must not use a fabricated thermo-optic correction'
+  );
+
+  const nonDefaultReferenceReq = new JobRequest({
+    domain: 'optics',
+    operation: 'calculate_refractive_index',
+    parameters: {
+      customGlassRecord: { ...customGlassRecord, referenceTemperatureC: 25.0, dndTPerK: undefined },
+      wavelengthUm: 0.58756,
+      temperatureC: 25.0
+    }
+  });
+  const nonDefaultReferenceResult = await adapter.execute(nonDefaultReferenceReq);
+  assert.strictEqual(nonDefaultReferenceResult.outputData.temperatureC, 25.0);
+  assert.strictEqual(nonDefaultReferenceResult.outputData.properties.dataReferenceTemperatureC, 25.0);
+  assert(Math.abs(nonDefaultReferenceResult.outputData.refractiveIndex - nd) < 1e-12);
 
   // 3. Polarization Optics & Malus' Law
   console.log('[3] Testing Polarization Optics (Malus Law at 45°)...');

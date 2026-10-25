@@ -526,7 +526,7 @@ END DESIGN`;
 
   testSmoke(65, 'Schott N-BK7 Sellmeier Dispersion Equation Index of Refraction @ 587.6nm (d-line)', () => {
     const catalog = new OpticalGlassCatalog(opticalExamples.opticalGlassExamples);
-    const nd = catalog.getRefractiveIndex('N-BK7', 0.58756);
+    const nd = catalog.getRefractiveIndex('N-BK7', 0.58756, 20.0);
     assert(Math.abs(nd - 1.5168) < 0.002);
   });
 

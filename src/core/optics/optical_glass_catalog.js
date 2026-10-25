@@ -32,6 +32,13 @@ class OpticalGlassCatalog {
     if (typeof record.name !== 'string' || !record.name.trim()) {
       throw new TypeError('An optical material record needs a nonempty name.');
     }
+    if (
+      typeof record.referenceTemperatureC !== 'number' ||
+      !Number.isFinite(record.referenceTemperatureC) ||
+      record.referenceTemperatureC <= -273.15
+    ) {
+      throw new TypeError('An optical material record needs a finite referenceTemperatureC above absolute zero.');
+    }
     if (record.formula === 'sellmeier1') {
       for (const field of ['B', 'C']) {
         if (!Array.isArray(record[field]) || record[field].length !== 3 || !record[field].every(Number.isFinite)) {
@@ -44,6 +51,12 @@ class OpticalGlassCatalog {
       }
     } else {
       throw new TypeError('Optical material formula must be sellmeier1 or birefringent.');
+    }
+    if (Object.hasOwn(record, 'dndT')) {
+      throw new TypeError('Thermo-optic coefficients must use the unit-explicit dndTPerK field.');
+    }
+    if (record.dndTPerK !== undefined && (typeof record.dndTPerK !== 'number' || !Number.isFinite(record.dndTPerK))) {
+      throw new TypeError('The supplied thermo-optic coefficient must be finite and named per kelvin.');
     }
     const normalized = {
       ...record,
@@ -59,7 +72,7 @@ class OpticalGlassCatalog {
     return this.database.get(glassName.trim().toUpperCase()) || null;
   }
 
-  calculateIndex(glass, wavelengthUm = 0.58756, temperatureC = 20.0) {
+  calculateIndex(glass, wavelengthUm, temperatureC) {
     const record = typeof glass === 'string' ? this.getGlass(glass) : glass;
     if (!record) throw new RangeError(`Glass '${glass}' is not available; supply an explicit optical material record.`);
     if (record.formula !== 'sellmeier1' || !Array.isArray(record.B) || !Array.isArray(record.C)) {
@@ -68,8 +81,15 @@ class OpticalGlassCatalog {
     if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
       throw new TypeError('Wavelength must be a finite positive value in micrometers.');
     }
-    if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC)) {
-      throw new TypeError('Temperature must be a finite value in degrees Celsius.');
+    if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC) || temperatureC <= -273.15) {
+      throw new TypeError('Temperature must be finite and above absolute zero in degrees Celsius.');
+    }
+    if (
+      typeof record.referenceTemperatureC !== 'number' ||
+      !Number.isFinite(record.referenceTemperatureC) ||
+      record.referenceTemperatureC <= -273.15
+    ) {
+      throw new TypeError('The supplied optical material record needs an explicit referenceTemperatureC.');
     }
 
     const wavelengthSquared = wavelengthUm * wavelengthUm;
@@ -86,11 +106,11 @@ class OpticalGlassCatalog {
     }
 
     let index = Math.sqrt(nSquared);
-    if (temperatureC !== 20.0 && record.dndT !== undefined) {
-      if (typeof record.dndT !== 'number' || !Number.isFinite(record.dndT)) {
-        throw new TypeError('The supplied thermo-optic coefficient must be finite.');
+    if (temperatureC !== record.referenceTemperatureC) {
+      if (record.dndTPerK === undefined) {
+        throw new RangeError('Thermo-optic correction is unavailable without a caller-supplied dndTPerK coefficient.');
       }
-      index += record.dndT * (temperatureC - 20.0);
+      index += record.dndTPerK * (temperatureC - record.referenceTemperatureC);
     }
     if (!Number.isFinite(index) || index <= 0) {
       throw new RangeError('The supplied material data produce a nonpositive refractive index.');
@@ -98,20 +118,23 @@ class OpticalGlassCatalog {
     return index;
   }
 
-  getRefractiveIndex(glass, wavelengthUm = 0.58756, temperatureC = 20.0) {
+  getRefractiveIndex(glass, wavelengthUm, temperatureC) {
     return this.calculateIndex(glass, wavelengthUm, temperatureC);
   }
 
-  getOpticalProperties(glass) {
+  getOpticalProperties(glass, temperatureC) {
     const record = typeof glass === 'string' ? this.getGlass(glass) : glass;
     if (!record) throw new RangeError(`Glass '${glass}' is not available; supply an explicit optical material record.`);
-    const nd = this.calculateIndex(record, this.spectralLines.d);
-    const nF = this.calculateIndex(record, this.spectralLines.F);
-    const nC = this.calculateIndex(record, this.spectralLines.C);
-    const ne = this.calculateIndex(record, this.spectralLines.e);
-    const ng = this.calculateIndex(record, this.spectralLines.g);
-    const nFp = this.calculateIndex(record, this.spectralLines.F_prime);
-    const nCp = this.calculateIndex(record, this.spectralLines.C_prime);
+    if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC) || temperatureC <= -273.15) {
+      throw new TypeError('A finite calculation temperature above absolute zero in degrees Celsius is required.');
+    }
+    const nd = this.calculateIndex(record, this.spectralLines.d, temperatureC);
+    const nF = this.calculateIndex(record, this.spectralLines.F, temperatureC);
+    const nC = this.calculateIndex(record, this.spectralLines.C, temperatureC);
+    const ne = this.calculateIndex(record, this.spectralLines.e, temperatureC);
+    const ng = this.calculateIndex(record, this.spectralLines.g, temperatureC);
+    const nFp = this.calculateIndex(record, this.spectralLines.F_prime, temperatureC);
+    const nCp = this.calculateIndex(record, this.spectralLines.C_prime, temperatureC);
     const deltaN = nF - nC;
     if (Math.abs(deltaN) < 1e-15 || Math.abs(nFp - nCp) < 1e-15) {
       throw new RangeError('The supplied Sellmeier record does not define finite Abbe numbers.');
@@ -123,6 +146,8 @@ class OpticalGlassCatalog {
       type: record.type,
       dataStatus: record.dataStatus || 'caller-supplied',
       provenance: record.provenance || null,
+      temperatureC,
+      dataReferenceTemperatureC: record.referenceTemperatureC,
       nd,
       ne,
       nF,
@@ -133,20 +158,23 @@ class OpticalGlassCatalog {
       partialDispersion_PgF: (ng - nF) / deltaN,
       density: record.density,
       thermalExpansion: record.thermalExpansion,
-      dndT: record.dndT
+      dndTPerK: record.dndTPerK
     };
   }
 
-  findNearestGlasses(targetNd, targetVd, maxResults = 5) {
+  findNearestGlasses(targetNd, targetVd, temperatureC, maxResults = 5) {
     if (![targetNd, targetVd].every((value) => typeof value === 'number' && Number.isFinite(value))) {
       throw new TypeError('Target index and Abbe values must be finite numbers.');
+    }
+    if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC) || temperatureC <= -273.15) {
+      throw new TypeError('A finite temperature above absolute zero in degrees Celsius is required.');
     }
     if (!Number.isInteger(maxResults) || maxResults < 0)
       throw new RangeError('maxResults must be a nonnegative integer.');
     const candidates = [];
     for (const [name, record] of this.database.entries()) {
       if (record.formula !== 'sellmeier1') continue;
-      const properties = this.getOpticalProperties(record);
+      const properties = this.getOpticalProperties(record, temperatureC);
       const dNd = (properties.nd - targetNd) / 0.1;
       const dVd = (properties.Abbe_Vd - targetVd) / 10.0;
       candidates.push({
@@ -155,6 +183,7 @@ class OpticalGlassCatalog {
         type: record.type,
         nd: properties.nd,
         Abbe_Vd: properties.Abbe_Vd,
+        temperatureC,
         distance: Math.sqrt(dNd * dNd + dVd * dVd)
       });
     }

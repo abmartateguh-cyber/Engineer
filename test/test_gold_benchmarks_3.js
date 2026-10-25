@@ -697,7 +697,7 @@ function runGoldRegulatoryBenchmarks3() {
     const cat = new OpticalGlassCatalog(opticalExamples.opticalGlassExamples);
     assert(cat.catalogSize === 15, `Expected 15 fixed examples, got ${cat.catalogSize}`);
 
-    const nbk7Props = cat.getOpticalProperties('N-BK7');
+    const nbk7Props = cat.getOpticalProperties('N-BK7', 20.0);
     assert.strictEqual(nbk7Props.dataStatus, 'experimental');
     // SCHOTT N-BK7 official datasheet values; the local record's redistribution status is not reviewed.
     assert(Math.abs(nbk7Props.nd - 1.5168) < 1e-4, `N-BK7 nd ${nbk7Props.nd} must match 1.51680`);

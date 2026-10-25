@@ -110,7 +110,7 @@ const glassCatalog = new OpticalGlassCatalog(opticalExamples.opticalGlassExample
 assert.strictEqual(glassCatalog.database.size, 15, 'Only the fixed legacy example set should be present');
 
 // Test index calculation for standard Schott N-BK7
-const nbk7Index = glassCatalog.getRefractiveIndex('N-BK7', 0.58756);
+const nbk7Index = glassCatalog.getRefractiveIndex('N-BK7', 0.58756, 20.0);
 assert(Math.abs(nbk7Index - 1.5168) < 1e-3, 'N-BK7 index at d-line must be ~ 1.5168');
 assert.strictEqual(glassCatalog.getGlass('N-BK7').dataStatus, 'experimental');
 assert.strictEqual(glassCatalog.getGlass('N-BK7').provenance.redistributionLicenseStatus, 'not reviewed');
@@ -203,6 +203,7 @@ assert.strictEqual(
 const preloadSource = fs.readFileSync(path.join(__dirname, '../preload.js'), 'utf8');
 const preloadCalls = [];
 let exposedApi;
+let exposedGroupedApi;
 vm.runInNewContext(
   preloadSource,
   {
@@ -211,8 +212,9 @@ vm.runInNewContext(
       return {
         contextBridge: {
           exposeInMainWorld: (name, api) => {
-            assert.strictEqual(name, 'omniEngAPI');
-            exposedApi = api;
+            if (name === 'omniEngAPI') exposedApi = api;
+            else if (name === 'omnieng') exposedGroupedApi = api;
+            else assert.fail(`Unexpected preload API namespace: ${name}`);
           }
         },
         ipcRenderer: {
@@ -227,6 +229,8 @@ vm.runInNewContext(
   },
   { filename: 'preload.js' }
 );
+assert(exposedApi, 'The legacy omniEngAPI namespace must remain available.');
+assert(exposedGroupedApi, 'The grouped omnieng namespace must remain available.');
 exposedApi.importZmxOptics({ content: zmxContent });
 assert.strictEqual(preloadCalls.at(-1)[0], 'omni:import-zmx-optics');
 assert.strictEqual(preloadCalls.at(-1)[1].content, zmxContent, 'Legacy { content } callers remain compatible');

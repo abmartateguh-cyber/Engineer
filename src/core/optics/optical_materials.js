@@ -59,7 +59,7 @@ class OpticalMaterials {
   }
 
   /** Compute n(lambda) from explicitly supplied Sellmeier coefficients. */
-  static getRefractiveIndex(materialOrKey, wavelengthUm = this.FRAUNHOFER_WAVELENGTHS_UM.d) {
+  static getRefractiveIndex(materialOrKey, wavelengthUm) {
     if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
       throw new TypeError('Wavelength must be a finite positive value in micrometers.');
     }

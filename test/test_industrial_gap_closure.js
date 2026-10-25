@@ -105,6 +105,7 @@ test('OpticalMaterials: production catalog is empty and explicit Sellmeier recor
   const nsf11 = opticalExamples.sellmeierExamples.Schott_NSF11;
   assert.strictEqual(OpticalMaterials.listGlasses().length, 0);
   assert.throws(() => OpticalMaterials.getRefractiveIndex('N-BK7', 0.5875618), /unavailable/);
+  assert.throws(() => OpticalMaterials.getRefractiveIndex(nbk7), /Wavelength/);
 
   const nd = OpticalMaterials.getRefractiveIndex(nbk7, 0.5875618);
   assert(Math.abs(nd - 1.5168) < 0.0001, `Expected nd ~1.51680, got ${nd.toFixed(5)}`);
@@ -124,9 +125,35 @@ test('Optics production modules do not bundle legacy glass or housing property r
   const catalog = new OpticalGlassCatalog();
   assert.strictEqual(catalog.catalogSize, 0);
   assert.strictEqual(catalog.getGlass('N-BK7'), null);
-  assert.throws(() => catalog.getRefractiveIndex('N-BK7', 0.58756), /not available/);
+  assert.throws(() => catalog.getRefractiveIndex('N-BK7', 0.58756, 20.0), /not available/);
   assert.deepStrictEqual(Object.keys(SCHOTT_THERMAL_GLASS_CATALOG), []);
   assert.deepStrictEqual(Object.keys(HOUSING_CTE), []);
+});
+
+test('Optical dispersion requires explicit wavelength and temperature inputs', () => {
+  const record = opticalExamples.opticalGlassExamples.find((glass) => glass.name === 'N-BK7');
+  const catalog = new OpticalGlassCatalog([record]);
+  assert.throws(() => catalog.calculateIndex('N-BK7'), /Wavelength/);
+  assert.throws(() => catalog.calculateIndex('N-BK7', 0.58756), /Temperature/);
+  assert.throws(() => catalog.getOpticalProperties('N-BK7'), /calculation temperature/i);
+
+  const reference = catalog.getOpticalProperties('N-BK7', 20.0);
+  const hot = catalog.getOpticalProperties('N-BK7', 60.0);
+  assert.strictEqual(reference.temperatureC, 20.0);
+  assert.strictEqual(reference.dataReferenceTemperatureC, 20.0);
+  assert.strictEqual(hot.temperatureC, 60.0);
+  assert.strictEqual(hot.dataReferenceTemperatureC, 20.0);
+  assert.notStrictEqual(
+    hot.nd,
+    reference.nd,
+    'Explicit thermo-optic data must affect non-reference temperature results'
+  );
+  assert.throws(() => catalog.registerGlass({ ...record, dndT: record.dndTPerK }), /dndTPerK/);
+  const withoutThermoOpticData = new OpticalGlassCatalog([{ ...record, dndTPerK: undefined }]);
+  assert.throws(
+    () => withoutThermoOpticData.calculateIndex('N-BK7', 0.58756, 60.0),
+    /thermo-optic correction is unavailable/i
+  );
 });
 
 test('SkewRayTracer: Exact 3D vector refraction through spherical surfaces & TIR detection', () => {
@@ -822,9 +849,7 @@ console.log('\n7. Synthetic Aerospace Example Geometry:');
 
 test('FeatureTree: explicit test features exercise cylinder and revolve B-Rep construction', () => {
   const cylinderTree = new FeatureTree();
-  cylinderTree.addFeature(
-    new ParametricFeature('cylinder', 'TestCylinder', { radius: 4.5, height: 45, segments: 32 })
-  );
+  cylinderTree.addFeature(new ParametricFeature('cylinder', 'TestCylinder', { radius: 4.5, height: 45, segments: 32 }));
   assert.strictEqual(cylinderTree.features.length, 1);
   assert(cylinderTree.currentSolid !== null, 'Explicit cylinder feature should build a solid');
   assert(cylinderTree.currentSolid.vertices.length > 0, 'Explicit cylinder should have vertices');
