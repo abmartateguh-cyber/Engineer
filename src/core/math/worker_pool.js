@@ -247,6 +247,7 @@ class PersistentWorkerPool {
     this._nextTaskId = 1;
     this._workerScript = path.join(__dirname, 'worker_thread_kernel.js');
     this._closing = false;
+    this._terminationPromise = null;
 
     if (this.useThreads) {
       this._initWorkers();
@@ -389,6 +390,9 @@ class PersistentWorkerPool {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       throw new TypeError('A task payload object is required.');
     }
+    if (this._closing) {
+      throw new OmniError(OmniErrorCode.CANCELLED, 'Worker pool is terminated and cannot accept new tasks.');
+    }
 
     const priorityWeight = { HIGH: 3, NORMAL: 2, BATCH: 1, BACKGROUND: 1 }[options.priority ?? 'NORMAL'] || 2;
     const timeoutMs = Math.max(200, Number(options.timeoutMs) || this.defaultTimeoutMs);
@@ -501,18 +505,34 @@ class PersistentWorkerPool {
   }
 
   async terminateAll() {
+    if (this._terminationPromise) return this._terminationPromise;
+
     this._closing = true;
-    this.taskQueue.forEach((t) => {
-      t.reject(new OmniError(OmniErrorCode.CANCELLED, 'Worker pool terminated'));
+    this.executionMode = 'terminated';
+    this.taskQueue.forEach((task) => {
+      task.reject(new OmniError(OmniErrorCode.CANCELLED, 'Worker pool terminated'));
     });
     this.taskQueue = [];
+
     const termPromises = this.workers.map((slot) => {
       if (slot.timer) clearTimeout(slot.timer);
-      return slot.worker ? slot.worker.terminate() : Promise.resolve();
+      slot.timer = null;
+      if (slot.currentTask) {
+        slot.currentTask.reject(new OmniError(OmniErrorCode.CANCELLED, 'Worker pool terminated'));
+        slot.currentTask = null;
+      }
+      slot.busy = false;
+      try {
+        return slot.worker ? slot.worker.terminate() : Promise.resolve();
+      } catch (_) {
+        return Promise.resolve();
+      }
     });
-    await Promise.all(termPromises);
-    this.workers = [];
     this.activeTasks = 0;
+    this._terminationPromise = Promise.allSettled(termPromises).then(() => {
+      this.workers = [];
+    });
+    await this._terminationPromise;
   }
 }
 

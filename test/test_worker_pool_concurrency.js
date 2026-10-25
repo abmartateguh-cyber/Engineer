@@ -139,9 +139,30 @@ console.log('================================================================');
 
   // 7. Clean termination
   console.log('\n[7] Clean shutdown...');
-  await pool.terminateAll();
+  const shutdownTasks = Array.from({ length: 4 }, (_, index) =>
+    pool.dispatch('ECHO_TEST', { message: `shutdown-${index}`, delayMs: 10000 })
+  );
+  const shutdownOutcomes = shutdownTasks.map((task) =>
+    task.then(
+      () => null,
+      (error) => error
+    )
+  );
+  assert.strictEqual(pool.taskQueue.length, 1, 'One task must be queued behind the three active workers');
+  await Promise.all([pool.terminateAll(), pool.terminateAll()]);
+  const shutdownErrors = await Promise.all(shutdownOutcomes);
+  assert.ok(
+    shutdownErrors.every((error) => error?.code === OmniErrorCode.CANCELLED),
+    'Shutdown must reject active and queued tasks with CANCELLED'
+  );
   assert.strictEqual(pool.workers.length, 0);
   assert.strictEqual(pool.activeTasks, 0);
+  assert.strictEqual(pool.getTelemetry().executionMode, 'terminated');
+  await assert.rejects(
+    pool.dispatch('ECHO_TEST', { message: 'after-shutdown' }),
+    (error) => error.code === OmniErrorCode.CANCELLED,
+    'A terminated worker pool must reject new work'
+  );
   console.log('  ✓ PASSED: All worker threads terminated cleanly');
 
   console.log('\n================================================================');
