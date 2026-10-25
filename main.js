@@ -297,10 +297,10 @@ Options:
             assert(vlleRes && vlleRes.success && vlleRes.result.converged, 'IPC solveVlleFlash executes 3-phase VLLE liquid-liquid-vapor flash');
 
             const meshColRes = await window.omniEngAPI.solveMeshDistillation({});
-            assert(meshColRes && meshColRes.success && meshColRes.result.stages.length === 15, 'IPC solveMeshDistillation solves simultaneous MESH column');
+            assert(meshColRes && !meshColRes.success && meshColRes.status === 'unavailable', 'IPC solveMeshDistillation reports unavailable pending a reviewed column model');
 
             const hammerRes = await window.omniEngAPI.solveWaterHammerMOC({});
-            assert(hammerRes && hammerRes.success && hammerRes.result.passedAsmeB31_3, 'IPC solveWaterHammerMOC simulates transient wave damping and ASME B31.3 stress');
+            assert(hammerRes && !hammerRes.success && hammerRes.status === 'unavailable', 'IPC solveWaterHammerMOC reports unavailable pending model review');
 
             // 12. Test Binary GDSII Stream, Optical Thermal Soak, and Constrained MPC
             const gdsExportRes = await window.omniEngAPI.exportGdsii({});

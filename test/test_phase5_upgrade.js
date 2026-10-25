@@ -265,38 +265,10 @@ function runPhase5Tests() {
     assert(Math.abs(aqueousLiquidL1 + organicLiquidL2 + vaporV - 1.0) < 1e-3, 'Fractions sum to 1');
   });
 
-  // ----------------------------------------------------
-  // 4. Naphtali-Sandholm MESH Distillation Column Solver
-  // ----------------------------------------------------
-  console.log('\n4. Naphtali-Sandholm Simultaneous MESH Column Solver:');
-
-  test('NaphtaliSandholmColumnSolver converges on 15-stage multi-component distillation', () => {
-    const col = NaphtaliSandholmColumnSolver.solve({
-      stages: 15,
-      feedStage: 8,
-      components: ['Propane', 'n-Butane', 'n-Pentane'],
-      feedFlows: [15.0, 20.0, 15.0],
-      feedTemperatureK: 330.0,
-      pressurePa: 1.01325e5,
-      refluxRatio: 2.5,
-      distillateRate: 25.0
-    });
-
-    assert(col.converged, 'Column solver should converge');
-    assert(col.iterations <= 25, `Iterations should be <= 25, got ${col.iterations}`);
-    assert.strictEqual(col.stages.length, 15);
-
-    // Verify temperature profile monotonically increases from top to bottom
-    const topT = col.stages[0].temperatureK;
-    const botT = col.stages[14].temperatureK;
-    assert(topT < botT, `Top temperature (${topT}K) must be cooler than bottom (${botT}K)`);
-
-    // Verify light key (Propane, index 0) is concentrated in overhead distillate
-    const topX = col.stages[0].liquidMoleFractions;
-    const botX = col.stages[14].liquidMoleFractions;
-    assert(topX[0] > botX[0], 'Propane mole fraction must be higher in overhead distillate than bottoms');
-    // Verify heavy key (n-Pentane, index 2) is concentrated in bottoms
-    assert(botX[2] > topX[2], 'n-Pentane mole fraction must be higher in bottoms than overhead');
+  test('Legacy distillation solver fails closed without reviewed VLE/property models', () => {
+    const col = NaphtaliSandholmColumnSolver.solve({ stages: 15 });
+    assert.strictEqual(col.status, 'unavailable');
+    assert.strictEqual(col.error.code, 'UNSUPPORTED');
   });
 
   // ----------------------------------------------------
@@ -316,6 +288,10 @@ function runPhase5Tests() {
     assert(a > 1100 && a < 1450, `Wave speed should be 1100-1450 m/s, got ${a} m/s`);
   });
 
+  test('WaterHammerMOC wave-speed estimate does not supply physical defaults', () => {
+    assert.throws(() => WaterHammerMOC.computeWaveSpeed({}), /explicit finite inputs/);
+  });
+
   test('WaterHammerMOC Joukowsky formula evaluates pressure surge ~35-45 bar for 3 m/s water', () => {
     const surge = WaterHammerMOC.computeJoukowskySurge(1000.0, 1300.0, 3.0);
     const deltaPBar = surge.pressureSurgePa / 1e5;
@@ -323,7 +299,7 @@ function runPhase5Tests() {
     assert(surge.headSurgeM > 350.0);
   });
 
-  test('WaterHammerMOC returns an experimental transient estimate without a code verdict', () => {
+  test('Legacy WaterHammerMOC transient simulation fails closed pending independent review', () => {
     const sim = WaterHammerMOC.simulateMOC({
       pipeLengthM: 400.0,
       initialVelocityMs: 2.5,
@@ -333,15 +309,8 @@ function runPhase5Tests() {
       totalTimeSec: 1.5
     });
 
-    assert(sim.waveSpeedMs > 1000.0);
-    assert(sim.peakPressureBar > 10.0, `Peak transient pressure should exceed 10 bar, got ${sim.peakPressureBar}`);
-    assert.strictEqual(sim.validationLevel, 'experimental');
-    assert.strictEqual(sim.screeningStatus, 'EXPERIMENTAL_ESTIMATE_ONLY');
-    assert.strictEqual(sim.codeAssessment, 'NOT_PERFORMED');
-    assert(sim.pipeHoopStressEstimateMPa > 0.0);
-    assert.strictEqual(Object.hasOwn(sim, 'passedAsmeB31_3'), false);
-    assert.strictEqual(Object.hasOwn(sim, 'safetyFactor'), false);
-    assert(sim.history.length > 5, 'Should generate transient waveform history');
+    assert.strictEqual(sim.status, 'unavailable');
+    assert.strictEqual(sim.error.code, 'UNSUPPORTED');
   });
 
   console.log('\n================================================================');

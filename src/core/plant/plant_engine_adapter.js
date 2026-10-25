@@ -7,7 +7,6 @@ const { ValidationMaturity } = require('../contracts/ValidationRecord');
 const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 const { PengRobinsonEOS } = require('./peng_robinson_eos');
-const { NaphtaliSandholmColumnSolver } = require('./naphtali_sandholm_mesh');
 const { TransientWaterHammerSolver } = require('./transient_water_hammer');
 const { VLEPhaseEnvelopeEngine } = require('./vle_envelope');
 
@@ -27,13 +26,154 @@ class PlantEngineAdapter extends EngineAdapter {
       supportedOperations: [
         'solve_vle_flash',
         'calculate_nrtl_activity',
-        'solve_distillation_mesh',
         'calculate_water_hammer',
         'generate_vle_envelope'
       ],
       maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
+  }
+
+  async validate(jobRequest) {
+    await super.validate(jobRequest);
+    const params = jobRequest.parameters;
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Plant operations require an explicit parameter object');
+    }
+
+    const requireFields = (fields, operation) => {
+      const missing = fields.filter((field) => params[field] === undefined || params[field] === null);
+      if (missing.length) {
+        throw new OmniError(
+          OmniErrorCode.INVALID_INPUT,
+          `${operation} requires explicit inputs: ${missing.join(', ')}`
+        );
+      }
+    };
+    const requireFinite = (fields, operation) => {
+      const invalid = fields.filter((field) => !Number.isFinite(params[field]));
+      if (invalid.length) {
+        throw new OmniError(
+          OmniErrorCode.INVALID_INPUT,
+          `${operation} requires finite numeric inputs: ${invalid.join(', ')}`
+        );
+      }
+    };
+    const requireOneOf = (fields, operation) => {
+      if (!fields.some((field) => params[field] !== undefined && params[field] !== null)) {
+        throw new OmniError(OmniErrorCode.INVALID_INPUT, `${operation} requires one of: ${fields.join(', ')}`);
+      }
+    };
+
+    switch (jobRequest.operation) {
+      case 'solve_vle_flash': {
+        requireFields(['components', 'k_ij', 'temperatureK', 'pressurePa', 'maxIter', 'tol'], jobRequest.operation);
+        requireOneOf(['feedComposition', 'z'], jobRequest.operation);
+        if (!Array.isArray(params.components) || params.components.length === 0) {
+          throw new OmniError(OmniErrorCode.INVALID_INPUT, 'solve_vle_flash requires a non-empty components array');
+        }
+        if (
+          params.components.some((component) => !component || typeof component !== 'object' || Array.isArray(component))
+        ) {
+          throw new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            'solve_vle_flash requires explicit component property records; bundled component names are unavailable'
+          );
+        }
+        requireFinite(['temperatureK', 'pressurePa', 'maxIter', 'tol'], jobRequest.operation);
+        if (
+          params.temperatureK <= 0 ||
+          params.pressurePa <= 0 ||
+          !Number.isSafeInteger(params.maxIter) ||
+          params.maxIter < 1 ||
+          params.tol <= 0
+        ) {
+          throw new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            'solve_vle_flash requires positive temperature, pressure, iteration count, and tolerance'
+          );
+        }
+        const composition = params.feedComposition ?? params.z;
+        if (!Array.isArray(composition) || composition.length !== params.components.length) {
+          throw new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            'solve_vle_flash requires a feed composition matching the component count'
+          );
+        }
+        if (
+          composition.some((value) => !Number.isFinite(value) || value < 0) ||
+          Math.abs(composition.reduce((sum, value) => sum + value, 0) - 1) > 1e-8
+        ) {
+          throw new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            'Feed mole fractions must be finite, non-negative, and sum to one'
+          );
+        }
+        break;
+      }
+      case 'calculate_nrtl_activity': {
+        requireFields(['liquidComposition', 'temperatureK', 'delta_g', 'alpha'], jobRequest.operation);
+        requireFinite(['temperatureK'], jobRequest.operation);
+        if (!Array.isArray(params.liquidComposition) || params.liquidComposition.length < 2) {
+          throw new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            'calculate_nrtl_activity requires at least two explicit liquid mole fractions'
+          );
+        }
+        break;
+      }
+      case 'calculate_water_hammer': {
+        requireFields(
+          ['fluidDensity', 'fluidBulkModulus', 'pipeElasticModulus', 'pipeWallThickness', 'restraintFactor'],
+          jobRequest.operation
+        );
+        requireOneOf(['pipeDiameter', 'pipeInnerDiameter'], jobRequest.operation);
+        requireOneOf(['steadyVelocity', 'steadyFlowRate'], jobRequest.operation);
+        requireFields(['runMOC'], jobRequest.operation);
+        if (typeof params.runMOC !== 'boolean') {
+          throw new OmniError(
+            OmniErrorCode.INVALID_INPUT,
+            'calculate_water_hammer requires an explicit boolean runMOC choice'
+          );
+        }
+        requireFinite(
+          [
+            'fluidDensity',
+            'fluidBulkModulus',
+            'pipeElasticModulus',
+            'pipeWallThickness',
+            'restraintFactor',
+            ...(params.pipeDiameter !== undefined ? ['pipeDiameter'] : ['pipeInnerDiameter']),
+            ...(params.steadyVelocity !== undefined ? ['steadyVelocity'] : ['steadyFlowRate'])
+          ],
+          jobRequest.operation
+        );
+        if (params.runMOC === true) {
+          requireFields(
+            [
+              'pipeLength',
+              'darcyFrictionFactor',
+              'reservoirHead',
+              'valveClosureTime',
+              'valveClosureLaw',
+              'simulationDuration',
+              'reaches'
+            ],
+            jobRequest.operation
+          );
+        }
+        break;
+      }
+      case 'generate_vle_envelope':
+        requireFields(
+          ['composition', 'pMinBar', 'pMaxBar', 'points', 'componentProperties', 'tMinC', 'tMaxC'],
+          jobRequest.operation
+        );
+        break;
+      default:
+        break;
+    }
+    return true;
   }
 
   async execute(jobRequest, onEvent = () => {}, signal = null) {
@@ -51,6 +191,8 @@ class PlantEngineAdapter extends EngineAdapter {
 
     try {
       let outputData = null;
+      let convergenceHistory = [];
+      const warnings = [];
       const params = jobRequest.parameters || {};
 
       switch (jobRequest.operation) {
@@ -63,12 +205,12 @@ class PlantEngineAdapter extends EngineAdapter {
               message: 'Configuring Peng-Robinson EOS multicomponent flash'
             })
           );
-          const components = params.components || ['methane', 'ethane', 'propane'];
+          const components = params.components;
           const eos = new PengRobinsonEOS(components, params.k_ij);
 
-          const T = Number(params.temperatureK || 250.0);
-          const P = Number(params.pressurePa || 3.0e6);
-          const z = params.feedComposition || params.z || new Array(components.length).fill(1 / components.length);
+          const T = params.temperatureK;
+          const P = params.pressurePa;
+          const z = params.feedComposition ?? params.z;
 
           onEvent(
             new JobEvent({
@@ -78,7 +220,16 @@ class PlantEngineAdapter extends EngineAdapter {
               message: `Solving Rachford-Rice isothermal-isobaric flash at T=${T}K, P=${(P / 1e5).toFixed(1)}bar`
             })
           );
-          const flash = eos.flashPT(z, T, P, params.maxIter || 60, params.tol || 1e-6);
+          const flash = eos.flashPT(z, T, P, { maxIter: params.maxIter, tol: params.tol });
+          if (!flash.converged) {
+            throw new OmniError(
+              OmniErrorCode.NUMERICAL_FAILURE,
+              'Peng-Robinson flash did not meet the requested convergence tolerance',
+              { iterations: flash.iterations, residual: flash.residual, tolerance: params.tol }
+            );
+          }
+          convergenceHistory = flash.convergenceHistory;
+          warnings.push('Caller-supplied component property records are unverified engineering data.');
 
           outputData = {
             temperatureK: T,
@@ -89,7 +240,13 @@ class PlantEngineAdapter extends EngineAdapter {
             equilibriumConstantsK: Array.from(flash.K).map((v) => Number(v.toFixed(5))),
             compressibilityLiquid: Number(flash.Z_L.toFixed(4)),
             compressibilityVapor: Number(flash.Z_V.toFixed(4)),
-            converged: flash.converged
+            converged: flash.converged,
+            phaseState: flash.phaseState,
+            iterations: flash.iterations,
+            residual: flash.residual,
+            componentDataStatus: 'caller-supplied-unverified-property-records',
+            componentProvenance: components.map(({ name, provenance }) => ({ name, provenance })),
+            solverControls: { maxIter: params.maxIter, tolerance: params.tol }
           };
           break;
         }
@@ -103,16 +260,10 @@ class PlantEngineAdapter extends EngineAdapter {
               message: 'Calculating NRTL liquid activity coefficients'
             })
           );
-          const x = params.liquidComposition || [0.5, 0.5];
-          const T = Number(params.temperatureK || 298.15);
-          const delta_g = params.delta_g || [
-            [0, 2000],
-            [1500, 0]
-          ];
-          const alpha = params.alpha || [
-            [0, 0.3],
-            [0.3, 0]
-          ];
+          const x = params.liquidComposition;
+          const T = params.temperatureK;
+          const delta_g = params.delta_g;
+          const alpha = params.alpha;
 
           const gamma = PengRobinsonEOS.calculateNRTL(x, T, delta_g, alpha);
           outputData = {
@@ -120,19 +271,6 @@ class PlantEngineAdapter extends EngineAdapter {
             liquidComposition: x,
             activityCoefficients: Array.from(gamma).map((v) => Number(v.toFixed(5)))
           };
-          break;
-        }
-
-        case 'solve_distillation_mesh': {
-          onEvent(
-            new JobEvent({
-              jobId,
-              type: JobEventType.PROGRESS,
-              progressPercent: 30,
-              message: 'Formulating simultaneous MESH equations for column'
-            })
-          );
-          outputData = NaphtaliSandholmColumnSolver.solve(params);
           break;
         }
 
@@ -146,20 +284,19 @@ class PlantEngineAdapter extends EngineAdapter {
             })
           );
           const conduit = {
-            fluidDensity: params.fluidDensity || 998.2,
-            fluidBulkModulus: params.fluidBulkModulus || 2.19e9,
-            pipeElasticModulus: params.pipeElasticModulus || 2.0e11,
-            pipeInnerDiameter: params.pipeDiameter || params.pipeInnerDiameter || 0.3,
-            pipeWallThickness: params.pipeWallThickness || 0.008,
-            restraintFactor: params.restraintFactor || 1.0
+            fluidDensity: params.fluidDensity,
+            fluidBulkModulus: params.fluidBulkModulus,
+            pipeElasticModulus: params.pipeElasticModulus,
+            pipeInnerDiameter: params.pipeDiameter ?? params.pipeInnerDiameter,
+            pipeWallThickness: params.pipeWallThickness,
+            restraintFactor: params.restraintFactor
           };
 
           const waveSpeed = TransientWaterHammerSolver.calculateWaveSpeed(conduit);
           const v0 =
-            params.steadyVelocity ||
-            (params.steadyFlowRate
-              ? params.steadyFlowRate / (Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2))
-              : 2.0);
+            params.steadyVelocity !== undefined
+              ? params.steadyVelocity
+              : params.steadyFlowRate / (Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2));
           const surge = TransientWaterHammerSolver.joukowskySurge(waveSpeed, v0, conduit.fluidDensity);
 
           let moc = null;
@@ -173,16 +310,16 @@ class PlantEngineAdapter extends EngineAdapter {
               })
             );
             const mocParams = {
-              pipeLength: params.pipeLength || 1000.0,
+              pipeLength: params.pipeLength,
               pipeDiameter: conduit.pipeInnerDiameter,
               pipeWallThickness: conduit.pipeWallThickness,
-              darcyFrictionFactor: params.darcyFrictionFactor || 0.018,
-              reservoirHead: params.reservoirHead || 100.0,
-              steadyFlowRate: params.steadyFlowRate || v0 * Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2),
-              valveClosureTime: params.valveClosureTime || 0.5,
-              valveClosureLaw: params.valveClosureLaw || 'linear',
-              simulationDuration: params.simulationDuration || 3.0,
-              reaches: params.reaches || 20,
+              darcyFrictionFactor: params.darcyFrictionFactor,
+              reservoirHead: params.reservoirHead,
+              steadyFlowRate: params.steadyFlowRate ?? v0 * Math.PI * Math.pow(conduit.pipeInnerDiameter / 2, 2),
+              valveClosureTime: params.valveClosureTime,
+              valveClosureLaw: params.valveClosureLaw,
+              simulationDuration: params.simulationDuration,
+              reaches: params.reaches,
               fluidDensity: conduit.fluidDensity,
               fluidBulkModulus: conduit.fluidBulkModulus,
               pipeElasticModulus: conduit.pipeElasticModulus,
@@ -210,39 +347,21 @@ class PlantEngineAdapter extends EngineAdapter {
               message: 'Calculating multicomponent VLE P-T envelope'
             })
           );
-          const composition = params.composition || { methane: 0.7, ethane: 0.2, propane: 0.1 };
-          const pMinBar = Number(params.pMinBar || 1.0);
-          const pMaxBar = Number(params.pMaxBar || 50.0);
-          const points = Number(params.points || 20);
-          const componentProperties = params.componentProperties || {
-            methane: {
-              criticalTemperatureK: 190.56,
-              criticalPressurePa: 45.99e5,
-              molecularWeightKgPerMol: 0.01604,
-              acentricFactor: 0.0115,
-              provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
-            },
-            ethane: {
-              criticalTemperatureK: 305.32,
-              criticalPressurePa: 48.72e5,
-              molecularWeightKgPerMol: 0.03007,
-              acentricFactor: 0.0995,
-              provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
-            },
-            propane: {
-              criticalTemperatureK: 369.83,
-              criticalPressurePa: 42.48e5,
-              molecularWeightKgPerMol: 0.0441,
-              acentricFactor: 0.1523,
-              provenance: { source: 'NIST Chemistry WebBook (SRD 69)', license: 'public-domain' }
-            }
-          };
+          const composition = params.composition;
+          const pMinBar = params.pMinBar;
+          const pMaxBar = params.pMaxBar;
+          const points = params.points;
+          const componentProperties = params.componentProperties;
+          const tMinC = params.tMinC;
+          const tMaxC = params.tMaxC;
           outputData = VLEPhaseEnvelopeEngine.generatePTEnvelope(
             composition,
             pMinBar,
             pMaxBar,
             points,
-            componentProperties
+            componentProperties,
+            tMinC,
+            tMaxC
           );
           break;
         }
@@ -263,6 +382,8 @@ class PlantEngineAdapter extends EngineAdapter {
         jobId,
         status: JobStatus.SUCCEEDED,
         outputData,
+        convergenceHistory,
+        warnings,
         backendName: this.name,
         backendVersion: this.version,
         executionDurationMs: durationMs,

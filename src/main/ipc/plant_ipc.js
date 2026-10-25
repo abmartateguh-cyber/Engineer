@@ -10,7 +10,6 @@ const { ThermodynamicsEngine } = require('../../core/plant/thermodynamics');
 const { PipingStressEngine } = require('../../core/plant/piping_stress');
 const { VLEPhaseEnvelopeEngine } = require('../../core/plant/vle_envelope');
 const { ProcessStream, ProcessFlowsheetSolver } = require('../../core/plant/process_flowsheet_solver');
-const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('../../core/plant/naphtali_sandholm_mesh');
 const { PengRobinsonEOS } = require('../../core/plant/peng_robinson_eos');
 const { TemaBellDelaware } = require('../../core/plant/tema_bell_delaware');
 const { Api520ReliefValve } = require('../../core/plant/api520_relief_valve');
@@ -112,15 +111,25 @@ function registerPlantIpc() {
       type: 'object',
       optional: true
     },
-    async (event, { composition, pMinBar, pMaxBar, points, componentProperties } = {}) => {
+    async (event, { composition, pMinBar, pMaxBar, points, componentProperties, tMinC, tMaxC } = {}) => {
       if (
-        [composition, pMinBar, pMaxBar, points, componentProperties].some(
+        [composition, pMinBar, pMaxBar, points, componentProperties, tMinC, tMaxC].some(
           (value) => value === undefined || value === null
         )
       ) {
-        return unavailable('Required inputs missing: composition, componentProperties, pMinBar, pMaxBar, points');
+        return unavailable(
+          'Required inputs missing: composition, componentProperties, pMinBar, pMaxBar, points, tMinC, tMaxC'
+        );
       }
-      return VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, pMinBar, pMaxBar, points, componentProperties);
+      return VLEPhaseEnvelopeEngine.generatePTEnvelope(
+        composition,
+        pMinBar,
+        pMaxBar,
+        points,
+        componentProperties,
+        tMinC,
+        tMaxC
+      );
     },
     {
       domain: 'plant',
@@ -190,12 +199,11 @@ function registerPlantIpc() {
       type: 'object',
       optional: true
     },
-    async (event, params = {}) => {
-      if (!params.spec) return unavailable('A complete column specification is required.');
-      const res = NaphtaliSandholmColumnSolver.solve(params.spec);
-      return { success: true, validationLevel: 'experimental', result: res };
-    },
-    { domain: 'plant', description: 'Run an experimental MESH column calculation from explicit inputs' }
+    async () =>
+      unavailable(
+        'Distillation is unavailable until a reviewed phase-equilibrium and enthalpy model, property data, and independent column reference are configured.'
+      ),
+    { domain: 'plant', description: 'Unavailable pending a reviewed column model and independent reference' }
   );
 
   // 10. Water Hammer Method of Characteristics (MOC)
@@ -205,12 +213,11 @@ function registerPlantIpc() {
       type: 'object',
       optional: true
     },
-    async (event, params = {}) => {
-      if (!params.options) return unavailable('Explicit water-hammer simulation options are required.');
-      const res = WaterHammerMOC.simulateMOC(params.options);
-      return { success: true, validationLevel: 'experimental', result: res };
-    },
-    { domain: 'plant', description: 'Run an experimental water-hammer estimate from explicit inputs' }
+    async () =>
+      unavailable(
+        'The legacy water-hammer simulation is unavailable pending independent model and boundary-condition review. Use the explicit-input Plant adapter for an experimental screening estimate.'
+      ),
+    { domain: 'plant', description: 'Unavailable pending independent transient-model review' }
   );
 
   // 11. Peng-Robinson 1978 EOS Flash
@@ -221,10 +228,10 @@ function registerPlantIpc() {
       optional: true
     },
     async (event, params = {}) => {
-      const missing = requireFields(params, ['components', 'z', 'T', 'P']);
+      const missing = requireFields(params, ['components', 'k_ij', 'z', 'T', 'P', 'maxIter', 'tol']);
       if (missing.length) return unavailable(`Required inputs missing: ${missing.join(', ')}`);
-      const eos = new PengRobinsonEOS(params.components);
-      const flash = eos.flashPT(params.z, params.T, params.P);
+      const eos = new PengRobinsonEOS(params.components, params.k_ij);
+      const flash = eos.flashPT(params.z, params.T, params.P, { maxIter: params.maxIter, tol: params.tol });
       return { success: true, validationLevel: 'experimental', flash };
     },
     { domain: 'plant', description: 'Run an experimental PR-78 flash from explicit inputs' }

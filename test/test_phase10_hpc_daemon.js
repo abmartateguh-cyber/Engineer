@@ -28,6 +28,19 @@ assert.strictEqual(optics.status, 'COMPUTED_EXPERIMENTAL');
 assert.strictEqual(optics.validationLevel, 'experimental');
 assert(Math.abs(optics.result.Rs - 0.04) < 0.005, 'Fresnel example returns the expected normal-incidence calculation');
 
+const plantDistillation = HeadlessSolverDaemon.solveJob({
+  discipline: 'plant',
+  parameters: { type: 'distillation' }
+});
+assert.strictEqual(plantDistillation.status, 'UNAVAILABLE');
+assert.strictEqual(plantDistillation.result.status, 'unavailable');
+const plantWaterHammer = HeadlessSolverDaemon.solveJob({
+  discipline: 'plant',
+  parameters: { type: 'water_hammer' }
+});
+assert.strictEqual(plantWaterHammer.status, 'UNAVAILABLE');
+assert.strictEqual(plantWaterHammer.result.status, 'unavailable');
+
 assert.throws(() => HeadlessSolverDaemon.solveJob({ discipline: 'optics' }), /parameters are required/i);
 assert.throws(() => HeadlessSolverDaemon.solveJob({ parameters: {} }), /discipline is required/i);
 

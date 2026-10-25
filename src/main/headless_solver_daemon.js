@@ -152,7 +152,7 @@ class HeadlessSolverDaemon {
 
     const tEnd = Date.now();
     return {
-      status: 'COMPUTED_EXPERIMENTAL',
+      status: result?.status === 'unavailable' ? 'UNAVAILABLE' : 'COMPUTED_EXPERIMENTAL',
       validationLevel: 'experimental',
       discipline,
       durationMs: tEnd - tStart,

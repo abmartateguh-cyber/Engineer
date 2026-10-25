@@ -406,4 +406,22 @@ function getExperimentalThermoProperties(componentNames) {
   );
 }
 
-module.exports = { EXPERIMENTAL_PROPERTY_EXAMPLES, getExperimentalThermoProperties };
+function getExperimentalPengRobinsonComponents(componentNames) {
+  const properties = getExperimentalThermoProperties(componentNames);
+  return componentNames.map((name) => {
+    const record = properties[name];
+    return {
+      name,
+      criticalTemperatureK: record.criticalTemperatureK,
+      criticalPressurePa: record.criticalPressurePa,
+      acentricFactor: record.acentricFactor,
+      provenance: record.provenance
+    };
+  });
+}
+
+module.exports = {
+  EXPERIMENTAL_PROPERTY_EXAMPLES,
+  getExperimentalThermoProperties,
+  getExperimentalPengRobinsonComponents
+};

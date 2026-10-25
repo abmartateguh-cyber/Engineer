@@ -44,6 +44,7 @@ const { DiffractionPSFMTFEngine } = require('../../src/core/optics/diffraction_p
 // 6. Chemical & Plant
 const { ExperimentalPropertyDatabase } = require('../../src/core/plant/dippr_database');
 const { EXPERIMENTAL_PROPERTY_EXAMPLES } = require('../support/experimental_property_examples');
+const { getExperimentalPengRobinsonComponents } = require('../support/experimental_property_examples');
 const { PengRobinsonEOS } = require('../../src/core/plant/peng_robinson_eos');
 const { ElectrolyteNRTLModel } = require('../../src/core/plant/enrtl_electrolyte_thermo');
 const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('../../src/core/plant/naphtali_sandholm_mesh');
@@ -572,14 +573,18 @@ END DESIGN`;
   });
 
   testSmoke(73, 'Peng-Robinson 1978 Cubic Equation of State Pure Methane Compressibility Factor Z', () => {
-    const eos = new PengRobinsonEOS(['methane']);
-    const z = eos.flashPT([1.0], 190.56, 4599000.0); // Near critical point
+    const eos = new PengRobinsonEOS(getExperimentalPengRobinsonComponents(['Methane']), [[0]]);
+    const z = eos.flashPT([1.0], 190.56, 4599000.0, { maxIter: 100, tol: 1e-8 }); // Near critical point
     assert(z.converged);
   });
 
   testSmoke(74, 'Peng-Robinson 78 Multi-Component Hydrocarbon Flash VLE Equilibrium', () => {
-    const eos = new PengRobinsonEOS(['methane', 'ethane', 'propane']);
-    const flash = eos.flashPT([0.5, 0.3, 0.2], 200.0, 2.0e6);
+    const eos = new PengRobinsonEOS(getExperimentalPengRobinsonComponents(['Methane', 'Ethane', 'Propane']), [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+    ]);
+    const flash = eos.flashPT([0.5, 0.3, 0.2], 200.0, 2.0e6, { maxIter: 100, tol: 1e-8 });
     assert(flash.converged && Math.abs(flash.x.reduce((a, b) => a + b, 0) - 1.0) < 1e-4);
   });
 
@@ -595,50 +600,24 @@ END DESIGN`;
     assert(vle.pCO2_kPa > 0.1 && vle.pCO2_kPa < 5.0);
   });
 
-  testSmoke(77, 'Naphtali-Sandholm Simultaneous MESH Multi-Component Distillation Solution', () => {
-    const col = NaphtaliSandholmColumnSolver.solve({
-      stages: 12,
-      feedStage: 6,
-      components: ['Propane', 'n-Butane', 'n-Pentane'],
-      feedFlows: [10.0, 15.0, 10.0],
-      refluxRatio: 2.0
-    });
-    assert(col.converged && col.temperatureProfile[0] < col.temperatureProfile[11]);
+  testSmoke(77, 'Legacy distillation model fails closed without reviewed property and column models', () => {
+    const col = NaphtaliSandholmColumnSolver.solve({ stages: 12 });
+    assert.strictEqual(col.status, 'unavailable');
   });
 
-  testSmoke(78, 'Naphtali-Sandholm Column with 80% Murphree Vapor Tray Efficiency', () => {
-    const col = NaphtaliSandholmColumnSolver.solve({
-      stages: 12,
-      feedStage: 6,
-      components: ['Propane', 'n-Butane', 'n-Pentane'],
-      feedFlows: [10.0, 15.0, 10.0],
-      refluxRatio: 2.0,
-      murphreeEfficiency: 0.8
-    });
-    assert(col.converged);
+  testSmoke(78, 'Legacy distillation model does not report fabricated tray efficiency results', () => {
+    const col = NaphtaliSandholmColumnSolver.solve({ stages: 12, murphreeEfficiency: 0.8 });
+    assert.strictEqual(col.error.code, 'UNSUPPORTED');
   });
 
-  testSmoke(79, 'Experimental water-hammer example acoustic wave-speed calculation', () => {
-    const res = WaterHammerMOC.solve({
-      innerDiameterM: 0.2,
-      wallThicknessM: 0.008,
-      elasticModulusPa: 200e9,
-      fluidDensityKgM3: 1000.0,
-      fluidBulkModulusPa: 2.19e9,
-      initialVelocityMps: 2.5
-    });
-    assert(res.waveSpeedMps > 1000 && res.waveSpeedMps < 1500);
+  testSmoke(79, 'Legacy water-hammer transient route fails closed pending independent review', () => {
+    const res = WaterHammerMOC.solve({});
+    assert.strictEqual(res.status, 'unavailable');
   });
 
-  testSmoke(80, 'Joukowsky Dynamic Transient Pressure Surge Delta_P = rho * a * Delta_v', () => {
-    const res = WaterHammerMOC.solve({
-      innerDiameterM: 0.2,
-      wallThicknessM: 0.008,
-      fluidDensityKgM3: 1000.0,
-      fluidBulkModulusPa: 2.19e9,
-      initialVelocityMps: 2.5
-    });
-    assert(res.joukowskyDeltaP_Pa > 2.5e6);
+  testSmoke(80, 'Explicit Joukowsky relation evaluates Delta_P = rho * a * Delta_v', () => {
+    const res = WaterHammerMOC.computeJoukowskySurge(1000.0, 1300.0, 2.5);
+    assert.strictEqual(res.pressureSurgePa, 3.25e6);
   });
 
   testSmoke(81, 'TEMA BEM Shell and Tube Heat Exchanger Bell-Delaware Heat Transfer Rating', () => {

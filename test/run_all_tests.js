@@ -1949,18 +1949,41 @@ endmodule
   test('VLEPhaseEnvelopeEngine: Wilson/Rachford-Rice estimate is labeled; fabricated tray profile is unavailable', () => {
     const composition = { Methane: 0.2, Propane: 0.5, nPentane: 0.3 };
     const componentProperties = getExperimentalThermoProperties(Object.keys(composition));
-    const envelope = VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, 1.0, 50.0, 20, componentProperties);
+    const envelope = VLEPhaseEnvelopeEngine.generatePTEnvelope(
+      composition,
+      1.0,
+      50.0,
+      20,
+      componentProperties,
+      -40,
+      160
+    );
     assert.strictEqual(envelope.points.length, 20);
     assert.strictEqual(envelope.validationLevel, 'experimental');
     assert.strictEqual(envelope.dataStatus, 'caller-supplied-unverified-data');
     assert.match(envelope.model, /Wilson K-value estimates/);
     assert.strictEqual(envelope.sampledPressureMaxBar, 50.0);
-    assert(envelope.sampledDewPointMaxC > 0);
+    assert(
+      envelope.points.some((point) => point.status === 'unavailable'),
+      'Unbracketed saturation estimates must be reported as unavailable.'
+    );
+    assert(
+      envelope.points.every((point) =>
+        point.status === 'unavailable'
+          ? point.twoPhaseWidthC === null
+          : Number.isFinite(point.bubblePointTempC) && Number.isFinite(point.dewPointTempC)
+      )
+    );
+    assert(envelope.sampledDewPointMaxC === null || Number.isFinite(envelope.sampledDewPointMaxC));
     assert.strictEqual(Object.hasOwn(envelope, 'criticalPoint'), false);
     assert.throws(() => VLEPhaseEnvelopeEngine.generatePTEnvelope(), /explicit non-empty component composition/);
     assert.throws(
       () => VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, 1.0, 50.0, 20),
       /Explicit component property records/
+    );
+    assert.throws(
+      () => VLEPhaseEnvelopeEngine.generatePTEnvelope(composition, 1.0, 50.0, 20, componentProperties),
+      /Explicit temperature bounds/
     );
 
     const column = VLEPhaseEnvelopeEngine.generateColumnTrayProfile(30, 22, 50000);

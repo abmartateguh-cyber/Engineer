@@ -26,7 +26,11 @@ The 21 fixed legacy component examples in `test/support/experimental_property_ex
 
 The seven legacy pure-component property rows formerly embedded in `src/core/plant/thermodynamics.js` were removed from the production registry for the same provenance and redistribution review. The Wilson/Rachford–Rice example algorithm remains callable only when the caller supplies positive critical temperature, critical pressure, molecular weight, a finite acentric factor, and non-empty source and license labels for every feed component. Those labels document the caller's assertion; OmniEng does not verify the source, license, applicability, or values. Results remain marked experimental and caller-supplied-unverified.
 
+The Wilson/Rachford–Rice phase-envelope estimate additionally requires caller-supplied pressure and temperature bounds. Bubble- and dew-point targets that are not bracketed within those bounds are returned as unavailable with no substituted boundary temperature. The bounded estimate remains experimental and is not an EOS-based, independently validated envelope.
+
 The piping estimate no longer bundles pipe-schedule or material-property records. It requires the caller to supply geometry, pressure, temperature, and material properties explicitly. These user inputs are unverified, and the reduced calculation does not produce a code allowable or compliance result.
+
+The legacy distillation routine is disabled because it used embedded K-value guesses rather than a reviewed phase-equilibrium and enthalpy model, and it reported convergence without verifying it. The legacy transient water-hammer simulator is also disabled because it supplied physical defaults and lacks an independent reference. A separate Plant adapter can run an experimental Korteweg/Joukowsky screening calculation from explicit properties and flow inputs; it does not calculate a transient history or piping-code verdict. Its physical property values remain caller-supplied and unverified.
 
 ## Stress-line screening inputs
 

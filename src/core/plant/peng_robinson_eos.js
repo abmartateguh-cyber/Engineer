@@ -1,59 +1,71 @@
 /**
- * Peng-Robinson 1978 Equation of State (PR-78 EOS) & Multicomponent VLE Flash
- * 
- * Provides rigorous thermodynamic phase equilibrium calculations:
- * - Pure component a(T) and b parameters with PR-78 alpha formulation
- * - van der Waals quadratic mixing rules with binary interaction parameters (k_ij)
- * - Analytical cubic equation solver for compressibility factor (Z)
- * - Fugacity coefficients for vapor and liquid phases (ln phi_i)
- * - Isothermal-isobaric (PT) Flash via Rachford-Rice with Newton-Raphson & bounded bisection
- * - NRTL (Non-Random Two-Liquid) activity coefficient model for polar/non-ideal liquid mixtures
- * 
- * Complies with API Technical Data Book & GPSA Engineering Data Book standards.
+ * Experimental Peng-Robinson EOS and NRTL calculation utilities.
+ * Component properties, binary interaction parameters, and solver controls must
+ * be supplied explicitly. No standards compliance or independent validation is claimed.
  */
 
 'use strict';
 
 const R_GAS = 8.314462618; // J / (mol * K)
 
-// Pre-defined database of common hydrocarbons & gases (Tc in K, Pc in Pa, omega acentric factor)
-const COMPONENT_DB = {
-  methane: { name: 'Methane', formula: 'CH4', Tc: 190.56, Pc: 4599000, omega: 0.0115, Mw: 16.043 },
-  ethane: { name: 'Ethane', formula: 'C2H6', Tc: 305.32, Pc: 4872000, omega: 0.0995, Mw: 30.070 },
-  propane: { name: 'Propane', formula: 'C3H8', Tc: 369.83, Pc: 4248000, omega: 0.1523, Mw: 44.096 },
-  i_butane: { name: 'Isobutane', formula: 'iC4H10', Tc: 407.85, Pc: 3640000, omega: 0.1848, Mw: 58.122 },
-  n_butane: { name: 'n-Butane', formula: 'nC4H10', Tc: 425.12, Pc: 3796000, omega: 0.2002, Mw: 58.122 },
-  i_pentane: { name: 'Isopentane', formula: 'iC5H12', Tc: 460.35, Pc: 3381000, omega: 0.2280, Mw: 72.150 },
-  n_pentane: { name: 'n-Pentane', formula: 'nC5H12', Tc: 469.70, Pc: 3370000, omega: 0.2515, Mw: 72.150 },
-  n_hexane: { name: 'n-Hexane', formula: 'C6H14', Tc: 507.60, Pc: 3025000, omega: 0.3013, Mw: 86.177 },
-  nitrogen: { name: 'Nitrogen', formula: 'N2', Tc: 126.20, Pc: 3390000, omega: 0.0372, Mw: 28.013 },
-  co2: { name: 'Carbon Dioxide', formula: 'CO2', Tc: 304.13, Pc: 7377000, omega: 0.2239, Mw: 44.010 },
-  water: { name: 'Water', formula: 'H2O', Tc: 647.10, Pc: 22064000, omega: 0.3443, Mw: 18.015 }
-};
+// Kept empty for compatibility. Property records must be provided by the caller.
+const COMPONENT_DB = Object.freeze({});
 
 class PengRobinsonEOS {
   /**
-   * @param {Array<Object>} components Array of { name, Tc, Pc, omega, Mw }
-   * @param {Array<Array<number>>} [k_ij] Binary interaction parameters matrix (N x N)
+   * @param {Array<Object>} components Explicit unit-labeled property records with provenance.
+   * @param {Array<Array<number>>} k_ij Explicit dimensionless interaction matrix (N x N).
    */
-  constructor(components, k_ij = null) {
-    this.components = components.map(c => {
-      if (typeof c === 'string') {
-        const entry = COMPONENT_DB[c.toLowerCase()];
-        if (!entry) throw new Error(`Unknown component: ${c}`);
-        return { ...entry };
+  constructor(components, k_ij) {
+    if (!Array.isArray(components) || components.length === 0) {
+      throw new TypeError('PengRobinsonEOS requires explicit component property records.');
+    }
+    this.components = components.map((component, index) => {
+      if (!component || typeof component !== 'object' || Array.isArray(component)) {
+        throw new TypeError(`Component ${index} must be an explicit property record; bundled names are unavailable.`);
       }
-      return { ...c };
+      const { name, criticalTemperatureK, criticalPressurePa, acentricFactor, provenance } = component;
+      if (
+        typeof name !== 'string' ||
+        !name.trim() ||
+        !Number.isFinite(criticalTemperatureK) ||
+        criticalTemperatureK <= 0 ||
+        !Number.isFinite(criticalPressurePa) ||
+        criticalPressurePa <= 0 ||
+        !Number.isFinite(acentricFactor) ||
+        !provenance ||
+        typeof provenance !== 'object' ||
+        typeof provenance.source !== 'string' ||
+        !provenance.source.trim() ||
+        typeof provenance.license !== 'string' ||
+        !provenance.license.trim()
+      ) {
+        throw new TypeError(
+          `Component ${index} requires name, criticalTemperatureK, criticalPressurePa, acentricFactor, and source/license provenance.`
+        );
+      }
+      return {
+        name: name.trim(),
+        Tc: criticalTemperatureK,
+        Pc: criticalPressurePa,
+        omega: acentricFactor,
+        provenance: { source: provenance.source, license: provenance.license }
+      };
     });
 
     const N = this.components.length;
     this.N = N;
-
-    if (k_ij) {
-      this.k_ij = k_ij;
-    } else {
-      this.k_ij = Array.from({ length: N }, () => new Float64Array(N));
+    if (!Array.isArray(k_ij) || k_ij.length !== N || k_ij.some((row) => !Array.isArray(row) || row.length !== N)) {
+      throw new TypeError(`PengRobinsonEOS requires an explicit ${N}x${N} binary interaction matrix.`);
     }
+    this.k_ij = k_ij.map((row, rowIndex) =>
+      row.map((value, columnIndex) => {
+        if (!Number.isFinite(value)) {
+          throw new TypeError(`Binary interaction value k_ij[${rowIndex}][${columnIndex}] must be finite.`);
+        }
+        return value;
+      })
+    );
   }
 
   /**
@@ -89,8 +101,8 @@ class PengRobinsonEOS {
       const sqrtTr = Math.sqrt(Tr);
       const alpha = Math.pow(1 + m * (1 - sqrtTr), 2);
 
-      a[i] = 0.45724 * (R_GAS * R_GAS * comp.Tc * comp.Tc / comp.Pc) * alpha;
-      b[i] = 0.07780 * (R_GAS * comp.Tc / comp.Pc);
+      a[i] = 0.45724 * ((R_GAS * R_GAS * comp.Tc * comp.Tc) / comp.Pc) * alpha;
+      b[i] = 0.0778 * ((R_GAS * comp.Tc) / comp.Pc);
     }
 
     return { a, b };
@@ -196,9 +208,7 @@ class PengRobinsonEOS {
     const phi = new Float64Array(this.N);
 
     const termZ_B = Math.log(Math.max(1e-15, Z - B));
-    const termSqrt = Math.log(
-      Math.max(1e-15, (Z + (1 + sqrt2) * B) / (Z + (1 - sqrt2) * B))
-    );
+    const termSqrt = Math.log(Math.max(1e-15, (Z + (1 + sqrt2) * B) / (Z + (1 - sqrt2) * B)));
 
     for (let i = 0; i < this.N; i++) {
       let sumZa = 0;
@@ -207,7 +217,7 @@ class PengRobinsonEOS {
       }
 
       const b_ratio = b_pure[i] / b_mix;
-      const termA = (A / (2 * sqrt2 * B)) * ( (2 * sumZa) / a_mix - b_ratio );
+      const termA = (A / (2 * sqrt2 * B)) * ((2 * sumZa) / a_mix - b_ratio);
 
       const ln_phi_i = b_ratio * (Z - 1) - termZ_B - termA * termSqrt;
       lnPhi[i] = ln_phi_i;
@@ -220,16 +230,36 @@ class PengRobinsonEOS {
   /**
    * Two-phase PT (Isothermal-Isobaric) Flash via Rachford-Rice
    * Solves f(beta) = sum( z_i * (K_i - 1) / (1 + beta * (K_i - 1)) ) = 0
-   * 
+   *
    * @param {Array<number>} z Overall feed mole fractions
    * @param {number} T Temperature in Kelvin
    * @param {number} P Pressure in Pascals
-   * @param {Object} [options]
-   * @returns {{ beta: number, x: Float64Array, y: Float64Array, K: Float64Array, Z_L: number, Z_V: number, converged: boolean }}
+   * @param {{ maxIter: number, tol: number }} options Explicit solver controls.
+   * @returns {{ beta: number, x: Float64Array, y: Float64Array, K: Float64Array, Z_L: number, Z_V: number, converged: boolean, phaseState: string, iterations: number, residual: number|null, convergenceHistory: object[] }}
    */
-  flashPT(z, T, P, options = {}) {
-    const maxIter = options.maxIter || 100;
-    const tol = options.tol || 1e-8;
+  flashPT(z, T, P, options) {
+    if (!Array.isArray(z) || z.length !== this.N || z.some((value) => !Number.isFinite(value) || value < 0)) {
+      throw new TypeError(
+        'flashPT requires explicit finite non-negative feed mole fractions matching the component count.'
+      );
+    }
+    if (Math.abs(z.reduce((sum, value) => sum + value, 0) - 1) > 1e-8) {
+      throw new RangeError('flashPT feed mole fractions must sum to one.');
+    }
+    if (!Number.isFinite(T) || T <= 0 || !Number.isFinite(P) || P <= 0) {
+      throw new TypeError('flashPT requires positive finite temperatureK and pressurePa.');
+    }
+    if (
+      !options ||
+      typeof options !== 'object' ||
+      !Number.isSafeInteger(options.maxIter) ||
+      options.maxIter < 1 ||
+      !Number.isFinite(options.tol) ||
+      options.tol <= 0
+    ) {
+      throw new TypeError('flashPT requires explicit positive maxIter and tol solver controls.');
+    }
+    const { maxIter, tol } = options;
 
     // Initial Wilson correlation estimate for K-values:
     // K_i = (Pc_i / P) * exp(5.373 * (1 + omega_i) * (1 - Tc_i / T))
@@ -237,11 +267,17 @@ class PengRobinsonEOS {
     for (let i = 0; i < this.N; i++) {
       const comp = this.components[i];
       K[i] = (comp.Pc / P) * Math.exp(5.373 * (1 + comp.omega) * (1 - comp.Tc / T));
-      if (K[i] <= 0 || isNaN(K[i])) K[i] = 1.0;
+      if (!Number.isFinite(K[i]) || K[i] <= 0) {
+        throw new RangeError(`Wilson K-value for component '${comp.name}' is outside the finite positive range.`);
+      }
     }
 
     let beta = 0.5; // Vapor fraction
     let converged = false;
+    let phaseState = 'two-phase';
+    let iterations = 0;
+    let residual = null;
+    const convergenceHistory = [];
     let Z_L = 0;
     let Z_V = 0;
 
@@ -250,6 +286,7 @@ class PengRobinsonEOS {
 
     // Outer successive substitution loop for K-values
     for (let iter = 0; iter < maxIter; iter++) {
+      iterations = iter + 1;
       // 1. Solve Rachford-Rice for beta using Newton-Raphson with bounded bisection
       let beta_min = 0;
       let beta_max = 1;
@@ -272,11 +309,13 @@ class PengRobinsonEOS {
       for (let i = 0; i < this.N; i++) f_0 += z[i] * (K[i] - 1);
       if (f_0 <= 0) {
         beta = 0.0;
+        phaseState = 'liquid-only';
         for (let i = 0; i < this.N; i++) {
           x[i] = z[i];
           y[i] = z[i] * K[i];
         }
         converged = true;
+        convergenceHistory.push({ iteration: iterations, status: 'single-phase-classified', phaseState });
         break;
       }
 
@@ -285,11 +324,13 @@ class PengRobinsonEOS {
       for (let i = 0; i < this.N; i++) f_1 += (z[i] * (K[i] - 1)) / K[i];
       if (f_1 >= 0) {
         beta = 1.0;
+        phaseState = 'vapor-only';
         for (let i = 0; i < this.N; i++) {
           y[i] = z[i];
           x[i] = z[i] / K[i];
         }
         converged = true;
+        convergenceHistory.push({ iteration: iterations, status: 'single-phase-classified', phaseState });
         break;
       }
 
@@ -343,6 +384,8 @@ class PengRobinsonEOS {
         K[i] = 0.5 * K[i] + 0.5 * K_new; // Damped successive substitution
       }
 
+      residual = maxError;
+      convergenceHistory.push({ iteration: iterations, maxRelativeKChange: maxError, tolerance: tol });
       if (maxError < tol) {
         converged = true;
         break;
@@ -356,17 +399,21 @@ class PengRobinsonEOS {
       K,
       Z_L,
       Z_V,
-      converged
+      converged,
+      phaseState,
+      iterations,
+      residual,
+      convergenceHistory
     };
   }
 
   /**
    * NRTL (Non-Random Two-Liquid) Activity Coefficient Model
    * For highly non-ideal polar mixtures (e.g. Ethanol-Water, Acetone-Water)
-   * 
+   *
    * ln gamma_i = [sum_j(x_j * tau_ji * G_ji) / sum_k(x_k * G_ki)] +
    *              sum_j [ (x_j * G_ij / sum_k(x_k * G_kj)) * (tau_ij - sum_m(x_m * tau_mj * G_mj) / sum_k(x_k * G_kj)) ]
-   * 
+   *
    * @param {Float64Array|Array<number>} x Liquid mole fractions
    * @param {number} T Temperature in Kelvin
    * @param {Array<Array<number>>} delta_g Binary energy parameter matrix (J/mol)
@@ -404,7 +451,7 @@ class PengRobinsonEOS {
           sum_k_Gkj += x[k] * G[k][j];
           sum_m_tauG += x[k] * tau[k][j] * G[k][j];
         }
-        term2 += (x[j] * G[i][j] / sum_k_Gkj) * (tau[i][j] - sum_m_tauG / sum_k_Gkj);
+        term2 += ((x[j] * G[i][j]) / sum_k_Gkj) * (tau[i][j] - sum_m_tauG / sum_k_Gkj);
       }
 
       const ln_gamma_i = term1 + term2;

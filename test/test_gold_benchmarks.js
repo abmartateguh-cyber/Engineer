@@ -312,8 +312,7 @@ function runGoldBenchmarks() {
       refluxRatio: 3.0,
       distillateRate: 22.0
     });
-    assert(colRes.converged, `Supplied 30-stage column example converged in ${colRes.iterations} iterations`);
-    assert(colRes.stages.length === 30, `The supplied column example returned 30 stage records`);
+    assert(colRes.status === 'unavailable', 'Legacy column solver remains disabled pending reviewed models');
   }
 
   // --- Diagnostic 13: Experimental water-hammer equation example ---
@@ -326,10 +325,7 @@ function runGoldBenchmarks() {
       closureTimeSec: 0.1,
       totalTimeSec: 1.2
     });
-    assert(mocRes.validationLevel === 'experimental', 'Water-hammer output is marked experimental');
-    assert(mocRes.screeningStatus === 'EXPERIMENTAL_ESTIMATE_ONLY', 'Water-hammer output is estimate-only');
-    assert(mocRes.waveSpeedMs > 0 && Number.isFinite(mocRes.waveSpeedMs), 'Wave-speed estimate is finite');
-    assert(!Object.hasOwn(mocRes, 'passedAsmeB31_3'), 'No ASME verdict is emitted');
+    assert(mocRes.status === 'unavailable', 'Legacy transient solver remains disabled pending review');
   }
 
   // --- Additional experimental module smoke checks ---

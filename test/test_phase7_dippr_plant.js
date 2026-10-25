@@ -107,68 +107,20 @@ console.log(
 );
 
 // -----------------------------------------------------------------------------
-// Test 3: Naphtali-Sandholm MESH Distillation Column with Murphree Tray Efficiency
+// Test 3: Legacy distillation route fails closed
 // -----------------------------------------------------------------------------
-console.log('\n[P7-3] Naphtali-Sandholm Simultaneous MESH Distillation Solver...');
-
-// Solve ideal column (Emv = 1.0)
-const colIdeal = NaphtaliSandholmColumnSolver.solve({
-  stages: 15,
-  feedStage: 8,
-  components: ['Propane', 'n-Butane', 'n-Pentane'],
-  feedFlows: [10.0, 15.0, 10.0],
-  refluxRatio: 2.5,
-  murphreeEfficiency: 1.0
-});
-assert(colIdeal.converged, 'Ideal column must converge');
-assert(colIdeal.temperatureProfile[0] < colIdeal.temperatureProfile[14], 'Condenser must be colder than reboiler');
-assert(colIdeal.distillateComposition[0] > 0.5, 'Distillate should be enriched in light key Propane');
-
-// Solve real column with 85% Murphree efficiency
-const colReal = NaphtaliSandholmColumnSolver.solve({
-  stages: 15,
-  feedStage: 8,
-  components: ['Propane', 'n-Butane', 'n-Pentane'],
-  feedFlows: [10.0, 15.0, 10.0],
-  refluxRatio: 2.5,
-  murphreeEfficiency: 0.85
-});
-assert(colReal.converged, 'Real column (Emv=0.85) must converge');
-assert(colReal.temperatureProfile[0] < colReal.temperatureProfile[14]);
-
-console.log(
-  `  ✓ [P7-3] Column Converged in ${colIdeal.iterations} iters: T_condenser = ${colIdeal.temperatureProfile[0].toFixed(1)} K, T_reboiler = ${colIdeal.temperatureProfile[14].toFixed(1)} K, Distillate x_propane = ${(colIdeal.distillateComposition[0] * 100).toFixed(1)}%`
-);
+console.log('\n[P7-3] Legacy distillation model availability...');
+const columnResult = NaphtaliSandholmColumnSolver.solve({ stages: 15 });
+assert.strictEqual(columnResult.status, 'unavailable');
+assert.strictEqual(columnResult.error.code, 'UNSUPPORTED');
 
 // -----------------------------------------------------------------------------
 // Test 4: Experimental Method of Characteristics (MOC) Water Hammer Example
 // -----------------------------------------------------------------------------
-console.log('\n[P7-4] Experimental Dynamic Water Hammer Example...');
-const hammerResult = WaterHammerMOC.solve({
-  pipeLengthM: 500.0,
-  innerDiameterM: 0.2,
-  wallThicknessM: 0.008,
-  elasticModulusPa: 2.0e11, // Steel pipe
-  fluidDensityKgM3: 998.0,
-  fluidBulkModulusPa: 2.15e9, // Water
-  initialVelocityMps: 2.5,
-  steadyPressurePa: 1.0e6, // 10 bar
-  valveClosureTimeS: 0.05 // Rapid closure
-});
-
-assert(
-  hammerResult.waveSpeedMps > 1000 && hammerResult.waveSpeedMps < 1500,
-  'Water hammer acoustic speed ~ 1000-1400 m/s'
-);
-assert(hammerResult.joukowskyDeltaP_Pa > 1.5e6, 'Peak surge pressure > 15 bar for 2.5 m/s water shutdown');
-assert(
-  hammerResult.maxPressurePa > hammerResult.steadyPressurePa,
-  'Max pressure must exceed steady operating pressure'
-);
-
-console.log(
-  `  ✓ [P7-4] Water Hammer: Acoustic speed = ${hammerResult.waveSpeedMps.toFixed(1)} m/s, Joukowsky Delta_P = ${(hammerResult.joukowskyDeltaP_Pa / 1e5).toFixed(1)} bar, Peak P_max = ${(hammerResult.maxPressurePa / 1e5).toFixed(1)} bar`
-);
+console.log('\n[P7-4] Legacy dynamic water-hammer model availability...');
+const hammerResult = WaterHammerMOC.solve({});
+assert.strictEqual(hammerResult.status, 'unavailable');
+assert.strictEqual(hammerResult.error.code, 'UNSUPPORTED');
 
 // -----------------------------------------------------------------------------
 // Test 5: Phase 7 Plant IPC Channel Registration & Integration

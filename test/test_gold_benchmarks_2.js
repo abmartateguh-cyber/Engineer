@@ -39,6 +39,7 @@ const { MCDCCoverageAnalyzer } = require('../src/core/dynamic_simulink/mcdc_cove
 
 // 6. Plant & FMI Co-Simulation modules
 const { PengRobinsonEOS } = require('../src/core/plant/peng_robinson_eos');
+const { getExperimentalPengRobinsonComponents } = require('./support/experimental_property_examples');
 const { TemaBellDelaware } = require('../src/core/plant/tema_bell_delaware');
 const { Api520ReliefValve } = require('../src/core/plant/api520_relief_valve');
 const { WegsteinRecycleSolver } = require('../src/core/plant/wegstein_recycle_solver');
@@ -586,9 +587,13 @@ function runAllGoldBenchmarks2() {
   try {
     console.log('[BM 15] Peng-Robinson 1978 VLE Flash & TEMA Shell Heat Exchanger...');
     // 1. PR-78 Flash for Hydrocarbon mixture: 50% Methane, 30% Ethane, 20% Propane at 200 K, 2.0 MPa
-    const eos = new PengRobinsonEOS(['methane', 'ethane', 'propane']);
+    const eos = new PengRobinsonEOS(getExperimentalPengRobinsonComponents(['Methane', 'Ethane', 'Propane']), [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+    ]);
     const z = [0.5, 0.3, 0.2];
-    const flash = eos.flashPT(z, 200.0, 2000000.0);
+    const flash = eos.flashPT(z, 200.0, 2000000.0, { maxIter: 100, tol: 1e-8 });
 
     assert(flash.converged, 'PR-78 flash calculation must converge');
     let sumX = 0;
