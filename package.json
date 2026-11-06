@@ -58,7 +58,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "three": "^0.187.0"
   },
   "overrides": {
     "minimatch": "^11.0.1",
