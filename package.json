@@ -50,7 +50,7 @@
   "author": "OmniEng Engineering Systems",
   "license": "Apache-2.0",
   "devDependencies": {
-    "electron": "43.8.6",
+    "electron": "45.2.1",
     "electron-builder": "^26.5.0",
     "eslint": "^9.39.5",
     "globals": "^17.13.0",
