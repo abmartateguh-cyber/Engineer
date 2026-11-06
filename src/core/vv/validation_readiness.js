@@ -8,9 +8,9 @@ const { REFERENCE_SHA256, REFERENCE_SOURCE_URL } = require('./nasa_tmr_flatplate
 
 const VALIDATION_CASES = Object.freeze([
   { id: 'NAFEMS_LE1', name: 'Elliptic membrane stress reference case' },
-  { id: 'NAFEMS_LE10', name: 'Thick plate bending reference case' },
-  { id: 'NAFEMS_LE11', name: 'Thick cylinder stress reference case' },
-  { id: 'NAFEMS_FV32', name: 'Cantilever plate frequency reference case' },
+  { id: 'NAFEMS_LE10', name: 'Thick elliptic plate under normal pressure reference case' },
+  { id: 'NAFEMS_LE11', name: 'Thermoelastic solid cylinder/taper/sphere reference case' },
+  { id: 'NAFEMS_FV32', name: 'Cantilevered tapered membrane fundamental-frequency reference case' },
   { id: 'NAFEMS_T1', name: 'Membrane with hot-spot thermo-elastic reference case' },
   { id: 'HERTZ_CONTACT_3D', name: 'Discrete sphere-on-flat contact pressure case' },
   {
@@ -20,8 +20,9 @@ const VALIDATION_CASES = Object.freeze([
     referenceDataSource: REFERENCE_SOURCE_URL,
     referenceDataSha256: REFERENCE_SHA256,
     solverAdapterStatus: 'unavailable',
+    experimentalDiagnosticStatus: 'failed',
     reason:
-      'The NASA TMR theoretical correlation data is bundled, but no compatible production RANS turbulence-model solver adapter is configured. No solver comparison was run.'
+      'An experimental direct FVM k-omega SST comparison is executed by test/vv/run_vv.js and the direct CAE IPC route. It currently fails the declared Cf tolerance after a stationary-window check; no qualified/release-eligible RANS validation adapter or independent solver comparison is configured.'
   },
   {
     id: 'HANOVER_BEAM_DYNAMIC_RESPONSE',
@@ -54,8 +55,18 @@ const VALIDATION_CASES = Object.freeze([
     reason:
       'The README, measurement data, and Abaqus input file were downloaded and SHA-256 pinned for provenance, but remain unbundled. No solver comparison was run, and no production adapter assembles a comparable beam mass model for dynamic response.'
   },
-  { id: 'NIST_SPARSE_ROBUSTNESS', name: 'Sparse matrix numerical reference case' },
-  { id: 'ISO_10110_OPTICS', name: 'Optical tolerance reference case' }
+  {
+    id: 'NIST_SPARSE_ROBUSTNESS',
+    name: 'Sparse matrix numerical reference case',
+    benchmarkRegistryId: 'NIST_SPARSE_ROBUSTNESS',
+    referenceSourceStatus: 'unverified-candidate'
+  },
+  {
+    id: 'ISO_10110_OPTICS',
+    name: 'Optical tolerance reference case',
+    benchmarkRegistryId: 'ISO_10110_OPTICS_TOLERANCE',
+    referenceSourceStatus: 'unverified-candidate'
+  }
 ]);
 
 const UNAVAILABLE_REASON =

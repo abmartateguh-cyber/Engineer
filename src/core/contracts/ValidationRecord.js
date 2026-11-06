@@ -55,17 +55,35 @@ class ValidationRecord {
     Object.freeze(this);
   }
 
-  get maturity() { return this._maturity; }
-  get benchmarkSet() { return this._benchmarkSet; }
-  get errors() { return this._errors; }
-  get reviewer() { return this._reviewer; }
-  get date() { return this._date; }
-  get signature() { return this._signature; }
-  get referenceArtifacts() { return this._referenceArtifacts; }
-  get tolerances() { return this._tolerances; }
+  get maturity() {
+    return this._maturity;
+  }
+  get benchmarkSet() {
+    return this._benchmarkSet;
+  }
+  get errors() {
+    return this._errors;
+  }
+  get reviewer() {
+    return this._reviewer;
+  }
+  get date() {
+    return this._date;
+  }
+  get signature() {
+    return this._signature;
+  }
+  get referenceArtifacts() {
+    return this._referenceArtifacts;
+  }
+  get tolerances() {
+    return this._tolerances;
+  }
 
   isReleaseReady() {
-    return this._maturity === ValidationMaturity.RELEASED && Boolean(this._reviewer) && Boolean(this._signature);
+    // Record fields are caller supplied. A non-empty signature string is not
+    // evidence that a review package was cryptographically verified.
+    return false;
   }
 
   toJSON() {

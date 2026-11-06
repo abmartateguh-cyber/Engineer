@@ -1,0 +1,110 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "inception-direct/mercury-3",
+  "default_agent": "mercury-industrial-supervisor",
+  "share": "disabled",
+  "warming": false,
+  "policies": [
+    { "action": "provider.use", "resource": "*", "effect": "deny" },
+    { "action": "provider.use", "resource": "inception-direct", "effect": "allow" }
+  ],
+  "instructions": ["PROJECT-CONTEXT.md", "docs/industrialization/mercury_inception/ENGINEERING_PROTOCOL.md"],
+  "providers": {
+    "inception-direct": {
+      "name": "Inception direct — Mercury 3 High",
+      "env": ["INCEPTION_API_KEY"],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.inceptionlabs.ai/v1",
+        "apiKey": "{env:INCEPTION_API_KEY}",
+        "transport": "http",
+        "encoding": "none",
+        "timeout": 600000
+      },
+      "models": {
+        "mercury-3": {
+          "modelID": "mercury-3",
+          "name": "Mercury 3 — Inception direct (High reasoning)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"],
+            "reasoning": { "supported": true, "effort": ["high"] }
+          },
+          "compatibility": { "maxTokensField": "max_completion_tokens" },
+          "limit": { "context": 1000000, "output": 131072 },
+          "body": { "reasoning_effort": "high" },
+          "variants": [
+            {
+              "id": "high",
+              "body": { "reasoning_effort": "high" }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "agents": {
+    "mercury-industrial-supervisor": {
+      "description": "Orchestrates evidence-gated OmniEng industrialization, delegates Mercury tasks, and verifies integration",
+      "mode": "primary",
+      "model": "inception-direct/mercury-3#high",
+      "system": "{file:.opencode/prompts/mercury-industrial-supervisor.md}",
+      "permissions": [
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "mercury-industrial-worker", "effect": "allow" },
+        { "action": "subagent", "resource": "mercury-industrial-reviewer", "effect": "allow" },
+        { "action": "subagent", "resource": "mercury-industrial-corrector", "effect": "allow" }
+      ]
+    },
+    "mercury-industrial-worker": {
+      "description": "Implements one assigned engineering workstream with exclusive file ownership and reproducible evidence",
+      "mode": "subagent",
+      "model": "inception-direct/mercury-3#high",
+      "system": "{file:.opencode/prompts/mercury-industrial-worker.md}",
+      "permissions": [{ "action": "subagent", "resource": "*", "effect": "deny" }]
+    },
+    "mercury-industrial-reviewer": {
+      "description": "Independently reviews engineering results, benchmark identity, mathematics, and regressions without editing",
+      "mode": "subagent",
+      "model": "inception-direct/mercury-3#high",
+      "system": "{file:.opencode/prompts/mercury-industrial-reviewer.md}",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "mercury-industrial-corrector": {
+      "description": "Diagnoses and corrects independently verified cross-domain defects under the supervisor's file assignment",
+      "mode": "subagent",
+      "model": "inception-direct/mercury-3#high",
+      "system": "{file:.opencode/prompts/mercury-industrial-corrector.md}",
+      "permissions": [{ "action": "subagent", "resource": "*", "effect": "deny" }]
+    },
+    "title": { "model": "inception-direct/mercury-3#high" },
+    "summary": { "model": "inception-direct/mercury-3#high" },
+    "compaction": { "model": "inception-direct/mercury-3#high" }
+  },
+  "commands": {
+    "industrialize": {
+      "description": "Start or resume the evidence-gated Mercury 3 High (Inception direct) industrialization campaign",
+      "agent": "mercury-industrial-supervisor",
+      "model": "inception-direct/mercury-3#high",
+      "template": "{file:.opencode/prompts/industrialize-command.md}"
+    }
+  },
+  "permissions": [
+    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+    { "action": "shell", "resource": "git log *", "effect": "allow" },
+    { "action": "shell", "resource": "git commit *", "effect": "deny" },
+    { "action": "shell", "resource": "git reset *", "effect": "deny" },
+    { "action": "shell", "resource": "git clean *", "effect": "deny" },
+    { "action": "shell", "resource": "git push *", "effect": "deny" },
+    { "action": "read", "resource": "*.env*", "effect": "deny" },
+    { "action": "read", "resource": "*auth.json", "effect": "deny" },
+    { "action": "edit", "resource": "*.env*", "effect": "deny" }
+  ]
+}

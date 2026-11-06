@@ -1,0 +1,164 @@
+{
+  "plantChemicalsAndCatalysts": {
+    "solvents": [
+      {
+        "id": "SOLV-01",
+        "name": "Activated MDEA (aMDEA)",
+        "chemicalFormula": "C5H13NO2 (MDEA) + C4H10N2 (Piperazine)",
+        "casNumber": "105-59-9 / 110-85-0",
+        "unit": "Unit 20 - Acid Gas Removal (AGRU)",
+        "composition": "45.0 wt% MDEA + 5.0 wt% Piperazine + 50.0 wt% Demin Water",
+        "purpose": "Simultaneous removal of CO2 (< 50 ppmv) and H2S (< 4 ppmv) from high-pressure natural gas",
+        "initialChargeTonnes": 450.0,
+        "makeupRateTonnesPerYear": 35.0,
+        "operatingTemperatureRangeC": [45.0, 125.0],
+        "operatingPressureRangeBarg": [1.5, 68.0],
+        "regenerationHeatDutyKJPerKgCO2": 3200.0,
+        "handlingAndSafety": "Mild alkaline, non-flammable, handle with nitrile gloves and safety goggles. Biodegradable."
+      },
+      {
+        "id": "SOLV-02",
+        "name": "Triethylene Glycol (TEG)",
+        "chemicalFormula": "C6H14O4",
+        "casNumber": "112-27-6",
+        "unit": "Unit 20 / Upstream Dehydration",
+        "composition": "99.5 wt% lean TEG",
+        "purpose": "Intermediate dehydration and hydrate prevention during upset scenarios",
+        "initialChargeTonnes": 65.0,
+        "makeupRateTonnesPerYear": 8.5,
+        "operatingTemperatureRangeC": [35.0, 204.0],
+        "operatingPressureRangeBarg": [0.1, 70.0],
+        "handlingAndSafety": "Low toxicity, hygroscopic liquid, flash point 177 °C."
+      }
+    ],
+    "adsorbents": [
+      {
+        "id": "ADS-01",
+        "name": "Molecular Sieve Type 4A",
+        "chemicalFormula": "Na12[(AlO2)12(SiO2)12] . xH2O",
+        "casNumber": "70955-01-0",
+        "unit": "Unit 40 - Gas Dehydration",
+        "form": "1.6 - 2.5 mm spherical extrudates / beads",
+        "bulkDensityKgM3": 720.0,
+        "poreDiameterAngstrom": 4.0,
+        "purpose": "Ultra-deep gas dehydration down to < 0.1 ppmv H2O to prevent cryogenic ice and hydrate blockages at -162 °C",
+        "adsorptionCapacityWtPercent": 14.5,
+        "initialChargeTonnes": 180.0,
+        "regenerationTemperatureC": 260.0,
+        "serviceLifeYears": 4.0,
+        "handlingAndSafety": "Inert aluminosilicate ceramic, dust inhalation protection required during loading."
+      },
+      {
+        "id": "ADS-02",
+        "name": "Mercury Guard Bed Adsorbent",
+        "chemicalFormula": "C (Activated Carbon) + S (Elemental Sulfur)",
+        "casNumber": "7440-44-0 / 7704-34-9",
+        "unit": "Unit 40 - Mercury Removal",
+        "form": "3 - 4 mm extruded cylindrical pellets",
+        "sulfurContentWtPercent": 12.0,
+        "bulkDensityKgM3": 560.0,
+        "purpose": "Chemisorptive removal of elemental mercury vapor from natural gas down to < 0.01 ug/Nm3 (forms HgS cinnabar) to prevent liquid metal embrittlement of aluminum MCHE brazed fins",
+        "initialChargeTonnes": 65.0,
+        "serviceLifeYears": 5.0,
+        "handlingAndSafety": "Non-regenerable, spent material is classified as stable non-leachable metal sulfide waste."
+      }
+    ],
+    "catalysts": [
+      {
+        "id": "CAT-01",
+        "name": "Claus Stage 1 Titania-Promoted Catalyst",
+        "chemicalFormula": "Al2O3 + TiO2",
+        "casNumber": "1344-28-1 / 13463-67-7",
+        "unit": "Unit 30 - Sulfur Recovery (Claus)",
+        "composition": "85.0 wt% gamma-Al2O3 + 15.0 wt% TiO2",
+        "form": "3 - 5 mm spheres, surface area > 280 m2/g",
+        "purpose": "Converts H2S and SO2 to elemental sulfur while hydrolyzing COS and CS2 at 320 °C",
+        "initialChargeTonnes": 30.0,
+        "serviceLifeYears": 4.0
+      },
+      {
+        "id": "CAT-02",
+        "name": "Claus Stage 2 Standard Activated Alumina Catalyst",
+        "chemicalFormula": "Al2O3",
+        "casNumber": "1344-28-1",
+        "unit": "Unit 30 - Sulfur Recovery (Claus)",
+        "composition": "99.0 wt% activated gamma-Al2O3",
+        "form": "4 - 6 mm high-porosity spheres",
+        "purpose": "High-conversion Claus reaction (2 H2S + SO2 <-> 3 S + 2 H2O) at 220 °C near dew point",
+        "initialChargeTonnes": 60.0,
+        "serviceLifeYears": 4.0
+      },
+      {
+        "id": "CAT-03",
+        "name": "SCOT Tail Gas Hydrogenation Catalyst",
+        "chemicalFormula": "CoO-MoO3 on Al2O3",
+        "casNumber": "1308-06-1 / 1313-27-5 / 1344-28-1",
+        "unit": "Unit 35 - Tail Gas Treating Unit (SCOT)",
+        "composition": "3.5 wt% CoO + 13.0 wt% MoO3 on porous Al2O3 support",
+        "form": "1.3 mm trilobe extrudates",
+        "purpose": "Catalytic hydrogenation of all unconverted SO2, Sx, COS, and CS2 to H2S at 280 °C with H2 make-up",
+        "initialChargeTonnes": 28.0,
+        "serviceLifeYears": 5.0
+      }
+    ],
+    "refrigerants": [
+      {
+        "id": "REFR-01",
+        "name": "High-Purity Propane (R-290)",
+        "chemicalFormula": "C3H8",
+        "casNumber": "115-07-1",
+        "unit": "Unit 60 - Precooling Refrigeration Loop",
+        "purityMolPercent": 99.5,
+        "purpose": "Chills treated feed gas and mixed refrigerant down from +35 °C to -35 °C across 3 pressure stages",
+        "initialChargeTonnes": 320.0,
+        "makeupRateTonnesPerYear": 15.0,
+        "operatingTemperaturesC": [-35.0, -10.0, 15.0],
+        "operatingPressuresBarg": [0.35, 2.4, 6.5]
+      },
+      {
+        "id": "REFR-02",
+        "name": "Mixed Refrigerant (MR) Working Fluid",
+        "chemicalFormula": "CH4 + C2H6 + C3H8 + N2",
+        "unit": "Unit 60 - Liquefaction & Subcooling Loop",
+        "compositionMolPercent": {
+          "nitrogen": 8.0,
+          "methane": 42.0,
+          "ethane": 45.0,
+          "propane": 5.0
+        },
+        "purpose": "Continuous boiling multicomponent refrigerant evaporating from -35 °C to -162 °C inside the Main Cryogenic Heat Exchanger (MCHE)",
+        "initialChargeTonnes": 140.0,
+        "makeupSourcedFrom": "On-site NGL fractionation and Nitrogen ASU"
+      }
+    ],
+    "utilityChemicals": [
+      {
+        "id": "UTIL-01",
+        "name": "Sodium Hypochlorite (Electrochlorination)",
+        "chemicalFormula": "NaOCl",
+        "casNumber": "7681-52-9",
+        "unit": "Unit 95 - Seawater Cooling Intake",
+        "dosingRatePpm": 1.5,
+        "purpose": "Prevents marine biofouling (mussels, barnacles, algae) in the 60,000 m3/h seawater intake and ORV tubes"
+      },
+      {
+        "id": "UTIL-02",
+        "name": "Diethylhydroxylamine (DEHA) Oxygen Scavenger",
+        "chemicalFormula": "(C2H5)2NOH",
+        "casNumber": "3710-84-7",
+        "unit": "Unit 90 - Boiler Feedwater System",
+        "dosingRateGPerTonSteam": 25.0,
+        "purpose": "Eliminates dissolved oxygen in 45 barg boiler feedwater to prevent pitting in HRSG tubes"
+      },
+      {
+        "id": "UTIL-03",
+        "name": "Tetrahydrothiophene (THT) Odorant",
+        "chemicalFormula": "C4H8S",
+        "casNumber": "110-01-0",
+        "unit": "Unit 80 - Regasification Export",
+        "dosingRateMgNm3": 15.0,
+        "purpose": "Provides standardized warning odor for export natural gas pipeline distribution per ISO 13734"
+      }
+    ]
+  }
+}

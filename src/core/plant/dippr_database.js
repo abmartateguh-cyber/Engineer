@@ -2,19 +2,30 @@
  * Experimental plant-property calculations and a legacy component example set.
  *
  * Provides:
- * 1. Temperature-dependent DIPPR correlation equations:
+ * 1. Temperature-dependent DIPPR-style correlation equations evaluated from
+ *    explicit caller-supplied coefficient records:
  *    - Extended Antoine (DIPPR 101): Vapor pressure P_vap(T)
  *    - Rackett (DIPPR 105): Liquid density rho_L(T)
  *    - Hyperbolic Ideal Gas Heat Capacity (DIPPR 107): Cp0(T)
  *    - Exponential Liquid Viscosity (DIPPR 102): mu_L(T)
  *    - Polynomial Liquid Thermal Conductivity (DIPPR 100): k_L(T)
- * 2. Caller-supplied property records; no component catalog is bundled.
- * 3. Experimental 3-Phase Vapor-Liquid-Liquid Equilibrium (VLLE) Flash calculation.
+ * 2. The documented correlation-based species engine (see thermo_compounds.js):
+ *    a real, cited pure-component property catalog of core chemical species,
+ *    labeled as a correlation set built from public literature - NOT a licensed
+ *    AIChE DIPPR 801 data product.
+ * 3. Caller-supplied property records; the experimental legacy catalog is empty.
+ * 4. Experimental 3-Phase Vapor-Liquid-Liquid Equilibrium (VLLE) Flash calculation.
  *
  * This file does not contain or represent an AIChE DIPPR 801 data product.
  */
 
 'use strict';
+
+const {
+  CorrelationPropertyComponent,
+  CorrelationSpeciesCatalog,
+  DOCUMENTED_CORRELATION_SET
+} = require('./thermo_compounds');
 
 function requirePositiveTemperature(temperatureK, propertyName) {
   if (!Number.isFinite(temperatureK) || temperatureK <= 0) {
@@ -465,6 +476,11 @@ module.exports = {
   ExperimentalPropertyComponent,
   ExperimentalPropertyDatabase,
   EXPERIMENTAL_SPECIES_DATA,
+  CorrelationPropertyComponent,
+  CorrelationSpeciesCatalog,
+  CorrelationPropertyDatabase: CorrelationSpeciesCatalog,
+  DOCUMENTED_CORRELATION_SET,
+  THERMO_COMPOUNDS: DOCUMENTED_CORRELATION_SET,
   // Deprecated import aliases retained for existing integrations. These names
   // do not indicate that the included values came from AIChE DIPPR 801.
   DIPPRComponent: ExperimentalPropertyComponent,

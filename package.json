@@ -1,23 +1,32 @@
 {
   "name": "engineering-engine",
   "version": "1.0.0",
-  "description": "OmniEng \u2014 experimental engineering workbench for CAD, CAE, EDA, optics, plant, controls, and aerospace examples",
+  "description": "OmniEng — experimental engineering workbench for CAD, CAE, EDA, optics, plant, controls, and aerospace examples",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "start:web": "node src/main/workstation_web_server.js",
+    "start:web:open": "node scripts/start_web_open.js",
     "test": "node scripts/run_tests_clean.js",
+    "test:clean": "node scripts/run_tests_clean.js",
     "test:ui": "electron . --test-ui",
     "test:vv": "node test/vv/run_vv.js",
     "test:experimental": "node test/vv/suite_100_gold_benchmarks.js",
     "test:poisson-budget": "node scripts/run_poisson_budget.js",
+    "test:coverage": "node scripts/run_coverage.js",
     "report:vv": "node scripts/generate_vv_report.js",
     "solver:headless": "node src/main/headless_solver_daemon.js",
     "check:ipc": "node scripts/check_ipc.js",
+    "check:determinism": "node scripts/check_determinism.js",
     "check:syntax": "node scripts/check_syntax.js",
     "coverage": "node scripts/run_coverage.js",
+    "test:ci-matrix": "node scripts/run_local_ci_matrix.js",
+    "test:soak": "node --expose-gc scripts/run_soak_test.js",
+    "qualify": "node scripts/run_tool_qualification.js",
     "lint": "eslint .",
     "typecheck": "tsc --pretty false",
-    "format:check": "prettier --check .github/workflows/ci.yml package.json .prettierrc.json eslint.config.mjs tsconfig.json preload.js main.js scripts/check_syntax.js scripts/check_renderer_sinks.js src/core/aerospace/nasa_rocket_propulsion.js src/core/ai/omni_ai_engine.js test/test_nasa_rocket_propulsion.js test/test_anatomy_craft_parity.js scripts/run_poisson_budget.js scripts/coverage_threshold.js scripts/generate_vv_report.js scripts/generate_sbom.js scripts/run_coverage.js scripts/run_tests_clean.js src/core/maturity/feature_maturity.js src/core/contracts/engine_registry.js src/core/cad/geometry_engine_adapter.js src/core/cae/fea_engine_adapter.js src/core/cae/cfd_engine_adapter.js src/core/controls/controls_engine_adapter.js src/core/eda/eda_engine_adapter.js src/core/optics/optics_engine_adapter.js src/core/plant/plant_engine_adapter.js src/core/plant/naphtali_sandholm_mesh.js src/core/plant/vle_envelope.js src/core/cam/cam_engine_adapter.js src/core/aerospace/aerospace_engine_adapter.js src/core/security/enterprise_iam.js src/core/compliance/tool_qualification_kit.js src/core/compliance/asme_section_viii_div2.js src/core/hpc/cloud_cluster.js src/core/optics/optical_glass_catalog.js src/core/plant/dippr_database.js src/core/plant/peng_robinson_eos.js src/main/ipc/plant_ipc.js src/core/vv/*.js src/core/math/poisson_2d_direct.js src/main/compute_host.js src/main/headless_solver_daemon.js src/main/ipc/cae_schemas.js src/main/ipc/cae_ipc.js src/main/ipc/cad_schemas.js src/main/ipc/cad_ipc.js src/main/ipc/system_ipc.js src/core/cad/drafting_2d.js src/core/cae/prism_layer_mesher.js src/core/cae/thermal_cht.js src/core/eda/drc_engine.js src/core/eda/mcmm_sta_engine.js src/core/math/worker_pool.js src/ui/app.js src/ui/bode_chart_model.js src/ui/eda_result_view.js src/ui/engineering_result_view.js src/ui/workspace_tab_view.js src/ui/measurement_hud_view.js src/ui/command_palette_view.js src/ui/property_grid_view.js src/ui/panel_host.js src/ui/safe_dom.js src/ui/viewport3d.js src/core/cae/transient_drop_animator.js test/test_gold_benchmarks.js test/test_gold_benchmarks_2.js test/test_gold_benchmarks_3.js test/test_phase5_upgrade.js test/test_phase7_dippr_plant.js test/run_all_tests.js test/test_engine_registry.js test/test_plant_engine_adapter.js test/test_deepened_adapters.js test/test_bode_ui_contract.js test/test_eda_result_view.js test/test_engineering_result_view.js test/test_workspace_tab_view.js test/test_measurement_hud_view.js test/test_command_palette_view.js test/test_property_grid_view.js test/test_production_import_boundary.js test/test_vv_status_contract.js test/test_preload_compatibility.js test/test_phase4_upgrade.js test/test_phase6_optics_polarization.js test/test_phase9_enterprise_security.js test/vv/run_vv.js test/vv/nafems/*.js test/vv/nasa_tmr/*.js test/vv/nist_matrix/*.js test/vv/optics/*.js test/vv/suite_100_gold_benchmarks.js test/test_phase10_hpc_daemon.js test/test_new_industrial_engines.js test/support/*.js docs/security/threat_model.md docs/known_limitations.md docs/data_provenance.md docs/third_party_notices.md docs/industrialization/code-reduction-review.md docs/industrialization/status.md docs/industrialization/decisions/*.md",
+    "format:check": "prettier --check .github/workflows/ci.yml package.json .prettierrc.json eslint.config.mjs tsconfig.json preload.js main.js scripts/check_syntax.js scripts/check_renderer_sinks.js src/core/aerospace/nasa_rocket_propulsion.js src/core/ai/omni_ai_engine.js test/test_nasa_rocket_propulsion.js test/test_anatomy_craft_parity.js scripts/run_poisson_budget.js scripts/coverage_threshold.js scripts/generate_vv_report.js scripts/generate_sbom.js scripts/run_coverage.js scripts/run_tests_clean.js src/core/maturity/feature_maturity.js src/core/contracts/engine_registry.js src/core/pdm/pdm_engine_adapter.js src/core/hpc/hpc_engine_adapter.js src/core/cad/geometry_engine_adapter.js src/core/cae/fea_engine_adapter.js src/core/cae/cfd_engine_adapter.js src/core/controls/controls_engine_adapter.js src/core/eda/eda_engine_adapter.js src/core/optics/optics_engine_adapter.js src/core/plant/plant_engine_adapter.js src/core/plant/iapws_if97.js src/core/plant/naphtali_sandholm_mesh.js src/core/plant/vle_envelope.js src/core/cam/cam_engine_adapter.js src/core/aerospace/aerospace_engine_adapter.js src/core/security/enterprise_iam.js src/core/security/ipc_validator.js src/core/compliance/tool_qualification_kit.js src/core/compliance/asme_section_viii_div2.js src/core/hpc/cloud_cluster.js src/core/optics/optical_glass_catalog.js src/core/plant/dippr_database.js src/core/plant/peng_robinson_eos.js src/main/ipc/plant_ipc.js src/core/vv/*.js src/core/vv/reference_benchmarks.json src/main/stenographer_supervisor.js bin/stenographer.js src/core/robotics/robotics_engine_adapter.js src/core/robotics/serial_manipulator_kinematics.js src/core/math/poisson_2d_direct.js src/main/compute_host.js src/main/headless_solver_daemon.js src/main/ipc/cae_schemas.js src/main/ipc/cae_ipc.js src/main/ipc/cad_schemas.js src/main/ipc/cad_ipc.js src/main/ipc/system_ipc.js src/core/cad/drafting_2d.js src/core/cae/prism_layer_mesher.js src/core/cae/thermal_cht.js src/core/eda/drc_engine.js src/core/eda/mcmm_sta_engine.js src/core/math/worker_pool.js src/ui/app.js src/ui/bode_chart_model.js src/ui/eda_result_view.js src/ui/engineering_result_view.js src/ui/workspace_tab_view.js src/ui/measurement_hud_view.js src/ui/command_palette_view.js src/ui/property_grid_view.js src/ui/panel_host.js src/ui/safe_dom.js src/ui/viewport3d.js src/core/cae/transient_drop_animator.js test/test_gold_benchmarks.js test/test_gold_benchmarks_2.js test/test_gold_benchmarks_3.js test/test_phase5_upgrade.js test/test_phase7_dippr_plant.js test/run_all_tests.js test/test_industrial_e2e_stack.js test/test_stenographer_daemon_lifecycle.js test/test_robotics_contract.js test/test_hil_telemetry_contract.js test/test_engine_registry.js test/test_plant_engine_adapter.js test/test_deepened_adapters.js test/test_bode_ui_contract.js test/test_eda_result_view.js test/test_engineering_result_view.js test/test_workspace_tab_view.js test/test_measurement_hud_view.js test/test_command_palette_view.js test/test_property_grid_view.js test/test_production_import_boundary.js test/test_ui_smoke_contract.js test/test_vv_status_contract.js test/test_preload_compatibility.js test/test_phase4_upgrade.js test/test_phase6_optics_polarization.js test/test_phase9_enterprise_security.js test/vv/run_vv.js test/vv/nafems/*.js test/vv/nasa_tmr/*.js test/vv/nist_matrix/*.js test/vv/optics/*.js test/vv/suite_100_gold_benchmarks.js test/fuzz/*.js test/test_phase10_hpc_daemon.js test/test_new_industrial_engines.js test/support/*.js docs/security/threat_model.md docs/known_limitations.md docs/data_provenance.md docs/third_party_notices.md docs/industrialization/code-reduction-review.md docs/industrialization/status.md docs/industrialization/decisions/*.md src/main/ipc/define_handler.js src/main/ipc/index.js test/test_coverage_*.js",
+    "format:check:review": "prettier --check scripts/generate_capability_matrix.js scripts/generate_vv_report.js src/core/cam/cnc_toolpath_engine.js test/test_capability_matrix_contract.js test/test_vv_report_generator.js test/test_fvm_turbulence_stability.js test/test_shared_contracts.js test/test_vv_status_contract.js test/test_engine_registry.js test/test_aerospace_cam_adapters.js test/test_coverage_engine_adapters.js test/test_coverage_simulink_controls_ai.js test/test_coverage_main_ipc.js test/test_new_industrial_engines.js docs/industrialization/reference_registry.md docs/industrialization/status.md docs/industrialization/certification/evidence_ledger.md docs/industrialization/vv_verification_evidence.md docs/industrialization/certification/do330_tql_dossier.md docs/industrialization/certification/iso26262_safety_case.md docs/industrialization/security_posture.md docs/industrialization/packaging_report.md docs/industrialization/mercury_inception/README.md docs/industrialization/mercury_inception/SETUP_VERIFICATION.md docs/industrialization/mercury_inception/IMPLEMENTATION_PLAN.md docs/industrialization/mercury_inception/WORKSTREAM_COMPLETENESS.md docs/known_limitations.md docs/third_party_notices.md",
     "dependency:audit": "npm audit --audit-level=high",
     "sbom": "node scripts/generate_sbom.js",
     "pack": "electron-builder --dir",
@@ -34,14 +43,14 @@
     "eda",
     "fea",
     "cfd",
-    "simulink",
+    "controls",
     "engineering-engine",
     "electron"
   ],
   "author": "OmniEng Engineering Systems",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
-    "electron": "^45.0.0",
+    "electron": "43.8.6",
     "electron-builder": "^26.5.0",
     "eslint": "^9.39.5",
     "globals": "^17.13.0",
@@ -52,6 +61,7 @@
     "three": "^0.186.1"
   },
   "overrides": {
+    "minimatch": "^11.0.1",
     "sprintf-js": "^1.1.3"
   }
 }

@@ -14,7 +14,55 @@ const { DiffractionPSFMTFEngine } = require('../../core/optics/diffraction_psf_m
 const { DampedLeastSquaresOptimizer } = require('../../core/optics/damped_least_squares_optimizer');
 const { Vector3 } = require('../../core/math/linear_algebra');
 const { ZemaxZmxImporter } = require('../../core/optics/zmx_importer');
+const { OpticalGlassCatalog } = require('../../core/optics/optical_glass_catalog');
 const { PolarizationRayTracer, Complex, JonesVector } = require('../../core/optics/polarization_ray_tracer');
+const { defaultEngineRegistry } = require('../../core/contracts/engine_registry');
+const { JobRequest } = require('../../core/contracts/JobRequest');
+
+const OPTICAL_TOLERANCING_SCHEMA = Object.freeze({
+  type: 'object',
+  optional: true,
+  additionalProperties: false,
+  properties: {
+    nominalSystem: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        entrancePupilRadius: { type: 'number', min: Number.MIN_VALUE },
+        surfaces: {
+          type: 'array',
+          minItems: 2,
+          maxItems: 128,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              radius: { type: 'number' },
+              curvature: { type: 'number' },
+              thickness: { type: 'number', min: 0 },
+              refractiveIndex: { type: 'number', min: Number.MIN_VALUE }
+            }
+          }
+        }
+      }
+    },
+    toleranceDefs: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 512,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          surfaceIndex: { type: 'number', integer: true, min: 0 },
+          type: { type: 'string', enum: ['RADIUS', 'THICKNESS', 'INDEX'] },
+          tolerance: { type: 'number', min: Number.MIN_VALUE }
+        }
+      }
+    },
+    options: { type: 'object' }
+  }
+});
 
 const OPTICAL_SURFACE_SCHEMA = Object.freeze({
   type: 'object',
@@ -250,6 +298,60 @@ const POLARIZATION_TRACE_SCHEMA = Object.freeze({
     EyImag: { type: 'number' }
   }
 });
+
+const SHARED_GLASS_CATALOG = OpticalGlassCatalog.fromBundledData();
+
+function runOpticsGlassLookup(params = {}) {
+  const query = typeof params.query === 'string' ? params.query.trim().toUpperCase() : '';
+  const wavelengthsUm = Array.isArray(params.wavelengthsUm) ? params.wavelengthsUm : null;
+  const results = [];
+  const names = Array.from(SHARED_GLASS_CATALOG.database.keys()).sort();
+  for (const name of names) {
+    if (query && !name.includes(query)) continue;
+    const record = SHARED_GLASS_CATALOG.getGlass(name);
+    if (!record || record.formula !== 'sellmeier1') continue;
+    let properties;
+    try {
+      properties = SHARED_GLASS_CATALOG.getOpticalProperties(record, 20);
+    } catch {
+      continue;
+    }
+    const entry = {
+      name: record.name,
+      supplier: record.supplier,
+      type: record.type,
+      family: record.family,
+      dataStatus: record.dataStatus,
+      validationStatus: record.validationStatus,
+      provenance: record.provenance || null,
+      sellmeier: { B: record.B, C: record.C },
+      nd: properties.nd,
+      Abbe_Vd: properties.Abbe_Vd,
+      dndTPerK: record.dndTPerK,
+      referenceTemperatureC: record.referenceTemperatureC
+    };
+    if (wavelengthsUm) {
+      entry.spectrum = wavelengthsUm.map((wavelengthUm) => {
+        try {
+          return {
+            wavelengthUm,
+            index: SHARED_GLASS_CATALOG.calculateIndex(record, wavelengthUm, 20)
+          };
+        } catch {
+          return { wavelengthUm, index: null };
+        }
+      });
+    }
+    results.push(entry);
+    if (results.length >= 24) break;
+  }
+  return {
+    success: true,
+    validationLevel: 'experimental',
+    count: results.length,
+    glasses: results
+  };
+}
 
 function getOpticalGlassCatalogUnavailableResult() {
   return {
@@ -530,6 +632,11 @@ function runPolarizationTrace(params) {
   );
 }
 
+const MAX_DLS_SURFACES = 128;
+const MAX_DLS_VARIABLES = 256;
+const MAX_DLS_OPERANDS = 512;
+const MAX_DLS_ITERATIONS = 5000;
+
 function runOpticalDLS(params = {}) {
   try {
     if (!params.system || !Array.isArray(params.system.surfaces) || params.system.surfaces.length < 2) {
@@ -538,11 +645,73 @@ function runOpticalDLS(params = {}) {
         error: { code: 'INVALID_INPUT', message: 'Supply a caller-provided optical system with at least two surfaces.' }
       };
     }
+    if (params.system.surfaces.length > MAX_DLS_SURFACES) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: `The optical system is limited to ${MAX_DLS_SURFACES} surfaces.`
+        }
+      };
+    }
+    for (let i = 0; i < params.system.surfaces.length; i++) {
+      const surface = params.system.surfaces[i];
+      if (!surface || typeof surface !== 'object' || Array.isArray(surface)) {
+        return {
+          success: false,
+          error: {
+            code: 'INVALID_INPUT',
+            message: `system.surfaces[${i}] must be an object.`
+          }
+        };
+      }
+      for (const key of ['radius', 'curvature', 'thickness', 'refractiveIndex']) {
+        if (surface[key] !== undefined && (typeof surface[key] !== 'number' || !Number.isFinite(surface[key]))) {
+          return {
+            success: false,
+            error: {
+              code: 'INVALID_INPUT',
+              message: `system.surfaces[${i}].${key} must be a finite number.`
+            }
+          };
+        }
+      }
+    }
     if (!Array.isArray(params.variables) || params.variables.length === 0) {
       return {
         success: false,
         error: { code: 'INVALID_INPUT', message: 'Supply at least one bounded optimization variable.' }
       };
+    }
+    if (params.variables.length > MAX_DLS_VARIABLES) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: `The optimizer is limited to ${MAX_DLS_VARIABLES} variables.`
+        }
+      };
+    }
+    for (const variable of params.variables) {
+      if (
+        !variable ||
+        typeof variable !== 'object' ||
+        Array.isArray(variable) ||
+        (variable.surfaceIndex !== undefined &&
+          (!Number.isInteger(variable.surfaceIndex) ||
+            variable.surfaceIndex < 0 ||
+            variable.surfaceIndex >= params.system.surfaces.length)) ||
+        (variable.min !== undefined && (typeof variable.min !== 'number' || !Number.isFinite(variable.min))) ||
+        (variable.max !== undefined && (typeof variable.max !== 'number' || !Number.isFinite(variable.max)))
+      ) {
+        return {
+          success: false,
+          error: {
+            code: 'INVALID_INPUT',
+            message: 'Each optimization variable requires bounded finite min/max values.'
+          }
+        };
+      }
     }
     if (!Array.isArray(params.operands) || params.operands.length === 0) {
       return {
@@ -550,8 +719,31 @@ function runOpticalDLS(params = {}) {
         error: { code: 'INVALID_INPUT', message: 'Supply at least one explicit merit operand.' }
       };
     }
+    if (params.operands.length > MAX_DLS_OPERANDS) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: `The optimizer is limited to ${MAX_DLS_OPERANDS} operands.`
+        }
+      };
+    }
     if (!params.options || typeof params.options !== 'object' || Array.isArray(params.options)) {
       return { success: false, error: { code: 'INVALID_INPUT', message: 'Supply all optimizer controls explicitly.' } };
+    }
+    if (
+      params.options.maxIterations !== undefined &&
+      (!Number.isInteger(params.options.maxIterations) ||
+        params.options.maxIterations < 1 ||
+        params.options.maxIterations > MAX_DLS_ITERATIONS)
+    ) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: `options.maxIterations must be an integer from 1 through ${MAX_DLS_ITERATIONS}.`
+        }
+      };
     }
 
     const optimizer = new DampedLeastSquaresOptimizer(params.options);
@@ -839,21 +1031,88 @@ function registerOpticsIpc() {
     }
   );
 
-  // 13. Unavailable optical tolerancing compatibility endpoint
+  // 13. Optical tolerancing via the Optics engine adapter
   defineHandler(
     'omni:run-optical-tolerancing',
-    {
-      type: 'object',
-      optional: true
+    OPTICAL_TOLERANCING_SCHEMA,
+    async (event, params = {}) => {
+      const system = params.nominalSystem;
+      if (!system || !Array.isArray(system.surfaces) || system.surfaces.length < 2) {
+        return invalidOpticalInput(
+          'Supply a nominal optical system with at least two surfaces (nominalSystem.surfaces).'
+        );
+      }
+      if (!Array.isArray(params.toleranceDefs) || params.toleranceDefs.length === 0) {
+        return invalidOpticalInput('Supply at least one explicit tolerance definition (toleranceDefs).');
+      }
+      if (!params.options || typeof params.options !== 'object' || Array.isArray(params.options)) {
+        return invalidOpticalInput('Supply all optimizer controls explicitly (options).');
+      }
+      if (
+        params.options.trials !== undefined &&
+        (!Number.isInteger(params.options.trials) || params.options.trials < 1 || params.options.trials > 20000)
+      ) {
+        return invalidOpticalInput('options.trials must be an integer from 1 through 20000.');
+      }
+      if (
+        params.options.maxIterations !== undefined &&
+        (!Number.isInteger(params.options.maxIterations) ||
+          params.options.maxIterations < 1 ||
+          params.options.maxIterations > 5000)
+      ) {
+        return invalidOpticalInput('options.maxIterations must be an integer from 1 through 5000.');
+      }
+      try {
+        const jobResult = await defaultEngineRegistry.dispatch(
+          new JobRequest({
+            domain: 'optics',
+            operation: 'run_optical_tolerancing',
+            parameters: params
+          })
+        );
+        return {
+          success: true,
+          validationLevel: 'experimental',
+          jobId: jobResult.jobId,
+          ...(jobResult.outputData || {})
+        };
+      } catch (error) {
+        return invalidOpticalInput(error.message);
+      }
     },
-    async () => getOpticalTolerancingUnavailableResult(),
     {
       domain: 'optics',
-      description: 'Unavailable pending a sourced optical prescription, reviewed tolerances, and independent validation'
+      description:
+        'Run explicit-input Monte Carlo optical tolerancing with refocus compensation through the Optics engine adapter (run_optical_tolerancing)'
     }
   );
 
-  // 14. Withdrawn synthetic camera-lens example
+  // 14. Read-only bundled optical glass catalog lookup (Sellmeier, nd/Vd, n(lambda)).
+  defineHandler(
+    'omni:optics-glass-lookup',
+    {
+      type: 'object',
+      optional: true,
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', maxLength: 100 },
+        wavelengthsUm: {
+          type: 'array',
+          minItems: 2,
+          maxItems: 64,
+          items: { type: 'number', min: Number.MIN_VALUE }
+        }
+      }
+    },
+    async (event, params = {}) => runOpticsGlassLookup(params),
+    {
+      domain: 'optics',
+      description:
+        'Return read-only bundled optical glass records with Sellmeier coefficients, nd/Vd, and computed n(lambda) samples'
+    }
+  );
+
+  // 15. Withdrawn synthetic camera-lens example
   defineHandler(
     'omni:get-camera-lens-master',
     {
@@ -877,6 +1136,7 @@ function registerOpticsIpc() {
 
 module.exports = {
   registerOpticsIpc,
+  runOpticsGlassLookup,
   runOpticalDLS,
   runZmxImport,
   runSkewRayTrace,

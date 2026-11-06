@@ -1,0 +1,333 @@
+{
+  "schema": "omnieng-release-candidate-manifest-1.0.0",
+  "product": {
+    "name": "OmniEng",
+    "releaseTrain": "R0",
+    "candidate": "rc-2026-11-04",
+    "version": "1.0.0"
+  },
+  "status": {
+    "integrity": "UNSIGNED-PENDING-OWNER",
+    "certification": "NOT-YET-CERTIFIED",
+    "tierAEngineeringGates": "PARTIAL",
+    "note": "Manifest digests are computed locally; no signature key material exists on this host. Tier B (notarization, hosted CI) and Tier C (independent assessor) remain PENDING-OWNER / PENDING-EXTERNAL."
+  },
+  "sbom": {
+    "cyclonedx": "1.5",
+    "path": "docs/sbom/omnieng-dependencies.cdx.json"
+  },
+  "artifacts": {
+    "package.json": "f772fa06c2a02e881530c8c9b1bdc5751ce9bc7848280a1c57bc8bf9c6dffe57",
+    "main.js": "24a3cade19fef2c0f1eab309fa5c0a87ba359d0b968c45a1b535aa56f878f8d6",
+    "preload.js": "dd7f94b1ffe2d04941ec618f81ff9ce1c244623e3807484e65339aca900e71c9",
+    "electron-builder.yml": "1435bdab8610d54c190327cb4209845802b86889f4cdb606f756b8dbef1445ea",
+    "src/main/workstation_web_server.js": "34c02ad51d95e75206b63bc570a8f0f6ae1e7db33e2bb47f0f4ff1c930909888",
+    "src/main/window_bounds.js": "dd4d8f829aef26426b6254ec251869aa69515980e05f9dd0fec4588ae400acdd",
+    "src/main/ipc/index.js": "7464ce5a92c5176b29abbb659cc2e06844bfa567424c92f058fe07c9f3ccfb6b",
+    "src/core/plant/api520_relief_valve.js": "743167148d6edd53affb24c9c0ff4f8d32398cbd0feb1d2bc69c2793890b3bbd",
+    "src/core/plant/psv_sizing_api520.js": "4afcfff3c40457ad2fd8d768570db0c7dfdf45c9ec2fac710c2813f447c79f72",
+    "src/core/cae/j2_plasticity.js": "763e72131839cb26fa39028931ed037ca83a29770155c7a4de8adda63692cb51",
+    "src/core/cae/continuum_plasticity_3d.js": "8eab8599017d798d36c66374ff70a8d545d30186cd2aa9073c82df6bc06395d8",
+    "src/core/cae/contact_fem_3d.js": "7cb79b14c6acb9954eda7fae116ba6fed741955986227403dfb00e29d3913ffa",
+    "src/core/eda/drc_engine.js": "b8ec29e822d09f46f1188fe55274a5be7934d99a4ff2c7973ba81fe2222402c6",
+    "src/core/pdm/pdm_lifecycle.js": "6372bfab528daa05771dd80e6eea14b7749fe7a917e364c8099080f1515a4615",
+    "src/core/compliance/immutable_audit_ledger.js": "c8ad59fcffc5fbc38abc7dd2f514852fd88706e771539eb29d0641afb52d8c67",
+    "scripts/run_fuzz_sharded.js": "f43d66141c9c4655b9079cbc1601cb6e3262b2f127adb47d2af1ce20c088e73b",
+    "scripts/run_tests_clean.js": "ea37a50af995635a9bce9c0057a8a3674f8114f4966d690c5d85b11e4d7aa6d3",
+    "docs/industrialization/certification/evidence_ledger.md": "ff324b253b32aca23a386047f5beaf223036be7fd9fdd218cad9ed132ad20d4b",
+    "docs/industrialization/certification/do330_tql_dossier.md": "97401c2be92a8ff4d3296727af96fdf7be0080ff9a7a715578fd4351c7ae1e11",
+    "docs/industrialization/certification/iso26262_safety_case.md": "05973d5691131c7183f398770721e12418bc8d72a47abc18007f2453d73ee34a",
+    "docs/industrialization/readiness_scorecard.md": "00e2ee7ddb263a9958000636d8d30c70b3685f2588cbf2e76f75c4961e21fb6d",
+    "docs/industrialization/packaging_report.md": "4ac92080e9942a01233826ae40824f8077b5030912b6cfa60ea33542a7796003",
+    "docs/sbom/omnieng-dependencies.cdx.json": "dc2a1436a64f0db8f61de9183402a68add4be9b02d8b005ce077cafbdd84a1b9",
+    "src/core/math/amg_solver.js": "493d9b1a4be55974dc2a22b8fb11c3d9f55de1830df6674e0f0fe4d418f24228",
+    "src/core/math/dae_solver.js": "a4eed1aad9a324216030c66c44bccb9a000a9376809cc26bdfa0a0d600177dad",
+    "src/core/cae/radiation_s2s_view_factors.js": "2aad4d201babd7fd69b11196fda79b8a03afefe0c236419f3ba0d4d94e435dfa",
+    "src/core/cae/multiphase_vof_cfd.js": "60b8328dbe0846046f4e9aaaed5088eb8a4ecfa8a29cc0d60a9e2993bcad6903",
+    "src/core/cae/radiation_dom.js": "e0507d447aea4170d2c08e2c5685363b1dce3a485aa3c6dd264dd2c3883c792c",
+    "src/core/cae/mesh_generator_3d.js": "c2594e22aaa791f75e77aa5dba77863657e2c7571174ec64b382fb3cfa7643fd",
+    "src/core/cae/convex_hull_tet_mesher_3d.js": "3d677c3fef1a9a0bb73577c68afafd4f641ae7c91ef0af50047ef1175c5eaa25",
+    "src/core/plant/activity_models_unifac_nrtl.js": "f5b0184fd4e411901ebc3bdac830c4ed700cbdf9e615b5bc6cce821308f6de7f",
+    "src/core/plant/rigorous_distillation_column.js": "99edf26b5d11db5ca12390906d93e8eeb3fdf17a90ae5224a312dec9982e6819",
+    "src/core/plant/piping_stress_caesar.js": "107d215f286c88c02961917a7bcffbfc120a827f8d794b0ca0bb5525601fdbf6",
+    "src/core/collaboration/crdt_model_sync.js": "8bb37525f407e0240455b2b44460fb1715d4ed62d294318df7a9f478d4a0ce3a",
+    "src/core/compliance/mcdc_test_harness.js": "26ca18a2535931ecb0ad4a45112f596c316f2e663e5fd6b83168f6c9c227cb9e",
+    "src/core/cam/cutting_physics.js": "0724ba5cdb4ccfbfcf3edfb7396ed6ffede83b613ebe72c09376848f84ec43b6",
+    "src/core/cad/fastener_catalog.js": "c7a74348a32473678ff7c4240891eefd2fdcaf4db070677708a71577fe06bace",
+    "src/core/cad/assembly_constraint_solver.js": "b9d2840d7dceede730c1a3209d4ad00c82aaf6785951ff5c68b632635accc208",
+    "src/core/cad/drafting_gdt.js": "ef91061e9b5b8f735627154dc8ccbceb894efeceb4efcfefe347cd16fa141020",
+    "src/core/cae/aeroacoustics_fwh.js": "9f03e9a5f14b6a922c451f0936113709bb5185f43659c4e5f6ae782c4b872d55",
+    "src/core/cae/hybrid_turbulence_des.js": "0d2e146abd6eece1c52faec28f47bd9ac6502e6b15ec3aabfd6788ded217de21",
+    "src/core/cae/conjugate_heat_transfer_radiation.js": "73356dbfdb9a3a55f15560529e08e5a6db579612ed3783f47446b9abdf9f9acf",
+    "src/core/cae/viscoplasticity_damage.js": "bc6c2701387c74ac58c6a86330984b043aef86bd836db76b051be1e45c7da61e",
+    "src/core/cae/nonlinear_continuum_fea.js": "5afe6412c81ff4f38fb11545c097720f9cb32d90ae0797e9c6980d2667e6aaf4",
+    "src/core/plant/nozzle_load_evaluator.js": "bd344e554911eb4a01e1b9cec383879901c8a06b9d7bb39ef3560d124b748b2f",
+    "src/core/plant/piping_isometric_generator.js": "bee35e99ea0452f28fea1b6910e89725146c8a65f24bfb294c80f533de7a3b90",
+    "src/core/plant/electrolyte_nrtl.js": "760f95fea987b411361d8d69824a28ddcc1c6c37491eea50cc5eebc54f4243e8",
+    "src/core/cad/assembly_motion_collision.js": "ce3041c5acf26a092d52bb7dbb67bef629118b8dff6e15bfb025c5f5a3750b6e",
+    "src/core/plant/piping_network_3d_router.js": "895c1d6d5f5da4dc741a8f5a9cb65dc6d80e259cdd6300bde81e91ca80b6ff1b",
+    "src/core/plant/pipe_support_selector.js": "095e885e22b9f0960dcdd892babcfd80aa92e612f3f40d762c5de127c8aaa8c6",
+    "src/core/plant/pipe_sizing_engine.js": "5978fa081a99fefeb92c10d27d4830ef9dd48453bacba65a8f9632f698407cc0",
+    "test/test_audit_ledger.js": "f38c520097075153b209cda679fcad8c513bb65a6d645b85c9728a2c1801af93",
+    "src/core/security/rbac_governance.js": "3af55ef9ced5b307861f34784cf66cc314a07b92d1db1be6744e2fd3fd4e611a",
+    "src/core/security/vault_encryption.js": "761017436bb8ea297b5bf375c8493c45043fe4e0463944a2f301005c9cb14627",
+    "src/core/security/enterprise_iam.js": "431553b6d1a451141fa76dc9a93728c487cc0989ac5b982a2c3f1ecd2e343c7c",
+    "src/core/math/worker_pool.js": "eb518ffe0ce09c0e86b751cc77c882c3e49314fbb3d2c7f41a5800fd4097a2f6",
+    "src/core/plant/equipment_nozzle_manager.js": "5c32e15359544b9421651a577b2b1ab824f4ad51d30e3c87e36f20bbbe90aa29",
+    "src/core/plant/pcf_export.js": "ecf1ac37ad87ffe968848a99ced648d145c51c2f1ca25882793bf329539ddde2",
+    "test/test_eigensolver.js": "d6ddd9d2222f9e7a7c29998bf623b41c3ec54255198c5a97fb1f901f0c4dba83",
+    "test/test_five_axis_swarf.js": "c161cdaa2eb322239fd67325d50da1211029f1e2cc8e6e430d33b72a4379d2a7"
+  },
+  "verifiedGates2026_11_04": [
+    {
+      "id": "A43-window-bounds",
+      "test": "test/test_window_bounds.js",
+      "result": "6/6 PASS"
+    },
+    {
+      "id": "A44-web-server",
+      "test": "test/test_workstation_web_server.js",
+      "result": "8/8 PASS"
+    },
+    {
+      "id": "A11-api520-si",
+      "test": "test/test_api520_relief_valve_si.js",
+      "result": "3/3 PASS"
+    },
+    {
+      "id": "A03-plasticity",
+      "test": "test/test_continuum_plasticity.js",
+      "result": "5/5 PASS"
+    },
+    {
+      "id": "A30-eda-drc",
+      "test": "test/test_eda_drc.js",
+      "result": "26/26 PASS"
+    },
+    {
+      "id": "A37-pdm-lifecycle",
+      "test": "test/test_pdm_lifecycle.js",
+      "result": "21/21 PASS"
+    },
+    {
+      "id": "A48-fuzz-sharded",
+      "test": "scripts/run_fuzz_sharded.js",
+      "result": "4 shards x 7/7 in 8.6s"
+    },
+    {
+      "id": "A02-amg",
+      "test": "test/test_amg_solver.js",
+      "result": "9/9 PASS; 38k conv-diff in 3 iters"
+    },
+    {
+      "id": "A07-dae",
+      "test": "test/test_dae_solver.js",
+      "result": "5/5 PASS"
+    },
+    {
+      "id": "A03-mesher",
+      "test": "test/test_mesh_generator_3d.js",
+      "result": "17/17 PASS; 100% positive Jacobians"
+    },
+    {
+      "id": "A58-radiation-do",
+      "test": "test/test_radiation_do.js",
+      "result": "10/10 PASS"
+    },
+    {
+      "id": "A53-vof",
+      "test": "test/test_vof_cfd.js",
+      "result": "11/11 PASS"
+    },
+    {
+      "id": "A62-unifac",
+      "test": "test/test_unifac_dortmund.js",
+      "result": "11/11 PASS (azeotrope deviation reported)"
+    },
+    {
+      "id": "A66-column",
+      "test": "test/test_naphtali_sandholm.js",
+      "result": "20/20 PASS"
+    },
+    {
+      "id": "A59-s2s",
+      "test": "test/test_s2s_radiation.js",
+      "result": "8/8 PASS"
+    },
+    {
+      "id": "A73-pipestress",
+      "test": "test/test_piping_stress.js",
+      "result": "5/5 PASS"
+    },
+    {
+      "id": "A85-crdt",
+      "test": "test/test_crdt_sync.js",
+      "result": "5/5 PASS"
+    },
+    {
+      "id": "A92-mcdc",
+      "test": "test/test_mcdc_coverage.js",
+      "result": "7/7 PASS"
+    },
+    {
+      "id": "A39-cutting",
+      "test": "test/test_cutting_physics.js",
+      "result": "13/13 PASS"
+    },
+    {
+      "id": "A29-fastener",
+      "test": "test/test_fastener_catalog.js",
+      "result": "11/11 PASS"
+    },
+    {
+      "id": "A22-assembly",
+      "test": "test/test_assembly_constraints.js",
+      "result": "11/11 PASS"
+    },
+    {
+      "id": "A27-gdt",
+      "test": "test/test_drafting_gdt.js",
+      "result": "11/11 PASS"
+    },
+    {
+      "id": "A60-fwh",
+      "test": "test/test_aeroacoustics.js",
+      "result": "8/8 PASS"
+    },
+    {
+      "id": "A56-ddes",
+      "test": "test/test_hybrid_des.js",
+      "result": "6/6 PASS (shedding gate not-achieved, documented)"
+    },
+    {
+      "id": "A57-cht",
+      "test": "test/test_cht_multiphysics.js",
+      "result": "5/5 PASS"
+    },
+    {
+      "id": "A44-viscoplasticity",
+      "test": "test/test_viscoplasticity.js",
+      "result": "7/7 PASS"
+    },
+    {
+      "id": "A41-nonlinear-fea",
+      "test": "test/test_nonlinear_fea.js",
+      "result": "7/7 PASS"
+    },
+    {
+      "id": "A75-nozzle-loads",
+      "test": "test/test_nozzle_loads.js",
+      "result": "10/10 PASS"
+    },
+    {
+      "id": "A77-isometric",
+      "test": "test/test_isometric_generator.js",
+      "result": "6/6 PASS"
+    },
+    {
+      "id": "A64-enrtl",
+      "test": "test/test_enrtl.js",
+      "result": "12/12 PASS"
+    },
+    {
+      "id": "A23-motion-collision",
+      "test": "test/test_assembly_collision.js",
+      "result": "12/12 PASS"
+    },
+    {
+      "id": "A72-pipe-router3d",
+      "test": "test/test_piping_3d_router.js",
+      "result": "19/19 PASS"
+    },
+    {
+      "id": "A76-spring-hangers",
+      "test": "test/test_pipe_supports.js",
+      "result": "8/8 PASS"
+    },
+    {
+      "id": "A82-audit-ledger",
+      "test": "test/test_audit_ledger.js",
+      "result": "13/13 PASS"
+    },
+    {
+      "id": "A63-activity-lle",
+      "test": "test/test_nrtl_uniquac.js",
+      "result": "12/12 PASS"
+    },
+    {
+      "id": "A79-wall-thickness",
+      "test": "test/test_pipe_wall_thickness.js",
+      "result": "6/6 PASS"
+    },
+    {
+      "id": "A87-rbac",
+      "test": "test/test_rbac_governance.js",
+      "result": "16/16 PASS"
+    },
+    {
+      "id": "A88-vault",
+      "test": "test/test_vault_encryption.js",
+      "result": "10/10 PASS"
+    },
+    {
+      "id": "A86-sso",
+      "test": "test/test_enterprise_sso.js",
+      "result": "20/20 PASS"
+    },
+    {
+      "id": "A89-worker-supervisor",
+      "test": "test/test_worker_supervisor.js",
+      "result": "6/6 PASS"
+    },
+    {
+      "id": "A80-equipment-nozzles",
+      "test": "test/test_equipment_nozzles.js",
+      "result": "18/18 PASS"
+    },
+    {
+      "id": "A78-pcf",
+      "test": "test/test_pcf_export.js",
+      "result": "9/9 PASS"
+    },
+    {
+      "id": "A06-eigensolver",
+      "test": "test/test_eigensolver.js",
+      "result": "6/6 PASS"
+    },
+    {
+      "id": "A32-swarf",
+      "test": "test/test_five_axis_swarf.js",
+      "result": "7/7 PASS"
+    },
+    {
+      "id": "A99-npm-audit",
+      "test": "npm audit --audit-level=low",
+      "result": "0 vulnerabilities"
+    }
+  ],
+  "openGates": [
+    {
+      "id": "A01-hertz-discrete-contact",
+      "status": "PENDING",
+      "detail": "unverified on host (runtime >1h43m); last measured radius -3.19% vs 3%"
+    },
+    {
+      "id": "A46-layout-canvas-area",
+      "status": "PENDING",
+      "detail": "requires GUI verification"
+    },
+    {
+      "id": "A47-pid-studio-promotion",
+      "status": "PENDING",
+      "detail": "modal-based; requires GUI verification"
+    },
+    {
+      "id": "B-notarization",
+      "status": "PENDING-OWNER"
+    },
+    {
+      "id": "C-independent-assessor",
+      "status": "PENDING-EXTERNAL"
+    }
+  ]
+}

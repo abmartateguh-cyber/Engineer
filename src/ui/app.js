@@ -3,12 +3,57 @@
  * Coordinates Studio Switching, 3D/2D viewports, manual parameter sliders, and OmniAI Co-Pilot.
  */
 
+function getExplicitCamRequest() {
+  const number = (id) => {
+    const input = document.getElementById(id);
+    const value = input?.value?.trim();
+    if (!value) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const toolSelection = document.getElementById('select-cam-tool')?.value || '';
+  const [toolType, rawToolDiameter] = toolSelection.split(':');
+  const toolDiameter = rawToolDiameter ? Number(rawToolDiameter) : null;
+  const bounds = {
+    minX: number('cam-bound-min-x'),
+    maxX: number('cam-bound-max-x'),
+    minY: number('cam-bound-min-y'),
+    maxY: number('cam-bound-max-y'),
+    minZ: number('cam-bound-min-z'),
+    maxZ: number('cam-bound-max-z')
+  };
+  const options = {
+    toolDiameter,
+    toolType,
+    spindleRpm: number('input-cam-spindle'),
+    feedRateMmMin: number('input-cam-feed'),
+    plungeRateMmMin: number('input-cam-plunge'),
+    stepoverMm: number('input-cam-stepover'),
+    stepdownMm: number('input-cam-stepdown'),
+    safeZ: number('input-cam-safe-z')
+  };
+  const programNumber = document.getElementById('input-cam-program-number')?.value?.trim() || '';
+  const missing = [...Object.entries(bounds), ...Object.entries(options)]
+    .filter(
+      ([, value]) => value === null || value === undefined || (typeof value === 'number' && !Number.isFinite(value))
+    )
+    .map(([key]) => key);
+  if (missing.length > 0 || !/^O\d{1,8}$/.test(programNumber)) {
+    return {
+      request: null,
+      reason: `Enter finite bounds/tool inputs${missing.length ? ` (missing: ${missing.join(', ')})` : ''} and a valid O-number program ID.`
+    };
+  }
+  return { request: { bounds, options, programNumber }, reason: null };
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const maturityLabel = document.getElementById('status-maturity-label');
   if (maturityLabel && window.omniEngAPI?.getFeatureMaturity) {
     window.omniEngAPI
       .getFeatureMaturity()
       .then((response) => {
+        window.omniMaturityReport = response;
         const domains = response?.domains;
         if (!response?.success || !domains || typeof domains !== 'object') {
           maturityLabel.textContent = 'Maturity unknown · assume experimental';
@@ -59,6 +104,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.OmniIcons.hydrateAll(document);
   }
 
+  // Experimental capability panels (read-only viewer patterns; DOM-only).
+  const experimentalPanels = [
+    ['panel-materials-catalog', 'OmniMaterialsCatalogView', (api) => api.mount(document, panel, window.omniEngAPI)],
+    ['panel-optics-glass-lookup', 'OmniOpticsGlassLookupView', (api) => api.mount(document, panel, window.omniEngAPI)],
+    [
+      'panel-ai-surrogate-trainer',
+      'OmniAiSurrogateTrainerView',
+      (api) => api.mount(document, panel, window.omniEngAPI)
+    ],
+    ['panel-hpc-local-dispatch', 'OmniHpcLocalDispatchView', (api) => api.mount(document, panel, window.omniEngAPI)]
+  ];
+  for (const [panelId, globalName, mountPanel] of experimentalPanels) {
+    const panel = document.getElementById(panelId);
+    const api = window[globalName];
+    if (!panel || !api || typeof api.mount !== 'function') continue;
+    try {
+      mountPanel(api);
+    } catch (panelErr) {
+      console.warn(`[Experimental Panel] ${globalName} mount skipped:`, panelErr.message);
+    }
+  }
+
+  // Diagnostics Console mount (Stage 2 item 2; no architect host found in index.html yet, fallback #console-host).
+  {
+    const consoleHost =
+      document.getElementById('diagnostics-console') ||
+      document.getElementById('console-container') ||
+      (() => {
+        const host = document.createElement('div');
+        host.id = 'console-host';
+        document.body.appendChild(host);
+        return host;
+      })();
+    if (window.OmniDiagnosticsConsoleView && typeof window.OmniDiagnosticsConsoleView.mount === 'function') {
+      try {
+        window.OmniDiagnosticsConsoleView.mount(document, consoleHost, window.omniEngAPI);
+      } catch (consoleErr) {
+        console.warn('[Diagnostics Console] mount skipped:', consoleErr.message);
+      }
+    }
+  }
+
   // Initialize Viewports
   const viewport3D = new Viewport3D('three-canvas');
   const blockDiagramUI = new BlockDiagramUI('diagram-canvas');
@@ -67,6 +154,194 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Expose instances for automation and inspection
   window.viewport3D = viewport3D;
   window.omniAppState = null;
+
+  // Storytelling Rails boot: expose the legacy lowercase alias used by existing
+  // call sites and share a single controller instance with omniStorytelling.
+  if (window.StorytellingRails) {
+    try {
+      window.storytellingRails = window.omniStorytelling = window.StorytellingRails.createController({
+        viewport3d: window.viewport3D
+      });
+    } catch (storyErr) {
+      console.debug('[Storytelling] Controller boot skipped:', storyErr.message);
+    }
+  }
+
+  // Session evidence ledger for the audit report (kept honest: only records
+  // data that actually existed in this session).
+  window.__omniSessionSolves = [];
+  const OMNI_ENG_VERSION = window.__OMNI_APP_VERSION__ || '1.0.0';
+  const OMNI_DEP_VERSIONS = { 'omnieng-core': OMNI_ENG_VERSION };
+  function stableEvidenceHash(input) {
+    const str = typeof input === 'string' ? input : JSON.stringify(input ?? {});
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return ('00000000' + h.toString(16)).slice(-8);
+  }
+  function recordSessionSolve(record) {
+    if (!record || typeof record !== 'object') return;
+    try {
+      const hash = stableEvidenceHash(record.input);
+      window.__omniSessionSolves.push({
+        domain: record.domain || 'ui-session',
+        name: record.name || 'interactive_solve',
+        units: record.units || 'dimensionless',
+        projectRevision: OMNI_ENG_VERSION,
+        engineVersion: OMNI_ENG_VERSION,
+        backendVersion: OMNI_ENG_VERSION,
+        dependencyVersions: { ...OMNI_DEP_VERSIONS },
+        convergenceDiagnostics: {
+          status: 'unavailable',
+          reason: 'UI session evidence; independent convergence verification is not configured in this build.'
+        },
+        warnings: ['Experimental workstation session result; no released validation review has been performed.'],
+        inputHashes: [hash]
+      });
+      if (window.__omniSessionSolves.length > 24) window.__omniSessionSolves.shift();
+    } catch (_) {}
+  }
+  function collectSessionEvidenceResults() {
+    const results = [...(window.__omniSessionSolves || [])];
+    const maturity = window.omniMaturityReport?.domains;
+    if (maturity && typeof maturity === 'object') {
+      results.push({
+        domain: 'platform',
+        name: 'feature_maturity',
+        units: 'count',
+        projectRevision: OMNI_ENG_VERSION,
+        engineVersion: OMNI_ENG_VERSION,
+        backendVersion: OMNI_ENG_VERSION,
+        dependencyVersions: { ...OMNI_DEP_VERSIONS },
+        convergenceDiagnostics: {
+          status: 'unavailable',
+          reason: 'Maturity registry query executed; feature states are experimental.'
+        },
+        warnings: ['Maturity reflects registry presence, not validated engineering release status.'],
+        inputHashes: [stableEvidenceHash('feature_maturity_query')]
+      });
+    }
+    return results;
+  }
+  function assembleProjectEvidence() {
+    const results = collectSessionEvidenceResults();
+    if (results.length === 0) return null;
+    const inputs = [];
+    const seenHashes = new Set();
+    for (const result of results) {
+      for (const hash of result.inputHashes || []) {
+        if (!seenHashes.has(hash)) {
+          seenHashes.add(hash);
+          inputs.push({ hash, units: result.units || 'dimensionless' });
+        }
+      }
+    }
+    if (inputs.length === 0) return null;
+    return {
+      projectId: stableEvidenceHash(window.location?.href || 'omnieng-workstation'),
+      projectName: 'OmniEng Interactive Workstation Session',
+      projectRevision: OMNI_ENG_VERSION,
+      engineVersion: OMNI_ENG_VERSION,
+      dependencyVersions: { ...OMNI_DEP_VERSIONS },
+      inputs,
+      assumptions: ['All results are illustrative in-session outputs from the local workstation.'],
+      warnings: ['Entirely session-local evidence; no reviewed validation service was configured.'],
+      results: results.map((result) => ({ ...result }))
+    };
+  }
+
+  // OmniEng Active Job Monitor & Cancellation Controller
+  window.OmniJobMonitor = {
+    activeJobId: null,
+    startJob(jobId, jobName) {
+      this.activeJobId = jobId;
+      const el = document.getElementById('job-monitor');
+      const label = document.getElementById('job-name-label');
+      const bar = document.getElementById('job-progress-bar-fill');
+      const pct = document.getElementById('job-percent-label');
+      if (el) el.style.display = 'inline-flex';
+      if (label) label.textContent = jobName || 'Executing';
+      if (bar) bar.style.width = '0%';
+      if (pct) pct.textContent = '0%';
+    },
+    updateProgress(percent, message) {
+      const bar = document.getElementById('job-progress-bar-fill');
+      const pct = document.getElementById('job-percent-label');
+      const label = document.getElementById('job-name-label');
+      const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+      if (bar) bar.style.width = `${clamped}%`;
+      if (pct) pct.textContent = `${clamped}%`;
+      if (message && label) label.textContent = message;
+    },
+    endJob(jobId) {
+      if (this.activeJobId === jobId || !jobId) {
+        this.activeJobId = null;
+        const el = document.getElementById('job-monitor');
+        if (el) el.style.display = 'none';
+      }
+    },
+    async cancelActiveJob() {
+      if (!this.activeJobId) return;
+      const id = this.activeJobId;
+      try {
+        if (window.omnieng?.jobs?.cancel) {
+          await window.omnieng.jobs.cancel(id);
+        } else if (window.omniEngAPI?.cancelComputeJob) {
+          await window.omniEngAPI.cancelComputeJob(id);
+        }
+      } catch (err) {
+        console.warn('[OmniEng Job Cancellation Error]', err);
+      } finally {
+        this.endJob(id);
+      }
+    },
+    async submitComputeJob(taskType, payload, options = {}) {
+      const jobId = `compute-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      this.startJob(jobId, options.label || taskType);
+      try {
+        const res = await window.omniEngAPI?.submitComputeJob?.(taskType, payload, options);
+        if (res && typeof res === 'object' && typeof res.percent === 'number') {
+          this.updateProgress(res.percent, res.message || options.label || taskType);
+        } else {
+          this.updateProgress(100, options.label || taskType);
+        }
+        if (!res || res.success === false) this.endJob(jobId);
+        return res;
+      } catch (err) {
+        this.endJob(jobId);
+        throw err;
+      }
+    },
+    async submitHpcJob(jobType, params, ranks) {
+      const jobId = `hpc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      this.startJob(jobId, `HPC ${jobType}`);
+      try {
+        const res = await window.omniEngAPI?.submitHPCJob?.(jobType, params, ranks);
+        if (res && typeof res === 'object' && typeof res.percent === 'number') {
+          this.updateProgress(res.percent, res.message || `HPC ${jobType}`);
+        } else {
+          this.updateProgress(100, `HPC ${jobType}`);
+        }
+        if (!res || res.success === false) this.endJob(jobId);
+        return res;
+      } catch (err) {
+        this.endJob(jobId);
+        throw err;
+      }
+    }
+  };
+  window.omniSubmitComputeJob = (taskType, payload, options) =>
+    window.OmniJobMonitor.submitComputeJob(taskType, payload, options);
+  window.omniSubmitHpcJob = (jobType, params, ranks) => window.OmniJobMonitor.submitHpcJob(jobType, params, ranks);
+
+  const btnCancelActiveJob = document.getElementById('btn-cancel-active-job');
+  if (btnCancelActiveJob) {
+    btnCancelActiveJob.addEventListener('click', async () => {
+      await window.OmniJobMonitor.cancelActiveJob();
+    });
+  }
 
   // Application State
   const state = {
@@ -622,6 +897,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       ribbon.classList.add(`filter-${studio}`);
     }
+    const studioToolsMenu = document.getElementById('tools-menu');
+    if (studioToolsMenu) {
+      studioToolsMenu.classList.remove(
+        'filter-consumer',
+        'filter-eda',
+        'filter-aerospace',
+        'filter-oilgas',
+        'filter-simulink',
+        'filter-universal_cad'
+      );
+      studioToolsMenu.classList.add(`filter-${studio}`);
+    }
   }
 
   // --- Dynamic Inspector Panels (Full Manual Editing Support) ---
@@ -629,7 +916,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Optical estimates run only through IPC with explicit form inputs.
   async function calculateOptics(inputs) {
     if (!window.omniEngAPI?.solveOptics) throw new Error('Optical calculation service is unavailable.');
-    return window.omniEngAPI.solveOptics(inputs);
+    const result = await window.omniEngAPI.solveOptics(inputs);
+    if (result?.success) {
+      recordSessionSolve({
+        domain: 'optics',
+        name: 'skew_ray_trace',
+        units: 'µm (spot radial rms)',
+        input: inputs
+      });
+    }
+    return result;
   }
 
   function renderConsumerInspector() {
@@ -1197,6 +1493,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             phoneMass: phoneMassKg,
             impactAngle
           });
+          if (res?.inputs) {
+            recordSessionSolve({
+              domain: 'consumer-mechanics',
+              name: 'drop_test_impact',
+              units: 'kPa (peak impact estimate)',
+              input: { dropHeight: dropHeightM, phoneMass: phoneMassKg, impactAngle }
+            });
+          }
         } catch (error) {
           if (dropContainer) dropContainer.textContent = `No estimate was returned: ${String(error?.message ?? error)}`;
           return;
@@ -1471,10 +1775,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
     });
     document.getElementById('btn-open-nasa-wbs')?.addEventListener('click', openNasaWbsModal);
-    document.getElementById('btn-open-nasa-ship-spec')?.addEventListener('click', openNasaShipSpecModal);
+    document
+      .getElementById('btn-open-nasa-ship-spec')
+      ?.addEventListener('click', () => openNasaShipSpecModal('overview'));
     document.getElementById('btn-storytelling-nasa')?.addEventListener('click', () => {
-      if (window.storytellingRails) {
-        window.storytellingRails.loadStagePreset('nasa_rocket');
+      const rails = window.storytellingRails || window.omniStorytelling;
+      if (rails) {
+        rails.loadStagePreset('nasa_rocket');
         addAiMessage(
           '[Illustrative aerospace tour] Geometry and callouts are synthetic examples, not validated engineering data.'
         );
@@ -1578,6 +1885,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (loopSelection === 'true' || loopSelection === 'false') params.hasExpansionLoop = loopSelection === 'true';
 
       const res = await window.omniEngAPI.evaluatePipingStress(params);
+      if (res?.success) {
+        recordSessionSolve({
+          domain: 'oilgas',
+          name: 'piping_stress_estimate',
+          units: 'MPa',
+          input: params
+        });
+      }
 
       const telem = document.getElementById('pipe-telemetry-container');
       if (telem) {
@@ -1757,6 +2072,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (statusOutput) statusOutput.textContent = 'Running the caller-supplied experimental graph…';
       try {
         const result = await window.omniEngAPI.simulateBlockDiagram(graphData, tEnd, dt);
+        if (result?.success) {
+          recordSessionSolve({
+            domain: 'controls',
+            name: 'block_diagram_simulation',
+            units: 's (simulated end time)',
+            input: { graphData, tEnd, dt }
+          });
+        }
         blockDiagramUI.setSimulationResult(result);
         const scopeSummaries = graphData.blocks
           .filter((block) => block.type === 'scope')
@@ -1851,18 +2174,38 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div>
             <label style="font-size: 10px; color: var(--text-muted);">Endmill Tool:</label>
             <select id="select-cam-tool" class="ribbon-select" style="width: 100%; font-size: 11px; padding: 4px;">
-              <option value="10">Ø10mm Carbide Flat</option>
-              <option value="6">Ø6mm Flat Endmill</option>
-              <option value="16">Ø16mm Rougher</option>
+              <option value="" selected>Select tool</option>
+              <option value="flat_endmill:10">Ø10mm Carbide Flat</option>
+              <option value="flat_endmill:6">Ø6mm Flat Endmill</option>
+              <option value="flat_endmill:16">Ø16mm Rougher</option>
             </select>
           </div>
           <div>
             <label style="font-size: 10px; color: var(--text-muted);">Spindle (RPM):</label>
-            <input type="number" id="input-cam-spindle" class="ribbon-select" value="8000" style="width: 100%; font-size: 11px; padding: 4px;">
+            <input type="number" id="input-cam-spindle" class="ribbon-select" min="1" placeholder="Required" style="width: 100%; font-size: 11px; padding: 4px;">
           </div>
         </div>
 
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px;">
+          <label style="font-size: 10px; color: var(--text-muted);">Stock X min (mm)<input id="cam-bound-min-x" type="number" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stock X max (mm)<input id="cam-bound-max-x" type="number" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stock Y min (mm)<input id="cam-bound-min-y" type="number" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stock Y max (mm)<input id="cam-bound-max-y" type="number" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stock Z min (mm)<input id="cam-bound-min-z" type="number" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stock Z max (mm)<input id="cam-bound-max-z" type="number" step="any" placeholder="Required"></label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px;">
+          <label style="font-size: 10px; color: var(--text-muted);">Feed (mm/min)<input id="input-cam-feed" type="number" min="0" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Plunge (mm/min)<input id="input-cam-plunge" type="number" min="0" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stepover (mm)<input id="input-cam-stepover" type="number" min="0" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Stepdown (mm)<input id="input-cam-stepdown" type="number" min="0" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Safe Z (mm)<input id="input-cam-safe-z" type="number" step="any" placeholder="Required"></label>
+          <label style="font-size: 10px; color: var(--text-muted);">Program ID<input id="input-cam-program-number" type="text" maxlength="9" placeholder="O1001"></label>
+        </div>
+
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">The generated example has no machine-specific postprocessor or NC validation and is not ready for machining.</div>
+        <div id="cam-input-status" role="status" style="font-size: 10px; color: var(--text-muted); margin-bottom: 6px;">Provide explicit stock and tool inputs.</div>
         <button class="btn-primary" id="btn-generate-cam-toolpath" style="width: 100%; margin-top: 0; padding: 7px; font-size: 11px;">
           <span class="icon-slot" data-omni-icon="camGcode"></span> Generate Illustrative Toolpath
         </button>
@@ -1989,33 +2332,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // CAM Toolpath Generator Event
     document.getElementById('btn-generate-cam-toolpath')?.addEventListener('click', async () => {
-      const toolDia = parseFloat(document.getElementById('select-cam-tool')?.value || 10);
-      const rpm = parseInt(document.getElementById('input-cam-spindle')?.value || 8000, 10);
-
-      window.omniSetSolverProgress('Planning 3-Axis Planar Roughing Toolpath...', 40);
-      if (window.omniEngAPI?.camGenerateToolpath) {
-        const res = await window.omniEngAPI.camGenerateToolpath({
-          options: { toolDiameter: toolDia, spindleRpm: rpm, feedRateMmMin: 1200, stepdownMm: 2.5 }
-        });
-        if (res?.success && res.telemetry) {
-          const telemBox = document.getElementById('cam-telemetry-container');
-          if (telemBox) telemBox.style.display = 'block';
-          const elTime = document.getElementById('cam-cut-time');
-          const elLen = document.getElementById('cam-path-len');
-          const elMrr = document.getElementById('cam-mrr');
-          if (elTime) elTime.textContent = `${res.telemetry.estimatedTimeMin} min`;
-          if (elLen) elLen.textContent = `${res.telemetry.totalPathLengthMm} mm`;
-          if (elMrr) elMrr.textContent = `${res.telemetry.mrrMm3PerMin.toLocaleString()} mm³/min`;
-
-          // Render real CNC toolpath layers in Three.js viewport
-          const actualLayers = res.layers || [];
-          window.viewport3D?.renderToolpath3D(actualLayers);
-
-          window.omniSetSolverProgress(`CAM: ${res.totalGcodeLines} G-Code Lines Generated`, 100, true);
-          addAiMessage(
-            `[Experimental toolpath example] Generated ${res.totalGcodeLines} illustrative G-code blocks with an estimated cut time of ${res.telemetry.estimatedTimeMin} min. The output has no machine-specific postprocessor or NC validation and is not ready for machining.`
-          );
+      const { request: camRequest, reason } = getExplicitCamRequest();
+      const inputStatus = document.getElementById('cam-input-status');
+      if (!camRequest) {
+        if (inputStatus) inputStatus.textContent = reason;
+        window.omniSetSolverProgress('CAM example needs explicit inputs', 100, false);
+        return;
+      }
+      try {
+        window.omniSetSolverProgress('Planning caller-specified 3-axis roughing path...', 40);
+        if (!window.omniEngAPI?.camGenerateToolpath) throw new Error('CAM IPC route is unavailable.');
+        const res = await window.omniEngAPI.camGenerateToolpath(camRequest);
+        if (!res?.success || !res.telemetry || !Array.isArray(res.layers)) {
+          throw new Error(res?.error?.message || 'CAM route returned no valid toolpath result.');
         }
+        recordSessionSolve({
+          domain: 'manufacturing',
+          name: 'cam_toolpath_planning',
+          units: 'mm (total path length)',
+          input: camRequest
+        });
+        const telemBox = document.getElementById('cam-telemetry-container');
+        if (telemBox) telemBox.style.display = 'block';
+        const elTime = document.getElementById('cam-cut-time');
+        const elLen = document.getElementById('cam-path-len');
+        const elMrr = document.getElementById('cam-mrr');
+        if (elTime) elTime.textContent = `${res.telemetry.estimatedTimeMin} min`;
+        if (elLen) elLen.textContent = `${res.telemetry.totalPathLengthMm} mm`;
+        if (elMrr) elMrr.textContent = `${res.telemetry.mrrMm3PerMin.toLocaleString()} mm³/min`;
+        window.viewport3D?.renderToolpath3D(res.layers);
+        if (inputStatus)
+          inputStatus.textContent =
+            'Experimental path returned from the supplied geometry and tool inputs; not NC validated.';
+        window.omniSetSolverProgress(`CAM: ${res.totalGcodeLines} G-Code Lines Generated`, 100, true);
+        addAiMessage(
+          `[Experimental toolpath example] Generated ${res.totalGcodeLines} illustrative G-code blocks with an estimated cut time of ${res.telemetry.estimatedTimeMin} min. The output has no machine-specific postprocessor or NC validation and is not ready for machining.`
+        );
+      } catch (error) {
+        if (inputStatus) inputStatus.textContent = `CAM example failed: ${error.message}`;
+        window.omniSetSolverProgress('CAM example failed', 100, false);
       }
     });
 
@@ -2278,13 +2633,184 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  async function refreshStenographerBadge() {
+    const badge = document.getElementById('stenographer-status-badge');
+    const label = document.getElementById('stenographer-ledger-state') || badge;
+    if (!badge || !label) return null;
+    const verifyFn = window.omniEngAPI?.verifyLedger || window.omniEngAPI?.stenographerVerifyLedger;
+    if (typeof verifyFn !== 'function') return null;
+    try {
+      const res = await verifyFn();
+      const valid = Boolean(res?.valid);
+      const count = Number.isFinite(res?.entryCount) ? res.entryCount : 0;
+      label.textContent = valid ? `Session audit: intact (${count})` : 'Audit: Integrity Failure';
+      badge.title = res?.daemonConnected
+        ? 'Local Stenographer process running; query protocol is unavailable. Ledger integrity covers present entries only.'
+        : 'Stenographer daemon unavailable; local ledger integrity checked for present entries only.';
+      badge.style.color = valid ? 'var(--success)' : 'var(--danger, #ef4444)';
+      badge.dataset.ledgerValid = String(valid);
+      badge.dataset.ledgerCount = String(count);
+      return res;
+    } catch (_) {
+      label.textContent = 'Audit: Unavailable';
+      badge.title = 'Local audit status unavailable.';
+      return null;
+    }
+  }
+  window.refreshStenographerBadge = refreshStenographerBadge;
+
+  const stenographerBadgeElem = document.getElementById('stenographer-status-badge');
+  if (stenographerBadgeElem) {
+    stenographerBadgeElem.style.cursor = 'pointer';
+    stenographerBadgeElem.addEventListener('click', () => {
+      refreshStenographerBadge();
+    });
+  }
+  refreshStenographerBadge();
+
+  function renderStenographerProposalCard(proposal) {
+    if (!proposal || typeof proposal !== 'object') return null;
+    const container =
+      aiChatHistory || document.getElementById('ai-chat-history') || document.getElementById('ai-copilot-dock');
+    if (!container) return null;
+
+    const card = document.createElement('div');
+    card.className = 'chat-bubble ai stenographer-proposal-card';
+    card.dataset.proposalId = String(proposal.proposalId || '');
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;';
+
+    const title = document.createElement('strong');
+    title.textContent = `Stenographer Proposal: ${String(proposal.toolName || proposal.toolId || 'tool')}`;
+    header.appendChild(title);
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'proposal-status-badge';
+    statusBadge.style.cssText = 'font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(56,189,248,0.18);';
+    statusBadge.textContent = String(proposal.status || 'pending').toUpperCase();
+    header.appendChild(statusBadge);
+    card.appendChild(header);
+
+    const meta = document.createElement('div');
+    meta.style.cssText = 'font-size:11px;margin-bottom:4px;opacity:0.85;';
+    meta.textContent = `ID: ${String(proposal.proposalId || '')} | Project: ${String(proposal.originatingProjectId || 'unavailable')} | Rev: ${String(proposal.originatingProjectRevision ?? 'unavailable')}`;
+    card.appendChild(meta);
+
+    if (proposal.rationale) {
+      const rationaleEl = document.createElement('div');
+      rationaleEl.style.cssText = 'font-size:11px;margin-bottom:6px;';
+      rationaleEl.textContent = String(proposal.rationale);
+      card.appendChild(rationaleEl);
+    }
+
+    const argsPre = document.createElement('pre');
+    argsPre.style.cssText =
+      'font-size:10px;padding:6px;border-radius:4px;background:rgba(0,0,0,0.25);overflow-x:auto;margin:4px 0 8px 0;';
+    argsPre.textContent = JSON.stringify(proposal.parameters || proposal.args || {}, null, 2);
+    card.appendChild(argsPre);
+
+    const actionsRow = document.createElement('div');
+    actionsRow.style.cssText = 'display:flex;gap:8px;align-items:center;';
+
+    const approveBtn = document.createElement('button');
+    approveBtn.type = 'button';
+    approveBtn.className = 'ribbon-btn action-btn btn-approve-proposal';
+    approveBtn.textContent = 'Approve & Execute';
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.type = 'button';
+    rejectBtn.className = 'ribbon-btn btn-reject-proposal';
+    rejectBtn.textContent = 'Reject';
+
+    const resultRow = document.createElement('div');
+    resultRow.style.cssText = 'font-size:11px;margin-top:6px;display:none;';
+
+    approveBtn.addEventListener('click', async () => {
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+      statusBadge.textContent = 'APPROVING...';
+      try {
+        const evalFn = window.omniEngAPI?.evaluateProposal || window.omniEngAPI?.stenographerEvaluateProposal;
+        const execFn = window.omniEngAPI?.executeTool || window.omniEngAPI?.stenographerExecuteTool;
+
+        if (typeof evalFn !== 'function' || typeof execFn !== 'function') {
+          throw new Error('Stenographer approval and execution routes are unavailable');
+        }
+        const approvalResponse = await evalFn({
+          proposalId: proposal.proposalId,
+          decision: 'approved',
+          rationale: 'Approved via AI Copilot Dock'
+        });
+        if (approvalResponse?.success !== true) {
+          throw new Error(approvalResponse?.error?.message || 'Proposal approval failed');
+        }
+        statusBadge.textContent = 'APPROVED';
+
+        const execRes = await execFn({ proposalId: proposal.proposalId });
+        statusBadge.textContent = execRes?.success === true ? 'EXECUTED' : 'FAILED';
+        resultRow.style.display = 'block';
+        resultRow.textContent =
+          execRes?.success === true
+            ? `Executed [${String(proposal.toolName || proposal.toolId)}]: ${JSON.stringify(execRes?.result || {})}`
+            : `Execution Error: ${String(execRes?.error?.message || 'Failed')}`;
+        await refreshStenographerBadge();
+      } catch (err) {
+        statusBadge.textContent = 'ERROR';
+        resultRow.style.display = 'block';
+        resultRow.textContent = `Error: ${String(err.message || err)}`;
+      }
+    });
+
+    rejectBtn.addEventListener('click', async () => {
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+      try {
+        const evalFn = window.omniEngAPI?.evaluateProposal || window.omniEngAPI?.stenographerEvaluateProposal;
+        if (typeof evalFn !== 'function') {
+          throw new Error('Stenographer approval route is unavailable');
+        }
+        const rejectionResponse = await evalFn({
+          proposalId: proposal.proposalId,
+          decision: 'rejected',
+          rationale: 'Rejected via AI Copilot Dock'
+        });
+        if (rejectionResponse?.success !== true) {
+          throw new Error(rejectionResponse?.error?.message || 'Proposal rejection failed');
+        }
+        statusBadge.textContent = 'REJECTED';
+        resultRow.style.display = 'block';
+        resultRow.textContent = 'Proposal rejected and logged to Stenographer ledger.';
+        await refreshStenographerBadge();
+      } catch (err) {
+        statusBadge.textContent = 'ERROR';
+        resultRow.style.display = 'block';
+        resultRow.textContent = `Error: ${String(err.message || err)}`;
+      }
+    });
+
+    actionsRow.appendChild(approveBtn);
+    actionsRow.appendChild(rejectBtn);
+    card.appendChild(actionsRow);
+    card.appendChild(resultRow);
+
+    container.appendChild(card);
+    container.scrollTop = container.scrollHeight;
+    return card;
+  }
+  window.renderStenographerProposalCard = renderStenographerProposalCard;
+
   async function handleAiPrompt(promptText) {
     if (!promptText.trim()) return;
     addAiMessage(promptText, true);
     aiInput.value = '';
 
     try {
-      const plan = await window.omniEngAPI.processAIPrompt(promptText, {
+      const processFn = window.omniEngAPI?.processAIPrompt;
+      if (typeof processFn !== 'function') {
+        throw new Error('The legacy macro route is unavailable.');
+      }
+      const plan = await processFn(promptText, {
         currentStudio: state.currentStudio,
         params: state.manualParams
       });
@@ -2292,7 +2818,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error(plan?.error?.message || 'The legacy router is unavailable. No action was taken.');
       }
 
-      addAiMessage(plan.assistantMessage, false, plan.suggestedManualEdits);
+      addAiMessage(
+        plan.assistantMessage || plan.message || 'Legacy macro response available.',
+        false,
+        plan.suggestedManualEdits
+      );
+      if (plan.proposal) {
+        renderStenographerProposalCard(plan.proposal);
+        await refreshStenographerBadge();
+      }
 
       // Automatically sync AI results with manual sliders & viewport
       if (plan.matchedTool === 'design_camera_lens_optics' || plan.matchedTool === 'solve_skew_optics') {
@@ -2669,7 +3203,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnOpenReport.addEventListener('click', async () => {
       modalReport.classList.add('active');
       try {
-        const report = await window.omniEngAPI.generateAuditReport(window.omniProjectEvidence || {});
+        const evidence = assembleProjectEvidence() || window.omniProjectEvidence || {};
+        window.omniProjectEvidence = evidence;
+        const report = await window.omniEngAPI.generateAuditReport(evidence);
         if (reportIframe) {
           if (report?.success && typeof report.htmlReport === 'string') {
             reportIframe.srcdoc = report.htmlReport;
@@ -2731,13 +3267,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      const res = await window.omniEngAPI.solveBode({
+      const bodeRequest = {
         numCoeffs: preset.numCoeffs,
         denCoeffs: preset.denCoeffs,
         omegaMin: 0.1,
         omegaMax: 1000,
         points: 80
-      });
+      };
+      const res = await window.omniEngAPI.solveBode(bodeRequest);
+      if (res?.success) {
+        recordSessionSolve({
+          domain: 'controls',
+          name: 'bode_frequency_response',
+          units: 'Hz (frequency sweep)',
+          input: bodeRequest
+        });
+      }
       renderBodeSVG(res);
     } catch (err) {
       if (bodeSvgContainer) {
@@ -2776,12 +3321,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const opticalInspectorBody = document.getElementById('optical-inspector-body');
   let opticalInspectorInstance = null;
   let lastOpticalInspectionResult = null;
+  let opticalInspectionRequestSequence = 0;
 
   async function runOpticalInspection(request) {
     if (!opticalInspectorInstance && window.OpticalInspectorUI) {
       opticalInspectorInstance = new window.OpticalInspectorUI('optical-inspector-body');
     }
     if (!opticalInspectorInstance) return;
+    const requestToken = ++opticalInspectionRequestSequence;
     if (!request) {
       opticalInspectorInstance.render(
         lastOpticalInspectionResult || {
@@ -2810,9 +3357,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     try {
       const result = await window.omniEngAPI.solveSkewOptics(request);
+      if (requestToken !== opticalInspectionRequestSequence) return; // stale request; a newer one superseded this
       lastOpticalInspectionResult = result?.success === true ? result : null;
       opticalInspectorInstance.render(result);
     } catch (error) {
+      if (requestToken !== opticalInspectionRequestSequence) return;
       opticalInspectorInstance.render({
         success: false,
         status: 'numerical-failure',
@@ -2902,6 +3451,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   if (btnCloseFlowsheetPfd && modalFlowsheetPfd) {
     btnCloseFlowsheetPfd.addEventListener('click', () => modalFlowsheetPfd.classList.remove('active'));
+  }
+
+  // --- Experimental P&ID studio modal ---
+  const modalPidStudio = document.getElementById('modal-pid-studio');
+  const btnOpenPidStudio = document.getElementById('ribbon-btn-pid');
+  const btnClosePidStudio = document.getElementById('btn-close-pid-studio');
+  let pidStudioInstance = null;
+
+  if (btnOpenPidStudio && modalPidStudio) {
+    btnOpenPidStudio.addEventListener('click', () => {
+      modalPidStudio.classList.add('active');
+      btnOpenPidStudio.classList.add('active', 'pressed');
+      if (!pidStudioInstance && window.PIDStudioUI) {
+        pidStudioInstance = new window.PIDStudioUI('pid-studio-body');
+        pidStudioInstance.render();
+      }
+    });
+  }
+  if (btnClosePidStudio && modalPidStudio) {
+    btnClosePidStudio.addEventListener('click', () => {
+      modalPidStudio.classList.remove('active');
+      btnOpenPidStudio?.classList.remove('active', 'pressed');
+    });
   }
 
   // --- ISO 10303-21 STEP Export Ribbon Button ---
@@ -2996,45 +3568,79 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // --- Phase 1 Project Lifecycle, Atomic Persistence & Undo/Redo ---
-  function updateProjectHistoryUI(summary) {
+  function getProjectAPI() {
+    const api = window.omniEngAPI || {};
+    const proj = window.omnieng?.projects || {};
+    return {
+      newProject: (params) =>
+        typeof api.newProject === 'function'
+          ? api.newProject(params)
+          : typeof proj.newProject === 'function'
+            ? proj.newProject(params)
+            : proj.new?.(params),
+      saveProject: (params) =>
+        typeof api.saveProject === 'function'
+          ? api.saveProject(params)
+          : typeof proj.saveProject === 'function'
+            ? proj.saveProject(params)
+            : proj.save?.(params),
+      openProject: (params) =>
+        typeof api.openProject === 'function'
+          ? api.openProject(params)
+          : typeof proj.openProject === 'function'
+            ? proj.openProject(params)
+            : proj.open?.(params),
+      undo: () => (typeof api.undo === 'function' ? api.undo() : proj.undo?.()),
+      redo: () => (typeof api.redo === 'function' ? api.redo() : proj.redo?.()),
+      getHistory: () => (typeof api.getProjectHistory === 'function' ? api.getProjectHistory() : proj.getHistory?.())
+    };
+  }
+
+  async function updateProjectHistoryUI(summary) {
+    let resolved = summary;
+    if (!resolved) {
+      try {
+        resolved = await getProjectAPI().getHistory();
+      } catch (_) {
+        resolved = null;
+      }
+    }
     const btnUndoElem = document.getElementById('ribbon-btn-undo');
     const btnRedoElem = document.getElementById('ribbon-btn-redo');
     if (btnUndoElem) {
-      btnUndoElem.disabled = !summary?.canUndo;
-      btnUndoElem.title = summary?.canUndo ? 'Undo last change (Ctrl+Z)' : 'Nothing to undo';
+      btnUndoElem.disabled = !resolved?.canUndo;
+      btnUndoElem.title = resolved?.canUndo ? 'Undo last change (Ctrl+Z)' : 'Nothing to undo';
       btnUndoElem.setAttribute('aria-label', btnUndoElem.title);
     }
     if (btnRedoElem) {
-      btnRedoElem.disabled = !summary?.canRedo;
-      btnRedoElem.title = summary?.canRedo ? 'Redo change (Ctrl+Y)' : 'Nothing to redo';
+      btnRedoElem.disabled = !resolved?.canRedo;
+      btnRedoElem.title = resolved?.canRedo ? 'Redo change (Ctrl+Y)' : 'Nothing to redo';
       btnRedoElem.setAttribute('aria-label', btnRedoElem.title);
     }
   }
   window.updateProjectHistoryUI = updateProjectHistoryUI;
 
-  const btnNewProject = document.getElementById('ribbon-btn-new-project');
-  if (btnNewProject) {
-    btnNewProject.addEventListener('click', async () => {
+  function initProjectPersistenceUI() {
+    const projectApi = getProjectAPI();
+
+    const triggerNewProject = async () => {
       try {
-        const res = await window.omni?.newProject?.({
+        const res = await projectApi.newProject({
           projectName: 'Untitled_Project',
           engineeringDomain: state.currentStudio || 'universal'
         });
         if (res?.success) {
-          updateProjectHistoryUI(res.project);
+          await updateProjectHistoryUI(res.project);
           addAiMessage(`[Project Storage] Initialized fresh project session: ${res.project.projectName}`);
         }
       } catch (err) {
         console.error('Failed to create new project:', err);
       }
-    });
-  }
+    };
 
-  const btnSaveProject = document.getElementById('ribbon-btn-save-project');
-  if (btnSaveProject) {
-    btnSaveProject.addEventListener('click', async () => {
+    const triggerSaveProject = async () => {
       try {
-        const res = await window.omni?.saveProject?.();
+        const res = await projectApi.saveProject();
         if (res?.success) {
           addAiMessage(`[Project Storage] Saved project revision ${res.revision} to: ${res.filePath}`);
         } else if (res?.cancelled) {
@@ -3045,16 +3651,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (err) {
         console.error('Failed to save project:', err);
       }
-    });
-  }
+    };
 
-  const btnOpenProject = document.getElementById('ribbon-btn-open-project');
-  if (btnOpenProject) {
-    btnOpenProject.addEventListener('click', async () => {
+    const triggerOpenProject = async () => {
       try {
-        const res = await window.omni?.openProject?.();
+        const res = await projectApi.openProject();
         if (res?.success && res.project) {
-          updateProjectHistoryUI(res.project);
+          await updateProjectHistoryUI(res.project);
           addAiMessage(
             `[Project Storage] Opened project: ${res.project.projectName} (Revision ${res.project.revision}, ${res.project.blobCount} artifacts)`
           );
@@ -3066,38 +3669,76 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (err) {
         console.error('Failed to open project:', err);
       }
-    });
-  }
+    };
 
-  const btnUndo = document.getElementById('ribbon-btn-undo');
-  if (btnUndo) {
-    btnUndo.addEventListener('click', async () => {
+    const triggerUndo = async () => {
       try {
-        const res = await window.omni?.undoProjectCommand?.();
+        const res = await projectApi.undo();
         if (res?.success) {
-          updateProjectHistoryUI(res);
+          await updateProjectHistoryUI(res);
           addAiMessage(`[Undo] Undone: ${res.undoneEntry?.description || res.undoneEntry?.actionType || 'command'}`);
         }
       } catch (err) {
         console.error('Undo failed:', err);
       }
-    });
-  }
+    };
 
-  const btnRedo = document.getElementById('ribbon-btn-redo');
-  if (btnRedo) {
-    btnRedo.addEventListener('click', async () => {
+    const triggerRedo = async () => {
       try {
-        const res = await window.omni?.redoProjectCommand?.();
+        const res = await projectApi.redo();
         if (res?.success) {
-          updateProjectHistoryUI(res);
+          await updateProjectHistoryUI(res);
           addAiMessage(`[Redo] Redone: ${res.redoneEntry?.description || res.redoneEntry?.actionType || 'command'}`);
         }
       } catch (err) {
         console.error('Redo failed:', err);
       }
+    };
+
+    const btnNewProject = document.getElementById('ribbon-btn-new-project');
+    if (btnNewProject) {
+      btnNewProject.addEventListener('click', triggerNewProject);
+    }
+
+    const btnSaveProject = document.getElementById('ribbon-btn-save-project');
+    if (btnSaveProject) {
+      btnSaveProject.addEventListener('click', triggerSaveProject);
+    }
+
+    const btnOpenProject = document.getElementById('ribbon-btn-open-project');
+    if (btnOpenProject) {
+      btnOpenProject.addEventListener('click', triggerOpenProject);
+    }
+
+    const btnUndo = document.getElementById('ribbon-btn-undo');
+    if (btnUndo) {
+      btnUndo.addEventListener('click', triggerUndo);
+    }
+
+    const btnRedo = document.getElementById('ribbon-btn-redo');
+    if (btnRedo) {
+      btnRedo.addEventListener('click', triggerRedo);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = (e.key || '').toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        triggerSaveProject();
+      } else if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        triggerUndo();
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        triggerRedo();
+      }
     });
+
+    updateProjectHistoryUI();
   }
+  window.initProjectPersistenceUI = initProjectPersistenceUI;
+  initProjectPersistenceUI();
 
   // --- Universal Usability & Phase 1 Guided Design Wizards ---
   const modalWizards = document.getElementById('modal-design-wizards');
@@ -3527,14 +4168,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // --- Phase 6: DIN 6935 K-Factor Sheet Metal Unfolding ---
+  // --- Experimental sheet-metal K-factor formula example ---
   const btnSheetMetal = document.getElementById('ribbon-btn-sheet-metal');
   if (btnSheetMetal) {
     btnSheetMetal.addEventListener('click', async () => {
       try {
         if (window.omniEngAPI?.unfoldSheetMetal) {
           const res = await window.omniEngAPI.unfoldSheetMetal({
-            bend: { angleDeg: 90.0, innerRadiusMm: 2.0, thicknessMm: 2.0, kFactor: 0.44 },
+            lengthUnit: 'mm',
+            bend: { angleDeg: 90.0, innerRadiusMm: 2.0, thicknessMm: 2.0, kFactor: 0.44, direction: 'UP' },
             flanges: [
               { name: 'Base', lengthMm: 60, widthMm: 40 },
               { name: 'Flange', lengthMm: 40, widthMm: 40 }
@@ -3542,7 +4184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
           if (res?.success && res.flat) {
             addAiMessage(
-              `[Sheet Metal] DIN 6935 unfolder generated 2D flat blank pattern (Developed Length: ${res.flat.totalDevelopedLengthMm?.toFixed(2)} mm, Bend Allowance: ${res.bendAllowanceMm?.toFixed(2)} mm, Bend Deduction: ${res.bendDeductionMm?.toFixed(2)} mm).`
+              `[Sheet Metal Example] Illustrative K-factor formula result; material-specific bend data and manufacturing validation are unavailable (Developed Length: ${res.flat.totalDevelopedLengthMm?.toFixed(2)} mm, Bend Allowance: ${res.bendAllowanceMm?.toFixed(2)} mm, Bend Deduction: ${res.bendDeductionMm?.toFixed(2)} mm).`
             );
           }
         }
@@ -4153,7 +4795,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnCloseDLS.addEventListener('click', () => modalDLS.classList.remove('active'));
   }
 
-  // 4. ASME Section VIII Div 2 Compliance Report Modal
+  // 4. Experimental stress screen; no ASME code assessment is available.
   const modalASME = document.getElementById('modal-asme-report');
   const btnOpenASME = document.getElementById('ribbon-btn-asme');
   const btnCloseASME = document.getElementById('btn-close-asme-report');
@@ -4667,14 +5309,68 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   window.openNasaShipSpecModal = openNasaShipSpecModal;
 
-  function renderNasaShipSpecTab() {
+  const SHIP_SPEC_TABS = {
+    overview: {
+      title: 'Overview',
+      rows: [
+        ['Vehicle class', 'Unverified (experimental synthetic example)'],
+        ['Crew accommodation', 'No source-verified crew data is available'],
+        ['Mission role', 'Illustrative only; no requirements traceability exists']
+      ]
+    },
+    propulsion: {
+      title: 'Propulsion',
+      rows: [
+        ['Engine cycle', 'Unverified (no engine configuration record is loaded)'],
+        ['Thrust / Isp', 'No validated performance envelope is available'],
+        ['Propellant feed', 'Illustrative geometry only; no flow or pressure data']
+      ]
+    },
+    avionics: {
+      title: 'Avionics',
+      rows: [
+        ['Flight computer', 'No source-verified avionics part record is loaded'],
+        ['Guidance & navigation', 'Unverified; no GNC algorithm provenance exists'],
+        ['Data bus', 'Not specified; no bus topology or protocol data']
+      ]
+    },
+    thermal: {
+      title: 'Thermal',
+      rows: [
+        ['Thermal control system', 'No validated TCS design data is available'],
+        ['Heating / cooling loops', 'Illustrative only; no fluid or capacity values'],
+        ['Radiator sizing', 'Not assessed; no thermal math model is loaded']
+      ]
+    },
+    eclss: {
+      title: 'ECLSS',
+      rows: [
+        ['Atmosphere control', 'No source-verified ECLSS data is available'],
+        ['Water recovery', 'Unverified; no recovery-loop performance data'],
+        ['Waste management', 'Not specified; no consumable inventory exists']
+      ]
+    }
+  };
+
+  function renderNasaShipSpecTab(tab = 'overview') {
     const container = document.getElementById('nasa-ship-tab-content');
     if (!container) return;
+    const spec = SHIP_SPEC_TABS[tab] || SHIP_SPEC_TABS.overview;
+    const rows = spec.rows
+      .map(
+        ([label, value]) => `
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid var(--border-subtle);font-size:11px;">
+          <span style="color:var(--fg-2);flex-shrink:0;">${label}</span>
+          <span style="color:var(--fg-3);text-align:right;">${value}</span>
+        </div>`
+      )
+      .join('');
     container.innerHTML = `
       <div class="sample-status" role="status">
-        Spacecraft specification unavailable. The previous unsourced crew, life-support, radiation,
+        ${spec.title} — spacecraft specification unavailable. The previous unsourced crew, life-support, radiation,
         avionics, and vehicle values have been withdrawn. No standards assessment is available.
       </div>
+      <div style="border:1px solid var(--border-subtle);border-radius:6px;overflow:hidden;">${rows}</div>
     `;
   }
 
@@ -5112,12 +5808,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       icon: getPaletteIcon('bolt'),
       action: async () => {
         window.omniSetSolverProgress('Experimental sparse Cholesky example running...', 45);
+        const jobId = 'sparse-cholesky-' + Date.now();
+        window.OmniJobMonitor.startJob(jobId, 'Sparse Cholesky');
         const result = await window.omniEngAPI?.solveWasmSparseMultifrontal?.({ N: 40 });
         if (!result?.success) {
+          window.OmniJobMonitor.endJob(jobId);
           window.omniSetSolverProgress('Sparse calculation unavailable', 100, false);
           addAiMessage('[Experimental sparse solver] No result was returned.');
           return;
         }
+        window.OmniJobMonitor.updateProgress(100, 'Sparse Cholesky completed');
+        window.OmniJobMonitor.endJob(jobId);
         window.omniSetSolverProgress(`Experimental sparse solve completed for N=${result.N}`, 100, true);
         addAiMessage(
           `[Experimental sparse solver] N=${result.N}, elapsed=${result.totalTimeMs.toFixed(1)} ms, relative residual=${result.relativeResidual.toExponential(2)}, ordering=${result.orderingMethod}. This is an internal smoke example, not performance qualification.`
@@ -5132,12 +5833,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       icon: getPaletteIcon('gear'),
       action: async () => {
         window.omniSetSolverProgress('Running experimental CPU PCG example...', 60);
+        const jobId = 'cpu-pcg-' + Date.now();
+        window.OmniJobMonitor.startJob(jobId, 'CPU PCG');
         const res = await window.omniEngAPI?.solveGpuParallelPCG?.({ N: 30 });
         if (!res || !Number.isFinite(res.relativeResidual)) {
+          window.OmniJobMonitor.endJob(jobId);
           window.omniSetSolverProgress('PCG result unavailable', 100, false);
           addAiMessage('[Experimental PCG] No result was returned.');
           return;
         }
+        window.OmniJobMonitor.updateProgress(100, 'CPU PCG completed');
+        window.OmniJobMonitor.endJob(jobId);
         window.omniSetSolverProgress('Experimental CPU PCG result returned', 100, Boolean(res.converged));
         addAiMessage(
           `[Experimental PCG] N=${res.solution?.length ?? 30}, iterations=${res.iterations}, relative residual=${res.relativeResidual.toExponential(2)}, backend=${res.hardwareAcceleration}. No GPU speedup or solver qualification is established.`
@@ -5186,7 +5892,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       icon: getPaletteIcon('play'),
       action: () => {
         switchStudio('aerospace');
-        window.storytellingRails?.loadStagePreset('nasa_rocket');
+        const rails = window.storytellingRails || window.omniStorytelling;
+        rails?.loadStagePreset('nasa_rocket');
       }
     },
 
@@ -5254,11 +5961,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         )
     },
 
-    // Compliance & Lifecycle
+    // Evidence and project tools
     {
       id: 'tool-asme-viii',
       title: 'Experimental Stress Screen',
-      desc: 'Unreleased stress-line calculations for research and development only',
+      desc: 'Open the experimental stress-line screen; no ASME code assessment or certification evidence is available',
       category: 'compliance',
       icon: getPaletteIcon('asme'),
       action: () => {
@@ -5408,14 +6115,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       icon: getPaletteIcon('auditReport'),
       action: async () => {
         window.omniSetSolverProgress('Requesting experimental diagnostics...', 40);
+        const jobId = 'gold-benchmarks-' + Date.now();
+        window.OmniJobMonitor.startJob(jobId, 'Gold Benchmarks');
         const res = await window.omniEngAPI?.run100GoldBenchmarks?.();
         if (!res?.success) {
+          window.OmniJobMonitor.endJob(jobId);
           window.omniSetSolverProgress('Diagnostics unavailable', 100, false);
           addAiMessage(
             `[Validation Evidence] ${res?.error?.message || 'No released validation service is configured.'}`
           );
           return;
         }
+        window.OmniJobMonitor.updateProgress(100, 'Gold Benchmarks completed');
+        window.OmniJobMonitor.endJob(jobId);
         const summary = res.summary || res;
         window.omniSetSolverProgress('Experimental diagnostics completed', 100, true);
         addAiMessage(
@@ -5526,13 +6238,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       category: 'cad',
       icon: getPaletteIcon('camGcode'),
       action: async () => {
-        window.omniSetSolverProgress('Generating experimental toolpath example...', 50);
-        const res = await window.omniEngAPI?.camGenerateToolpath?.({
-          stepdown: 2.5,
-          stepover: 4.0,
-          feedrate: 800,
-          spindleRPM: 6000
-        });
+        const { request, reason } = getExplicitCamRequest();
+        if (!request) {
+          window.omniSetSolverProgress('CAM example needs explicit inputs', 100, false);
+          addAiMessage(`[Experimental toolpath] ${reason} Enter them in the CAM panel first.`);
+          return;
+        }
+        window.omniSetSolverProgress('Generating experimental toolpath from supplied inputs...', 50);
+        const res = await window.omniEngAPI?.camGenerateToolpath?.(request);
         if (!res?.success || !res.toolpath || typeof res.gcode !== 'string') {
           window.omniSetSolverProgress('Experimental toolpath unavailable', 100, false);
           addAiMessage('[Experimental toolpath] No result was returned.');
@@ -5613,6 +6326,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         addAiMessage(
           `[Plant Thermodynamics] ${res?.error?.message || res?.error || 'No validated non-ideal mixture result was returned.'}`
         );
+      }
+    },
+    {
+      id: 'pid-studio',
+      title: 'Generate P&ID',
+      desc: 'Generate an experimental oil & gas P&ID drawing with schedule and validation tables',
+      category: 'plant',
+      icon: getPaletteIcon('piping'),
+      action: () => {
+        btnOpenPidStudio?.click();
       }
     }
   ];
@@ -6063,6 +6786,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
+    // Click the first existing element among candidate ids; warn when none exist.
+    const clickMenuFallback = (candidates) => {
+      for (const candidateId of candidates) {
+        const el = document.getElementById(candidateId);
+        if (el) {
+          el.click();
+          return true;
+        }
+      }
+      console.warn(`[Viewport Context Menu] No handler element found (tried: ${candidates.join(', ')})`);
+      return false;
+    };
+
     // Handle context menu actions
     viewportContextMenu.querySelectorAll('.context-menu-item').forEach((item) => {
       item.addEventListener('click', async () => {
@@ -6077,16 +6813,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             addAiMessage('[Selection Filter] Selection mask set to <strong>B-Rep Edges</strong>.');
             break;
           case 'extrude-face':
-            document.getElementById('cad-extrude-btn')?.click();
+            clickMenuFallback(['cad-extrude-btn', 'btn-cad-extrude']);
             break;
           case 'revolve-profile':
-            document.getElementById('cad-revolve-btn')?.click();
+            clickMenuFallback(['cad-revolve-btn', 'btn-cad-revolve']);
             break;
           case 'shell-body':
-            document.getElementById('cad-shell-btn')?.click();
+            clickMenuFallback(['cad-shell-btn', 'btn-cad-shell']);
             break;
           case 'cam-toolpath':
-            document.getElementById('cad-cam-preview-btn')?.click();
+            clickMenuFallback(['cad-cam-preview-btn', 'btn-generate-cam-toolpath']);
             break;
           case 'nonlinear-fea': {
             window.omniSetSolverProgress('Calculating experimental cantilever formula example...', 50);
@@ -6112,7 +6848,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             break;
           }
           case 'measure-caliper':
-            document.getElementById('btn-measure-caliper')?.click();
+            clickMenuFallback(['btn-measure-caliper', 'ribbon-btn-measure']);
             break;
           case 'toggle-wireframe':
             window.viewport3D?.toggleWireframe();
@@ -6129,4 +6865,405 @@ document.addEventListener('DOMContentLoaded', async () => {
   state.manualParams.nasaRocketArticle = 'full_stack';
   switchStudio('aerospace');
   viewport3D.renderNasaSpaceRocket3D('full_stack');
+});
+
+// Industrial capability probes: explicit renderer call sites for capabilities
+// whose IPC and preload surfaces exist but had no verified UI/headless route.
+document.addEventListener('DOMContentLoaded', () => {
+  const section = document.createElement('section');
+  section.id = 'industrial-capability-probes';
+  section.className = 'panel';
+  section.style.cssText = 'margin:12px;padding:12px;border:1px solid var(--border, rgba(255,255,255,0.08));';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Industrial Capability Probes';
+  heading.style.cssText =
+    'margin:0 0 8px 0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted, #8a93a6);';
+  section.appendChild(heading);
+
+  const hint = document.createElement('p');
+  hint.textContent =
+    'Each probe invokes one registered experimental engineering route with caller-supplied inputs. Results are diagnostic only.';
+  hint.style.cssText = 'font-size:11px;margin:0 0 10px 0;opacity:0.75;';
+  section.appendChild(hint);
+
+  const status = document.createElement('pre');
+  status.setAttribute('aria-live', 'polite');
+  status.style.cssText =
+    'max-height:180px;overflow:auto;font-size:11px;white-space:pre-wrap;line-height:1.4;margin-top:8px;background:rgba(0,0,0,0.22);padding:8px;border-radius:4px;';
+  section.appendChild(status);
+
+  const report = (label, res) => {
+    const ok = Boolean(res && (res.success === true || res.converged === true));
+    const line = `[${ok ? 'OK' : 'ERR'}] ${label}\n${JSON.stringify(res, null, 2)}\n`;
+    status.textContent = line + status.textContent;
+  };
+
+  const addProbe = (label, run) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ribbon-btn action-btn';
+    btn.style.cssText = 'margin:0 6px 6px 0;font-size:11px;';
+    btn.textContent = label;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const res = await run();
+        report(label, res);
+      } catch (err) {
+        report(label, { success: false, error: { message: String(err?.message || err) } });
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    section.appendChild(btn);
+  };
+
+  addProbe('NURBS surface evaluation', async () =>
+    window.omniEngAPI?.evaluateNurbs?.({
+      degree: 3,
+      controlPoints: [
+        [0, 0, 0],
+        [10, 5, 0],
+        [20, 0, 0]
+      ],
+      u: 0.5
+    })
+  );
+
+  addProbe('NURBS surface intersection', async () =>
+    window.omniEngAPI?.intersectBasicNurbs?.({
+      z1: 5,
+      y2: 10,
+      width1: 20,
+      height1: 20,
+      width2: 20,
+      height2: 20
+    })
+  );
+
+  addProbe('HEX20 linear-elastic FEA', async () => {
+    const coords = Array.from({ length: 20 }, (_, i) => ({
+      x: i % 2,
+      y: Math.floor(i / 2) % 2,
+      z: Math.floor(i / 4)
+    }));
+    return window.omniEngAPI?.solveFEA?.({
+      coords,
+      material: { E: 70e9, nu: 0.33, yieldStress: 2.76e8 },
+      fixedNodes: [0, 1, 2, 3],
+      loadNode: 4,
+      force: { x: 0, y: 0, z: -500 }
+    });
+  });
+
+  addProbe('Roe flux (transonic Riemann)', async () =>
+    window.omniEngAPI?.solveTransonicRiemann?.({
+      method: 'roe',
+      leftState: { rho: 1.0, u: 0, v: 0, w: 0, p: 1e5 },
+      rightState: { rho: 0.125, u: 0, v: 0, w: 0, p: 1e4 },
+      normal: { x: 1, y: 0, z: 0 }
+    })
+  );
+
+  addProbe('Rocket nozzle / propulsion estimate', async () =>
+    window.omniEngAPI?.solveNasaRocket?.({
+      chamberPressurePa: 5e6,
+      expansionRatio: 16,
+      throatAreaM2: 0.05
+    })
+  );
+
+  addProbe('Hohmann orbital transfer delta-v', async () =>
+    window.omniEngAPI?.calculateOrbitalTransfer?.({
+      r1Meters: 6.7e6,
+      r2Meters: 4.2e7
+    })
+  );
+
+  addProbe('Supersonic shock-expansion estimate', async () =>
+    window.omniEngAPI?.runAerospaceCFD?.({
+      machNumber: 2.0,
+      deflectionAngleDeg: 8,
+      altitudeM: 10000
+    })
+  );
+
+  addProbe('LQR Riccati synthesis', async () =>
+    window.omniEngAPI?.synthesizeLQR?.({
+      A: [
+        [0, 1],
+        [0, 0]
+      ],
+      B: [[0], [1]],
+      Q: [
+        [1, 0],
+        [0, 1]
+      ],
+      R: [[1]],
+      maxIter: 50,
+      tolerance: 1e-6
+    })
+  );
+
+  addProbe('MPC active-set QP', async () =>
+    window.omniEngAPI?.solveMPC?.({
+      options: {
+        A: [
+          [1, 0.1],
+          [0, 1]
+        ],
+        B: [[0], [0.1]],
+        C: [[1, 0]],
+        predictionHorizon: 10,
+        controlHorizon: 3,
+        Q: [1, 1],
+        R: [0.1],
+        Rdelta: [0.01],
+        uMin: [-10],
+        uMax: [10],
+        deltaUMax: [5],
+        initialControl: [0]
+      },
+      x0: [0, 0],
+      yRef: [1]
+    })
+  );
+
+  addProbe('State-space LTI simulation', async () =>
+    window.omniEngAPI?.solveStateSpaceLTI?.({
+      A: [
+        [0, 1],
+        [-2, -3]
+      ],
+      B: [[0], [1]],
+      C: [[1, 0]],
+      D: [[0]],
+      initialX: [0, 0],
+      tEnd: 2.0,
+      dt: 0.01
+    })
+  );
+
+  addProbe('Extended Kalman filter estimate', async () =>
+    window.omniEngAPI?.estimateEKF?.({
+      dt: 0.01,
+      gyro: [0, 0, 0],
+      accel: [0, 0, -9.80665],
+      recordTrajectory: true
+    })
+  );
+
+  addProbe('Robotics forward kinematics', async () =>
+    window.omniEngAPI?.runRoboticsOperation?.({
+      operation: 'forward_kinematics',
+      parameters: { preset: 'UR5E', jointAnglesRad: [0, 0, 0, 0, 0, 0] }
+    })
+  );
+
+  addProbe('Robotics inverse kinematics', async () =>
+    window.omniEngAPI?.runRoboticsOperation?.({
+      operation: 'damped_least_squares_levenberg_marquardt_ik',
+      parameters: { preset: 'UR5E', targetPose: { position: [0.3, 0, 0.5] } }
+    })
+  );
+
+  addProbe('Robotics inverse dynamics', async () =>
+    window.omniEngAPI?.runRoboticsOperation?.({
+      operation: 'recursive_newton_euler_inverse_dynamics',
+      parameters: { preset: 'UR5E', jointAnglesRad: [0, 0, 0, 0, 0, 0] }
+    })
+  );
+
+  addProbe('Robotics trajectory planning', async () =>
+    window.omniEngAPI?.runRoboticsOperation?.({
+      operation: 'minimum_jerk_quintic_trajectory_generation',
+      parameters: { preset: 'UR5E' }
+    })
+  );
+
+  addProbe('URDF parsing', async () =>
+    window.omniEngAPI?.runRoboticsOperation?.({
+      operation: 'deterministic_urdf_xml_json_parser',
+      parameters: { urdf: '<robot name="probe"><link name="base"/></robot>' }
+    })
+  );
+
+  addProbe('MCMM static timing analysis', async () =>
+    window.omniEngAPI?.runMcmmSTA?.({
+      pathDelayPs: 1200,
+      cornerFactors: { ss: 1.1, tt: 1.0, ff: 0.9 }
+    })
+  );
+
+  addProbe('GDSII export', async () =>
+    window.omniEngAPI?.exportGdsii?.({ cells: [{ name: 'PROBE_CELL', geometries: [] }] })
+  );
+
+  addProbe('3D parasitic extraction estimate', async () =>
+    window.omniEngAPI?.extractPex3D?.({
+      geometry: { widthM: 1e-6, heightM: 1e-6, lengthM: 10e-6 },
+      material: { resistivityOhmM: 2.82e-8, permittivity: 3.9 }
+    })
+  );
+
+  addProbe('Signal integrity crosstalk', async () =>
+    window.omniEngAPI?.evaluateSignalIntegrityPower?.({
+      kind: 'signal',
+      spec: { aggressorV: 1.0, couplingFactor: 0.1 }
+    })
+  );
+
+  addProbe('Power-grid IR drop estimate', async () =>
+    window.omniEngAPI?.evaluateSignalIntegrityPower?.({
+      kind: 'power',
+      vdd: 1.0,
+      maxDropThresholdPercent: 10,
+      metalThickness: 1e-6,
+      padNodeIds: ['p0'],
+      currentLoads: [{ nodeId: 'n0', currentA: 1e-4 }]
+    })
+  );
+
+  addProbe('Wavefront PSF/MTF evaluation', async () =>
+    window.omniEngAPI?.evaluateWavefrontPSF?.({
+      grid: 128,
+      wavelengthNm: 550,
+      apertureMm: 25,
+      focalLengthMm: 50,
+      wavefrontTerms: {}
+    })
+  );
+
+  addProbe('Thin-film coating evaluation', async () =>
+    window.omniEngAPI?.evaluateThinFilmCoating?.({
+      stack: [
+        { thicknessNm: 100, index: 1.45 },
+        { thicknessNm: 120, index: 2.0 }
+      ],
+      angleDeg: 0,
+      wavelengthNm: 550
+    })
+  );
+
+  addProbe('Peng-Robinson VLE flash', async () =>
+    window.omniEngAPI?.flashPengRobinson?.({
+      components: [
+        {
+          name: 'Methane',
+          criticalTemperatureK: 190.56,
+          criticalPressurePa: 45.99e5,
+          acentricFactor: 0.011
+        },
+        {
+          name: 'Ethane',
+          criticalTemperatureK: 305.32,
+          criticalPressurePa: 48.72e5,
+          acentricFactor: 0.099
+        }
+      ],
+      feedMoles: [0.5, 0.5],
+      pressurePa: 3e6,
+      temperatureK: 280
+    })
+  );
+
+  addProbe('TEMA heat-exchanger rating', async () =>
+    window.omniEngAPI?.rateTemaHeatExchanger?.({
+      shell: { diameterMm: 500, baffleSpacingMm: 250 },
+      tubes: { outerDiameterMm: 19.05, pitchMm: 25.4, count: 200 },
+      fluids: { shellSide: { massFlowKgS: 20, cpJKgK: 4200 }, tubeSide: { massFlowKgS: 10, cpJKgK: 2500 } }
+    })
+  );
+
+  addProbe('PDM lifecycle-rule validation', async () =>
+    window.omniEngAPI?.validateLifecycle?.({
+      item: { partNumber: 'PRB-001', name: 'Probe Part', lifecycleState: 'in_work' }
+    })
+  );
+
+  addProbe('HPC local parallel dispatch', async () =>
+    window.omniEngAPI?.hpcExecuteLocalParallel?.({
+      taskType: 'PARALLEL_COMPUTE',
+      payload: { value: 42 }
+    })
+  );
+
+  addProbe('HPC storage-use estimate', async () =>
+    window.omniEngAPI?.hpcPlanOutOfCore?.({
+      dofCount: 100000,
+      availableRamBytes: 8e9,
+      assumptions: { matrixNonzerosPerDof: 20, factorEntriesPerDof: 200 }
+    })
+  );
+
+  addProbe('Sparse Cholesky solve', async () =>
+    window.omniEngAPI?.solveSparseCholesky?.({
+      N: 3,
+      triplets: [
+        [0, 0, 4],
+        [1, 1, 9],
+        [2, 2, 16]
+      ],
+      b: [4, 9, 16]
+    })
+  );
+
+  addProbe('Sparse ordering report', async () => window.omniEngAPI?.solveSparseOrdering?.({ N: 40 }));
+
+  addProbe('PCG dense solve', async () =>
+    window.omniEngAPI?.solvePcgDense?.({
+      method: 'pcg',
+      A: [
+        [4, 1],
+        [1, 3]
+      ],
+      b: [1, 2]
+    })
+  );
+
+  addProbe('Gaussian dense solve', async () =>
+    window.omniEngAPI?.solvePcgDense?.({
+      method: 'gaussian',
+      A: [
+        [4, 1],
+        [1, 3]
+      ],
+      b: [1, 2]
+    })
+  );
+
+  addProbe('ASME stress screen', async () =>
+    window.omniEngAPI?.evaluateASMEVIIIDiv2?.({
+      sclPoints: [
+        { x: -10.0, stressMpa: 120 },
+        { x: 10.0, stressMpa: 150 }
+      ],
+      wallThicknessMm: 20.0,
+      allowableStressS: 138,
+      allowableStressSource: 'Caller-supplied screening limit',
+      isSecondaryThermal: false
+    })
+  );
+
+  addProbe('Artifact SHA-256 hash', async () =>
+    window.omniEngAPI?.hashArtifactSha256?.({ content: 'engineering probe artifact' })
+  );
+
+  addProbe('Diagnostic maturity report', async () => window.omniEngAPI?.generateMaturityReport?.({}));
+
+  addProbe('CAS blob store + retrieve', async () => {
+    const added = await window.omniEngAPI?.addBlob?.({
+      content: 'engineering probe artifact',
+      mimeType: 'text/plain'
+    });
+    if (!added?.success || !added.hash) return added;
+    return window.omniEngAPI?.getBlob?.({ hash: added.hash });
+  });
+
+  addProbe('Ledger integrity verification', async () => window.omniEngAPI?.verifyLedger?.());
+
+  addProbe('Stenographer proposals', async () => window.omniEngAPI?.getProposals?.());
+
+  document.body.appendChild(section);
 });

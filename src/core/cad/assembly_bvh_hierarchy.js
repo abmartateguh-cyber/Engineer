@@ -1,12 +1,8 @@
 /**
- * OmniEng 100,000+ Part Assembly Spatial Hierarchy (BVH & Dynamic AABB Tree)
- * 
- * Provides high-performance spatial partitioning for massive aerospace & automotive assemblies:
- * 1. Bounding Volume Hierarchy (BVH) with Surface Area Heuristic (SAH) construction.
- * 2. O(log N) interference fit detection and part collision queries.
- * 3. Hierarchical sub-assembly kinematic traversal.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental AABB hierarchy for assembly overlap candidate screening. It
+ * recursively splits parts at the median of the longest axis and reports
+ * overlapping boxes; capacity, performance, and solid-level collision accuracy
+ * have not been independently characterized.
  */
 
 'use strict';
@@ -44,9 +40,12 @@ class AABB3D {
 
   intersects(other) {
     return (
-      this.min.x <= other.max.x && this.max.x >= other.min.x &&
-      this.min.y <= other.max.y && this.max.y >= other.min.y &&
-      this.min.z <= other.max.z && this.max.z >= other.min.z
+      this.min.x <= other.max.x &&
+      this.max.x >= other.min.x &&
+      this.min.y <= other.max.y &&
+      this.max.y >= other.min.y &&
+      this.min.z <= other.max.z &&
+      this.max.z >= other.min.z
     );
   }
 
@@ -112,7 +111,7 @@ class AssemblyBVHHierarchy {
   }
 
   /**
-   * Finds all interfering/colliding part pairs across the assembly in O(N log N)
+   * Finds pairs of parts whose axis-aligned bounding boxes overlap.
    * @returns {Array<Object>} Colliding pairs
    */
   findInterferences() {
@@ -129,7 +128,8 @@ class AssemblyBVHHierarchy {
     if (nodeA.isLeaf && nodeB.isLeaf) {
       for (const pA of nodeA.parts) {
         for (const pB of nodeB.parts) {
-          if (pA.id !== pB.id && pA.id < pB.id) { // Avoid duplicate pair check
+          if (pA.id !== pB.id && pA.id < pB.id) {
+            // Avoid duplicate pair check
             if (pA.aabb.intersects(pB.aabb)) {
               collisions.push({
                 partA: pA.id,

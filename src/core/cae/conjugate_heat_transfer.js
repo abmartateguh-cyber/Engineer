@@ -1,11 +1,7 @@
 /**
- * OmniEng Conjugate Heat Transfer (CHT) Solid-Fluid Interface Coupling Engine
- * 
- * Experimental thermal coupling example:
- * 1. Interface energy flux conservation across non-conformal fluid-solid boundaries.
- * 2. Enforces temperature continuity: T_fluid = T_solid.
- * 3. Enforces heat flux continuity: -k_fluid * (dT/dn)_fluid = -k_solid * (dT/dn)_solid.
- * 4. Harmonic mean thermal conductivity weighting across interface cells.
+ * Experimental one-step fluid-solid interface heat-flux arithmetic.
+ * This helper does not assemble a conjugate heat-transfer solver or enforce
+ * interface continuity on a mesh.
  * 
  * No independent CHT validation or comparison to a production solver is established.
  */
@@ -14,19 +10,24 @@
 
 class ConjugateHeatTransferEngine {
   /**
-   * Couples solid and fluid cell temperatures across an interface face
+   * Computes an interface heat-flux estimate from caller-supplied cell properties
    * @param {Object} fluidCell - Fluid domain cell { T, k, centroid }
    * @param {Object} solidCell - Solid domain cell { T, k, centroid }
    * @param {Object} face - Interface face { area, normal }
    * @returns {{interfaceTemp: number, heatFluxW_m2: number, totalHeatPowerW: number}}
    */
   static evaluateInterfaceHeatFlux(fluidCell, solidCell, face) {
-    const k_f = fluidCell.k || 0.026; // Air thermal conductivity W/(m*K)
-    const k_s = solidCell.k || 205.0; // Aluminum thermal conductivity W/(m*K)
+    this.validateCell(fluidCell, 'fluid');
+    this.validateCell(solidCell, 'solid');
+    if (!face || !Number.isFinite(face.area) || face.area <= 0) {
+      throw new TypeError('Provide a positive finite interface face area in square metres.');
+    }
+    const k_f = fluidCell.k;
+    const k_s = solidCell.k;
 
     // Normal distance from fluid centroid to interface, and solid centroid to interface
-    const d_f = Math.max(1e-5, fluidCell.wallDistance || 1e-3);
-    const d_s = Math.max(1e-5, solidCell.wallDistance || 2e-3);
+    const d_f = fluidCell.wallDistance;
+    const d_s = solidCell.wallDistance;
 
     // Harmonic interface thermal conductance: 1 / U_int = (d_f / k_f) + (d_s / k_s)
     const thermalResistance = (d_f / k_f) + (d_s / k_s);
@@ -41,7 +42,7 @@ class ConjugateHeatTransferEngine {
     const h_s = k_s / d_s;
     const T_interface = (h_f * fluidCell.T + h_s * solidCell.T) / (h_f + h_s);
 
-    const totalPower = qFlux * (face.area || 1e-4);
+    const totalPower = qFlux * face.area;
 
     return {
       interfaceTempK: Number(T_interface.toFixed(2)),
@@ -52,12 +53,26 @@ class ConjugateHeatTransferEngine {
     };
   }
 
+  static validateCell(cell, label) {
+    const required = ['T', 'k', 'wallDistance'];
+    if (!cell || typeof cell !== 'object' || !required.every((field) => Number.isFinite(cell[field]))) {
+      throw new TypeError(`Provide explicit ${label} cell temperature, conductivity, and wall distance.`);
+    }
+    if (cell.T <= 0 || cell.k <= 0 || cell.wallDistance <= 0) {
+      throw new RangeError(`${label} cell temperature, conductivity, and wall distance must be positive.`);
+    }
+    return cell;
+  }
+
   /**
-   * Relaxes coupled solid and fluid cell temperatures toward thermodynamic equilibrium
-   * @param {Array<Object>} interfacePairs Array of { fluidCell, solidCell, face }
-   * @param {number} [dt=0.01] Time step in seconds
+   * Applies one explicit energy update to caller-supplied solid and fluid cells
+   * @param {Array<Object>} interfacePairs Array of { fluidCell, solidCell, face }; cells must also include rho, Cp and volume.
+   * @param {number} dt Time step in seconds
    */
-  static solveCoupledEnergyStep(interfacePairs = [], dt = 0.01) {
+  static solveCoupledEnergyStep(interfacePairs, dt) {
+    if (!Array.isArray(interfacePairs) || !Number.isFinite(dt) || dt <= 0) {
+      throw new TypeError('Provide interface pairs and a positive finite time step in seconds.');
+    }
     let totalHeatTransfer = 0.0;
 
     for (const pair of interfacePairs) {
@@ -65,8 +80,10 @@ class ConjugateHeatTransferEngine {
       totalHeatTransfer += Math.abs(res.totalHeatPowerW);
 
       // Energy balance update: dT/dt = Q / (rho * Cp * V)
-      const capF = (pair.fluidCell.rho || 1.225) * (pair.fluidCell.Cp || 1005.0) * (pair.fluidCell.volume || 1e-4);
-      const capS = (pair.solidCell.rho || 2700.0) * (pair.solidCell.Cp || 900.0) * (pair.solidCell.volume || 1e-4);
+      this.validateEnergyCell(pair.fluidCell, 'fluid');
+      this.validateEnergyCell(pair.solidCell, 'solid');
+      const capF = pair.fluidCell.rho * pair.fluidCell.Cp * pair.fluidCell.volume;
+      const capS = pair.solidCell.rho * pair.solidCell.Cp * pair.solidCell.volume;
 
       pair.fluidCell.T += (res.totalHeatPowerW * dt) / capF;
       pair.solidCell.T -= (res.totalHeatPowerW * dt) / capS;
@@ -75,8 +92,17 @@ class ConjugateHeatTransferEngine {
     return {
       pairsCount: interfacePairs.length,
       totalHeatExchangeWatts: Number(totalHeatTransfer.toFixed(3)),
-      converged: totalHeatTransfer < 1e-3
+      stepCompleted: true,
+      convergenceAssessed: false
     };
+  }
+
+  static validateEnergyCell(cell, label) {
+    this.validateCell(cell, label);
+    const required = ['rho', 'Cp', 'volume'];
+    if (!required.every((field) => Number.isFinite(cell[field]) && cell[field] > 0)) {
+      throw new TypeError(`Provide positive ${label} cell density, heat capacity, and volume.`);
+    }
   }
 }
 

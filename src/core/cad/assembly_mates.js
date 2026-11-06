@@ -1,9 +1,7 @@
 /**
- * OmniEng 3D Multi-Body Assembly Kinematic Constraint Solver
- * Experimental implementation: Siemens D-Cubed AEM / SolidWorks Assembly Mates
- *
- * Implements 6-DOF Multi-Body Kinematic Solvers with Levenberg-Marquardt optimization,
- * Dual Quaternion representations, and Rank-Revealing QR Decomposition for DOF analysis.
+ * Experimental multi-body mate constraint solver using finite-difference
+ * residuals and damped normal-equation updates. It uses quaternions; returned
+ * rank and remaining-DOF values are estimates, not QR-based rank analysis.
  *
  * Constraints Supported:
  *  - COINCIDENT_PLANES (Face-to-Face contact)
@@ -18,13 +16,63 @@
 
 const { Vector3, Quaternion } = require('../math/linear_algebra');
 
+function readFiniteTuple(value, length, label) {
+  const tuple = Array.isArray(value)
+    ? value
+    : value && typeof value === 'object'
+      ? length === 3
+        ? [value.x, value.y, value.z]
+        : [value.w, value.x, value.y, value.z]
+      : null;
+  if (
+    !tuple ||
+    tuple.length !== length ||
+    !tuple.every((component) => typeof component === 'number' && Number.isFinite(component))
+  ) {
+    throw new TypeError(`${label} must contain exactly ${length} finite numeric components.`);
+  }
+  return [...tuple];
+}
+
+function readVector3(value, label) {
+  const [x, y, z] = readFiniteTuple(value, 3, label);
+  return new Vector3(x, y, z);
+}
+
+function readQuaternion(value, label) {
+  const [w, x, y, z] = readFiniteTuple(value, 4, label);
+  const quaternion = new Quaternion(w, x, y, z);
+  const magnitude = Math.hypot(w, x, y, z);
+  if (magnitude <= 1e-12) throw new TypeError(`${label} must have a non-zero magnitude.`);
+  return quaternion.normalize();
+}
+
+function requireDirection(value, label) {
+  const direction = readVector3(value, label);
+  if (direction.length() <= 1e-12) throw new TypeError(`${label} must have a non-zero magnitude.`);
+  return direction;
+}
+
 class AssemblyComponent {
   constructor(id, name = 'Part', options = {}) {
+    if (typeof id !== 'string' || !id.trim()) throw new TypeError('Assembly component id must be a non-empty string.');
+    if (typeof name !== 'string' || !name.trim())
+      throw new TypeError('Assembly component name must be a non-empty string.');
+    if (!options || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError('Assembly component options must be an object.');
+    }
+    if (options.fixed !== undefined && typeof options.fixed !== 'boolean') {
+      throw new TypeError('Assembly component fixed must be a boolean when supplied.');
+    }
     this.id = id;
     this.name = name;
-    this.position = options.position ? options.position.clone() : new Vector3(0, 0, 0);
-    this.rotation = options.rotation ? options.rotation.clone() : new Quaternion(1, 0, 0, 0);
-    this.fixed = !!options.fixed;
+    this.position =
+      options.position === undefined ? new Vector3(0, 0, 0) : readVector3(options.position, 'Assembly position');
+    this.rotation =
+      options.rotation === undefined
+        ? new Quaternion(1, 0, 0, 0)
+        : readQuaternion(options.rotation, 'Assembly rotation');
+    this.fixed = options.fixed ?? false;
   }
 
   /**
@@ -55,6 +103,61 @@ class AssemblyMateSolver {
   addComponent(comp) {
     this.components.set(comp.id, comp);
     return comp;
+  }
+
+  /**
+   * Generic add mate method matching geometry engine adapter dispatch
+   */
+  addMate(mate) {
+    if (!mate || typeof mate !== 'object' || Array.isArray(mate)) {
+      throw new TypeError('Assembly mate must be an object.');
+    }
+    if (typeof mate.type !== 'string' || !mate.type.trim()) {
+      throw new TypeError('Assembly mate type is required.');
+    }
+    if (
+      typeof mate.compA !== 'string' ||
+      !this.components.has(mate.compA) ||
+      typeof mate.compB !== 'string' ||
+      !this.components.has(mate.compB)
+    ) {
+      throw new TypeError('Assembly mate requires two registered component identifiers.');
+    }
+
+    const aliases = {
+      COINCIDENT: 'COINCIDENT_PLANES',
+      COINCIDENT_PLANES: 'COINCIDENT_PLANES',
+      CONCENTRIC: 'CONCENTRIC',
+      CONCENTRIC_AXES: 'CONCENTRIC',
+      DISTANCE: 'DISTANCE',
+      DISTANCE_OFFSET: 'DISTANCE',
+      PARALLEL: 'PARALLEL',
+      PARALLEL_PLANES: 'PARALLEL',
+      PERPENDICULAR: 'PERPENDICULAR',
+      PERPENDICULAR_PLANES: 'PERPENDICULAR'
+    };
+    const type = aliases[mate.type.toUpperCase()];
+    if (!type) throw new TypeError(`Unsupported assembly mate type: ${mate.type}`);
+
+    const pointA = () => readVector3(mate.ptA, 'Assembly mate ptA');
+    const pointB = () => readVector3(mate.ptB, 'Assembly mate ptB');
+    const normalA = (field = 'normA') => requireDirection(mate[field], `Assembly mate ${field}`);
+    const normalB = (field = 'normB') => requireDirection(mate[field], `Assembly mate ${field}`);
+
+    if (type === 'COINCIDENT_PLANES') {
+      this.addCoincidentPlanes(mate.compA, pointA(), normalA(), mate.compB, pointB(), normalB());
+    } else if (type === 'CONCENTRIC') {
+      this.addConcentric(mate.compA, pointA(), normalA('axisA'), mate.compB, pointB(), normalB('axisB'));
+    } else if (type === 'DISTANCE') {
+      if (typeof mate.distance !== 'number' || !Number.isFinite(mate.distance) || mate.distance < 0) {
+        throw new TypeError('Assembly mate distance must be a non-negative finite number.');
+      }
+      this.addDistance(mate.compA, pointA(), normalA(), mate.compB, pointB(), normalB(), mate.distance);
+    } else if (type === 'PARALLEL') {
+      this.addParallel(mate.compA, normalA(), mate.compB, normalB());
+    } else if (type === 'PERPENDICULAR') {
+      this.addPerpendicular(mate.compA, normalA(), mate.compB, normalB());
+    }
   }
 
   getComponent(id) {
@@ -213,10 +316,11 @@ class AssemblyMateSolver {
   }
 
   /**
-   * Solves assembly kinematics using Levenberg-Marquardt with QR rank analysis.
+   * Solves mate residuals using damped normal equations. Rank and remaining
+   * degrees of freedom are rough counts based on the number of mates.
    */
   solve(maxIterations = 50, tolerance = 1e-6) {
-    const freeComps = Array.from(this.components.values()).filter(c => !c.fixed);
+    const freeComps = Array.from(this.components.values()).filter((c) => !c.fixed);
     if (freeComps.length === 0 || this.mates.length === 0) {
       return { success: true, iterations: 0, maxResidual: 0, rank: 0, dofRemaining: 0 };
     }
@@ -288,12 +392,12 @@ class AssemblyMateSolver {
       }
 
       const JtR = AssemblyMateSolver._matVecMul(AssemblyMateSolver._transpose(J), R);
-      const negJtR = JtR.map(v => -v);
+      const negJtR = JtR.map((v) => -v);
 
       const deltaX = AssemblyMateSolver._solveLinearSystem(JtJ, negJtR);
 
       // Trial update
-      const backupState = freeComps.map(c => ({
+      const backupState = freeComps.map((c) => ({
         pos: c.position.clone(),
         rot: c.rotation.clone()
       }));
@@ -341,7 +445,7 @@ class AssemblyMateSolver {
       rank,
       totalDOFs,
       dofRemaining,
-      components: Array.from(this.components.values()).map(c => ({
+      components: Array.from(this.components.values()).map((c) => ({
         id: c.id,
         name: c.name,
         position: c.position.toArray(),
@@ -385,7 +489,7 @@ class AssemblyMateSolver {
   }
 
   static _matVecMul(M, v) {
-    return M.map(row => row.reduce((sum, val, idx) => sum + val * v[idx], 0));
+    return M.map((row) => row.reduce((sum, val, idx) => sum + val * v[idx], 0));
   }
 
   static _solveLinearSystem(A, b) {
@@ -417,7 +521,7 @@ class AssemblyMateSolver {
       }
     }
 
-    return aug.map(row => row[n]);
+    return aug.map((row) => row[n]);
   }
 }
 

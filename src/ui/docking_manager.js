@@ -1,12 +1,12 @@
 /**
  * OmniEng Modeless Docking Panel Manager
- * 
+ *
  * Replaces blocking modal dialogs with flexible CAD workstation docking panels:
  *   - Allows tools (Optics, SPICE Scope, Flowsheet PFD, Healer, ASME Report, CAD Diff)
  *     to be docked into Left Sidebar, Right Inspector, Bottom Dock, or Float.
  *   - Supports layout saving and restoration to localStorage.
  *   - Supports tear-off to child window or modeless floating container.
- *   - Maintains 100% backward compatibility with all legacy modal IDs and test selectors.
+ *   - Maintains compatibility with legacy modal IDs and test selectors.
  */
 
 'use strict';
@@ -106,7 +106,11 @@ class DockingManager {
 
     // Check if electron window opening is available, else float
     if (typeof window !== 'undefined' && window.open) {
-      const childWin = window.open(`ui/panel_host.html?panelId=${encodeURIComponent(panelId)}`, `Omni_${panelId}`, 'width=600,height=500,resizable=yes');
+      const childWin = window.open(
+        `ui/panel_host.html?panelId=${encodeURIComponent(panelId)}`,
+        `Omni_${panelId}`,
+        'width=600,height=500,resizable=yes'
+      );
       if (childWin) {
         this.detachedWindows.set(panelId, childWin);
         this.closePanel(panelId);
@@ -123,8 +127,8 @@ class DockingManager {
 
   getActivePanels() {
     return Array.from(this.panels.values())
-      .filter(p => p.isOpen)
-      .map(p => ({ id: p.id, title: p.title, slot: p.currentSlot }));
+      .filter((p) => p.isOpen)
+      .map((p) => ({ id: p.id, title: p.title, slot: p.currentSlot }));
   }
 
   saveLayout() {

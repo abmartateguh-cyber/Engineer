@@ -11,8 +11,11 @@
  *    - TANGENT: Circle-to-line or circle-to-circle smooth contact.
  *    - EQUAL_LENGTH: Symmetric sizing.
  * 3. Damped Newton-Raphson (Levenberg-Marquardt) solver:
- *    F(X) = 0, delta = -(J^T * J + lambda * I)^(-1) * J^T * F(X).
- * 4. Degrees-of-Freedom (DOF) status: under-constrained, fully-constrained, over-constrained.
+ *    F(X) = 0, delta = -(J^T * J + lambda * diag(J^T * J))^(-1) * J^T * F(X),
+ *    with adaptive lambda updates driven by the actual residual gain ratio.
+ * 4. Degrees-of-Freedom (DOF) status via SVD rank detection of the Jacobian:
+ *    under-constrained, fully-constrained, over-constrained. Exposed through
+ *    analyzeSystem() -> { rank, dof, constraintStatus, singularValues }.
  * 
  * Experimental implementation; release maturity and provenance are not established.
  */
@@ -89,6 +92,26 @@ class VariationalConstraintSolver {
     return c;
   }
 
+  _getFreePoints() {
+    return this.points.filter((p) => !p.fixed);
+  }
+
+  _stateVector(freePoints) {
+    const X = new Float64Array(freePoints.length * 2);
+    for (let i = 0; i < freePoints.length; i++) {
+      X[2 * i] = freePoints[i].x;
+      X[2 * i + 1] = freePoints[i].y;
+    }
+    return X;
+  }
+
+  _writeback(freePoints, X) {
+    for (let i = 0; i < freePoints.length; i++) {
+      freePoints[i].x = X[2 * i];
+      freePoints[i].y = X[2 * i + 1];
+    }
+  }
+
   /**
    * Evaluates the constraint residual vector F(X)
    * @param {Float64Array} X
@@ -137,7 +160,6 @@ class VariationalConstraintSolver {
         const d1y = l1p2.y - l1p1.y;
         const d2x = l2p2.x - l2p1.x;
         const d2y = l2p2.y - l2p1.y;
-        // Dot product must equal 0
         residuals.push(d1x * d2x + d1y * d2y);
       } else if (c.type === 'TANGENT_CIRCLE_LINE') {
         const cPt = ptMap.get(c.center);
@@ -146,7 +168,6 @@ class VariationalConstraintSolver {
         const dx = lp2.x - lp1.x;
         const dy = lp2.y - lp1.y;
         const L = Math.sqrt(dx * dx + dy * dy) || 1.0;
-        // Distance from point to line: |(x2-x1)(y1-y0) - (x1-x0)(y2-y1)| / L
         const dist = Math.abs(dx * (lp1.y - cPt.y) - (lp1.x - cPt.x) * dy) / L;
         residuals.push(dist - c.radius);
       }
@@ -155,30 +176,197 @@ class VariationalConstraintSolver {
   }
 
   /**
-   * Solves the geometric constraint system using Damped Newton-Raphson
+   * Builds the numerical Jacobian J (m x n) at state X.
+   * @param {Float64Array} X
+   * @returns {Object} { F, J } where J is an array of Float64Array rows
+   */
+  _numericalJacobian(X) {
+    const F = this.evaluateResiduals(X);
+    const m = F.length;
+    const n = X.length;
+    const J = Array.from({ length: m }, () => new Float64Array(n));
+    const eps = 1e-7;
+
+    for (let j = 0; j < n; j++) {
+      const orig = X[j];
+      X[j] += eps;
+      const Fplus = this.evaluateResiduals(X);
+      X[j] = orig;
+      for (let i = 0; i < m; i++) {
+        J[i][j] = (Fplus[i] - F[i]) / eps;
+      }
+    }
+    return { F, J };
+  }
+
+  /**
+   * Jacobi eigenvalue decomposition of a real symmetric matrix (householder-free,
+   * cyclic Jacobi rotations). Returns eigenvalues (ascending) and eigenvectors
+   * as columns of V.
+   * @param {Array<Float64Array>} A n x n symmetric matrix
+   * @returns {Object} { eigenvalues: Float64Array, V: Array<Float64Array> }
+   */
+  _eigenSymmetric(A, n) {
+    const V = Array.from({ length: n }, (_, i) => {
+      const row = new Float64Array(n);
+      row[i] = 1.0;
+      return row;
+    });
+    const a = Array.from({ length: n }, (_, i) => Float64Array.from(A[i]));
+
+    const maxIter = 100;
+    for (let iter = 0; iter < maxIter; iter++) {
+      let off = 0.0;
+      for (let p = 0; p < n - 1; p++) {
+        for (let q = p + 1; q < n; q++) off += a[p][q] * a[p][q];
+      }
+      if (Math.sqrt(off) < 1e-14) break;
+
+      for (let p = 0; p < n - 1; p++) {
+        for (let q = p + 1; q < n; q++) {
+          const apq = a[p][q];
+          if (Math.abs(apq) < 1e-14) continue;
+          const app = a[p][p];
+          const aqq = a[q][q];
+          const theta = (aqq - app) / (2 * apq);
+          const t = Math.sign(theta) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+          const c = 1 / Math.sqrt(t * t + 1);
+          const s = t * c;
+
+          for (let k = 0; k < n; k++) {
+            const akp = a[k][p];
+            const akq = a[k][q];
+            a[k][p] = c * akp - s * akq;
+            a[k][q] = s * akp + c * akq;
+          }
+          for (let k = 0; k < n; k++) {
+            const apk = a[p][k];
+            const aqk = a[q][k];
+            a[p][k] = c * apk - s * aqk;
+            a[q][k] = s * apk + c * aqk;
+          }
+          for (let k = 0; k < n; k++) {
+            const vkp = V[k][p];
+            const vkq = V[k][q];
+            V[k][p] = c * vkp - s * vkq;
+            V[k][q] = s * vkp + c * vkq;
+          }
+        }
+      }
+    }
+
+    const eigenvalues = new Float64Array(n);
+    for (let i = 0; i < n; i++) eigenvalues[i] = a[i][i];
+    return { eigenvalues, V };
+  }
+
+  /**
+   * Computes the singular values of J via the eigenvalues of J^T J
+   * (J^T J is symmetric positive semi-definite; sigma_i = sqrt(lambda_i)).
+   * @param {Array<Float64Array>} J m x n matrix (rows = residuals)
+   * @param {number} n
+   * @returns {Float64Array} singular values (ascending)
+   */
+  _singularValues(J, n) {
+    if (n === 0) return new Float64Array(0);
+    const JtJ = Array.from({ length: n }, () => new Float64Array(n));
+    for (const row of J) {
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          JtJ[r][c] += row[r] * row[c];
+        }
+      }
+    }
+    const { eigenvalues } = this._eigenSymmetric(JtJ, n);
+    const sigma = new Float64Array(n);
+    for (let i = 0; i < n; i++) sigma[i] = Math.sqrt(Math.max(0.0, eigenvalues[i]));
+    return sigma;
+  }
+
+  /**
+   * Analyzes the constraint system at the current point configuration using SVD
+   * rank detection on the Jacobian.
+   * @returns {Object} { rank, dof, constraintStatus, singularValues, numVariables, numConstraints, residualNorm }
+   */
+  analyzeSystem() {
+    const freePoints = this._getFreePoints();
+    const numVars = freePoints.length * 2;
+    const X = this._stateVector(freePoints);
+
+    if (numVars === 0) {
+      const F = this.evaluateResiduals(X);
+      let norm = 0.0;
+      for (let i = 0; i < F.length; i++) norm += F[i] * F[i];
+      return {
+        rank: 0,
+        dof: 0,
+        constraintStatus: 'FULLY_CONSTRAINED',
+        singularValues: new Float64Array(0),
+        numVariables: 0,
+        numConstraints: F.length,
+        residualNorm: Math.sqrt(norm)
+      };
+    }
+
+    const { F, J } = this._numericalJacobian(X);
+    const sigma = this._singularValues(J, numVars);
+
+    let maxSigma = 0.0;
+    for (let i = 0; i < sigma.length; i++) maxSigma = Math.max(maxSigma, sigma[i]);
+
+    const tol = maxSigma > 0 ? maxSigma * 1e-8 : 1e-12;
+    let rank = 0;
+    for (let i = 0; i < sigma.length; i++) {
+      if (sigma[i] > tol) rank++;
+    }
+
+    const dof = Math.max(0, numVars - rank);
+    const numConstraints = F.length;
+
+    let constraintStatus;
+    if (numConstraints > rank) {
+      constraintStatus = 'OVER_CONSTRAINED';
+    } else if (rank < numVars) {
+      constraintStatus = 'UNDER_CONSTRAINED';
+    } else {
+      constraintStatus = 'FULLY_CONSTRAINED';
+    }
+
+    let norm = 0.0;
+    for (let i = 0; i < F.length; i++) norm += F[i] * F[i];
+
+    return {
+      rank,
+      dof,
+      constraintStatus,
+      singularValues: sigma,
+      numVariables: numVars,
+      numConstraints,
+      residualNorm: Math.sqrt(norm)
+    };
+  }
+
+  /**
+   * Solves the geometric constraint system using Levenberg-Marquardt damping
+   * (scaled damped Gauss-Newton with adaptive lambda).
    * @returns {Object} Solution status and degrees of freedom diagnostics
    */
   solve() {
-    // 1. Map free point variables into state vector X
-    const freePoints = this.points.filter(p => !p.fixed);
+    const freePoints = this._getFreePoints();
     const numVars = freePoints.length * 2;
 
     if (numVars === 0) {
       return { converged: true, iterations: 0, residualNorm: 0.0, dofRemaining: 0 };
     }
 
-    const X = new Float64Array(numVars);
-    for (let i = 0; i < freePoints.length; i++) {
-      X[2 * i] = freePoints[i].x;
-      X[2 * i + 1] = freePoints[i].y;
-    }
+    const X = this._stateVector(freePoints);
 
     let lambda = 1e-3;
     let iter = 0;
     let finalResidualNorm = Infinity;
 
     for (iter = 0; iter < this.maxIterations; iter++) {
-      const F = this.evaluateResiduals(X);
+      const { F, J } = this._numericalJacobian(X);
       const m = F.length;
 
       let rNormSq = 0.0;
@@ -189,80 +377,111 @@ class VariationalConstraintSolver {
         break;
       }
 
-      // Compute numerical Jacobian J (m x numVars)
-      const J = Array.from({ length: m }, () => new Float64Array(numVars));
-      const eps = 1e-7;
-
-      for (let j = 0; j < numVars; j++) {
-        const orig = X[j];
-        X[j] += eps;
-        const Fplus = this.evaluateResiduals(X);
-        X[j] = orig;
-
-        for (let i = 0; i < m; i++) {
-          J[i][j] = (Fplus[i] - F[i]) / eps;
-        }
-      }
-
-      // Form Normal Equations: (J^T * J + lambda * I) * delta = -J^T * F
-      const JTJ = Array.from({ length: numVars }, () => new Float64Array(numVars));
-      const JTF = new Float64Array(numVars);
-
+      // Normal equations: JtJ and JtF
+      const JtJ = Array.from({ length: numVars }, () => new Float64Array(numVars));
+      const JtF = new Float64Array(numVars);
       for (let r = 0; r < numVars; r++) {
         let jtf = 0.0;
         for (let i = 0; i < m; i++) {
           jtf += J[i][r] * F[i];
           for (let c = 0; c < numVars; c++) {
-            JTJ[r][c] += J[i][r] * J[i][c];
+            JtJ[r][c] += J[i][r] * J[i][c];
           }
         }
-        JTJ[r][r] += lambda;
-        JTF[r] = -jtf;
+        JtF[r] = -jtf;
       }
 
-      // Solve small dense system via Gaussian Elimination
-      const delta = this.solveDenseSystem(JTJ, JTF, numVars);
-
-      // Trial update
+      // Levenberg-Marquardt damping: scale the diagonal by the curvature of JtJ
+      const D = new Float64Array(numVars);
       for (let j = 0; j < numVars; j++) {
-        X[j] += delta[j];
+        D[j] = Math.max(JtJ[j][j], 1e-12);
       }
+      const A = Array.from({ length: numVars }, (_, r) => {
+        const row = new Float64Array(numVars);
+        for (let c = 0; c < numVars; c++) row[c] = JtJ[r][c];
+        row[r] += lambda * D[r];
+        return row;
+      });
 
-      const Fnew = this.evaluateResiduals(X);
+      const delta = this.solveDenseSystem(A, JtF, numVars);
+
+      // Trial step
+      const Xtrial = new Float64Array(numVars);
+      let stepNorm = 0.0;
+      for (let j = 0; j < numVars; j++) {
+        Xtrial[j] = X[j] + delta[j];
+        stepNorm += delta[j] * delta[j];
+      }
+      stepNorm = Math.sqrt(stepNorm);
+
+      const Fnew = this.evaluateResiduals(Xtrial);
       let rNewNormSq = 0.0;
       for (let i = 0; i < m; i++) rNewNormSq += Fnew[i] * Fnew[i];
       const newNorm = Math.sqrt(rNewNormSq);
 
-      if (newNorm < finalResidualNorm) {
-        lambda = Math.max(1e-6, lambda * 0.5);
-      } else {
-        lambda *= 2.0;
+      // Gain ratio: actual reduction over model-predicted reduction
+      let modelReduction = 0.0;
+      for (let j = 0; j < numVars; j++) {
+        let jtJd = 0.0;
+        for (let c = 0; c < numVars; c++) jtJd += JtJ[j][c] * delta[c];
+        modelReduction -= delta[j] * JtF[j] + 0.5 * delta[j] * jtJd;
       }
+      const actualReduction = rNormSq - rNewNormSq;
+      const gainRatio = modelReduction > 1e-16 ? actualReduction / modelReduction : -1.0;
+
+      if (gainRatio > 1e-4 || newNorm < finalResidualNorm) {
+        // Accept step
+        for (let j = 0; j < numVars; j++) X[j] = Xtrial[j];
+        lambda = Math.max(1e-12, lambda / 10.0);
+        if (stepNorm < 1e-14 && newNorm < finalResidualNorm) {
+          finalResidualNorm = newNorm;
+          break;
+        }
+        if (newNorm < this.tolerance) {
+          finalResidualNorm = newNorm;
+          break;
+        }
+      } else {
+        // Reject step and increase damping
+        lambda = Math.min(1e12, lambda * 10.0);
+      }
+
+      if (finalResidualNorm < this.tolerance) break;
     }
 
-    // Update point coordinates
-    for (let i = 0; i < freePoints.length; i++) {
-      freePoints[i].x = X[2 * i];
-      freePoints[i].y = X[2 * i + 1];
-    }
+    this._writeback(freePoints, X);
 
-    const numEquations = this.evaluateResiduals(X).length;
-    const dof = Math.max(0, numVars - numEquations);
+    const analysis = this.analyzeSystem();
+    const finalF = this.evaluateResiduals(X);
+    let norm = 0.0;
+    for (let i = 0; i < finalF.length; i++) norm += finalF[i] * finalF[i];
+    const residualNorm = Math.sqrt(norm);
 
     const pointsMap = {};
     for (const pt of this.points) {
       pointsMap[pt.id] = { x: pt.x, y: pt.y, fixed: pt.fixed };
     }
 
+    const dof = analysis.dof;
+    const status =
+      dof === 0 && residualNorm < 1e-4
+        ? 'FULLY_CONSTRAINED'
+        : analysis.constraintStatus === 'OVER_CONSTRAINED'
+          ? 'OVER_CONSTRAINED'
+          : 'UNDER_CONSTRAINED';
+
     return {
-      converged: finalResidualNorm < 1e-6,
+      converged: residualNorm < 1e-6,
       iterations: iter,
-      residualNorm: finalResidualNorm,
+      residualNorm,
       numVariables: numVars,
-      numConstraints: numEquations,
+      numConstraints: analysis.numConstraints,
       dofRemaining: dof,
       degreesOfFreedom: dof,
-      status: dof === 0 && finalResidualNorm < 1e-4 ? 'FULLY_CONSTRAINED' : dof > 0 ? 'UNDER_CONSTRAINED' : 'OVER_CONSTRAINED',
+      status,
+      rank: analysis.rank,
+      constraintStatus: analysis.constraintStatus,
+      singularValues: analysis.singularValues,
       points: pointsMap
     };
   }

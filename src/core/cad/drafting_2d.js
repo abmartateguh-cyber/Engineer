@@ -1,11 +1,7 @@
 /**
- * OmniEng 2D Engineering Drafting & GD&T Engine
- * Standards: ISO 1101, ASME Y14.5, ISO 128 (Technical Drawings - Orthographic Projections)
- *
- * Implements automated orthographic projections (First-Angle & Third-Angle),
- * Hidden-Line Removal (HLR), associative dimensioning, and ASME/ISO Feature Control Frames.
- *
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental 2D drawing and dimension-label helpers. Complete ISO/ASME
+ * drafting or GD&T conformance and independent geometric validation are not
+ * established.
  */
 
 const { Vector3 } = require('../math/linear_algebra');

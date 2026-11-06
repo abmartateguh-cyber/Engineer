@@ -48,5 +48,23 @@ export default [
     }
   },
   { files: ['src/**/*.mjs'], languageOptions: { sourceType: 'module' } },
+  {
+    files: ['test/**/*.js'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Use a seeded PRNG for reproducible test inputs.'
+        },
+        {
+          object: 'crypto',
+          property: 'randomBytes',
+          message: 'Use fixed or seeded byte fixtures in deterministic tests.'
+        }
+      ]
+    }
+  },
   { files: ['eslint.config.mjs'], languageOptions: { sourceType: 'module' } }
 ];

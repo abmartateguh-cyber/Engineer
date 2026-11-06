@@ -1,5 +1,5 @@
 /**
- * OmniEng Native WebAssembly High-Performance Kernel Engine
+ * Experimental WebAssembly kernel engine
  * 
  * Provides bare-metal compiled WebAssembly acceleration for:
  * 1. BLAS-1 dot product (dotProduct)
@@ -39,7 +39,7 @@ function encodeString(str) {
 }
 
 /**
- * Builds standard WebAssembly binary bytes for high-performance linear algebra.
+ * Builds WebAssembly binary bytes for the implemented linear algebra kernels.
  */
 function buildOmniEngWasmBinary() {
   const magic = [0x00, 0x61, 0x73, 0x6d];
@@ -548,7 +548,7 @@ class WasmKernelEngine {
   }
 
   /**
-   * High-Performance SIMD128-Accelerated Vector Dot Product.
+   * SIMD128-capable vector dot product.
    * Leverages 128-bit 2x f64 vectorization with unrolled accumulators.
    * @param {Float64Array} vecA
    * @param {Float64Array} vecB
@@ -574,7 +574,7 @@ class WasmKernelEngine {
   }
 
   /**
-   * High-Performance SIMD128-Accelerated DAXPY: y[i] = y[i] + alpha * x[i].
+   * SIMD128-capable DAXPY: y[i] = y[i] + alpha * x[i].
    * @param {Float64Array} x
    * @param {Float64Array} y
    * @param {number} alpha
@@ -595,7 +595,7 @@ class WasmKernelEngine {
   }
 
   /**
-   * High-Performance SIMD128 Euclidean Norm ||x||_2
+   * SIMD128-capable Euclidean norm ||x||_2
    * @param {Float64Array} vec
    * @returns {number}
    */
@@ -604,7 +604,7 @@ class WasmKernelEngine {
   }
 
   /**
-   * High-Performance SIMD128-Accelerated Sparse Matrix-Vector Multiply (CSR format).
+   * SIMD128-capable sparse matrix-vector multiply (CSR format).
    * @param {Int32Array} rowPtr
    * @param {Int32Array} colInd
    * @param {Float64Array} values

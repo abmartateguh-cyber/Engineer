@@ -1068,9 +1068,9 @@ function runAnatomyCraftParityTests() {
   // -----------------------------------------------------------------------------
   // 7. Procedural PBR Materials & Physical Craft Synthesis
   // -----------------------------------------------------------------------------
-  console.log('\n[SUITE 7] Procedural PBR Anisotropy & Optical AR Sheen');
+  console.log('\n[SUITE 7] Procedural Visual Material Effects');
 
-  it('ProceduralPbrMaterials creates brushed metal anisotropic normal & roughness maps', () => {
+  it('ProceduralPbrMaterials creates brushed-metal directional normal and roughness maps', () => {
     const normMap = ProceduralPbrMaterials.createBrushedMetalNormalMap({ width: 128, height: 128 });
     assert(normMap instanceof THREE.CanvasTexture, 'Expected THREE.CanvasTexture for normal map');
     assert(normMap.wrapS === THREE.RepeatWrapping, 'Expected RepeatWrapping wrapS');
@@ -1079,24 +1079,33 @@ function runAnatomyCraftParityTests() {
     assert(roughMap instanceof THREE.CanvasTexture, 'Expected THREE.CanvasTexture for roughness map');
   });
 
-  it('ProceduralPbrMaterials compiles satin anodized aluminum & turned 316L stainless steel', () => {
+  it('ProceduralPbrMaterials creates illustrative metallic appearance materials', () => {
     const alu = ProceduralPbrMaterials.createAnodizedAluminumMaterial(0x38bdf8, 0.4);
     assert(alu instanceof THREE.MeshStandardMaterial, 'Expected MeshStandardMaterial');
-    assert(alu.userData.pbrType.includes('Anodized 7075-T6'), 'Expected Anodized 7075-T6 flag');
+    assert.strictEqual(alu.userData.isIllustrativeOnly, true);
+    assert(alu.userData.pbrType.includes('not material data'));
     assert.strictEqual(alu.roughness, 0.4);
 
     const steel = ProceduralPbrMaterials.createTurnedStainlessSteelMaterial();
     assert(steel instanceof THREE.MeshStandardMaterial, 'Expected MeshStandardMaterial');
-    assert.strictEqual(steel.userData.pbrType, 'Turned 316L Passivated Stainless Steel');
+    assert.strictEqual(steel.userData.isIllustrativeOnly, true);
+    assert(steel.userData.pbrType.includes('not material data'));
     assert.strictEqual(steel.metalness, 0.94);
   });
 
-  it('ProceduralPbrMaterials compiles multi-layer optical AR thin-film coating sheen', () => {
+  it('ProceduralPbrMaterials creates an illustrative optical-surface appearance', () => {
     const arMat = ProceduralPbrMaterials.createOpticalArCoatingMaterial(1.65);
     assert(arMat instanceof THREE.MeshPhysicalMaterial, 'Expected MeshPhysicalMaterial');
-    assert.strictEqual(arMat.userData.pbrType, 'Multi-Layer Subwavelength Anti-Reflective Nano-Coating');
+    assert.strictEqual(arMat.userData.isIllustrativeOnly, true);
+    assert(arMat.userData.pbrType.includes('not coating data'));
+    assert.strictEqual(arMat.userData.transmissionT, undefined);
+    assert.strictEqual(arMat.userData.reflectanceR, undefined);
     assert.strictEqual(arMat.ior, 1.65);
     assert.strictEqual(arMat.transmission, 0.92);
+    assert.throws(
+      () => ProceduralPbrMaterials.createOpticalArCoatingMaterial(),
+      /explicit positive finite rendering index/
+    );
   });
 
   // -----------------------------------------------------------------------------
@@ -1349,7 +1358,10 @@ function runAnatomyCraftParityTests() {
     );
 
     const preloadSource = fs.readFileSync(path.join(__dirname, '../preload.js'), 'utf8');
-    assert.match(preloadSource, /simulateBlockDiagram:[\s\S]*?units:[\s\S]*?dimensionless/);
+    assert.match(preloadSource, /DEFAULT_BLOCK_DIAGRAM_UNITS/);
+    assert.match(preloadSource, /DEFAULT_BLOCK_DIAGRAM_UNITS[\s\S]*?dimensionless/);
+    assert.match(preloadSource, /simulateBlockDiagram:[\s\S]*?DEFAULT_BLOCK_DIAGRAM_UNITS/);
+    assert.match(preloadSource, /simulateBlockDiagram:[\s\S]*?units:[\s\S]*?DEFAULT_BLOCK_DIAGRAM_UNITS/);
 
     const previousDocument = global.document;
     const previousRequestAnimationFrame = global.requestAnimationFrame;

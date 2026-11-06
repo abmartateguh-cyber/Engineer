@@ -1,7 +1,9 @@
 /**
  * OmniEng Core Mathematics: Linear Algebra, Vector, Matrix, Quaternion & Linear Solvers
- * Provides deterministic, high-precision mathematical operations for CAD, CAE, and GNC.
+ * Provides JavaScript floating-point operations for CAD, CAE, and GNC.
  */
+
+const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 class Vector3 {
   constructor(x = 0, y = 0, z = 0) {
@@ -329,6 +331,230 @@ class LinearSolver {
     let s = 0;
     for (let i = 0; i < u.length; i++) s += u[i] * v[i];
     return s;
+  }
+
+  static _toSparseSolver(A) {
+    const { WasmSparseMultifrontalSolver } = require('./wasm_sparse_multifrontal');
+    const { SparseMatrixCSR } = require('./sparse_cholesky');
+
+    if (A instanceof WasmSparseMultifrontalSolver) return A;
+
+    if (A instanceof SparseMatrixCSR) {
+      const solver = new WasmSparseMultifrontalSolver(A.nRows, A.nCols);
+      for (let r = 0; r < A.nRows; r++) {
+        for (let p = A.rowPtr[r]; p < A.rowPtr[r + 1]; p++) {
+          solver.addEntry(r, A.colInd[p], A.values[p]);
+        }
+      }
+      solver.finalizeCSR();
+      return solver;
+    }
+
+    if (A && Number.isInteger(A.nRows) && A.rowPtr && A.colInd && A.values) {
+      const solver = new WasmSparseMultifrontalSolver(A.nRows, A.nRows);
+      for (let r = 0; r < A.nRows; r++) {
+        for (let p = A.rowPtr[r]; p < A.rowPtr[r + 1]; p++) {
+          solver.addEntry(r, A.colInd[p], A.values[p]);
+        }
+      }
+      solver.finalizeCSR();
+      return solver;
+    }
+
+    if (Array.isArray(A) && A.length > 0 && Array.isArray(A[0])) {
+      const n = A.length;
+      const solver = new WasmSparseMultifrontalSolver(n, n);
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (Math.abs(A[r][c]) > 1e-15) solver.addEntry(r, c, A[r][c]);
+        }
+      }
+      solver.finalizeCSR();
+      return solver;
+    }
+
+    if (A instanceof Float64Array) {
+      const n = Math.round(Math.sqrt(A.length));
+      if (n * n !== A.length) {
+        throw new TypeError('Flat Float64Array input must be square.');
+      }
+      const solver = new WasmSparseMultifrontalSolver(n, n);
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          const value = A[r * n + c];
+          if (Math.abs(value) > 1e-15) solver.addEntry(r, c, value);
+        }
+      }
+      solver.finalizeCSR();
+      return solver;
+    }
+
+    throw new TypeError(
+      'solveSparse expects a WasmSparseMultifrontalSolver, SparseMatrixCSR, CSR-like object, dense array-of-arrays, or flat Float64Array.'
+    );
+  }
+
+  static _toDense(solver, n) {
+    const dense = Array.from({ length: n }, () => new Array(n).fill(0));
+    for (let r = 0; r < n; r++) {
+      for (let p = solver.rowPtr[r]; p < solver.rowPtr[r + 1]; p++) {
+        dense[solver.colIdx[p]][r] = solver.values[p];
+      }
+    }
+    return dense;
+  }
+
+  static _denseResidual(dense, solution, rhs) {
+    const n = dense.length;
+    let resSq = 0;
+    let rhsSq = 0;
+    for (let i = 0; i < n; i++) {
+      let ax = 0;
+      const row = dense[i];
+      for (let j = 0; j < n; j++) ax += row[j] * solution[j];
+      const residual = rhs[i] - ax;
+      resSq += residual * residual;
+      rhsSq += rhs[i] * rhs[i];
+    }
+    const residualNorm = Math.sqrt(resSq);
+    const relativeResidual = residualNorm / (Math.sqrt(rhsSq) || 1);
+    return { residualNorm, relativeResidual };
+  }
+
+  static solveSparse(A, b, options = {}) {
+    const rhs = b instanceof Float64Array ? b : Float64Array.from(b);
+    let solver;
+    try {
+      solver = LinearSolver._toSparseSolver(A);
+    } catch (cause) {
+      throw new OmniError(
+        OmniErrorCode.INVALID_INPUT,
+        'solveSparse received an unsupported matrix type.',
+        {},
+        cause
+      );
+    }
+
+    try {
+      const factorization = solver.factorize();
+      const result = solver.solve(rhs);
+      return {
+        solution: result.solution,
+        method: factorization.solverMethod,
+        residualNorm: result.residualNorm,
+        relativeResidual: result.relativeResidual,
+        converged: result.converged,
+        factorization
+      };
+    } catch (choleskyError) {
+      let dense;
+      try {
+        dense = LinearSolver._toDense(solver, solver.n);
+      } catch (cause) {
+        throw new OmniError(
+          OmniErrorCode.INVALID_INPUT,
+          'Could not materialize a dense matrix from the sparse input.',
+          {},
+          cause
+        );
+      }
+      let solutionArray;
+      try {
+        solutionArray = LinearSolver.solveGaussian(dense, Array.from(rhs));
+      } catch (luError) {
+        throw new OmniError(
+          OmniErrorCode.NUMERICAL_FAILURE,
+          `Sparse Cholesky failed and dense LU fallback also failed: ${choleskyError.message}; ${luError.message}`,
+          { choleskyMessage: choleskyError.message, luMessage: luError.message },
+          luError
+        );
+      }
+      const solution = Float64Array.from(solutionArray);
+      const { residualNorm, relativeResidual } = LinearSolver._denseResidual(dense, solution, rhs);
+      return {
+        solution,
+        method: 'dense-lu',
+        residualNorm,
+        relativeResidual,
+        converged: relativeResidual < 1e-8,
+        factorization: { solverMethod: 'dense-lu', sparseCholeskyFailed: choleskyError.message }
+      };
+    }
+  }
+
+  static isPositiveDefinite(A) {
+    let solver;
+    try {
+      solver = LinearSolver._toSparseSolver(A);
+    } catch (err) {
+      return {
+        positiveDefinite: false,
+        reason: err.message,
+        symmetric: false,
+        diagonallyDominant: false,
+        strictlyDiagonallyDominant: false,
+        factorizationOutcome: 'failed',
+        n: null
+      };
+    }
+
+    const n = solver.n;
+    let maxAbs = 0;
+    let weaklyDominant = true;
+    let strictlyDominant = true;
+    for (let r = 0; r < n; r++) {
+      let diagonal = 0;
+      let offDiagonalSum = 0;
+      for (let p = solver.rowPtr[r]; p < solver.rowPtr[r + 1]; p++) {
+        const c = solver.colIdx[p];
+        const value = solver.values[p];
+        if (c === r) diagonal = Math.abs(value);
+        else offDiagonalSum += Math.abs(value);
+        const absValue = Math.abs(value);
+        if (absValue > maxAbs) maxAbs = absValue;
+      }
+      if (diagonal < offDiagonalSum - 1e-12 * Math.max(1, offDiagonalSum)) weaklyDominant = false;
+      if (diagonal <= offDiagonalSum) strictlyDominant = false;
+    }
+
+    let maxSymDiff = 0;
+    for (let r = 0; r < n; r++) {
+      for (let p = solver.rowPtr[r]; p < solver.rowPtr[r + 1]; p++) {
+        const c = solver.colIdx[p];
+        const value = solver.values[p];
+        let mirror = 0;
+        for (let q = solver.rowPtr[c]; q < solver.rowPtr[c + 1]; q++) {
+          if (solver.colIdx[q] === r) {
+            mirror = solver.values[q];
+            break;
+          }
+        }
+        const diff = Math.abs(value - mirror);
+        if (diff > maxSymDiff) maxSymDiff = diff;
+      }
+    }
+    const symmetric = maxAbs > 0 ? maxSymDiff <= 1e-9 * maxAbs : true;
+
+    let factorizationOutcome = 'failed';
+    let factorized = false;
+    try {
+      solver.factorize();
+      factorizationOutcome = 'spd';
+      factorized = true;
+    } catch (err) {
+      factorizationOutcome = 'non-spd-pivot';
+    }
+
+    return {
+      positiveDefinite: symmetric && factorized,
+      symmetric,
+      diagonallyDominant: weaklyDominant,
+      strictlyDiagonallyDominant: strictlyDominant,
+      factorizationOutcome,
+      maxSymmetricDifference: maxSymDiff,
+      maxAbsoluteEntry: maxAbs,
+      n
+    };
   }
 }
 

@@ -185,15 +185,19 @@ function runIndustrialMasterEnginesTests() {
     assert.strictEqual(decomp.isBalanced, true);
   });
 
-  it('HpcClusterGateway calculates sparse multifrontal out-of-core chunk streaming', () => {
+  it('HpcClusterGateway reports a caller-assumption-based storage estimate only', () => {
     const chunking = HpcClusterGateway.planOutOfCoreFrontal(
       5000000,
-      16 * 1024 * 1024 * 1024 // 16 GB RAM
+      16 * 1024 * 1024 * 1024,
+      { matrixNonzerosPerDof: 180, factorEntriesPerDof: 450 }
     );
 
-    assert.strictEqual(chunking.isOutOfCore, true);
-    assert(chunking.totalChunks > 1, 'Should require multi-chunk streaming');
-    assert(chunking.chunkSizeDofs > 0, 'Chunk size must be positive');
+    assert.strictEqual(chunking.status, 'ESTIMATE_ONLY');
+    assert.strictEqual(chunking.solvePerformed, false);
+    assert.strictEqual(chunking.estimatedOutOfCore, true);
+    assert.strictEqual(chunking.isOutOfCore, null);
+    assert(chunking.totalChunks > 1, 'The stated memory assumptions imply multiple estimated chunks');
+    assert(chunking.chunkSizeDofs > 0, 'Estimated chunk size must be positive');
   });
 
   // ---------------------------------------------------------------------------
@@ -246,19 +250,19 @@ function runIndustrialMasterEnginesTests() {
   // ---------------------------------------------------------------------------
   console.log('\n[SECTION 4] Transient Water Hammer & Hydraulic Shockwave MOC');
 
-  it('TransientWaterHammerSolver calculates Korteweg acoustic wave speed in steel pipe', () => {
+  it('TransientWaterHammerSolver calculates wave speed from explicit conduit inputs', () => {
     assert.throws(() => TransientWaterHammerSolver.calculateWaveSpeed(), /requires explicit finite inputs/);
-    // 300mm pipe, 8mm steel wall, water
+    // Caller-supplied example values; not a material or fluid property record.
     const waveSpeed = TransientWaterHammerSolver.calculateWaveSpeed({
-      fluidDensity: 998.2,
-      fluidBulkModulus: 2.19e9,
-      pipeElasticModulus: 2.0e11,
+      fluidDensity: 2,
+      fluidBulkModulus: 1e6,
+      pipeElasticModulus: 2e8,
       pipeInnerDiameter: 0.3,
       pipeWallThickness: 0.008,
       restraintFactor: 1.0
     });
 
-    assert(waveSpeed > 1000 && waveSpeed < 1400, `Wave speed (${waveSpeed} m/s) should be ~1200 m/s for steel pipe`);
+    assert(waveSpeed > 600 && waveSpeed < 800, `Wave speed (${waveSpeed} m/s) follows the supplied synthetic inputs`);
   });
 
   it('TransientWaterHammerSolver computes Joukowsky theoretical peak surge', () => {
@@ -266,11 +270,9 @@ function runIndustrialMasterEnginesTests() {
       () => TransientWaterHammerSolver.joukowskySurge(1200.0, 2.0),
       /requires positive waveSpeed and density/
     );
-    const surge = TransientWaterHammerSolver.joukowskySurge(1200.0, 2.0, 998.2);
-    // Delta_P = 998.2 * 1200 * 2 = 2.395 MPa (~24 bar)
-    assert(surge.surgePressurePa > 2.3e6 && surge.surgePressurePa < 2.5e6);
-    // Delta_H = (1200 * 2) / 9.80665 = 244.7m
-    assert(surge.surgeHeadM > 240 && surge.surgeHeadM < 250);
+    const surge = TransientWaterHammerSolver.joukowskySurge(12.0, 3.0, 2.0);
+    assert.strictEqual(surge.surgePressurePa, 72);
+    assert(Math.abs(surge.surgeHeadM - (36 / 9.80665)) < 0.01);
   });
 
   it('TransientWaterHammerSolver returns an experimental 1D MOC estimate without a code verdict', () => {
@@ -284,11 +286,11 @@ function runIndustrialMasterEnginesTests() {
       steadyFlowRate: 0.1,
       valveClosureTime: 0.4,
       valveClosureLaw: 'linear',
-      simulationDuration: 3.0,
+      simulationDuration: 5.0,
       reaches: 12,
-      fluidDensity: 998.2,
-      fluidBulkModulus: 2.19e9,
-      pipeElasticModulus: 2.0e11,
+      fluidDensity: 2,
+      fluidBulkModulus: 1e6,
+      pipeElasticModulus: 2e8,
       restraintFactor: 1.0
     });
 

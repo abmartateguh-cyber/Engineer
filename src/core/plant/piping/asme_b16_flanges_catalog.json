@@ -1,0 +1,602 @@
+{
+  "standard": "ASME B16.5 / ASME B16.47",
+  "materialGroups": {
+    "1.1": {
+      "description": "Carbon Steel (A105, A350-LF2, A106-B)",
+      "classes": {
+        "150": [
+          {
+            "tempC": -29,
+            "mawpBarg": 19.6
+          },
+          {
+            "tempC": 50,
+            "mawpBarg": 19.2
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 17.7
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 15.8
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 13.8
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 12.1
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 10.2
+          },
+          {
+            "tempC": 350,
+            "mawpBarg": 8.4
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 6.5
+          }
+        ],
+        "300": [
+          {
+            "tempC": -29,
+            "mawpBarg": 51.1
+          },
+          {
+            "tempC": 50,
+            "mawpBarg": 50.1
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 46.6
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 45.1
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 43.8
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 41.9
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 39.8
+          },
+          {
+            "tempC": 350,
+            "mawpBarg": 37.6
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 34.7
+          }
+        ],
+        "600": [
+          {
+            "tempC": -29,
+            "mawpBarg": 102.1
+          },
+          {
+            "tempC": 50,
+            "mawpBarg": 100.2
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 93.2
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 90.2
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 87.6
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 83.9
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 79.6
+          },
+          {
+            "tempC": 350,
+            "mawpBarg": 75.1
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 69.4
+          }
+        ],
+        "900": [
+          {
+            "tempC": -29,
+            "mawpBarg": 153.2
+          },
+          {
+            "tempC": 50,
+            "mawpBarg": 150.4
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 139.8
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 135.2
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 131.4
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 125.8
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 119.5
+          },
+          {
+            "tempC": 350,
+            "mawpBarg": 112.7
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 104.2
+          }
+        ],
+        "1500": [
+          {
+            "tempC": -29,
+            "mawpBarg": 255.3
+          },
+          {
+            "tempC": 50,
+            "mawpBarg": 250.6
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 233
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 225.4
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 219
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 209.7
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 199.1
+          },
+          {
+            "tempC": 350,
+            "mawpBarg": 187.8
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 173.6
+          }
+        ],
+        "2500": [
+          {
+            "tempC": -29,
+            "mawpBarg": 425.5
+          },
+          {
+            "tempC": 50,
+            "mawpBarg": 417.7
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 388.3
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 375.6
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 365
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 349.5
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 331.8
+          },
+          {
+            "tempC": 350,
+            "mawpBarg": 313
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 289.3
+          }
+        ]
+      }
+    },
+    "2.2": {
+      "description": "Austenitic SS (316, 316L, A182-F316L)",
+      "classes": {
+        "150": [
+          {
+            "tempC": -196,
+            "mawpBarg": 19
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 19
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 16.2
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 14.8
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 13.7
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 12.1
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 10.2
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 6.5
+          }
+        ],
+        "300": [
+          {
+            "tempC": -196,
+            "mawpBarg": 49.6
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 49.6
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 42.2
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 38.5
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 35.7
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 33.4
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 31.6
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 29.4
+          }
+        ],
+        "600": [
+          {
+            "tempC": -196,
+            "mawpBarg": 99.3
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 99.3
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 84.4
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 77
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 71.3
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 66.8
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 63.2
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 58.9
+          }
+        ],
+        "900": [
+          {
+            "tempC": -196,
+            "mawpBarg": 148.9
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 148.9
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 126.6
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 115.5
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 107
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 100.1
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 94.9
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 88.3
+          }
+        ],
+        "1500": [
+          {
+            "tempC": -196,
+            "mawpBarg": 248.2
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 248.2
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 211
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 192.5
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 178.3
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 166.9
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 158.1
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 147.2
+          }
+        ],
+        "2500": [
+          {
+            "tempC": -196,
+            "mawpBarg": 413.7
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 413.7
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 351.6
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 320.8
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 297.2
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 278.1
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 263.5
+          },
+          {
+            "tempC": 400,
+            "mawpBarg": 245.3
+          }
+        ]
+      }
+    },
+    "2.8": {
+      "description": "Duplex 2205 (S31803 / S32205, A182-F51)",
+      "classes": {
+        "150": [
+          {
+            "tempC": -50,
+            "mawpBarg": 20
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 20
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 17.6
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 16.4
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 15.3
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 14.5
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 10.2
+          }
+        ],
+        "300": [
+          {
+            "tempC": -50,
+            "mawpBarg": 51.7
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 51.7
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 45.9
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 42.7
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 39.9
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 37.8
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 36.4
+          }
+        ],
+        "600": [
+          {
+            "tempC": -50,
+            "mawpBarg": 103.4
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 103.4
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 91.8
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 85.3
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 79.9
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 75.6
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 72.7
+          }
+        ],
+        "900": [
+          {
+            "tempC": -50,
+            "mawpBarg": 155.1
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 155.1
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 137.7
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 128
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 119.8
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 113.4
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 109.1
+          }
+        ],
+        "1500": [
+          {
+            "tempC": -50,
+            "mawpBarg": 258.6
+          },
+          {
+            "tempC": 38,
+            "mawpBarg": 258.6
+          },
+          {
+            "tempC": 100,
+            "mawpBarg": 229.5
+          },
+          {
+            "tempC": 150,
+            "mawpBarg": 213.3
+          },
+          {
+            "tempC": 200,
+            "mawpBarg": 199.7
+          },
+          {
+            "tempC": 250,
+            "mawpBarg": 189
+          },
+          {
+            "tempC": 300,
+            "mawpBarg": 181.8
+          }
+        ]
+      }
+    }
+  }
+}

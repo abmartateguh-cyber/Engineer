@@ -1,0 +1,1551 @@
+[
+  {
+    "nps": "0.125",
+    "dn": 6,
+    "doMm": 10.3,
+    "schedules": {
+      "40": {
+        "wallMm": 1.73,
+        "idMm": 6.84,
+        "weightKgM": 0.37
+      },
+      "80": {
+        "wallMm": 2.41,
+        "idMm": 5.48,
+        "weightKgM": 0.47
+      },
+      "10S": {
+        "wallMm": 1.24,
+        "idMm": 7.82,
+        "weightKgM": 0.28
+      },
+      "40S": {
+        "wallMm": 1.73,
+        "idMm": 6.84,
+        "weightKgM": 0.37
+      },
+      "80S": {
+        "wallMm": 2.41,
+        "idMm": 5.48,
+        "weightKgM": 0.47
+      }
+    }
+  },
+  {
+    "nps": "0.25",
+    "dn": 8,
+    "doMm": 13.7,
+    "schedules": {
+      "40": {
+        "wallMm": 2.24,
+        "idMm": 9.22,
+        "weightKgM": 0.63
+      },
+      "80": {
+        "wallMm": 3.02,
+        "idMm": 7.66,
+        "weightKgM": 0.8
+      },
+      "10S": {
+        "wallMm": 1.65,
+        "idMm": 10.4,
+        "weightKgM": 0.49
+      },
+      "40S": {
+        "wallMm": 2.24,
+        "idMm": 9.22,
+        "weightKgM": 0.63
+      },
+      "80S": {
+        "wallMm": 3.02,
+        "idMm": 7.66,
+        "weightKgM": 0.8
+      }
+    }
+  },
+  {
+    "nps": "0.375",
+    "dn": 10,
+    "doMm": 17.1,
+    "schedules": {
+      "40": {
+        "wallMm": 2.31,
+        "idMm": 12.48,
+        "weightKgM": 0.84
+      },
+      "80": {
+        "wallMm": 3.2,
+        "idMm": 10.7,
+        "weightKgM": 1.1
+      },
+      "10S": {
+        "wallMm": 1.65,
+        "idMm": 13.8,
+        "weightKgM": 0.63
+      },
+      "40S": {
+        "wallMm": 2.31,
+        "idMm": 12.48,
+        "weightKgM": 0.84
+      },
+      "80S": {
+        "wallMm": 3.2,
+        "idMm": 10.7,
+        "weightKgM": 1.1
+      }
+    }
+  },
+  {
+    "nps": "0.5",
+    "dn": 15,
+    "doMm": 21.3,
+    "schedules": {
+      "10": {
+        "wallMm": 2.11,
+        "idMm": 17.08,
+        "weightKgM": 1
+      },
+      "40": {
+        "wallMm": 2.77,
+        "idMm": 15.76,
+        "weightKgM": 1.27
+      },
+      "80": {
+        "wallMm": 3.73,
+        "idMm": 13.84,
+        "weightKgM": 1.62
+      },
+      "160": {
+        "wallMm": 4.78,
+        "idMm": 11.74,
+        "weightKgM": 1.95
+      },
+      "5S": {
+        "wallMm": 1.65,
+        "idMm": 18,
+        "weightKgM": 0.8
+      },
+      "10S": {
+        "wallMm": 2.11,
+        "idMm": 17.08,
+        "weightKgM": 1
+      },
+      "40S": {
+        "wallMm": 2.77,
+        "idMm": 15.76,
+        "weightKgM": 1.27
+      },
+      "80S": {
+        "wallMm": 3.73,
+        "idMm": 13.84,
+        "weightKgM": 1.62
+      },
+      "XXS": {
+        "wallMm": 7.47,
+        "idMm": 6.36,
+        "weightKgM": 2.55
+      }
+    }
+  },
+  {
+    "nps": "0.75",
+    "dn": 20,
+    "doMm": 26.7,
+    "schedules": {
+      "10": {
+        "wallMm": 2.11,
+        "idMm": 22.48,
+        "weightKgM": 1.28
+      },
+      "40": {
+        "wallMm": 2.87,
+        "idMm": 20.96,
+        "weightKgM": 1.69
+      },
+      "80": {
+        "wallMm": 3.91,
+        "idMm": 18.88,
+        "weightKgM": 2.2
+      },
+      "160": {
+        "wallMm": 5.56,
+        "idMm": 15.58,
+        "weightKgM": 2.9
+      },
+      "5S": {
+        "wallMm": 1.65,
+        "idMm": 23.4,
+        "weightKgM": 1.02
+      },
+      "10S": {
+        "wallMm": 2.11,
+        "idMm": 22.48,
+        "weightKgM": 1.28
+      },
+      "40S": {
+        "wallMm": 2.87,
+        "idMm": 20.96,
+        "weightKgM": 1.69
+      },
+      "80S": {
+        "wallMm": 3.91,
+        "idMm": 18.88,
+        "weightKgM": 2.2
+      },
+      "XXS": {
+        "wallMm": 7.82,
+        "idMm": 11.06,
+        "weightKgM": 3.64
+      }
+    }
+  },
+  {
+    "nps": "1",
+    "dn": 25,
+    "doMm": 33.4,
+    "schedules": {
+      "10": {
+        "wallMm": 2.77,
+        "idMm": 27.86,
+        "weightKgM": 2.09
+      },
+      "40": {
+        "wallMm": 3.38,
+        "idMm": 26.64,
+        "weightKgM": 2.5
+      },
+      "80": {
+        "wallMm": 4.55,
+        "idMm": 24.3,
+        "weightKgM": 3.24
+      },
+      "160": {
+        "wallMm": 6.35,
+        "idMm": 20.7,
+        "weightKgM": 4.24
+      },
+      "5S": {
+        "wallMm": 1.65,
+        "idMm": 30.1,
+        "weightKgM": 1.29
+      },
+      "10S": {
+        "wallMm": 2.77,
+        "idMm": 27.86,
+        "weightKgM": 2.09
+      },
+      "40S": {
+        "wallMm": 3.38,
+        "idMm": 26.64,
+        "weightKgM": 2.5
+      },
+      "80S": {
+        "wallMm": 4.55,
+        "idMm": 24.3,
+        "weightKgM": 3.24
+      },
+      "XXS": {
+        "wallMm": 9.09,
+        "idMm": 15.22,
+        "weightKgM": 5.45
+      }
+    }
+  },
+  {
+    "nps": "1.25",
+    "dn": 32,
+    "doMm": 42.2,
+    "schedules": {
+      "10": {
+        "wallMm": 2.77,
+        "idMm": 36.66,
+        "weightKgM": 2.69
+      },
+      "40": {
+        "wallMm": 3.56,
+        "idMm": 35.08,
+        "weightKgM": 3.39
+      },
+      "80": {
+        "wallMm": 4.85,
+        "idMm": 32.5,
+        "weightKgM": 4.47
+      },
+      "160": {
+        "wallMm": 6.35,
+        "idMm": 29.5,
+        "weightKgM": 5.61
+      },
+      "5S": {
+        "wallMm": 1.65,
+        "idMm": 38.9,
+        "weightKgM": 1.65
+      },
+      "10S": {
+        "wallMm": 2.77,
+        "idMm": 36.66,
+        "weightKgM": 2.69
+      },
+      "40S": {
+        "wallMm": 3.56,
+        "idMm": 35.08,
+        "weightKgM": 3.39
+      },
+      "80S": {
+        "wallMm": 4.85,
+        "idMm": 32.5,
+        "weightKgM": 4.47
+      },
+      "XXS": {
+        "wallMm": 9.7,
+        "idMm": 22.8,
+        "weightKgM": 7.77
+      }
+    }
+  },
+  {
+    "nps": "1.5",
+    "dn": 40,
+    "doMm": 48.3,
+    "schedules": {
+      "10": {
+        "wallMm": 2.77,
+        "idMm": 42.76,
+        "weightKgM": 3.11
+      },
+      "40": {
+        "wallMm": 3.68,
+        "idMm": 40.94,
+        "weightKgM": 4.05
+      },
+      "80": {
+        "wallMm": 5.08,
+        "idMm": 38.14,
+        "weightKgM": 5.41
+      },
+      "160": {
+        "wallMm": 7.14,
+        "idMm": 34.02,
+        "weightKgM": 7.25
+      },
+      "5S": {
+        "wallMm": 1.65,
+        "idMm": 45,
+        "weightKgM": 1.9
+      },
+      "10S": {
+        "wallMm": 2.77,
+        "idMm": 42.76,
+        "weightKgM": 3.11
+      },
+      "40S": {
+        "wallMm": 3.68,
+        "idMm": 40.94,
+        "weightKgM": 4.05
+      },
+      "80S": {
+        "wallMm": 5.08,
+        "idMm": 38.14,
+        "weightKgM": 5.41
+      },
+      "XXS": {
+        "wallMm": 10.15,
+        "idMm": 28,
+        "weightKgM": 9.55
+      }
+    }
+  },
+  {
+    "nps": "2",
+    "dn": 50,
+    "doMm": 60.3,
+    "schedules": {
+      "10": {
+        "wallMm": 2.77,
+        "idMm": 54.76,
+        "weightKgM": 3.93
+      },
+      "40": {
+        "wallMm": 3.91,
+        "idMm": 52.48,
+        "weightKgM": 5.44
+      },
+      "80": {
+        "wallMm": 5.54,
+        "idMm": 49.22,
+        "weightKgM": 7.48
+      },
+      "160": {
+        "wallMm": 8.74,
+        "idMm": 42.82,
+        "weightKgM": 11.11
+      },
+      "5S": {
+        "wallMm": 1.65,
+        "idMm": 57,
+        "weightKgM": 2.39
+      },
+      "10S": {
+        "wallMm": 2.77,
+        "idMm": 54.76,
+        "weightKgM": 3.93
+      },
+      "40S": {
+        "wallMm": 3.91,
+        "idMm": 52.48,
+        "weightKgM": 5.44
+      },
+      "80S": {
+        "wallMm": 5.54,
+        "idMm": 49.22,
+        "weightKgM": 7.48
+      },
+      "XXS": {
+        "wallMm": 11.07,
+        "idMm": 38.16,
+        "weightKgM": 13.44
+      }
+    }
+  },
+  {
+    "nps": "2.5",
+    "dn": 65,
+    "doMm": 73,
+    "schedules": {
+      "10": {
+        "wallMm": 3.05,
+        "idMm": 66.9,
+        "weightKgM": 5.26
+      },
+      "40": {
+        "wallMm": 5.16,
+        "idMm": 62.68,
+        "weightKgM": 8.63
+      },
+      "80": {
+        "wallMm": 7.01,
+        "idMm": 58.98,
+        "weightKgM": 11.41
+      },
+      "160": {
+        "wallMm": 9.53,
+        "idMm": 53.94,
+        "weightKgM": 14.92
+      },
+      "5S": {
+        "wallMm": 2.11,
+        "idMm": 68.78,
+        "weightKgM": 3.69
+      },
+      "10S": {
+        "wallMm": 3.05,
+        "idMm": 66.9,
+        "weightKgM": 5.26
+      },
+      "40S": {
+        "wallMm": 5.16,
+        "idMm": 62.68,
+        "weightKgM": 8.63
+      },
+      "80S": {
+        "wallMm": 7.01,
+        "idMm": 58.98,
+        "weightKgM": 11.41
+      },
+      "XXS": {
+        "wallMm": 14.02,
+        "idMm": 44.96,
+        "weightKgM": 20.39
+      }
+    }
+  },
+  {
+    "nps": "3",
+    "dn": 80,
+    "doMm": 88.9,
+    "schedules": {
+      "10": {
+        "wallMm": 3.05,
+        "idMm": 82.8,
+        "weightKgM": 6.46
+      },
+      "40": {
+        "wallMm": 5.49,
+        "idMm": 77.92,
+        "weightKgM": 11.29
+      },
+      "80": {
+        "wallMm": 7.62,
+        "idMm": 73.66,
+        "weightKgM": 15.27
+      },
+      "160": {
+        "wallMm": 11.13,
+        "idMm": 66.64,
+        "weightKgM": 21.35
+      },
+      "5S": {
+        "wallMm": 2.11,
+        "idMm": 84.68,
+        "weightKgM": 4.52
+      },
+      "10S": {
+        "wallMm": 3.05,
+        "idMm": 82.8,
+        "weightKgM": 6.46
+      },
+      "40S": {
+        "wallMm": 5.49,
+        "idMm": 77.92,
+        "weightKgM": 11.29
+      },
+      "80S": {
+        "wallMm": 7.62,
+        "idMm": 73.66,
+        "weightKgM": 15.27
+      },
+      "XXS": {
+        "wallMm": 15.24,
+        "idMm": 58.42,
+        "weightKgM": 27.68
+      }
+    }
+  },
+  {
+    "nps": "3.5",
+    "dn": 90,
+    "doMm": 101.6,
+    "schedules": {
+      "10": {
+        "wallMm": 3.05,
+        "idMm": 95.5,
+        "weightKgM": 7.41
+      },
+      "40": {
+        "wallMm": 5.74,
+        "idMm": 90.12,
+        "weightKgM": 13.57
+      },
+      "80": {
+        "wallMm": 8.08,
+        "idMm": 85.44,
+        "weightKgM": 18.64
+      },
+      "5S": {
+        "wallMm": 2.11,
+        "idMm": 97.38,
+        "weightKgM": 5.18
+      },
+      "10S": {
+        "wallMm": 3.05,
+        "idMm": 95.5,
+        "weightKgM": 7.41
+      },
+      "40S": {
+        "wallMm": 5.74,
+        "idMm": 90.12,
+        "weightKgM": 13.57
+      },
+      "80S": {
+        "wallMm": 8.08,
+        "idMm": 85.44,
+        "weightKgM": 18.64
+      }
+    }
+  },
+  {
+    "nps": "4",
+    "dn": 100,
+    "doMm": 114.3,
+    "schedules": {
+      "10": {
+        "wallMm": 3.05,
+        "idMm": 108.2,
+        "weightKgM": 8.37
+      },
+      "40": {
+        "wallMm": 6.02,
+        "idMm": 102.26,
+        "weightKgM": 16.08
+      },
+      "80": {
+        "wallMm": 8.56,
+        "idMm": 97.18,
+        "weightKgM": 22.32
+      },
+      "120": {
+        "wallMm": 11.13,
+        "idMm": 92.04,
+        "weightKgM": 28.32
+      },
+      "160": {
+        "wallMm": 13.49,
+        "idMm": 87.32,
+        "weightKgM": 33.54
+      },
+      "5S": {
+        "wallMm": 2.11,
+        "idMm": 110.08,
+        "weightKgM": 5.84
+      },
+      "10S": {
+        "wallMm": 3.05,
+        "idMm": 108.2,
+        "weightKgM": 8.37
+      },
+      "40S": {
+        "wallMm": 6.02,
+        "idMm": 102.26,
+        "weightKgM": 16.08
+      },
+      "80S": {
+        "wallMm": 8.56,
+        "idMm": 97.18,
+        "weightKgM": 22.32
+      },
+      "XXS": {
+        "wallMm": 17.12,
+        "idMm": 80.06,
+        "weightKgM": 41.03
+      }
+    }
+  },
+  {
+    "nps": "5",
+    "dn": 125,
+    "doMm": 141.3,
+    "schedules": {
+      "10": {
+        "wallMm": 3.4,
+        "idMm": 134.5,
+        "weightKgM": 11.56
+      },
+      "40": {
+        "wallMm": 6.55,
+        "idMm": 128.2,
+        "weightKgM": 21.77
+      },
+      "80": {
+        "wallMm": 9.53,
+        "idMm": 122.24,
+        "weightKgM": 30.97
+      },
+      "120": {
+        "wallMm": 12.7,
+        "idMm": 115.9,
+        "weightKgM": 40.28
+      },
+      "160": {
+        "wallMm": 15.88,
+        "idMm": 109.54,
+        "weightKgM": 49.12
+      },
+      "5S": {
+        "wallMm": 2.77,
+        "idMm": 135.76,
+        "weightKgM": 9.46
+      },
+      "10S": {
+        "wallMm": 3.4,
+        "idMm": 134.5,
+        "weightKgM": 11.56
+      },
+      "40S": {
+        "wallMm": 6.55,
+        "idMm": 128.2,
+        "weightKgM": 21.77
+      },
+      "80S": {
+        "wallMm": 9.53,
+        "idMm": 122.24,
+        "weightKgM": 30.97
+      },
+      "XXS": {
+        "wallMm": 19.05,
+        "idMm": 103.2,
+        "weightKgM": 57.43
+      }
+    }
+  },
+  {
+    "nps": "6",
+    "dn": 150,
+    "doMm": 168.3,
+    "schedules": {
+      "10": {
+        "wallMm": 3.4,
+        "idMm": 161.5,
+        "weightKgM": 13.83
+      },
+      "40": {
+        "wallMm": 7.11,
+        "idMm": 154.08,
+        "weightKgM": 28.26
+      },
+      "80": {
+        "wallMm": 10.97,
+        "idMm": 146.36,
+        "weightKgM": 42.56
+      },
+      "120": {
+        "wallMm": 14.27,
+        "idMm": 139.76,
+        "weightKgM": 54.21
+      },
+      "160": {
+        "wallMm": 18.26,
+        "idMm": 131.78,
+        "weightKgM": 67.57
+      },
+      "5S": {
+        "wallMm": 2.77,
+        "idMm": 162.76,
+        "weightKgM": 11.31
+      },
+      "10S": {
+        "wallMm": 3.4,
+        "idMm": 161.5,
+        "weightKgM": 13.83
+      },
+      "40S": {
+        "wallMm": 7.11,
+        "idMm": 154.08,
+        "weightKgM": 28.26
+      },
+      "80S": {
+        "wallMm": 10.97,
+        "idMm": 146.36,
+        "weightKgM": 42.56
+      },
+      "XXS": {
+        "wallMm": 21.95,
+        "idMm": 124.4,
+        "weightKgM": 79.22
+      }
+    }
+  },
+  {
+    "nps": "8",
+    "dn": 200,
+    "doMm": 219.1,
+    "schedules": {
+      "20": {
+        "wallMm": 6.35,
+        "idMm": 206.4,
+        "weightKgM": 33.32
+      },
+      "30": {
+        "wallMm": 7.04,
+        "idMm": 205.02,
+        "weightKgM": 36.82
+      },
+      "40": {
+        "wallMm": 8.18,
+        "idMm": 202.74,
+        "weightKgM": 42.55
+      },
+      "60": {
+        "wallMm": 10.31,
+        "idMm": 198.48,
+        "weightKgM": 53.09
+      },
+      "80": {
+        "wallMm": 12.7,
+        "idMm": 193.7,
+        "weightKgM": 64.64
+      },
+      "100": {
+        "wallMm": 15.09,
+        "idMm": 188.92,
+        "weightKgM": 75.92
+      },
+      "120": {
+        "wallMm": 18.26,
+        "idMm": 182.58,
+        "weightKgM": 90.44
+      },
+      "140": {
+        "wallMm": 20.62,
+        "idMm": 177.86,
+        "weightKgM": 100.93
+      },
+      "160": {
+        "wallMm": 23.01,
+        "idMm": 173.08,
+        "weightKgM": 111.27
+      },
+      "5S": {
+        "wallMm": 2.77,
+        "idMm": 213.56,
+        "weightKgM": 14.78
+      },
+      "10S": {
+        "wallMm": 3.76,
+        "idMm": 211.58,
+        "weightKgM": 19.97
+      },
+      "40S": {
+        "wallMm": 8.18,
+        "idMm": 202.74,
+        "weightKgM": 42.55
+      },
+      "80S": {
+        "wallMm": 12.7,
+        "idMm": 193.7,
+        "weightKgM": 64.64
+      },
+      "XXS": {
+        "wallMm": 22.23,
+        "idMm": 174.64,
+        "weightKgM": 107.93
+      }
+    }
+  },
+  {
+    "nps": "10",
+    "dn": 250,
+    "doMm": 273,
+    "schedules": {
+      "20": {
+        "wallMm": 6.35,
+        "idMm": 260.3,
+        "weightKgM": 41.76
+      },
+      "30": {
+        "wallMm": 7.8,
+        "idMm": 257.4,
+        "weightKgM": 51.01
+      },
+      "40": {
+        "wallMm": 9.27,
+        "idMm": 254.46,
+        "weightKgM": 60.29
+      },
+      "60": {
+        "wallMm": 12.7,
+        "idMm": 247.6,
+        "weightKgM": 81.53
+      },
+      "80": {
+        "wallMm": 15.09,
+        "idMm": 242.82,
+        "weightKgM": 95.98
+      },
+      "100": {
+        "wallMm": 18.26,
+        "idMm": 236.48,
+        "weightKgM": 114.71
+      },
+      "120": {
+        "wallMm": 21.44,
+        "idMm": 230.12,
+        "weightKgM": 133.01
+      },
+      "140": {
+        "wallMm": 25.4,
+        "idMm": 222.2,
+        "weightKgM": 155.1
+      },
+      "160": {
+        "wallMm": 28.58,
+        "idMm": 215.84,
+        "weightKgM": 172.27
+      },
+      "5S": {
+        "wallMm": 3.4,
+        "idMm": 266.2,
+        "weightKgM": 22.61
+      },
+      "10S": {
+        "wallMm": 4.19,
+        "idMm": 264.62,
+        "weightKgM": 27.78
+      },
+      "40S": {
+        "wallMm": 9.27,
+        "idMm": 254.46,
+        "weightKgM": 60.29
+      },
+      "80S": {
+        "wallMm": 15.09,
+        "idMm": 242.82,
+        "weightKgM": 95.98
+      },
+      "XXS": {
+        "wallMm": 25.4,
+        "idMm": 222.2,
+        "weightKgM": 155.1
+      }
+    }
+  },
+  {
+    "nps": "12",
+    "dn": 300,
+    "doMm": 323.8,
+    "schedules": {
+      "20": {
+        "wallMm": 6.35,
+        "idMm": 311.1,
+        "weightKgM": 49.71
+      },
+      "30": {
+        "wallMm": 8.38,
+        "idMm": 307.04,
+        "weightKgM": 65.19
+      },
+      "40": {
+        "wallMm": 10.31,
+        "idMm": 303.18,
+        "weightKgM": 79.71
+      },
+      "60": {
+        "wallMm": 14.27,
+        "idMm": 295.26,
+        "weightKgM": 108.93
+      },
+      "80": {
+        "wallMm": 17.48,
+        "idMm": 288.84,
+        "weightKgM": 132.05
+      },
+      "100": {
+        "wallMm": 21.44,
+        "idMm": 280.92,
+        "weightKgM": 159.87
+      },
+      "120": {
+        "wallMm": 25.4,
+        "idMm": 273,
+        "weightKgM": 186.92
+      },
+      "140": {
+        "wallMm": 28.58,
+        "idMm": 266.64,
+        "weightKgM": 208.08
+      },
+      "160": {
+        "wallMm": 33.32,
+        "idMm": 257.16,
+        "weightKgM": 238.69
+      },
+      "5S": {
+        "wallMm": 3.96,
+        "idMm": 315.88,
+        "weightKgM": 31.24
+      },
+      "10S": {
+        "wallMm": 4.57,
+        "idMm": 314.66,
+        "weightKgM": 35.98
+      },
+      "40S": {
+        "wallMm": 9.53,
+        "idMm": 304.74,
+        "weightKgM": 73.86
+      },
+      "80S": {
+        "wallMm": 12.7,
+        "idMm": 298.4,
+        "weightKgM": 97.44
+      },
+      "XXS": {
+        "wallMm": 25.4,
+        "idMm": 273,
+        "weightKgM": 186.92
+      }
+    }
+  },
+  {
+    "nps": "14",
+    "dn": 350,
+    "doMm": 355.6,
+    "schedules": {
+      "10": {
+        "wallMm": 6.35,
+        "idMm": 342.9,
+        "weightKgM": 54.69
+      },
+      "20": {
+        "wallMm": 7.92,
+        "idMm": 339.76,
+        "weightKgM": 67.91
+      },
+      "30": {
+        "wallMm": 9.53,
+        "idMm": 336.54,
+        "weightKgM": 81.33
+      },
+      "40": {
+        "wallMm": 11.13,
+        "idMm": 333.34,
+        "weightKgM": 94.55
+      },
+      "60": {
+        "wallMm": 15.09,
+        "idMm": 325.42,
+        "weightKgM": 126.72
+      },
+      "80": {
+        "wallMm": 19.05,
+        "idMm": 317.5,
+        "weightKgM": 158.11
+      },
+      "100": {
+        "wallMm": 23.83,
+        "idMm": 307.94,
+        "weightKgM": 194.98
+      },
+      "120": {
+        "wallMm": 27.79,
+        "idMm": 300.02,
+        "weightKgM": 224.66
+      },
+      "140": {
+        "wallMm": 31.75,
+        "idMm": 292.1,
+        "weightKgM": 253.58
+      },
+      "160": {
+        "wallMm": 35.71,
+        "idMm": 284.18,
+        "weightKgM": 281.72
+      },
+      "10S": {
+        "wallMm": 4.78,
+        "idMm": 346.04,
+        "weightKgM": 41.36
+      }
+    }
+  },
+  {
+    "nps": "16",
+    "dn": 400,
+    "doMm": 406.4,
+    "schedules": {
+      "10": {
+        "wallMm": 6.35,
+        "idMm": 393.7,
+        "weightKgM": 62.65
+      },
+      "20": {
+        "wallMm": 7.92,
+        "idMm": 390.56,
+        "weightKgM": 77.83
+      },
+      "30": {
+        "wallMm": 9.53,
+        "idMm": 387.34,
+        "weightKgM": 93.27
+      },
+      "40": {
+        "wallMm": 12.7,
+        "idMm": 381,
+        "weightKgM": 123.31
+      },
+      "60": {
+        "wallMm": 16.66,
+        "idMm": 373.08,
+        "weightKgM": 160.13
+      },
+      "80": {
+        "wallMm": 21.44,
+        "idMm": 363.52,
+        "weightKgM": 203.54
+      },
+      "100": {
+        "wallMm": 26.19,
+        "idMm": 354.02,
+        "weightKgM": 245.57
+      },
+      "120": {
+        "wallMm": 30.96,
+        "idMm": 344.48,
+        "weightKgM": 286.66
+      },
+      "140": {
+        "wallMm": 36.53,
+        "idMm": 333.34,
+        "weightKgM": 333.21
+      },
+      "160": {
+        "wallMm": 40.49,
+        "idMm": 325.42,
+        "weightKgM": 365.38
+      },
+      "10S": {
+        "wallMm": 4.78,
+        "idMm": 396.84,
+        "weightKgM": 47.34
+      }
+    }
+  },
+  {
+    "nps": "18",
+    "dn": 450,
+    "doMm": 457,
+    "schedules": {
+      "10": {
+        "wallMm": 6.35,
+        "idMm": 444.3,
+        "weightKgM": 70.57
+      },
+      "20": {
+        "wallMm": 7.92,
+        "idMm": 441.16,
+        "weightKgM": 87.71
+      },
+      "30": {
+        "wallMm": 11.13,
+        "idMm": 434.74,
+        "weightKgM": 122.38
+      },
+      "40": {
+        "wallMm": 14.27,
+        "idMm": 428.46,
+        "weightKgM": 155.81
+      },
+      "60": {
+        "wallMm": 19.05,
+        "idMm": 418.9,
+        "weightKgM": 205.75
+      },
+      "80": {
+        "wallMm": 23.83,
+        "idMm": 409.34,
+        "weightKgM": 254.57
+      },
+      "100": {
+        "wallMm": 29.36,
+        "idMm": 398.28,
+        "weightKgM": 309.64
+      },
+      "120": {
+        "wallMm": 34.93,
+        "idMm": 387.14,
+        "weightKgM": 363.58
+      },
+      "140": {
+        "wallMm": 39.67,
+        "idMm": 377.66,
+        "weightKgM": 408.28
+      },
+      "160": {
+        "wallMm": 45.24,
+        "idMm": 366.52,
+        "weightKgM": 459.4
+      },
+      "10S": {
+        "wallMm": 4.78,
+        "idMm": 447.44,
+        "weightKgM": 53.31
+      }
+    }
+  },
+  {
+    "nps": "20",
+    "dn": 500,
+    "doMm": 508,
+    "schedules": {
+      "10": {
+        "wallMm": 6.35,
+        "idMm": 495.3,
+        "weightKgM": 78.56
+      },
+      "20": {
+        "wallMm": 9.53,
+        "idMm": 488.94,
+        "weightKgM": 117.15
+      },
+      "30": {
+        "wallMm": 12.7,
+        "idMm": 482.6,
+        "weightKgM": 155.13
+      },
+      "40": {
+        "wallMm": 15.09,
+        "idMm": 477.82,
+        "weightKgM": 183.43
+      },
+      "60": {
+        "wallMm": 20.62,
+        "idMm": 466.76,
+        "weightKgM": 247.84
+      },
+      "80": {
+        "wallMm": 26.19,
+        "idMm": 455.62,
+        "weightKgM": 311.19
+      },
+      "100": {
+        "wallMm": 32.54,
+        "idMm": 442.92,
+        "weightKgM": 381.55
+      },
+      "120": {
+        "wallMm": 38.1,
+        "idMm": 431.8,
+        "weightKgM": 441.52
+      },
+      "140": {
+        "wallMm": 44.45,
+        "idMm": 419.1,
+        "weightKgM": 508.15
+      },
+      "160": {
+        "wallMm": 50.01,
+        "idMm": 407.98,
+        "weightKgM": 564.85
+      },
+      "10S": {
+        "wallMm": 5.54,
+        "idMm": 496.92,
+        "weightKgM": 68.65
+      }
+    }
+  },
+  {
+    "nps": "24",
+    "dn": 600,
+    "doMm": 610,
+    "schedules": {
+      "10": {
+        "wallMm": 6.35,
+        "idMm": 597.3,
+        "weightKgM": 94.53
+      },
+      "20": {
+        "wallMm": 9.53,
+        "idMm": 590.94,
+        "weightKgM": 141.12
+      },
+      "30": {
+        "wallMm": 14.27,
+        "idMm": 581.46,
+        "weightKgM": 209.65
+      },
+      "40": {
+        "wallMm": 17.48,
+        "idMm": 575.04,
+        "weightKgM": 255.43
+      },
+      "60": {
+        "wallMm": 24.61,
+        "idMm": 560.78,
+        "weightKgM": 355.28
+      },
+      "80": {
+        "wallMm": 30.96,
+        "idMm": 548.08,
+        "weightKgM": 442.11
+      },
+      "100": {
+        "wallMm": 38.89,
+        "idMm": 532.22,
+        "weightKgM": 547.74
+      },
+      "120": {
+        "wallMm": 46.02,
+        "idMm": 517.96,
+        "weightKgM": 640.07
+      },
+      "140": {
+        "wallMm": 52.37,
+        "idMm": 505.26,
+        "weightKgM": 720.19
+      },
+      "160": {
+        "wallMm": 59.54,
+        "idMm": 490.92,
+        "weightKgM": 808.27
+      },
+      "10S": {
+        "wallMm": 6.35,
+        "idMm": 597.3,
+        "weightKgM": 94.53
+      }
+    }
+  },
+  {
+    "nps": "28",
+    "dn": 700,
+    "doMm": 711,
+    "schedules": {
+      "10": {
+        "wallMm": 7.92,
+        "idMm": 695.16,
+        "weightKgM": 137.32
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 685.6,
+        "weightKgM": 218.71
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 679.24,
+        "weightKgM": 272.23
+      },
+      "40": {
+        "wallMm": 18.26,
+        "idMm": 674.48,
+        "weightKgM": 311.95
+      },
+      "60": {
+        "wallMm": 28.58,
+        "idMm": 653.84,
+        "weightKgM": 480.99
+      },
+      "80": {
+        "wallMm": 34.93,
+        "idMm": 641.14,
+        "weightKgM": 582.38
+      }
+    }
+  },
+  {
+    "nps": "30",
+    "dn": 750,
+    "doMm": 762,
+    "schedules": {
+      "10": {
+        "wallMm": 7.92,
+        "idMm": 746.16,
+        "weightKgM": 147.29
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 736.6,
+        "weightKgM": 234.68
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 730.24,
+        "weightKgM": 292.2
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 723.9,
+        "weightKgM": 349.04
+      },
+      "60": {
+        "wallMm": 31.75,
+        "idMm": 698.5,
+        "weightKgM": 571.79
+      },
+      "80": {
+        "wallMm": 38.1,
+        "idMm": 685.8,
+        "weightKgM": 680.18
+      }
+    }
+  },
+  {
+    "nps": "32",
+    "dn": 800,
+    "doMm": 813,
+    "schedules": {
+      "10": {
+        "wallMm": 7.92,
+        "idMm": 797.16,
+        "weightKgM": 157.25
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 787.6,
+        "weightKgM": 250.65
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 781.24,
+        "weightKgM": 312.17
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 774.9,
+        "weightKgM": 373
+      },
+      "60": {
+        "wallMm": 31.75,
+        "idMm": 749.5,
+        "weightKgM": 611.72
+      },
+      "80": {
+        "wallMm": 44.45,
+        "idMm": 724.1,
+        "weightKgM": 842.49
+      }
+    }
+  },
+  {
+    "nps": "36",
+    "dn": 900,
+    "doMm": 914,
+    "schedules": {
+      "10": {
+        "wallMm": 7.92,
+        "idMm": 898.16,
+        "weightKgM": 176.97
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 888.6,
+        "weightKgM": 282.29
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 882.24,
+        "weightKgM": 351.73
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 875.9,
+        "weightKgM": 420.45
+      },
+      "60": {
+        "wallMm": 38.1,
+        "idMm": 837.8,
+        "weightKgM": 823
+      },
+      "80": {
+        "wallMm": 47.62,
+        "idMm": 818.76,
+        "weightKgM": 1017.46
+      }
+    }
+  },
+  {
+    "nps": "40",
+    "dn": 1000,
+    "doMm": 1016,
+    "schedules": {
+      "10": {
+        "wallMm": 9.53,
+        "idMm": 996.94,
+        "weightKgM": 236.54
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 990.6,
+        "weightKgM": 314.23
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 984.24,
+        "weightKgM": 391.67
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 977.9,
+        "weightKgM": 468.37
+      }
+    }
+  },
+  {
+    "nps": "42",
+    "dn": 1050,
+    "doMm": 1067,
+    "schedules": {
+      "10": {
+        "wallMm": 9.53,
+        "idMm": 1047.94,
+        "weightKgM": 248.53
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 1041.6,
+        "weightKgM": 330.21
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 1035.24,
+        "weightKgM": 411.64
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 1028.9,
+        "weightKgM": 492.33
+      }
+    }
+  },
+  {
+    "nps": "48",
+    "dn": 1200,
+    "doMm": 1219,
+    "schedules": {
+      "10": {
+        "wallMm": 9.53,
+        "idMm": 1199.94,
+        "weightKgM": 284.25
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 1193.6,
+        "weightKgM": 377.81
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 1187.24,
+        "weightKgM": 471.17
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 1180.9,
+        "weightKgM": 563.74
+      }
+    }
+  },
+  {
+    "nps": "54",
+    "dn": 1350,
+    "doMm": 1372,
+    "schedules": {
+      "10": {
+        "wallMm": 9.53,
+        "idMm": 1352.94,
+        "weightKgM": 320.21
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 1346.6,
+        "weightKgM": 425.73
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 1340.24,
+        "weightKgM": 531.09
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 1333.9,
+        "weightKgM": 635.62
+      }
+    }
+  },
+  {
+    "nps": "60",
+    "dn": 1500,
+    "doMm": 1524,
+    "schedules": {
+      "10": {
+        "wallMm": 9.53,
+        "idMm": 1504.94,
+        "weightKgM": 355.94
+      },
+      "20": {
+        "wallMm": 12.7,
+        "idMm": 1498.6,
+        "weightKgM": 473.34
+      },
+      "30": {
+        "wallMm": 15.88,
+        "idMm": 1492.24,
+        "weightKgM": 590.62
+      },
+      "40": {
+        "wallMm": 19.05,
+        "idMm": 1485.9,
+        "weightKgM": 707.03
+      }
+    }
+  }
+]

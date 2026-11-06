@@ -10,6 +10,7 @@ const { LogicSynthesisEngine } = require('../eda/logic_synthesis');
 const { PipingStressEngine } = require('../plant/piping_stress');
 const { OpticalEngine } = require('../optics/optical_engine');
 const { CommandJournal } = require('../storage/omni_archive');
+const { trainSurrogate, predictSurrogate } = require('./neural_net');
 const {
   DropTestWizard,
   DroneDesignWizard,
@@ -1176,6 +1177,32 @@ class OmniAIEngine {
     }
 
     return actionPlan;
+  }
+
+  /**
+   * Train a genuine seeded MLP surrogate (mini-batch SGD with momentum) on
+   * caller-supplied tabular data. This is a real neural network computation,
+   * unlike the legacy keyword-macro routes.
+   * @param {Object|Array} dataset {inputs, outputs} or [ [input, output], ... ]
+   * @param {Object} config { hiddenUnits, activation, loss, epochs, batchSize, learningRate, momentum, seed }
+   * @returns {{model: object, lossHistory: number[], converged: boolean}}
+   */
+  trainSurrogate(dataset, config = {}) {
+    return trainSurrogate(dataset, config);
+  }
+
+  /**
+   * Deterministic inference on a trained surrogate model (same weights => same output).
+   * @param {Object} model A NeuralNetwork instance or a serialized model object
+   * @param {Array|Array<Array>} x Input vector or matrix of input vectors
+   * @returns {Array|Array<Array>} Prediction vector or matrix of predictions
+   */
+  predictSurrogate(model, x) {
+    if (model && model.format === 'omnieng-neural-net-v1') {
+      const { NeuralNetwork } = require('./neural_net');
+      model = NeuralNetwork.fromJSON(model);
+    }
+    return predictSurrogate(model, x);
   }
 }
 

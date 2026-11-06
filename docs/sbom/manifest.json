@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-24T00:03:57.434Z",
+  "generatedAt": "2026-10-29T16:02:16.580Z",
   "command": "npm sbom --package-lock-only --sbom-format <cyclonedx|spdx>",
-  "packageLockSha256": "587084e6f4689a2caafe143f49a00fca8fff4cd436f91edb7f70bc52e0d93a9f",
+  "packageLockSha256": "360d0c0e6341164eba8756d731ae61eb365985d1101f4da578f02229e0845666",
   "formats": [
     "CycloneDX",
     "SPDX"

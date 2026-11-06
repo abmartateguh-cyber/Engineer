@@ -1,16 +1,28 @@
 /**
- * OmniEng Procedural PBR Material & Anisotropy Generator
- * Inspired by wheresryan22/anatomy physical craft and surface finish standards.
- * 
+ * OmniEng procedural visual material helper.
+ * Generated textures are illustrative rendering effects, not material-property data.
+ *
  * Provides:
- * - Directional brushed metal anisotropy (lathe-turned circular and linear striations)
- * - Anodized 7075-T6 satin bead-blasted normal maps with micro-cellular noise
- * - Micro-scratch roughness perturbation maps for realistic specular highlight falloff
- * - Multi-layer optical thin-film interference sheen (anti-reflective AR coating & titanium heat-tint)
+ * - Directional brushed-metal normal maps
+ * - Micro-scratch roughness maps for visual variation
+ * - Illustrative metallic and optical-surface rendering styles
  */
 
 (function (root, factory) {
-  const THREE = (typeof window !== 'undefined' && window.THREE) ? window.THREE : ((typeof global !== 'undefined' && global.THREE) ? global.THREE : (typeof require !== 'undefined' ? (function () { try { return require('three'); } catch (e) { return null; } })() : null));
+  const THREE =
+    typeof window !== 'undefined' && window.THREE
+      ? window.THREE
+      : typeof global !== 'undefined' && global.THREE
+        ? global.THREE
+        : typeof require !== 'undefined'
+          ? (function () {
+              try {
+                return require('three');
+              } catch (e) {
+                return null;
+              }
+            })()
+          : null;
   const instance = factory(THREE);
   if (typeof module === 'object' && module.exports) {
     module.exports = instance;
@@ -21,7 +33,7 @@
   if (typeof window !== 'undefined') {
     window.ProceduralPbrMaterials = instance;
   }
-}(typeof self !== 'undefined' ? self : this, function (THREE) {
+})(typeof self !== 'undefined' ? self : this, function (THREE) {
   'use strict';
 
   if (!THREE) {
@@ -84,7 +96,7 @@
 
   /**
    * 2. Micro-Scratch Roughness Map
-   * Simulates realistic handling micro-abrasions and non-uniform surface roughness
+   * Adds illustrative scratch variation to a roughness texture
    */
   function createMicroScratchRoughnessMap(options = {}) {
     const width = options.width || 256;
@@ -116,7 +128,7 @@
   }
 
   /**
-   * 3. Anodized 7075-T6 Satin Bead-Blasted Material
+   * 3. Brushed-metal visual style (not alloy, temper, or finish data)
    */
   function createAnodizedAluminumMaterial(color = 0x334155, roughness = 0.32) {
     const normalMap = createBrushedMetalNormalMap({ grainScale: 1.2 });
@@ -132,14 +144,15 @@
     });
 
     mat.userData = {
-      pbrType: 'Anodized 7075-T6 Aerospace Aluminum',
-      isAnisotropic: true
+      pbrType: 'Procedural brushed-metal appearance (not material data)',
+      hasDirectionalNormalMap: true,
+      isIllustrativeOnly: true
     };
     return mat;
   }
 
   /**
-   * 4. Turned 316L Stainless Steel Material (with lathe striations)
+   * 4. Turned-metal visual style (not alloy or finish data)
    */
   function createTurnedStainlessSteelMaterial(color = 0x94a3b8) {
     const normalMap = createBrushedMetalNormalMap({ grainScale: 2.5 });
@@ -155,17 +168,20 @@
     });
 
     mat.userData = {
-      pbrType: 'Turned 316L Passivated Stainless Steel',
-      isAnisotropic: true
+      pbrType: 'Procedural turned-metal appearance (not material data)',
+      hasDirectionalNormalMap: true,
+      isIllustrativeOnly: true
     };
     return mat;
   }
 
   /**
-   * 5. Multi-Layer Optical Thin-Film AR Coating Sheen Material
-   * Computes thin-film interference reflections (MgF2 / TiO2 dielectric stack)
+   * 5. Illustrative optical-surface appearance; no coating stack or transmission is calculated.
    */
-  function createOpticalArCoatingMaterial(baseGlassIndex = 1.62) {
+  function createOpticalArCoatingMaterial(baseGlassIndex) {
+    if (!Number.isFinite(baseGlassIndex) || baseGlassIndex <= 0) {
+      throw new TypeError('Provide an explicit positive finite rendering index.');
+    }
     const mat = new THREE.MeshPhysicalMaterial({
       color: 0x0284c7,
       metalness: 0.1,
@@ -179,9 +195,8 @@
     });
 
     mat.userData = {
-      pbrType: 'Multi-Layer Subwavelength Anti-Reflective Nano-Coating',
-      transmissionT: 0.995,
-      reflectanceR: 0.005
+      pbrType: 'Illustrative optical-surface appearance (not coating data)',
+      isIllustrativeOnly: true
     };
     return mat;
   }
@@ -193,4 +208,4 @@
     createTurnedStainlessSteelMaterial,
     createOpticalArCoatingMaterial
   };
-}));
+});

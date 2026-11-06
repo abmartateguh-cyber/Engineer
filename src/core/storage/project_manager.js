@@ -2,8 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { OmniArchiveV2, CommandJournal } = require('./omni_archive');
-const { ProjectManifestV2 } = require('../contracts/ProjectManifestV2');
+const { OmniArchiveV2 } = require('./omni_archive');
 const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 /**
@@ -217,9 +216,7 @@ class ProjectManager {
     if (!this.archive) {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, 'No project currently active');
     }
-    const options = typeof mimeTypeOrOptions === 'string'
-      ? { mimeType: mimeTypeOrOptions }
-      : (mimeTypeOrOptions || {});
+    const options = typeof mimeTypeOrOptions === 'string' ? { mimeType: mimeTypeOrOptions } : mimeTypeOrOptions || {};
     const ref = this.archive.addBlob(content, options);
     this.isDirty = true;
     return ref;
@@ -235,6 +232,36 @@ class ProjectManager {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, 'No project currently active');
     }
     return this.archive.getBlob(hash);
+  }
+
+  /**
+   * Exports the project to a v3 streaming archive (chunked, out-of-core).
+   * Manifest/journal/results are written as small entries; blobs are streamed
+   * as chunked entries with per-chunk sha256 and a trailer index. Memory use
+   * is bounded by the chunk size regardless of total archive size.
+   * @param {string} targetPath
+   * @param {object} [options] - Passed through to OmniArchiveV3.writeChunks
+   * @returns {Promise<object>} Export confirmation
+   */
+  async exportLargeArchive(targetPath, options = {}) {
+    if (!this.archive) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'No project currently active');
+    }
+    const absPath = path.resolve(targetPath);
+    const res = await this.archive.saveToFileStreaming(absPath, options);
+    if (res.streamed) {
+      this.currentFilePath = absPath;
+      this.isDirty = false;
+    }
+    return {
+      success: true,
+      filePath: absPath,
+      revision: this.archive.manifest.revision,
+      sizeBytes: res.sizeBytes,
+      streamed: true,
+      blobCount: res.blobCount,
+      timestamp: new Date().toISOString()
+    };
   }
 }
 

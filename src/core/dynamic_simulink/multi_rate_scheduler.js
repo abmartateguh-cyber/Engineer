@@ -51,7 +51,16 @@ class ScheduledTask {
    * @param {number} [config.phaseOffsetSec=0.0]
    * @param {Function} config.stepFn - (t, dt, inputs) => outputs
    */
-  constructor(config) {
+  constructor(config, sampleRateOrPeriod) {
+    if (typeof config === 'string') {
+      let rate = 100;
+      if (typeof sampleRateOrPeriod === 'number' && sampleRateOrPeriod > 0) {
+        rate = sampleRateOrPeriod <= 1.0 ? 1.0 / sampleRateOrPeriod : sampleRateOrPeriod;
+      }
+      config = { id: config, sampleRateHz: rate };
+    } else if (!config || typeof config !== 'object') {
+      config = {};
+    }
     this.id = config.id || 'task_' + Math.random().toString(36).substr(2, 6);
     this.name = config.name || this.id;
     this.sampleRateHz = config.sampleRateHz || 100;

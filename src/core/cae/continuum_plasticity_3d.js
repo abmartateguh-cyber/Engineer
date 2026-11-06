@@ -1,12 +1,8 @@
 /**
- * OmniEng Continuum 3D Finite-Strain J2 Plasticity, Quadratic TET10 & Mortar Contact Engine
- * Implements 10-node quadratic tetrahedral elements (TET10), Gauss-point radial return mapping,
- * Johnson-Cook rate/thermal softening, augmented Lagrangian mortar contact, and Lanczos modal extraction.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental TET10 shape-function and Gauss-point constitutive helpers.
+ * Constitutive calculations require caller-supplied material properties and small-strain increments.
+ * The element, contact, and modal helpers are not assembled into a validated 3D solver.
  */
-
-const { Matrix, Vector, LinearSolver } = require('../math/linear_algebra');
 
 class GaussPoint3D {
   constructor(id, r, s, t, weight) {
@@ -23,35 +19,37 @@ class GaussPoint3D {
     this.equivalentPlasticStrain = 0.0;
     this.yieldStress = 0.0;
     this.isYielded = false;
-    this.temperature = 293.15; // 20 C
+    this.temperature = null; // Set by the caller when a constitutive update is evaluated.
   }
 }
 
 class QuadraticTet10Element {
-  constructor(id, nodeIds, material = {}) {
+  constructor(id, nodeIds, material) {
+    QuadraticTet10Element.validateMaterial(material);
     this.id = id;
     this.nodeIds = nodeIds; // 10 node indices: 0-3 vertices, 4-9 mid-edges
-    this.material = Object.assign({
-      E: 70e9,          // Young's modulus (Pa)
-      nu: 0.33,         // Poisson's ratio
-      yieldStress: 270e6, // Initial yield stress A (Pa)
-      hardeningModulus: 500e6, // Plastic tangent hardening H'
-      // Johnson-Cook parameters (e.g. Al7075-T6 or Ti-6Al-4V)
-      A: 270e6,
-      B: 450e6,
-      n: 0.42,
-      C: 0.015,
-      m: 1.0,
-      refStrainRate: 1.0,
-      Tmelt: 873.15,
-      Troom: 293.15
-    }, material);
+    this.material = { ...material };
 
     this.G = this.material.E / (2.0 * (1.0 + this.material.nu)); // Shear modulus
     this.K_bulk = this.material.E / (3.0 * (1.0 - 2.0 * this.material.nu)); // Bulk modulus
 
     // Initialize 4-point symmetric Gauss integration points for quadratic tetrahedron
     this.gaussPoints = this._initGaussPoints();
+  }
+
+  static validateMaterial(material) {
+    const fields = ['E', 'nu', 'yieldStress', 'hardeningModulus', 'A', 'B', 'n', 'C', 'm', 'refStrainRate', 'Tmelt', 'Troom'];
+    if (!material || typeof material !== 'object' || !fields.every((field) => Number.isFinite(material[field]))) {
+      throw new TypeError('Provide all continuum plasticity material constants explicitly.');
+    }
+    if (
+      material.E <= 0 || material.nu <= -1 || material.nu >= 0.5 || material.yieldStress <= 0 ||
+      material.hardeningModulus < 0 || material.A <= 0 || material.B < 0 || material.n < 0 ||
+      material.m < 0 || material.refStrainRate <= 0 || material.Troom <= 0 || material.Tmelt <= material.Troom
+    ) {
+      throw new RangeError('Invalid continuum plasticity material constants or units.');
+    }
+    return material;
   }
 
   _initGaussPoints() {
@@ -226,7 +224,15 @@ class QuadraticTet10Element {
    * Performs Gauss-point rate-independent J2 radial return mapping algorithm
    * with Johnson-Cook hardening & thermal softening
    */
-  radialReturnMapping(gaussPoint, totalStrainIncrement, strainRate = 1.0, currentTemp = 293.15) {
+  radialReturnMapping(gaussPoint, totalStrainIncrement, strainRate, currentTemp) {
+    if (
+      !gaussPoint || !totalStrainIncrement || totalStrainIncrement.length !== 6 ||
+      !Array.from(totalStrainIncrement).every(Number.isFinite) || !Number.isFinite(strainRate) || strainRate <= 0 ||
+      !Number.isFinite(currentTemp) || currentTemp <= 0
+    ) {
+      throw new TypeError('Provide six finite strain increments, a positive strain rate, and temperature in kelvin.');
+    }
+    gaussPoint.temperature = currentTemp;
     const { G, K_bulk, material } = this;
 
     // 1. Update trial strain: e_total = e_total_old + delta_e
@@ -262,7 +268,7 @@ class QuadraticTet10Element {
     // 5. Current flow stress from Johnson-Cook formulation
     const ep = gaussPoint.equivalentPlasticStrain;
     const strainFactor = material.A + material.B * Math.pow(Math.max(1e-12, ep), material.n);
-    const rateRatio = Math.max(1.0, strainRate / (material.refStrainRate || 1.0));
+    const rateRatio = Math.max(1.0, strainRate / material.refStrainRate);
     const rateFactor = 1.0 + material.C * Math.log(rateRatio);
 
     const Tstar = Math.min(1.0, Math.max(0.0, (currentTemp - material.Troom) / (material.Tmelt - material.Troom)));
@@ -564,9 +570,12 @@ class LanczosModalEigensolver {
   }
 }
 
+const { J2PlasticityModel } = require('./j2_plasticity');
+
 module.exports = {
   GaussPoint3D,
   QuadraticTet10Element,
   MortarContactPair3D,
-  LanczosModalEigensolver
+  LanczosModalEigensolver,
+  J2PlasticityModel
 };

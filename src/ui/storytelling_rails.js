@@ -296,6 +296,7 @@
     DEFAULT_STAGES,
     NASA_ROCKET_STAGES,
     StorytellingRailsController,
+    StorytellingRails: StorytellingRailsController,
     createController: (options) => new StorytellingRailsController(options)
   };
 }));

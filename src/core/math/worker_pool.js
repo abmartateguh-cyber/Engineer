@@ -1,9 +1,9 @@
 /**
- * Persistent Worker Pool for high-performance isolated engineering computation.
+ * Persistent worker pool for isolated engineering computations.
  *
  * Provides:
  * 1. PersistentWorkerPool: Multi-threaded worker isolation using Node.js worker_threads,
- *    task prioritization, true cancellation within 2 seconds, configurable timeouts,
+ *    task prioritization, cancellation, configurable timeouts,
  *    crash recovery, and execution telemetry.
  * 2. ExperimentalCalculationQueue: Legacy single-threaded event-loop calculation queue
  *    retained for backward compatibility.
@@ -17,6 +17,17 @@ const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 const TASK_PRIORITIES = Object.freeze(new Set(['HIGH', 'NORMAL', 'BATCH', 'BACKGROUND']));
 const MAX_WORKER_RESTARTS_WITHOUT_SUCCESS = 3;
+const MAX_POOLED_WORKERS = 64;
+
+function isSharedArrayBufferView(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    ArrayBuffer.isView(value) &&
+    typeof SharedArrayBuffer !== 'undefined' &&
+    value.buffer instanceof SharedArrayBuffer
+  );
+}
 
 function unsupportedQueueOption(optionName) {
   const error = new Error(
@@ -225,6 +236,13 @@ class PersistentWorkerPool {
   constructor(options = {}) {
     const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : 4;
     const requestedWorkers = Number(options.maxWorkers);
+    if (Number.isInteger(requestedWorkers) && requestedWorkers > MAX_POOLED_WORKERS) {
+      throw new OmniError(
+        OmniErrorCode.RESOURCE_EXHAUSTED,
+        `PersistentWorkerPool cannot spawn ${requestedWorkers} worker threads; the supported maximum is ${MAX_POOLED_WORKERS}.`,
+        { requestedWorkers, maxSupported: MAX_POOLED_WORKERS }
+      );
+    }
     this.maxWorkers =
       Number.isInteger(requestedWorkers) && requestedWorkers >= 1
         ? requestedWorkers
@@ -245,6 +263,16 @@ class PersistentWorkerPool {
     }
     this.useThreads = true;
     this.executionMode = 'worker-threads';
+    this.sharedArrayBufferAvailable = typeof SharedArrayBuffer !== 'undefined';
+    const requestedSharedMemory = options.useSharedArrayBuffer === true;
+    if (requestedSharedMemory && !this.sharedArrayBufferAvailable) {
+      throw new OmniError(
+        OmniErrorCode.UNSUPPORTED,
+        'PersistentWorkerPool cannot honor useSharedArrayBuffer: SharedArrayBuffer is unavailable in this runtime.'
+      );
+    }
+    this.useSharedArrayBuffer = requestedSharedMemory && this.sharedArrayBufferAvailable;
+    this.requeueOnWorkerDeath = options.requeueOnWorkerDeath === true;
     this._nextTaskId = 1;
     this._workerScript = path.join(__dirname, 'worker_thread_kernel.js');
     this._closing = false;
@@ -267,7 +295,7 @@ class PersistentWorkerPool {
       const partialWorkers = this.workers.splice(0);
       for (const slot of partialWorkers) {
         try {
-          Promise.resolve(slot.worker.terminate()).catch(() => {});
+          if (slot.worker?.terminate) slot.worker.terminate();
         } catch (_) {}
       }
       throw new OmniError(
@@ -366,14 +394,26 @@ class PersistentWorkerPool {
     this._terminationPromise = Promise.allSettled(terminations).then(() => {});
   }
 
-  _failWorker(slot, error, countRestart = false) {
+  _failWorker(slot, error, countRestart = false, requeueTask = false) {
     if (this._closing || this.workers[slot.id] !== slot) return;
 
     if (slot.timer) clearTimeout(slot.timer);
     slot.timer = null;
     this.workers[slot.id] = null;
 
-    if (slot.currentTask) this._failTask(slot, slot.currentTask, error);
+    const task = slot.currentTask;
+    if (task) {
+      slot.currentTask = null;
+      slot.busy = false;
+      this.activeTasks = Math.max(0, this.activeTasks - 1);
+      if (requeueTask) {
+        task.requeueCount = (task.requeueCount || 0) + 1;
+        this.taskQueue.push(task);
+        this.taskQueue.sort((a, b) => b.priorityWeight - a.priorityWeight);
+      } else {
+        task.reject(error);
+      }
+    }
     this._replaceWorker(slot, countRestart);
   }
 
@@ -383,14 +423,16 @@ class PersistentWorkerPool {
 
     if (message.type === 'RESULT' && task && task.id === message.taskId) {
       if (slot.timer) clearTimeout(slot.timer);
-      this._completeTask(slot, task, {
-        success: true,
-        taskId: task.id,
-        taskType: task.taskType,
-        computeTimeMs: message.computeTimeMs,
-        executionMode: this.executionMode,
-        validationLevel: 'experimental',
-        result: message.result
+      this._afterSharedCompute(task, () => {
+        this._completeTask(slot, task, {
+          success: true,
+          taskId: task.id,
+          taskType: task.taskType,
+          computeTimeMs: message.computeTimeMs,
+          executionMode: this.executionMode,
+          validationLevel: 'experimental',
+          result: message.result
+        });
       });
     } else if (message.type === 'CANCELLED' && task && task.id === message.taskId) {
       if (slot.timer) clearTimeout(slot.timer);
@@ -409,12 +451,19 @@ class PersistentWorkerPool {
 
   _onWorkerError(slot, error) {
     const omniErr = new OmniError(OmniErrorCode.INTERNAL, `Worker thread error: ${error.message}`);
-    this._failWorker(slot, omniErr, true);
+    this._failWorker(slot, omniErr, true, this.requeueOnWorkerDeath);
   }
 
   _onWorkerExit(slot, code) {
     const omniErr = new OmniError(OmniErrorCode.RESOURCE_EXHAUSTED, `Worker exited unexpectedly with code ${code}`);
-    this._failWorker(slot, omniErr, true);
+    this._failWorker(slot, omniErr, true, this.requeueOnWorkerDeath);
+  }
+
+  async _killWorker(slotIndex) {
+    const slot = this.workers[slotIndex];
+    if (!slot || !slot.worker) return false;
+    await slot.worker.terminate();
+    return true;
   }
 
   _completeTask(slot, task, resolution) {
@@ -456,6 +505,8 @@ class PersistentWorkerPool {
 
     const priorityWeight = { HIGH: 3, NORMAL: 2, BATCH: 1, BACKGROUND: 1 }[options.priority ?? 'NORMAL'] || 2;
     const timeoutMs = Math.max(200, Number(options.timeoutMs) || this.defaultTimeoutMs);
+    const useShared =
+      options.useSharedArrayBuffer === true || (this.useSharedArrayBuffer && options.useSharedArrayBuffer !== false);
 
     return new Promise((resolve, reject) => {
       const task = {
@@ -464,6 +515,7 @@ class PersistentWorkerPool {
         payload,
         priorityWeight,
         timeoutMs,
+        useShared,
         resolve,
         reject,
         queuedAt: performance.now()
@@ -492,12 +544,38 @@ class PersistentWorkerPool {
         this._handleTaskTimeout(idleSlot, task);
       }, task.timeoutMs);
 
+      let postedPayload = task.payload;
+      let sabCompletion = null;
+      if (task.useShared) {
+        if (!this.sharedArrayBufferAvailable) {
+          const unavailable = new OmniError(
+            OmniErrorCode.UNSUPPORTED,
+            `Task ${task.id} requested SharedArrayBuffer execution but SharedArrayBuffer is unavailable in this runtime.`
+          );
+          if (idleSlot.timer) clearTimeout(idleSlot.timer);
+          this._failTask(idleSlot, task, unavailable);
+          return;
+        }
+        const prepared = this._prepareSharedPayload(task.payload);
+        postedPayload = prepared.payload;
+        if (prepared.zeroCopyTransfers > 0 || prepared.materializedTransfers > 0) {
+          const flagsSharedBuffer = new SharedArrayBuffer(4);
+          sabCompletion = {
+            flags: new Int32Array(flagsSharedBuffer),
+            flagIndex: 0,
+            zeroCopyTransfers: prepared.zeroCopyTransfers,
+            materializedTransfers: prepared.materializedTransfers
+          };
+        }
+      }
+
       try {
         idleSlot.worker.postMessage({
           type: 'EXECUTE',
           taskId: task.id,
           taskType: task.taskType,
-          payload: task.payload
+          payload: postedPayload,
+          sabCompletion
         });
       } catch (error) {
         if (error.code === 'ERR_WORKER_NOT_RUNNING') {
@@ -551,6 +629,10 @@ class PersistentWorkerPool {
     return true;
   }
 
+  static isSharedArrayBufferAvailable() {
+    return typeof SharedArrayBuffer !== 'undefined';
+  }
+
   allocateSharedBuffer(byteLength) {
     if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
       throw new TypeError('A non-negative byte length is required.');
@@ -561,6 +643,76 @@ class PersistentWorkerPool {
       } catch (_) {}
     }
     return new ArrayBuffer(byteLength);
+  }
+
+  allocateSharedFloat64Array(length) {
+    if (!Number.isSafeInteger(length) || length < 0) {
+      throw new TypeError('A non-negative element count is required.');
+    }
+    if (!this.sharedArrayBufferAvailable) {
+      throw new OmniError(
+        OmniErrorCode.UNSUPPORTED,
+        'SharedArrayBuffer is unavailable in this runtime; cannot allocate a shared Float64Array.'
+      );
+    }
+    const byteLength = length * Float64Array.BYTES_PER_ELEMENT;
+    let sharedBuffer;
+    try {
+      sharedBuffer = new SharedArrayBuffer(byteLength);
+    } catch (cause) {
+      throw new OmniError(
+        OmniErrorCode.RESOURCE_EXHAUSTED,
+        'Could not allocate a SharedArrayBuffer.',
+        { byteLength },
+        cause
+      );
+    }
+    return new Float64Array(sharedBuffer);
+  }
+
+  _prepareSharedPayload(payload) {
+    const prepared = {};
+    let zeroCopyTransfers = 0;
+    let materializedTransfers = 0;
+    for (const [key, value] of Object.entries(payload)) {
+      if (value instanceof Float64Array) {
+        if (isSharedArrayBufferView(value)) {
+          prepared[key] = value;
+          zeroCopyTransfers++;
+        } else {
+          let sharedBuffer;
+          try {
+            sharedBuffer = new SharedArrayBuffer(value.byteLength);
+          } catch (cause) {
+            throw new OmniError(
+              OmniErrorCode.RESOURCE_EXHAUSTED,
+              'Could not materialize a SharedArrayBuffer copy of a Float64Array payload entry.',
+              { key, byteLength: value.byteLength },
+              cause
+            );
+          }
+          const sharedView = new Float64Array(sharedBuffer);
+          sharedView.set(value);
+          prepared[key] = sharedView;
+          materializedTransfers++;
+        }
+      } else {
+        prepared[key] = value;
+      }
+    }
+    return { payload: prepared, zeroCopyTransfers, materializedTransfers };
+  }
+
+  _afterSharedCompute(task, onDone) {
+    if (!task.useShared || !task.sabCompletion) {
+      onDone();
+      return;
+    }
+    const { flags, flagIndex } = task.sabCompletion;
+    let spins = 0;
+    const maxSpins = 100000;
+    while (spins < maxSpins && Atomics.load(flags, flagIndex) === 0) spins++;
+    onDone();
   }
 
   getTelemetry() {
@@ -576,7 +728,9 @@ class PersistentWorkerPool {
       completedTasksCount: this.completedTasksCount,
       averageExecutionTimeMs,
       cancellationSupported: true,
-      timeoutEnforced: true
+      timeoutEnforced: true,
+      sharedArrayBufferAvailable: this.sharedArrayBufferAvailable,
+      useSharedArrayBuffer: this.useSharedArrayBuffer
     };
   }
 
@@ -609,6 +763,10 @@ class PersistentWorkerPool {
       this.workers = [];
     });
     await this._terminationPromise;
+  }
+
+  async shutdown() {
+    return this.terminateAll();
   }
 }
 

@@ -4,7 +4,7 @@
  */
 
 class CFDSolver2D {
-  constructor(nx = 40, ny = 30, lx = 2.0, ly = 1.5, rho = 1.225, mu = 1.81e-5) {
+  constructor(nx = 40, ny = 30, lx = 2.0, ly = 1.5, rho = 1.225, mu = 1.81e-5, bc = null) {
     this.nx = nx;
     this.ny = ny;
     this.lx = lx; // meters
@@ -14,6 +14,13 @@ class CFDSolver2D {
     this.rho = rho; // kg/m^3 (air)
     this.mu = mu; // dynamic viscosity Pa*s
     this.nu = mu / rho; // kinematic viscosity
+    // Boundary-condition configuration. Default (empty) is the legacy uniform
+    // inlet/outlet channel: left inlet (u = inletVelocity), right outlet
+    // (zero-gradient), slip top/bottom walls. Pass
+    //   { top: { type: 'movingLid', u: lidSpeed } }
+    // for a lid-driven-cavity configuration: no-slip on bottom/left/right,
+    // tangential wall velocity u = lidSpeed on the top boundary.
+    this.bc = bc && typeof bc === 'object' ? bc : {};
 
     // Grid fields: u (x-velocity), v (y-velocity), p (pressure)
     this.u = Array.from({ length: ny }, () => new Float64Array(nx));
@@ -68,11 +75,17 @@ class CFDSolver2D {
     const dt = 0.001;
     const { nx, ny, dx, dy, rho, nu } = this;
 
-    // Initialize inlet velocity
+    const topBc = this.bc.top || {};
+    const movingLid = topBc.type === 'movingLid';
+    const lidU = movingLid && Number.isFinite(topBc.u) ? topBc.u : inletVelocity;
+
+    // Initialize velocity field. The lid-driven cavity starts from rest and
+    // is driven only by the moving lid; the legacy channel starts from the
+    // uniform inlet velocity.
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
         if (!this.obstacle[j][i]) {
-          this.u[j][i] = inletVelocity;
+          this.u[j][i] = movingLid ? 0 : inletVelocity;
           this.v[j][i] = 0;
         }
       }
@@ -112,61 +125,116 @@ class CFDSolver2D {
         }
       }
 
-      // 2. Pressure Poisson Equation (Enforce Continuity div(u) = 0)
-      for (let pIter = 0; pIter < 15; pIter++) {
+      // 2.+3. Projection loop: enforce continuity div(u) = 0 by solving the
+      // pressure Poisson equation and correcting the velocity with the
+      // pressure gradient. The moving-lid (enclosed cavity) configuration
+      // repeats the projection several times per step: a single pass of the
+      // scalar Jacobi sweep leaves enough divergence to suppress the cavity
+      // recirculation, so the projection is interleaved (same stencils, same
+      // correction) until the enclosed flow is close to solenoidal.
+      const projectionCycles = movingLid ? 4 : 1;
+      const pressureSweeps = movingLid ? 20 : 15;
+
+      for (let cycle = 0; cycle < projectionCycles; cycle++) {
+        for (let pIter = 0; pIter < pressureSweeps; pIter++) {
+          for (let j = 1; j < ny - 1; j++) {
+            for (let i = 1; i < nx - 1; i++) {
+              if (this.obstacle[j][i]) continue;
+
+              const div =
+                (this.u[j][i + 1] - this.u[j][i - 1]) / (2 * dx) + (this.v[j + 1][i] - this.v[j - 1][i]) / (2 * dy);
+
+              const p_new =
+                ((this.p[j][i + 1] + this.p[j][i - 1]) / (dx * dx) +
+                  (this.p[j + 1][i] + this.p[j - 1][i]) / (dy * dy) -
+                  (rho / dt) * div) /
+                (2 / (dx * dx) + 2 / (dy * dy));
+
+              this.p[j][i] = p_new;
+            }
+          }
+
+          // Pressure boundary conditions
+          if (movingLid) {
+            // Enclosed cavity: homogeneous Neumann (dp/dn = 0) on all walls.
+            for (let j = 0; j < ny; j++) {
+              this.p[j][0] = this.p[j][1];
+              this.p[j][nx - 1] = this.p[j][nx - 2];
+            }
+            for (let i = 0; i < nx; i++) {
+              this.p[0][i] = this.p[1][i];
+              this.p[ny - 1][i] = this.p[ny - 2][i];
+            }
+          } else {
+            for (let j = 0; j < ny; j++) {
+              this.p[j][0] = this.p[j][1]; // dp/dx = 0 at inlet
+              this.p[j][nx - 1] = 0; // p = 0 at outlet
+            }
+          }
+        }
+
+        if (movingLid) {
+          // Homogeneous Neumann pressure boundary conditions leave the
+          // pressure level free; pin its mean each projection to keep the
+          // enclosed-cavity pressure bounded. Only gradients affect the
+          // velocity correction, so this does not change the flow.
+          let pSum = 0;
+          for (let j = 0; j < ny; j++) {
+            for (let i = 0; i < nx; i++) pSum += this.p[j][i];
+          }
+          const pMean = pSum / (nx * ny);
+          for (let j = 0; j < ny; j++) {
+            for (let i = 0; i < nx; i++) this.p[j][i] -= pMean;
+          }
+        }
+
+        // Velocity Correction via Pressure Gradient
         for (let j = 1; j < ny - 1; j++) {
           for (let i = 1; i < nx - 1; i++) {
-            if (this.obstacle[j][i]) continue;
+            if (this.obstacle[j][i]) {
+              this.u[j][i] = 0;
+              this.v[j][i] = 0;
+              continue;
+            }
 
-            const div =
-              (this.u[j][i + 1] - this.u[j][i - 1]) / (2 * dx) + (this.v[j + 1][i] - this.v[j - 1][i]) / (2 * dy);
+            const dp_dx = (this.p[j][i + 1] - this.p[j][i - 1]) / (2 * dx);
+            const dp_dy = (this.p[j + 1][i] - this.p[j - 1][i]) / (2 * dy);
 
-            const p_new =
-              ((this.p[j][i + 1] + this.p[j][i - 1]) / (dx * dx) +
-                (this.p[j + 1][i] + this.p[j - 1][i]) / (dy * dy) -
-                (rho / dt) * div) /
-              (2 / (dx * dx) + 2 / (dy * dy));
-
-            this.p[j][i] = p_new;
+            this.u[j][i] -= (dt / rho) * dp_dx;
+            this.v[j][i] -= (dt / rho) * dp_dy;
           }
-        }
-
-        // Pressure boundary conditions
-        for (let j = 0; j < ny; j++) {
-          this.p[j][0] = this.p[j][1]; // dp/dx = 0 at inlet
-          this.p[j][nx - 1] = 0; // p = 0 at outlet
-        }
-      }
-
-      // 3. Velocity Correction via Pressure Gradient
-      for (let j = 1; j < ny - 1; j++) {
-        for (let i = 1; i < nx - 1; i++) {
-          if (this.obstacle[j][i]) {
-            this.u[j][i] = 0;
-            this.v[j][i] = 0;
-            continue;
-          }
-
-          const dp_dx = (this.p[j][i + 1] - this.p[j][i - 1]) / (2 * dx);
-          const dp_dy = (this.p[j + 1][i] - this.p[j - 1][i]) / (2 * dy);
-
-          this.u[j][i] -= (dt / rho) * dp_dx;
-          this.v[j][i] -= (dt / rho) * dp_dy;
         }
       }
 
       // Inlet / Outlet / Wall Boundary conditions
-      for (let j = 0; j < ny; j++) {
-        this.u[j][0] = inletVelocity;
-        this.v[j][0] = 0;
-        this.u[j][nx - 1] = this.u[j][nx - 2];
-        this.v[j][nx - 1] = this.v[j][nx - 2];
-      }
-      for (let i = 0; i < nx; i++) {
-        this.u[0][i] = this.u[1][i];
-        this.v[0][i] = 0;
-        this.u[ny - 1][i] = this.u[ny - 2][i];
-        this.v[ny - 1][i] = 0;
+      if (movingLid) {
+        // Lid-driven cavity: no-slip on bottom/left/right walls, tangential
+        // wall velocity u = lidU on the top boundary (moving lid).
+        for (let j = 0; j < ny; j++) {
+          this.u[j][0] = 0;
+          this.v[j][0] = 0;
+          this.u[j][nx - 1] = 0;
+          this.v[j][nx - 1] = 0;
+        }
+        for (let i = 0; i < nx; i++) {
+          this.u[0][i] = 0;
+          this.v[0][i] = 0;
+          this.u[ny - 1][i] = lidU;
+          this.v[ny - 1][i] = 0;
+        }
+      } else {
+        for (let j = 0; j < ny; j++) {
+          this.u[j][0] = inletVelocity;
+          this.v[j][0] = 0;
+          this.u[j][nx - 1] = this.u[j][nx - 2];
+          this.v[j][nx - 1] = this.v[j][nx - 2];
+        }
+        for (let i = 0; i < nx; i++) {
+          this.u[0][i] = this.u[1][i];
+          this.v[0][i] = 0;
+          this.u[ny - 1][i] = this.u[ny - 2][i];
+          this.v[ny - 1][i] = 0;
+        }
       }
     }
 

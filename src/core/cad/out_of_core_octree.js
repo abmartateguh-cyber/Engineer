@@ -101,6 +101,21 @@ class OctreeNode {
 
     return results;
   }
+
+  retrieveLOD(id, lodLevel = 'HIGH_BREP') {
+    for (const item of this.items) {
+      if (item.id === id) {
+        return item.lods ? (item.lods[lodLevel] || item.lods[lodLevel.toLowerCase()] || item.lods) : { id, lodLevel };
+      }
+    }
+    if (this.children) {
+      for (const child of this.children) {
+        const found = child.retrieveLOD(id, lodLevel);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
 }
 
 class OutOfCoreAssemblyManager {
@@ -171,6 +186,19 @@ class OutOfCoreAssemblyManager {
       streamedInCount: streamedIn,
       pagedOutCount: pagedOut
     };
+  }
+
+  containsPoint(p) {
+    return this.root.containsPoint(p);
+  }
+
+  retrieveLOD(partId, lodLevel = 'HIGH_BREP') {
+    const part = this.partRegistry.get(partId);
+    if (!part) return null;
+    if (part.lods) {
+      return part.lods[lodLevel] || part.lods[lodLevel.toLowerCase()] || part.lods;
+    }
+    return { id: partId, lodLevel };
   }
 }
 

@@ -21,6 +21,55 @@ async function executeKernel(taskType, payload) {
       const solver = new GPUParallelPCGSolver(payload);
       return solver.solveLinearSystem(payload.A, payload.b);
     }
+    case 'PCG_SPMV_PARTIAL': {
+      // Partition of (y = A*x) for the parallel preconditioned conjugate gradient
+      // solver. rowPtr/colIdx are cloned per dispatch; values/x/y are SharedArrayBuffer
+      // Float64Array views, so the vector and matrix-value memory is shared zero-copy.
+      // Upon completion the worker raises its completion flag and notifies the main
+      // thread, which synchronizes on Atomics.wait.
+      const { rowPtr, colIdx, values, x, y, startRow, endRow, flags, flagIndex } = payload;
+      if (
+        !rowPtr ||
+        !colIdx ||
+        !values ||
+        !x ||
+        !y ||
+        !Number.isInteger(startRow) ||
+        !Number.isInteger(endRow) ||
+        startRow < 0 ||
+        endRow > x.length ||
+        startRow >= endRow ||
+        rowPtr.length < endRow + 1 ||
+        colIdx.length > values.length
+      ) {
+        const invalid = new Error('PCG partial SpMV payload is malformed or out of bounds.');
+        invalid.code = 'INVALID_INPUT';
+        throw invalid;
+      }
+      const xLength = x.length;
+      const valuesLength = values.length;
+      for (let row = startRow; row < endRow; row++) {
+        for (let entry = rowPtr[row]; entry < rowPtr[row + 1]; entry++) {
+          if (entry >= valuesLength || colIdx[entry] < 0 || colIdx[entry] >= xLength) {
+            const outOfRange = new Error('PCG partial SpMV entry index is out of bounds.');
+            outOfRange.code = 'INVALID_INPUT';
+            throw outOfRange;
+          }
+        }
+      }
+      for (let row = startRow; row < endRow; row++) {
+        let sum = 0;
+        for (let entry = rowPtr[row]; entry < rowPtr[row + 1]; entry++) {
+          sum += values[entry] * x[colIdx[entry]];
+        }
+        y[row] = sum;
+      }
+      if (flags instanceof Int32Array && Number.isInteger(flagIndex)) {
+        Atomics.store(flags, flagIndex, 1);
+        Atomics.notify(flags, flagIndex);
+      }
+      return { rowsComputed: endRow - startRow };
+    }
     case 'VARIATIONAL_SOLVE': {
       const { VariationalConstraintSolver } = require('../cad/variational_constraint_solver');
       const solver = new VariationalConstraintSolver();
@@ -119,6 +168,9 @@ parentPort.on('message', async (message) => {
           computeTimeMs: elapsed
         });
       } else {
+        if (message.sabCompletion && message.sabCompletion.flags instanceof Int32Array) {
+          Atomics.store(message.sabCompletion.flags, message.sabCompletion.flagIndex || 0, 1);
+        }
         parentPort.postMessage({
           type: 'RESULT',
           taskId,

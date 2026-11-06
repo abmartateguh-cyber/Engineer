@@ -10,6 +10,9 @@ const { OpticsEngineAdapter } = require('../optics/optics_engine_adapter');
 const { PlantEngineAdapter } = require('../plant/plant_engine_adapter');
 const { CAMEngineAdapter } = require('../cam/cam_engine_adapter');
 const { AerospaceEngineAdapter } = require('../aerospace/aerospace_engine_adapter');
+const { PDMEngineAdapter } = require('../pdm/pdm_engine_adapter');
+const { HPCEngineAdapter } = require('../hpc/hpc_engine_adapter');
+const { RoboticsEngineAdapter } = require('../robotics/robotics_engine_adapter');
 
 /**
  * EngineRegistry: Unified central registry of all industrial domain EngineAdapters
@@ -26,6 +29,9 @@ class EngineRegistry {
     this.register(new PlantEngineAdapter());
     this.register(new CAMEngineAdapter());
     this.register(new AerospaceEngineAdapter());
+    this.register(new PDMEngineAdapter());
+    this.register(new HPCEngineAdapter());
+    this.register(new RoboticsEngineAdapter());
   }
 
   register(adapter) {
@@ -33,6 +39,10 @@ class EngineRegistry {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Invalid adapter registration');
     }
     this._adapters.set(adapter.domain.toLowerCase(), adapter);
+  }
+
+  registerAdapter(adapter) {
+    return this.register(adapter);
   }
 
   getAdapter(domain) {
@@ -46,13 +56,25 @@ class EngineRegistry {
     return adapter;
   }
 
+  get(domain) {
+    return this.getAdapter(domain);
+  }
+
   hasAdapter(domain) {
     if (!domain || typeof domain !== 'string') return false;
     return this._adapters.has(domain.toLowerCase());
   }
 
+  has(domain) {
+    return this.hasAdapter(domain);
+  }
+
   listRegisteredDomains() {
     return Array.from(this._adapters.keys());
+  }
+
+  listDomains() {
+    return this.listRegisteredDomains();
   }
 
   describeAllCapabilities() {
@@ -68,13 +90,33 @@ class EngineRegistry {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, 'dispatch requires a JobRequest with a valid domain');
     }
     const adapter = this.getAdapter(jobRequest.domain);
+    if (typeof adapter.validate === 'function') await adapter.validate(jobRequest);
     return adapter.execute(jobRequest, onEvent, signal);
+  }
+
+  async executeJob(domainOrRequest, maybeRequest, onEvent = () => {}, signal = null) {
+    let req = maybeRequest;
+    if (!req && domainOrRequest && typeof domainOrRequest === 'object') {
+      req = domainOrRequest;
+    } else if (req && typeof req === 'object' && !req.domain && typeof domainOrRequest === 'string') {
+      req.domain = domainOrRequest;
+    }
+    return this.dispatch(req, onEvent, signal);
   }
 }
 
-const defaultEngineRegistry = new EngineRegistry();
+/**
+ * Factory creating a fresh EngineRegistry populated with all default domain adapters.
+ * @returns {EngineRegistry}
+ */
+function createDefaultEngineRegistry() {
+  return new EngineRegistry();
+}
+
+const defaultEngineRegistry = createDefaultEngineRegistry();
 
 module.exports = {
   EngineRegistry,
+  createDefaultEngineRegistry,
   defaultEngineRegistry
 };

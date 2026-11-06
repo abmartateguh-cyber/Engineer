@@ -23,11 +23,11 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omni-archive-v2-test-'));
 try {
   // 1. Basic v2 creation and content-addressed blobs
   console.log('\n[1] Creating .omni v2 with content-addressed blobs...');
-  const v2 = new OmniArchiveV2({ projectName: 'Titanium Drone Arm Assembly' });
-  assert.strictEqual(v2.manifest.name, 'Titanium Drone Arm Assembly');
+  const v2 = new OmniArchiveV2({ projectName: 'Synthetic Drone Arm Assembly Example' });
+  assert.strictEqual(v2.manifest.name, 'Synthetic Drone Arm Assembly Example');
   assert.strictEqual(v2.manifest.schemaVersion, '2.0.0');
 
-  const stepContent = 'ISO-10303-21; HEADER; FILE_DESCRIPTION((\'OmniEng Drone Arm\'), \'2;1\');';
+  const stepContent = "ISO-10303-21; HEADER; FILE_DESCRIPTION(('OmniEng Drone Arm'), '2;1');";
   const meshContent = JSON.stringify({ nodes: 1540, elements: 4200, type: 'TET10' });
 
   const ref1 = v2.addBlob(stepContent, { mimeType: 'application/step', name: 'arm_geometry.step' });
@@ -66,7 +66,7 @@ try {
   assert.ok(v2Buffer.subarray(0, 8).equals(MAGIC_BYTES_V2), 'Must contain OMNIENG\\x02 magic header');
 
   const unpackedV2 = OmniArchiveV2.loadFromBuffer(v2Buffer);
-  assert.strictEqual(unpackedV2.manifest.name, 'Titanium Drone Arm Assembly');
+  assert.strictEqual(unpackedV2.manifest.name, 'Synthetic Drone Arm Assembly Example');
   assert.strictEqual(unpackedV2.manifest.schemaVersion, '2.0.0');
   assert.strictEqual(unpackedV2.hasBlob(ref1.hash), true);
   assert.strictEqual(unpackedV2.hasBlob(ref2.hash), true);
@@ -81,14 +81,14 @@ try {
 
   assert.strictEqual(fs.existsSync(archivePath), true);
   const loadedFromFile = OmniArchiveV2.loadFromFile(archivePath);
-  assert.strictEqual(loadedFromFile.manifest.name, 'Titanium Drone Arm Assembly');
+  assert.strictEqual(loadedFromFile.manifest.name, 'Synthetic Drone Arm Assembly Example');
 
   // Save again to trigger .bak creation
-  v2.manifest = v2.manifest.withIncrementedRevision({ name: 'Titanium Drone Arm Assembly Rev 2' });
+  v2.manifest = v2.manifest.withIncrementedRevision({ name: 'Synthetic Drone Arm Assembly Example Rev 2' });
   v2.saveToFile(archivePath);
   assert.strictEqual(fs.existsSync(`${archivePath}.bak`), true);
   const reloaded = OmniArchiveV2.loadFromFile(archivePath);
-  assert.strictEqual(reloaded.manifest.name, 'Titanium Drone Arm Assembly Rev 2');
+  assert.strictEqual(reloaded.manifest.name, 'Synthetic Drone Arm Assembly Example Rev 2');
   console.log('  ✓ PASSED: Atomic save commits via fsync, creates .bak, and updates atomically');
 
   // 5. Crash recovery journal
@@ -105,7 +105,7 @@ try {
   });
   OmniArchiveV2.recordAcknowledgedCommandSync(crashProjectPath, {
     actionType: 'CAD_APPLY_MATERIAL',
-    materialId: 'Ti-6Al-4V'
+    materialId: 'TEST-SYNTHETIC-MATERIAL'
   });
 
   const recovery = OmniArchiveV2.recoverFromCrash(crashProjectPath);

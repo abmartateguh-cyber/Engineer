@@ -3,11 +3,14 @@
  * Responsive, zero-overlap technical workstation shell.
  */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100vw;
@@ -31,10 +34,10 @@ body.app-shell {
   grid-template-columns: var(--rail-w) var(--left-w) minmax(0, 1fr) var(--right-w);
   grid-template-rows: var(--topbar-h) var(--toolbar-h) minmax(0, 1fr) var(--status-h);
   grid-template-areas:
-    "top  top   top   top"
-    "tool tool  tool  tool"
-    "rail left  stage right"
-    "stat stat  stat  stat";
+    'top  top   top   top'
+    'tool tool  tool  tool'
+    'rail left  stage right'
+    'stat stat  stat  stat';
 }
 
 /* Panel Collapse States */
@@ -207,12 +210,151 @@ body.right-collapsed .right-inspector {
 .stage {
   grid-area: stage;
   display: grid;
-  grid-template-rows: 32px 32px minmax(0, 1fr) auto;
+  grid-template-rows: 32px 32px minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'tab'
+    'mode'
+    'canvas'
+    'panels'
+    'diag';
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   position: relative;
   background: var(--surface-0);
+}
+
+.workspace-tab-bar {
+  grid-area: tab;
+}
+.stage-mode-bar {
+  grid-area: mode;
+}
+.canvas-host,
+.canvas-container {
+  grid-area: canvas;
+}
+.experimental-capability-panels {
+  grid-area: panels;
+}
+.diagnostics-console {
+  grid-area: diag;
+}
+
+/* Row 3.5: Experimental Capability Panels */
+.experimental-capability-panels {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--surface-1);
+  border-top: 1px solid var(--line);
+}
+
+.experimental-panel {
+  min-width: 0;
+  max-height: 244px;
+  overflow-y: auto;
+}
+
+.experimental-panel .materials-panel,
+.experimental-panel .optics-glass-panel,
+.experimental-panel .ai-surrogate-panel,
+.experimental-panel .hpc-dispatch-panel {
+  margin-bottom: 0;
+}
+
+.materials-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+
+.materials-search-input {
+  flex: 1 1 120px;
+  min-width: 90px;
+}
+
+.materials-temperature-slider {
+  flex: 1 1 80px;
+  min-width: 70px;
+}
+
+.materials-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.material-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg-1);
+  margin-bottom: 2px;
+}
+
+.material-card-class {
+  font-size: 10px;
+  color: var(--fg-3);
+  margin-bottom: 6px;
+}
+
+.material-card-source {
+  font-size: 9px;
+  color: var(--fg-3);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.material-count {
+  font-size: 10px;
+  color: var(--fg-2);
+  margin-bottom: var(--sp-2);
+}
+
+.optics-glass-select {
+  margin-bottom: var(--sp-2);
+}
+
+.optics-glass-spectrum,
+.ai-loss-chart {
+  margin-top: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-0);
+}
+
+.hpc-transitions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--sp-2);
+}
+
+.ai-csv-input {
+  height: auto;
+  min-height: 64px;
+  resize: vertical;
+  margin-bottom: var(--sp-2);
+}
+
+.ai-loss-chart {
+  margin-bottom: var(--sp-2);
+}
+
+.ai-predict-output {
+  font-size: 11px;
+  color: var(--fg-1);
+  margin-top: var(--sp-2);
+}
+
+.hpc-results {
+  margin-top: var(--sp-2);
 }
 
 /* Document Tab Bar in Stage */
@@ -312,6 +454,291 @@ body.right-collapsed .right-inspector {
   height: var(--ai-h-collapsed);
 }
 
+/* Legacy bottom AI drawer is superseded by the Diagnostics Console (Stage 2).
+   Kept in the DOM (id contract), removed from the shell flow. */
+.stage .ai-copilot-panel {
+  display: none;
+}
+
+/* =========================================================================
+   Stage 2: Floating Viewport HUD Capsule
+   ========================================================================= */
+
+.viewport-hud-capsule {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  max-width: calc(100% - 2 * var(--space-6));
+  padding: 4px var(--space-2);
+  background: rgba(14, 17, 23, 0.82);
+  border: 1px solid var(--border-standard);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.hud-capsule-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--hud-capsule-h);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--font-scale-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--ease),
+    border-color 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.hud-capsule-btn .icon-slot {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hud-capsule-btn:hover {
+  background: var(--surface-raised);
+  border-color: var(--border-standard);
+  color: var(--fg-1);
+}
+.hud-capsule-btn.active {
+  background: var(--accent-primary-tint);
+  border-color: rgba(56, 139, 253, 0.55);
+  color: var(--accent-primary);
+}
+.hud-capsule-label {
+  line-height: 1;
+}
+
+/* =========================================================================
+   Stage 2: Translucent ViewCube Wrapper (44px cube + RGBx triad)
+   ========================================================================= */
+
+.viewcube-wrapper {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-6);
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: calc(var(--viewcube-size) + 16px);
+  padding: var(--space-2);
+  background: rgba(14, 17, 23, 0.72);
+  border: 1px solid rgba(48, 54, 61, 0.7);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  pointer-events: auto;
+  user-select: none;
+}
+.viewcube-cube {
+  position: relative;
+  width: var(--viewcube-size);
+  height: var(--viewcube-size);
+  transform-style: preserve-3d;
+  transform: rotateX(-25deg) rotateY(35deg);
+  cursor: pointer;
+  transition: transform 0.25s var(--ease);
+}
+.viewcube-cube:hover {
+  transform: rotateX(-25deg) rotateY(35deg) scale(1.06);
+}
+.viewcube-face {
+  position: absolute;
+  width: var(--viewcube-size);
+  height: var(--viewcube-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(22, 27, 34, 0.92);
+  border: 1px solid var(--border-standard);
+  font-family: var(--font-mono);
+  font-size: var(--font-scale-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--fg-2);
+}
+.viewcube-face-x {
+  transform: rotateY(90deg) translateZ(22px);
+  color: var(--err);
+}
+.viewcube-face-y {
+  transform: rotateX(90deg) translateZ(22px);
+  color: var(--ok);
+}
+.viewcube-face-z {
+  transform: rotateY(0deg) translateZ(22px);
+  color: var(--accent-primary);
+}
+.viewcube-triad {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-scale-xs);
+  font-weight: var(--font-weight-semibold);
+}
+.viewcube-axis-r {
+  color: var(--err);
+}
+.viewcube-axis-g {
+  color: var(--ok);
+}
+.viewcube-axis-b {
+  color: var(--accent-primary);
+}
+
+/* =========================================================================
+   Stage 2: Collapsible Multi-Tab Diagnostics Console (replaces AI drawer)
+   ========================================================================= */
+
+.diagnostics-console {
+  width: 100%;
+  min-height: var(--diag-h-collapsed);
+  background: var(--surface-base);
+  border-top: 1px solid var(--border-standard);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: min-height 0.18s var(--ease);
+  z-index: 30;
+}
+.diagnostics-console.expanded {
+  min-height: var(--diag-h-expanded);
+}
+.diagnostics-header {
+  height: var(--diag-h-collapsed);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  background: var(--surface-raised);
+  border-bottom: 1px solid transparent;
+}
+.diagnostics-console.expanded .diagnostics-header {
+  border-bottom-color: var(--border-standard);
+}
+.diagnostics-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-standard);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: var(--font-scale-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.diagnostics-toggle-btn:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.diagnostics-toggle-btn .icon-slot {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  transition: transform 0.18s var(--ease);
+}
+.diagnostics-console.expanded .diagnostics-toggle-btn .icon-slot {
+  transform: rotate(180deg);
+}
+.diagnostics-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.diagnostics-tabs::-webkit-scrollbar {
+  display: none;
+}
+.diagnostics-tab {
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-ui);
+  font-size: var(--font-scale-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.diagnostics-tab:hover {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+.diagnostics-tab.active {
+  background: var(--accent-primary-tint);
+  color: var(--accent-primary);
+}
+.diagnostics-status-chip {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-scale-xs);
+  color: var(--fg-3);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-standard);
+  border-radius: var(--radius-pill);
+  background: var(--surface-base);
+}
+.diagnostics-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--surface-base);
+}
+.diagnostics-body[hidden] {
+  display: none;
+}
+.diagnostics-pane {
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-3);
+  font-size: var(--font-scale-md);
+  color: var(--fg-2);
+}
+.diagnostics-pane[hidden] {
+  display: none;
+}
+
 /* 7. Right Inspector Region */
 .right-inspector {
   grid-area: right;
@@ -369,6 +796,32 @@ body.right-collapsed .right-inspector {
   white-space: nowrap;
 }
 
+.job-monitor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+}
+
+.job-spinner {
+  animation: pulse-job 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-job {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
+}
+
 /* Popover Tools Menu (Native Popover API) */
 #tools-menu {
   position: fixed;
@@ -388,6 +841,37 @@ body.right-collapsed .right-inspector {
   color: var(--fg-1);
 }
 #tools-menu:not(:popover-open) {
+  display: none;
+}
+
+/* Studio-contextual ribbon & tools-menu filtering (app.js toggles filter-* on the ribbon and #tools-menu) */
+.engineering-ribbon.filter-consumer
+  [data-studio-cat]:not([data-studio-cat~='consumer']):not([data-studio-cat~='common']),
+#tools-menu.filter-consumer [data-studio-cat]:not([data-studio-cat~='consumer']):not([data-studio-cat~='common']) {
+  display: none;
+}
+.engineering-ribbon.filter-eda [data-studio-cat]:not([data-studio-cat~='eda']):not([data-studio-cat~='common']),
+#tools-menu.filter-eda [data-studio-cat]:not([data-studio-cat~='eda']):not([data-studio-cat~='common']) {
+  display: none;
+}
+.engineering-ribbon.filter-aerospace
+  [data-studio-cat]:not([data-studio-cat~='aerospace']):not([data-studio-cat~='common']),
+#tools-menu.filter-aerospace [data-studio-cat]:not([data-studio-cat~='aerospace']):not([data-studio-cat~='common']) {
+  display: none;
+}
+.engineering-ribbon.filter-oilgas [data-studio-cat]:not([data-studio-cat~='oilgas']):not([data-studio-cat~='common']),
+#tools-menu.filter-oilgas [data-studio-cat]:not([data-studio-cat~='oilgas']):not([data-studio-cat~='common']) {
+  display: none;
+}
+.engineering-ribbon.filter-simulink
+  [data-studio-cat]:not([data-studio-cat~='simulink']):not([data-studio-cat~='common']),
+#tools-menu.filter-simulink [data-studio-cat]:not([data-studio-cat~='simulink']):not([data-studio-cat~='common']) {
+  display: none;
+}
+.engineering-ribbon.filter-universal_cad
+  [data-studio-cat]:not([data-studio-cat~='universal_cad']):not([data-studio-cat~='common']),
+#tools-menu.filter-universal_cad
+  [data-studio-cat]:not([data-studio-cat~='universal_cad']):not([data-studio-cat~='common']) {
   display: none;
 }
 
@@ -421,5 +905,232 @@ body.right-collapsed .right-inspector {
 @media (max-height: 720px) {
   :root {
     --ai-h-expanded: 180px;
+  }
+}
+
+/* P&ID Studio panel */
+#pid-studio-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pid-preview {
+  overflow: auto;
+  border: 1px solid var(--line-soft, #1c2129);
+  background: #0d1117;
+  padding: 8px;
+}
+.pid-preview svg {
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+}
+.pid-schedule-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.pid-schedule-table th,
+.pid-schedule-table td {
+  border: 1px solid var(--line-soft, #1c2129);
+  padding: 3px 6px;
+  text-align: left;
+}
+.pid-validation-error {
+  color: #ff6b6b;
+}
+.pid-validation-warning {
+  color: #ffd166;
+}
+.pid-statusline {
+  font-size: 12px;
+  color: var(--text-secondary, #9aa4b2);
+}
+.pid-sheet-tabs,
+.pid-schedule-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.pid-sheet-tab,
+.pid-schedule-tab {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line-soft, #1c2129);
+  background: transparent;
+  color: var(--fg-2, #9aa4b2);
+  cursor: pointer;
+}
+.pid-sheet-tab.active,
+.pid-schedule-tab.active {
+  background: var(--accent, #38bdf8);
+  color: #0b0f19;
+  border-color: var(--accent, #38bdf8);
+}
+.pid-pane-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-2, #9aa4b2);
+  margin-bottom: 4px;
+}
+.pid-note {
+  font-size: 11px;
+  color: var(--text-secondary, #9aa4b2);
+  margin-top: 4px;
+}
+.pid-export-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pid-zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.pid-zoom-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  min-width: 32px;
+}
+.pid-zoom-label {
+  min-width: 44px;
+  text-align: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2, #9aa4b2);
+}
+.pid-preview-host {
+  min-height: 220px;
+  display: flex;
+  justify-content: center;
+}
+.pid-preview-host svg {
+  max-width: 100%;
+  height: auto;
+  transform-origin: center;
+}
+.pid-schedule-filter-row {
+  display: flex;
+  margin-bottom: 6px;
+}
+.pid-filter-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: var(--surface-2, #171b21);
+  color: var(--fg-1, #e8ebf0);
+  border: 1px solid var(--line-soft, #1c2129);
+  border-radius: var(--r-sm, 4px);
+  outline: none;
+}
+.pid-filter-input:focus {
+  border-color: var(--accent, #4c8dff);
+}
+.pid-schedule-body {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pid-schedule-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.pid-schedule-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-2, #171b21);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pid-schedule-table tbody tr:hover {
+  background: var(--accent-tint, rgba(76, 141, 255, 0.14));
+}
+.pid-schedule-table tbody tr:hover td {
+  color: var(--fg-1, #e8ebf0);
+}
+.pid-empty-state {
+  font-size: 12px;
+  color: var(--fg-2, #9aa4b2);
+  padding: 10px;
+  text-align: center;
+  border: 1px dashed var(--line-soft, #1c2129);
+  border-radius: var(--r-sm, 4px);
+}
+.pid-error-alert {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  padding: 6px 10px;
+  border-radius: var(--r-sm, 4px);
+}
+
+/* Property Grid (inspector) — pgrid namespace */
+.prop-input-group .pgrid-field-half {
+  width: 50%;
+}
+
+.pgrid-metadata-section {
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.06);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.pgrid-metadata-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-orange);
+  margin-bottom: 6px;
+}
+
+.pgrid-metadata-text {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.pgrid-inspect-btn {
+  width: 100%;
+  font-size: 10px;
+  justify-content: center;
+  padding: 5px 8px;
+}
+
+/* Print: render only the P&ID SVG preview */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #pid-preview,
+  #pid-preview * {
+    visibility: visible;
+  }
+  #pid-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: #fff;
+    overflow: visible;
+  }
+  #pid-preview .pid-zoom-bar,
+  #pid-preview .pid-sheet-tabs {
+    display: none;
+  }
+  #pid-preview svg {
+    max-width: 100% !important;
+    transform: none !important;
   }
 }

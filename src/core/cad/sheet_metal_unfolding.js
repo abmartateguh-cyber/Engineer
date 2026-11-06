@@ -1,14 +1,7 @@
 /**
- * OmniEng Experimental Sheet Metal Unfolding & K-Factor Example
- * 
- * Illustrates sheet metal flat-pattern calculations:
- * 1. Exact neutral axis K-factor formulation: BA = (pi/180) * theta * (R + K * T).
- * 2. Setback (OSB) and Bend Deduction: BD = 2 * (R + T) * tan(theta / 2) - BA.
- * 3. Automated corner reliefs (rectangular, tear, obround) to eliminate stress concentration.
- * 4. 2D Flat blank generation with bend lines, angles, and tooling punch direction.
- * 
- * No material-specific bend data, manufacturing validation, or comparison to commercial CAD
- * systems is established.
+ * Experimental sheet-metal flat-length formula and layout helpers. They use
+ * caller-supplied K factors and do not include material bend tables, springback,
+ * manufacturing validation, or standards conformance.
  */
 
 'use strict';
@@ -26,7 +19,7 @@ class SheetMetalBend {
     this.angleDeg = spec.angleDeg || 90.0;
     this.innerRadiusMm = spec.innerRadiusMm || 3.0;
     this.thicknessMm = spec.thicknessMm || 2.0;
-    this.kFactor = spec.kFactor !== undefined ? spec.kFactor : 0.44; // Default cold rolled steel
+    this.kFactor = spec.kFactor !== undefined ? spec.kFactor : 0.44; // Illustrative fallback only
     this.direction = spec.direction || 'UP';
 
     this.calculateBendParameters();
@@ -38,7 +31,7 @@ class SheetMetalBend {
     const T = this.thicknessMm;
     const K = this.kFactor;
 
-    // 1. Bend Allowance (BA): Arc length along the neutral axis
+    // 1. Bend allowance (BA) formula using the supplied neutral-axis K factor
     this.bendAllowanceMm = thetaRad * (R + K * T);
 
     // 2. Outside Setback (OSB): Distance from apex to bend tangent point
@@ -93,7 +86,7 @@ class SheetMetalUnfolder {
 
       if (i < bends.length) {
         const bend = bends[i];
-        // In DIN 6935 / ANSI, developed length = L1 + L2 - BD
+        // This helper computes developed length = L1 + L2 - BD; no standard conformity is established.
         // In unfolded blank layout, the bend region has width = Bend Allowance (BA)
         const bendStartX = currentOffset - bend.outsideSetbackMm;
         const bendCenterLineX = bendStartX + bend.bendAllowanceMm / 2.0;

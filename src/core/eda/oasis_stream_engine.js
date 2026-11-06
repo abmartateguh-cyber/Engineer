@@ -1,14 +1,8 @@
 /**
- * OmniEng SEMI P39 OASIS Binary Stream Engine
- * 
- * Provides high-efficiency reading, writing, and compression of IC physical layout
- * data adhering to the SEMI P39 Open Artwork System Interchange Standard (OASIS).
- * Employs modal variable state machines, variable-length integer encoding (vint),
- * and geometric primitives (RECTANGLE, POLYGON, PATH, PLACEMENT).
- * 
- * Unverified comparison target: Synopsys IC Compiler II / Cadence Innovus / Mentor Calibre.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental byte writer/parser for a narrow OASIS-like subset: cell names,
+ * rectangles, placements, and variable-length integers. Full SEMI P39 format
+ * conformance, general layout round trips, and independent interoperability
+ * have not been established.
  */
 
 class OasisStreamEngine {
@@ -43,9 +37,9 @@ class OasisStreamEngine {
   }
 
   /**
-   * Writes a Variable-Length Unsigned Integer (vint) as per SEMI P39.
+   * Encodes a non-negative integer using a 7-bit payload byte sequence.
    * Uses 7 bits of payload per byte; high bit (bit 7) is 1 if more bytes follow.
-   * 
+   *
    * @param {number} value - Non-negative integer
    * @returns {Array<number>} Sequence of bytes
    */
@@ -53,7 +47,7 @@ class OasisStreamEngine {
     let v = Math.floor(Math.abs(value));
     const bytes = [];
     do {
-      let b = v & 0x7F;
+      let b = v & 0x7f;
       v = Math.floor(v / 128);
       if (v > 0) {
         b |= 0x80;
@@ -65,7 +59,7 @@ class OasisStreamEngine {
 
   /**
    * Reads a Variable-Length Unsigned Integer (vint) from a byte buffer.
-   * 
+   *
    * @param {Uint8Array} buffer
    * @param {number} offset
    * @returns {{value: number, bytesRead: number}}
@@ -80,7 +74,7 @@ class OasisStreamEngine {
         throw new Error('Vint overflow: variable length integer exceeds 10 bytes');
       }
       const b = buffer[offset + bytesRead++];
-      result += (b & 0x7F) * Math.pow(2, shift);
+      result += (b & 0x7f) * Math.pow(2, shift);
       shift += 7;
       if ((b & 0x80) === 0) {
         break;
@@ -102,24 +96,24 @@ class OasisStreamEngine {
 
   decodeVsint(buffer, offset) {
     const { value: mapped, bytesRead } = this.decodeVint(buffer, offset);
-    const value = (mapped % 2 === 0) ? (mapped / 2) : -((mapped + 1) / 2);
+    const value = mapped % 2 === 0 ? mapped / 2 : -((mapped + 1) / 2);
     return { value, bytesRead };
   }
 
   /**
-   * Serializes an IC layout hierarchy into a SEMI P39 OASIS binary stream.
-   * 
+   * Serializes cell names, rectangles, and placements to an experimental byte stream.
+   *
    * @param {Object} layout - Layout hierarchy with cells, shapes, and instances
    * @param {string} layout.name - Top design name
    * @param {Array<Object>} layout.cells - Array of cell objects
-   * @returns {Uint8Array} Packed binary OASIS stream
+   * @returns {Uint8Array} Experimental encoded subset
    */
   serialize(layout) {
     this.resetModalState();
     const bytes = [];
 
-    // 1. Magic OASIS Header (13 bytes: %SEMI-OASIS\r\n)
-    const magic = [0x25, 0x53, 0x45, 0x4D, 0x49, 0x2D, 0x4F, 0x41, 0x53, 0x49, 0x53, 0x0D, 0x0A];
+    // Header bytes used by this experimental subset; conformance is unverified.
+    const magic = [0x25, 0x53, 0x45, 0x4d, 0x49, 0x2d, 0x4f, 0x41, 0x53, 0x49, 0x53, 0x0d, 0x0a];
     bytes.push(...magic);
 
     // 2. START Record (Record ID = 1)
@@ -134,7 +128,7 @@ class OasisStreamEngine {
     // 3. Serialize Cells
     const cells = layout.cells || [];
     for (const cell of cells) {
-      // CELL Record (Record ID = 13: cell name with reference)
+      // Experimental cell-name record byte.
       bytes.push(13);
       const nameBytes = Buffer.from ? Buffer.from(cell.name, 'utf8') : new TextEncoder().encode(cell.name);
       bytes.push(...this.encodeVint(nameBytes.length));
@@ -143,26 +137,26 @@ class OasisStreamEngine {
       // Serialize Rectangles in Cell
       const rectangles = cell.rectangles || [];
       for (const rect of rectangles) {
-        // SEMI P39 RECTANGLE record (Record ID 20 - standard modal rectangle)
-        // Bitmask for modal fields: 
+        // Experimental rectangle record byte with local modal fields.
+        // Bitmask for modal fields:
         // bit 0: layer explicit, bit 1: datatype explicit, bit 2: width explicit, bit 3: height explicit
         // bit 4: x explicit, bit 5: y explicit
         let infoByte = 0;
-        const layerDiff = (rect.layer !== this.modalState.layer);
-        const dataDiff = (rect.datatype !== this.modalState.datatype);
-        const wDiff = (rect.width !== this.modalState.width);
-        const hDiff = (rect.height !== this.modalState.height);
-        const xDiff = (rect.x !== this.modalState.x);
-        const yDiff = (rect.y !== this.modalState.y);
+        const layerDiff = rect.layer !== this.modalState.layer;
+        const dataDiff = rect.datatype !== this.modalState.datatype;
+        const wDiff = rect.width !== this.modalState.width;
+        const hDiff = rect.height !== this.modalState.height;
+        const xDiff = rect.x !== this.modalState.x;
+        const yDiff = rect.y !== this.modalState.y;
 
         if (layerDiff) infoByte |= 0x01;
-        if (dataDiff)  infoByte |= 0x02;
-        if (wDiff)     infoByte |= 0x04;
-        if (hDiff)     infoByte |= 0x08;
-        if (xDiff)     infoByte |= 0x10;
-        if (yDiff)     infoByte |= 0x20;
+        if (dataDiff) infoByte |= 0x02;
+        if (wDiff) infoByte |= 0x04;
+        if (hDiff) infoByte |= 0x08;
+        if (xDiff) infoByte |= 0x10;
+        if (yDiff) infoByte |= 0x20;
 
-        bytes.push(20); // RECTANGLE record
+        bytes.push(20);
         bytes.push(infoByte);
 
         if (layerDiff) {
@@ -194,7 +188,7 @@ class OasisStreamEngine {
       // Serialize Placements (Instances)
       const placements = cell.placements || [];
       for (const pl of placements) {
-        // PLACEMENT Record (Record ID = 17)
+        // Experimental placement record byte.
         bytes.push(17);
         const targetBytes = Buffer.from ? Buffer.from(pl.cellName, 'utf8') : new TextEncoder().encode(pl.cellName);
         bytes.push(...this.encodeVint(targetBytes.length));
@@ -204,15 +198,15 @@ class OasisStreamEngine {
       }
     }
 
-    // 4. END Record (Record ID = 2)
+    // Experimental end record byte.
     bytes.push(2);
 
     return new Uint8Array(bytes);
   }
 
   /**
-   * Deserializes a SEMI P39 OASIS binary stream into a structured Layout object.
-   * 
+   * Deserializes the record subset emitted by this experimental writer.
+   *
    * @param {Uint8Array} buffer
    * @returns {Object} Layout object with parsed cells and geometry
    */
@@ -224,7 +218,7 @@ class OasisStreamEngine {
     let offset = 0;
 
     // 1. Verify Magic Header (13 bytes: %SEMI-OASIS\r\n)
-    const magic = [0x25, 0x53, 0x45, 0x4D, 0x49, 0x2D, 0x4F, 0x41, 0x53, 0x49, 0x53, 0x0D, 0x0A];
+    const magic = [0x25, 0x53, 0x45, 0x4d, 0x49, 0x2d, 0x4f, 0x41, 0x53, 0x49, 0x53, 0x0d, 0x0a];
     for (let i = 0; i < magic.length; i++) {
       if (buffer[offset + i] !== magic[i]) {
         throw new Error(`Invalid OASIS magic header at byte ${i}`);
@@ -233,7 +227,7 @@ class OasisStreamEngine {
     offset += magic.length;
 
     const layout = {
-      format: 'SEMI-P39-OASIS',
+      format: 'oasis-like-record-subset-unverified',
       version: '1.0',
       cells: []
     };
@@ -253,7 +247,7 @@ class OasisStreamEngine {
         const unitDec = this.decodeVint(buffer, offset);
         offset += unitDec.bytesRead;
       } else if (recordType === 13) {
-        // CELL Record
+        // Experimental cell-name record.
         const nameLen = this.decodeVint(buffer, offset);
         offset += nameLen.bytesRead;
         const cellName = new TextDecoder('utf8').decode(buffer.slice(offset, offset + nameLen.value));
@@ -345,9 +339,9 @@ class OasisStreamEngine {
   }
 
   /**
-   * Compares OASIS serialized size vs raw uncompressed GDSII equivalent size.
-   * Demonstrates the > 70% compression ratio mandated by SEMI P39.
-   * 
+   * Compares this subset's encoded size with a heuristic GDSII size estimate.
+   * This estimate is not a standards requirement or a measured file-to-file comparison.
+   *
    * @param {Object} layout
    * @returns {Object} Size comparison and savings percentage
    */
@@ -361,19 +355,20 @@ class OasisStreamEngine {
     // In contrast, OASIS modal rectangle takes ~2 to 5 bytes when coordinates/dimensions are reused.
     let totalRects = 0;
     let totalPlacements = 0;
-    (layout.cells || []).forEach(c => {
+    (layout.cells || []).forEach((c) => {
       totalRects += (c.rectangles || []).length;
       totalPlacements += (c.placements || []).length;
     });
 
-    const estimatedGdsiiSize = 100 + (totalRects * 64) + (totalPlacements * 48);
-    const reductionPercent = Math.max(0.0, ((estimatedGdsiiSize - oasisSize) / estimatedGdsiiSize) * 100.0);
+    const estimatedGdsiiSize = 100 + totalRects * 64 + totalPlacements * 48;
+    const estimatedReductionPercent = Math.max(0.0, ((estimatedGdsiiSize - oasisSize) / estimatedGdsiiSize) * 100.0);
 
     return {
       oasisSizeBytes: oasisSize,
       estimatedGdsiiSizeBytes: estimatedGdsiiSize,
-      reductionPercent,
-      qualifiesTier1Standard: reductionPercent >= 70.0
+      estimatedReductionPercent,
+      reductionPercent: estimatedReductionPercent, // Compatibility alias; see estimateBasis.
+      estimateBasis: 'fixed per-record size assumptions; no GDSII file is serialized'
     };
   }
 }

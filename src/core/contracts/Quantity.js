@@ -50,122 +50,122 @@ const Dimensions = Object.freeze({
 const UnitRegistry = {
   // Dimensionless
   '': { dim: Dimensions.DIMENSIONLESS, scale: 1, offset: 0 },
-  '1': { dim: Dimensions.DIMENSIONLESS, scale: 1, offset: 0 },
+  1: { dim: Dimensions.DIMENSIONLESS, scale: 1, offset: 0 },
   '%': { dim: Dimensions.DIMENSIONLESS, scale: 0.01, offset: 0 },
-  'ppm': { dim: Dimensions.DIMENSIONLESS, scale: 1e-6, offset: 0 },
-  'rad': { dim: Dimensions.DIMENSIONLESS, scale: 1, offset: 0 },
-  'deg': { dim: Dimensions.DIMENSIONLESS, scale: Math.PI / 180, offset: 0 },
-  'arcmin': { dim: Dimensions.DIMENSIONLESS, scale: Math.PI / 10800, offset: 0 },
-  'arcsec': { dim: Dimensions.DIMENSIONLESS, scale: Math.PI / 648000, offset: 0 },
-  'rev': { dim: Dimensions.DIMENSIONLESS, scale: 2 * Math.PI, offset: 0 },
+  ppm: { dim: Dimensions.DIMENSIONLESS, scale: 1e-6, offset: 0 },
+  rad: { dim: Dimensions.DIMENSIONLESS, scale: 1, offset: 0 },
+  deg: { dim: Dimensions.DIMENSIONLESS, scale: Math.PI / 180, offset: 0 },
+  arcmin: { dim: Dimensions.DIMENSIONLESS, scale: Math.PI / 10800, offset: 0 },
+  arcsec: { dim: Dimensions.DIMENSIONLESS, scale: Math.PI / 648000, offset: 0 },
+  rev: { dim: Dimensions.DIMENSIONLESS, scale: 2 * Math.PI, offset: 0 },
 
   // Length [m]
-  'm': { dim: Dimensions.LENGTH, scale: 1, offset: 0 },
-  'mm': { dim: Dimensions.LENGTH, scale: 1e-3, offset: 0 },
-  'cm': { dim: Dimensions.LENGTH, scale: 1e-2, offset: 0 },
-  'km': { dim: Dimensions.LENGTH, scale: 1e3, offset: 0 },
-  'um': { dim: Dimensions.LENGTH, scale: 1e-6, offset: 0 },
-  'nm': { dim: Dimensions.LENGTH, scale: 1e-9, offset: 0 },
-  'in': { dim: Dimensions.LENGTH, scale: 0.0254, offset: 0 },
-  'ft': { dim: Dimensions.LENGTH, scale: 0.3048, offset: 0 },
-  'yd': { dim: Dimensions.LENGTH, scale: 0.9144, offset: 0 },
-  'mi': { dim: Dimensions.LENGTH, scale: 1609.344, offset: 0 },
-  'mil': { dim: Dimensions.LENGTH, scale: 2.54e-5, offset: 0 },
+  m: { dim: Dimensions.LENGTH, scale: 1, offset: 0 },
+  mm: { dim: Dimensions.LENGTH, scale: 1e-3, offset: 0 },
+  cm: { dim: Dimensions.LENGTH, scale: 1e-2, offset: 0 },
+  km: { dim: Dimensions.LENGTH, scale: 1e3, offset: 0 },
+  um: { dim: Dimensions.LENGTH, scale: 1e-6, offset: 0 },
+  nm: { dim: Dimensions.LENGTH, scale: 1e-9, offset: 0 },
+  in: { dim: Dimensions.LENGTH, scale: 0.0254, offset: 0 },
+  ft: { dim: Dimensions.LENGTH, scale: 0.3048, offset: 0 },
+  yd: { dim: Dimensions.LENGTH, scale: 0.9144, offset: 0 },
+  mi: { dim: Dimensions.LENGTH, scale: 1609.344, offset: 0 },
+  mil: { dim: Dimensions.LENGTH, scale: 2.54e-5, offset: 0 },
 
   // Area [m2]
-  'm2': { dim: Dimensions.AREA, scale: 1, offset: 0 },
-  'mm2': { dim: Dimensions.AREA, scale: 1e-6, offset: 0 },
-  'cm2': { dim: Dimensions.AREA, scale: 1e-4, offset: 0 },
-  'in2': { dim: Dimensions.AREA, scale: 0.00064516, offset: 0 },
-  'ft2': { dim: Dimensions.AREA, scale: 0.09290304, offset: 0 },
+  m2: { dim: Dimensions.AREA, scale: 1, offset: 0 },
+  mm2: { dim: Dimensions.AREA, scale: 1e-6, offset: 0 },
+  cm2: { dim: Dimensions.AREA, scale: 1e-4, offset: 0 },
+  in2: { dim: Dimensions.AREA, scale: 0.00064516, offset: 0 },
+  ft2: { dim: Dimensions.AREA, scale: 0.09290304, offset: 0 },
 
   // Volume [m3]
-  'm3': { dim: Dimensions.VOLUME, scale: 1, offset: 0 },
-  'mm3': { dim: Dimensions.VOLUME, scale: 1e-9, offset: 0 },
-  'cm3': { dim: Dimensions.VOLUME, scale: 1e-6, offset: 0 },
-  'L': { dim: Dimensions.VOLUME, scale: 1e-3, offset: 0 },
-  'mL': { dim: Dimensions.VOLUME, scale: 1e-6, offset: 0 },
-  'in3': { dim: Dimensions.VOLUME, scale: 1.6387064e-5, offset: 0 },
-  'ft3': { dim: Dimensions.VOLUME, scale: 0.028316846592, offset: 0 },
-  'gal': { dim: Dimensions.VOLUME, scale: 0.003785411784, offset: 0 },
+  m3: { dim: Dimensions.VOLUME, scale: 1, offset: 0 },
+  mm3: { dim: Dimensions.VOLUME, scale: 1e-9, offset: 0 },
+  cm3: { dim: Dimensions.VOLUME, scale: 1e-6, offset: 0 },
+  L: { dim: Dimensions.VOLUME, scale: 1e-3, offset: 0 },
+  mL: { dim: Dimensions.VOLUME, scale: 1e-6, offset: 0 },
+  in3: { dim: Dimensions.VOLUME, scale: 1.6387064e-5, offset: 0 },
+  ft3: { dim: Dimensions.VOLUME, scale: 0.028316846592, offset: 0 },
+  gal: { dim: Dimensions.VOLUME, scale: 0.003785411784, offset: 0 },
 
   // Mass [kg]
-  'kg': { dim: Dimensions.MASS, scale: 1, offset: 0 },
-  'g': { dim: Dimensions.MASS, scale: 1e-3, offset: 0 },
-  'mg': { dim: Dimensions.MASS, scale: 1e-6, offset: 0 },
-  'tonne': { dim: Dimensions.MASS, scale: 1e3, offset: 0 },
-  'lb': { dim: Dimensions.MASS, scale: 0.45359237, offset: 0 },
-  'oz': { dim: Dimensions.MASS, scale: 0.028349523125, offset: 0 },
-  'slug': { dim: Dimensions.MASS, scale: 14.5939029, offset: 0 },
+  kg: { dim: Dimensions.MASS, scale: 1, offset: 0 },
+  g: { dim: Dimensions.MASS, scale: 1e-3, offset: 0 },
+  mg: { dim: Dimensions.MASS, scale: 1e-6, offset: 0 },
+  tonne: { dim: Dimensions.MASS, scale: 1e3, offset: 0 },
+  lb: { dim: Dimensions.MASS, scale: 0.45359237, offset: 0 },
+  oz: { dim: Dimensions.MASS, scale: 0.028349523125, offset: 0 },
+  slug: { dim: Dimensions.MASS, scale: 14.5939029, offset: 0 },
 
   // Time [s]
-  's': { dim: Dimensions.TIME, scale: 1, offset: 0 },
-  'ms': { dim: Dimensions.TIME, scale: 1e-3, offset: 0 },
-  'us': { dim: Dimensions.TIME, scale: 1e-6, offset: 0 },
-  'ns': { dim: Dimensions.TIME, scale: 1e-9, offset: 0 },
-  'min': { dim: Dimensions.TIME, scale: 60, offset: 0 },
-  'h': { dim: Dimensions.TIME, scale: 3600, offset: 0 },
-  'day': { dim: Dimensions.TIME, scale: 86400, offset: 0 },
+  s: { dim: Dimensions.TIME, scale: 1, offset: 0 },
+  ms: { dim: Dimensions.TIME, scale: 1e-3, offset: 0 },
+  us: { dim: Dimensions.TIME, scale: 1e-6, offset: 0 },
+  ns: { dim: Dimensions.TIME, scale: 1e-9, offset: 0 },
+  min: { dim: Dimensions.TIME, scale: 60, offset: 0 },
+  h: { dim: Dimensions.TIME, scale: 3600, offset: 0 },
+  day: { dim: Dimensions.TIME, scale: 86400, offset: 0 },
 
   // Frequency [Hz = 1/s]
-  'Hz': { dim: Dimensions.FREQUENCY, scale: 1, offset: 0 },
-  'kHz': { dim: Dimensions.FREQUENCY, scale: 1e3, offset: 0 },
-  'MHz': { dim: Dimensions.FREQUENCY, scale: 1e6, offset: 0 },
-  'GHz': { dim: Dimensions.FREQUENCY, scale: 1e9, offset: 0 },
-  'rpm': { dim: Dimensions.FREQUENCY, scale: 1 / 60, offset: 0 },
+  Hz: { dim: Dimensions.FREQUENCY, scale: 1, offset: 0 },
+  kHz: { dim: Dimensions.FREQUENCY, scale: 1e3, offset: 0 },
+  MHz: { dim: Dimensions.FREQUENCY, scale: 1e6, offset: 0 },
+  GHz: { dim: Dimensions.FREQUENCY, scale: 1e9, offset: 0 },
+  rpm: { dim: Dimensions.FREQUENCY, scale: 1 / 60, offset: 0 },
 
   // Force [N]
-  'N': { dim: Dimensions.FORCE, scale: 1, offset: 0 },
-  'kN': { dim: Dimensions.FORCE, scale: 1e3, offset: 0 },
-  'mN': { dim: Dimensions.FORCE, scale: 1e-3, offset: 0 },
-  'lbf': { dim: Dimensions.FORCE, scale: 4.4482216152605, offset: 0 },
-  'dyne': { dim: Dimensions.FORCE, scale: 1e-5, offset: 0 },
+  N: { dim: Dimensions.FORCE, scale: 1, offset: 0 },
+  kN: { dim: Dimensions.FORCE, scale: 1e3, offset: 0 },
+  mN: { dim: Dimensions.FORCE, scale: 1e-3, offset: 0 },
+  lbf: { dim: Dimensions.FORCE, scale: 4.4482216152605, offset: 0 },
+  dyne: { dim: Dimensions.FORCE, scale: 1e-5, offset: 0 },
 
   // Pressure & Stress [Pa]
-  'Pa': { dim: Dimensions.PRESSURE, scale: 1, offset: 0 },
-  'kPa': { dim: Dimensions.PRESSURE, scale: 1e3, offset: 0 },
-  'MPa': { dim: Dimensions.PRESSURE, scale: 1e6, offset: 0 },
-  'GPa': { dim: Dimensions.PRESSURE, scale: 1e9, offset: 0 },
-  'bar': { dim: Dimensions.PRESSURE, scale: 1e5, offset: 0 },
-  'mbar': { dim: Dimensions.PRESSURE, scale: 100, offset: 0 },
-  'psi': { dim: Dimensions.PRESSURE, scale: 6894.757293168, offset: 0 },
-  'ksi': { dim: Dimensions.PRESSURE, scale: 6894757.293168, offset: 0 },
-  'atm': { dim: Dimensions.PRESSURE, scale: 101325, offset: 0 },
-  'torr': { dim: Dimensions.PRESSURE, scale: 133.322368421, offset: 0 },
+  Pa: { dim: Dimensions.PRESSURE, scale: 1, offset: 0 },
+  kPa: { dim: Dimensions.PRESSURE, scale: 1e3, offset: 0 },
+  MPa: { dim: Dimensions.PRESSURE, scale: 1e6, offset: 0 },
+  GPa: { dim: Dimensions.PRESSURE, scale: 1e9, offset: 0 },
+  bar: { dim: Dimensions.PRESSURE, scale: 1e5, offset: 0 },
+  mbar: { dim: Dimensions.PRESSURE, scale: 100, offset: 0 },
+  psi: { dim: Dimensions.PRESSURE, scale: 6894.757293168, offset: 0 },
+  ksi: { dim: Dimensions.PRESSURE, scale: 6894757.293168, offset: 0 },
+  atm: { dim: Dimensions.PRESSURE, scale: 101325, offset: 0 },
+  torr: { dim: Dimensions.PRESSURE, scale: 133.322368421, offset: 0 },
 
   // Energy & Work [J]
-  'J': { dim: Dimensions.ENERGY, scale: 1, offset: 0 },
-  'kJ': { dim: Dimensions.ENERGY, scale: 1e3, offset: 0 },
-  'MJ': { dim: Dimensions.ENERGY, scale: 1e6, offset: 0 },
-  'cal': { dim: Dimensions.ENERGY, scale: 4.184, offset: 0 },
-  'kcal': { dim: Dimensions.ENERGY, scale: 4184, offset: 0 },
-  'BTU': { dim: Dimensions.ENERGY, scale: 1055.05585, offset: 0 },
-  'kWh': { dim: Dimensions.ENERGY, scale: 3.6e6, offset: 0 },
-  'eV': { dim: Dimensions.ENERGY, scale: 1.602176634e-19, offset: 0 },
+  J: { dim: Dimensions.ENERGY, scale: 1, offset: 0 },
+  kJ: { dim: Dimensions.ENERGY, scale: 1e3, offset: 0 },
+  MJ: { dim: Dimensions.ENERGY, scale: 1e6, offset: 0 },
+  cal: { dim: Dimensions.ENERGY, scale: 4.184, offset: 0 },
+  kcal: { dim: Dimensions.ENERGY, scale: 4184, offset: 0 },
+  BTU: { dim: Dimensions.ENERGY, scale: 1055.05585, offset: 0 },
+  kWh: { dim: Dimensions.ENERGY, scale: 3.6e6, offset: 0 },
+  eV: { dim: Dimensions.ENERGY, scale: 1.602176634e-19, offset: 0 },
 
   // Power [W]
-  'W': { dim: Dimensions.POWER, scale: 1, offset: 0 },
-  'kW': { dim: Dimensions.POWER, scale: 1e3, offset: 0 },
-  'MW': { dim: Dimensions.POWER, scale: 1e6, offset: 0 },
-  'hp': { dim: Dimensions.POWER, scale: 745.69987158227, offset: 0 },
+  W: { dim: Dimensions.POWER, scale: 1, offset: 0 },
+  kW: { dim: Dimensions.POWER, scale: 1e3, offset: 0 },
+  MW: { dim: Dimensions.POWER, scale: 1e6, offset: 0 },
+  hp: { dim: Dimensions.POWER, scale: 745.69987158227, offset: 0 },
 
   // Temperature [K]
-  'K': { dim: Dimensions.TEMPERATURE, scale: 1, offset: 0 },
-  'degC': { dim: Dimensions.TEMPERATURE, scale: 1, offset: 273.15 },
-  'degF': { dim: Dimensions.TEMPERATURE, scale: 5 / 9, offset: 459.67 },
-  'degR': { dim: Dimensions.TEMPERATURE, scale: 5 / 9, offset: 0 },
+  K: { dim: Dimensions.TEMPERATURE, scale: 1, offset: 0 },
+  degC: { dim: Dimensions.TEMPERATURE, scale: 1, offset: 273.15 },
+  degF: { dim: Dimensions.TEMPERATURE, scale: 5 / 9, offset: 459.67 },
+  degR: { dim: Dimensions.TEMPERATURE, scale: 5 / 9, offset: 0 },
 
   // Velocity [m/s]
   'm/s': { dim: Dimensions.VELOCITY, scale: 1, offset: 0 },
   'km/h': { dim: Dimensions.VELOCITY, scale: 1 / 3.6, offset: 0 },
   'ft/s': { dim: Dimensions.VELOCITY, scale: 0.3048, offset: 0 },
-  'mph': { dim: Dimensions.VELOCITY, scale: 0.44704, offset: 0 },
-  'knot': { dim: Dimensions.VELOCITY, scale: 0.514444444444, offset: 0 },
+  mph: { dim: Dimensions.VELOCITY, scale: 0.44704, offset: 0 },
+  knot: { dim: Dimensions.VELOCITY, scale: 0.514444444444, offset: 0 },
 
   // Acceleration [m/s2]
   'm/s2': { dim: Dimensions.ACCELERATION, scale: 1, offset: 0 },
   'ft/s2': { dim: Dimensions.ACCELERATION, scale: 0.3048, offset: 0 },
-  'g0': { dim: Dimensions.ACCELERATION, scale: 9.80665, offset: 0 },
+  g0: { dim: Dimensions.ACCELERATION, scale: 9.80665, offset: 0 },
 
   // Density [kg/m3]
   'kg/m3': { dim: Dimensions.DENSITY, scale: 1, offset: 0 },
@@ -174,28 +174,28 @@ const UnitRegistry = {
 
   // Viscosity
   'Pa.s': { dim: Dimensions.DYNAMIC_VISCOSITY, scale: 1, offset: 0 },
-  'cP': { dim: Dimensions.DYNAMIC_VISCOSITY, scale: 1e-3, offset: 0 },
+  cP: { dim: Dimensions.DYNAMIC_VISCOSITY, scale: 1e-3, offset: 0 },
   'm2/s': { dim: Dimensions.KINEMATIC_VISCOSITY, scale: 1, offset: 0 },
-  'cSt': { dim: Dimensions.KINEMATIC_VISCOSITY, scale: 1e-6, offset: 0 },
+  cSt: { dim: Dimensions.KINEMATIC_VISCOSITY, scale: 1e-6, offset: 0 },
 
   // Electrical
-  'A': { dim: Dimensions.CURRENT, scale: 1, offset: 0 },
-  'mA': { dim: Dimensions.CURRENT, scale: 1e-3, offset: 0 },
-  'uA': { dim: Dimensions.CURRENT, scale: 1e-6, offset: 0 },
-  'V': { dim: Dimensions.VOLTAGE, scale: 1, offset: 0 },
-  'mV': { dim: Dimensions.VOLTAGE, scale: 1e-3, offset: 0 },
-  'kV': { dim: Dimensions.VOLTAGE, scale: 1e3, offset: 0 },
-  'Ohm': { dim: Dimensions.RESISTANCE, scale: 1, offset: 0 },
-  'kOhm': { dim: Dimensions.RESISTANCE, scale: 1e3, offset: 0 },
-  'MOhm': { dim: Dimensions.RESISTANCE, scale: 1e6, offset: 0 },
-  'F': { dim: Dimensions.CAPACITANCE, scale: 1, offset: 0 },
-  'uF': { dim: Dimensions.CAPACITANCE, scale: 1e-6, offset: 0 },
-  'nF': { dim: Dimensions.CAPACITANCE, scale: 1e-9, offset: 0 },
-  'pF': { dim: Dimensions.CAPACITANCE, scale: 1e-12, offset: 0 },
-  'H': { dim: Dimensions.INDUCTANCE, scale: 1, offset: 0 },
-  'mH': { dim: Dimensions.INDUCTANCE, scale: 1e-3, offset: 0 },
-  'uH': { dim: Dimensions.INDUCTANCE, scale: 1e-6, offset: 0 },
-  'T': { dim: Dimensions.MAGNETIC_FLUX_DENSITY, scale: 1, offset: 0 }
+  A: { dim: Dimensions.CURRENT, scale: 1, offset: 0 },
+  mA: { dim: Dimensions.CURRENT, scale: 1e-3, offset: 0 },
+  uA: { dim: Dimensions.CURRENT, scale: 1e-6, offset: 0 },
+  V: { dim: Dimensions.VOLTAGE, scale: 1, offset: 0 },
+  mV: { dim: Dimensions.VOLTAGE, scale: 1e-3, offset: 0 },
+  kV: { dim: Dimensions.VOLTAGE, scale: 1e3, offset: 0 },
+  Ohm: { dim: Dimensions.RESISTANCE, scale: 1, offset: 0 },
+  kOhm: { dim: Dimensions.RESISTANCE, scale: 1e3, offset: 0 },
+  MOhm: { dim: Dimensions.RESISTANCE, scale: 1e6, offset: 0 },
+  F: { dim: Dimensions.CAPACITANCE, scale: 1, offset: 0 },
+  uF: { dim: Dimensions.CAPACITANCE, scale: 1e-6, offset: 0 },
+  nF: { dim: Dimensions.CAPACITANCE, scale: 1e-9, offset: 0 },
+  pF: { dim: Dimensions.CAPACITANCE, scale: 1e-12, offset: 0 },
+  H: { dim: Dimensions.INDUCTANCE, scale: 1, offset: 0 },
+  mH: { dim: Dimensions.INDUCTANCE, scale: 1e-3, offset: 0 },
+  uH: { dim: Dimensions.INDUCTANCE, scale: 1e-6, offset: 0 },
+  T: { dim: Dimensions.MAGNETIC_FLUX_DENSITY, scale: 1, offset: 0 }
 };
 
 /**
@@ -227,10 +227,16 @@ class Quantity {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, `Quantity value must be a finite number: ${valueSi}`);
     }
     if (typeof uncertaintySi !== 'number' || !Number.isFinite(uncertaintySi) || uncertaintySi < 0) {
-      throw new OmniError(OmniErrorCode.INVALID_INPUT, `Quantity uncertainty must be a non-negative finite number: ${uncertaintySi}`);
+      throw new OmniError(
+        OmniErrorCode.INVALID_INPUT,
+        `Quantity uncertainty must be a non-negative finite number: ${uncertaintySi}`
+      );
     }
     if (!Array.isArray(dimension) || dimension.length !== 7) {
-      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Quantity dimension must be a 7-element array [M, L, T, I, Theta, N, J]');
+      throw new OmniError(
+        OmniErrorCode.INVALID_INPUT,
+        'Quantity dimension must be a 7-element array [M, L, T, I, Theta, N, J]'
+      );
     }
 
     this._valueSi = valueSi;
@@ -303,6 +309,12 @@ class Quantity {
   uncertaintyTo(targetUnit) {
     const def = UnitRegistry[targetUnit];
     if (!def) throw new OmniError(OmniErrorCode.UNSUPPORTED, `Target unit "${targetUnit}" is not registered`);
+    if (!dimensionsEqual(this._dimension, def.dim)) {
+      throw new OmniError(
+        OmniErrorCode.INVALID_INPUT,
+        `Dimension mismatch: cannot convert uncertainty to ${targetUnit}`
+      );
+    }
     return this._uncertaintySi / def.scale;
   }
 
@@ -369,10 +381,7 @@ class Quantity {
     if (factor instanceof Quantity) {
       const newVal = this._valueSi * factor.valueSi;
       const newDim = this._dimension.map((d, i) => d + factor.dimension[i]);
-      // Fractional uncertainty in quadrature
-      const relA = this._valueSi !== 0 ? this._uncertaintySi / Math.abs(this._valueSi) : 0;
-      const relB = factor.valueSi !== 0 ? factor.uncertaintySi / Math.abs(factor.valueSi) : 0;
-      const newUnc = Math.abs(newVal) * Math.hypot(relA, relB);
+      const newUnc = Math.hypot(factor.valueSi * this._uncertaintySi, this._valueSi * factor.uncertaintySi);
       return new Quantity(newVal, '', newDim, newUnc);
     }
     throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Multiplication requires Quantity or finite number');
@@ -401,9 +410,10 @@ class Quantity {
       }
       const newVal = this._valueSi / divisor.valueSi;
       const newDim = this._dimension.map((d, i) => d - divisor.dimension[i]);
-      const relA = this._valueSi !== 0 ? this._uncertaintySi / Math.abs(this._valueSi) : 0;
-      const relB = divisor.valueSi !== 0 ? divisor.uncertaintySi / Math.abs(divisor.valueSi) : 0;
-      const newUnc = Math.abs(newVal) * Math.hypot(relA, relB);
+      const newUnc = Math.hypot(
+        this._uncertaintySi / divisor.valueSi,
+        (this._valueSi * divisor.uncertaintySi) / (divisor.valueSi * divisor.valueSi)
+      );
       return new Quantity(newVal, '', newDim, newUnc);
     }
     throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Division requires Quantity or finite number');
@@ -443,7 +453,12 @@ class Quantity {
     if (!json || typeof json !== 'object') {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, 'Invalid Quantity JSON');
     }
-    return new Quantity(json.valueSi, json.displayUnit, json.dimension, json.uncertaintySi || 0);
+    return new Quantity(
+      json.valueSi,
+      json.displayUnit,
+      json.dimension,
+      json.uncertaintySi === undefined ? 0 : json.uncertaintySi
+    );
   }
 }
 

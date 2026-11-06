@@ -4,40 +4,92 @@
  */
 
 :root {
+  /* Precision surface palette (Stage 2 canonical values) */
+  --surface-canvas: #090d12;
+  --surface-base: #0e1117;
+  --surface-raised: #161b22;
+  --border-standard: #30363d;
+  --accent-primary: #388bfd;
+  --accent-primary-hover: #5ea1ff;
+  --accent-primary-tint: rgba(56, 139, 253, 0.16);
+
   /* Surfaces (dark technical workstation) */
-  --surface-0: #0b0d12;   /* app background / canvas well */
-  --surface-1: #111418;   /* panels / sidebar background */
-  --surface-2: #171b21;   /* raised: menus, inputs, cards */
-  --surface-3: #1f242c;   /* hover / active elevated */
-  --line:      #262c35;   /* region dividers and borders */
-  --line-soft: #1c2129;   /* subtle inner dividers */
+  --surface-0: var(--surface-canvas); /* app background / canvas well */
+  --surface-1: var(--surface-base); /* panels / sidebar background */
+  --surface-2: var(--surface-raised); /* raised: menus, inputs, cards */
+  --surface-3: #1f242c; /* hover / active elevated */
+  --line: var(--border-standard); /* region dividers and borders */
+  --line-soft: #1c2129; /* subtle inner dividers */
 
   /* Text hierarchy */
-  --fg-1: #e8ebf0;  /* primary label and value */
-  --fg-2: #a3abb8;  /* secondary / muted label */
-  --fg-3: #6b7482;  /* subtle / disabled / caption */
+  --fg-1: #e8ebf0; /* primary label and value */
+  --fg-2: #a3abb8; /* secondary / muted label */
+  --fg-3: #6b7482; /* subtle / disabled / caption */
 
   /* Single focal accent + semantic indicators */
-  --accent: #4c8dff;
-  --accent-tint: rgba(76, 141, 255, 0.14);
-  --accent-hover: #3b7ced;
+  --accent: var(--accent-primary);
+  --accent-tint: var(--accent-primary-tint);
+  --accent-hover: var(--accent-primary-hover);
   --ok: #3fb68b;
   --warn: #e0a43a;
   --err: #e5566b;
 
-  /* Spacing Scale (4px grid) */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
+  /* Precision Spacing Scale (4px / 8px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+  --space-12: 96px;
+
+  /* Legacy Spacing Aliases (4px grid) */
+  --sp-1: var(--space-1);
+  --sp-2: var(--space-2);
+  --sp-3: var(--space-3);
+  --sp-4: var(--space-4);
+  --sp-5: var(--space-6);
 
   /* Corner Radii */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  /* Legacy Radius Aliases */
   --r-sm: 4px;
   --r-md: 6px;
   --r-lg: 10px;
 
-  /* Font Sizes */
+  /* Typography Scale */
+  --font-scale-xs: 10px;
+  --font-scale-sm: 11px;
+  --font-scale-md: 12px;
+  --font-scale-lg: 13px;
+  --font-scale-xl: 14px;
+  --font-scale-2xl: 15px;
+  --font-scale-3xl: 18px;
+  --font-scale-4xl: 22px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-loose: 1.7;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
+
+  /* Legacy Font Sizes */
   --fs-xs: 11px;
   --fs-sm: 12px;
   --fs-md: 13px;
@@ -48,8 +100,10 @@
   --row-h: 32px;
 
   /* Shell Layout Metrics (read by JS for canvas safe-area) */
-  --topbar-h: 40px;
-  --toolbar-h: 40px;
+  --topbar-h: 36px; /* 36px Top Command Bar */
+  --toolbar-h: 36px; /* 36px Dynamic Contextual Ribbon */
+  --commandbar-h: 36px;
+  --ribbon-h: 36px;
   --status-h: 24px;
   --rail-w: 48px;
   --left-w: 260px;
@@ -57,9 +111,17 @@
   --ai-h-collapsed: 44px;
   --ai-h-expanded: 240px;
 
+  /* Diagnostics Console Metrics (Stage 2) */
+  --diag-h-collapsed: 36px;
+  --diag-h-expanded: 240px;
+  --diag-tab-h: 32px;
+  --hud-capsule-h: 40px;
+  --viewcube-size: 44px;
+
   /* Typography */
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, Monaco, "Liberation Mono", monospace;
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, Menlo, Consolas, Monaco, 'Liberation Mono', monospace;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Legacy aliases for backward compatibility */
@@ -68,6 +130,8 @@
   --bg-tertiary: var(--surface-2);
   --bg-card: var(--surface-2);
   --border-color: var(--line);
+  --border-subtle: var(--line-soft, #1c2129);
+  --ramBorder-subtle: var(--line-soft, #1c2129);
   --text-main: var(--fg-1);
   --text-muted: var(--fg-2);
   --text-dim: var(--fg-3);

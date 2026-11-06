@@ -5,7 +5,7 @@ The dependency inventory is generated from the lockfile and installed package me
 Direct dependencies declared in `package.json` and their lockfile-resolved SBOM versions are:
 
 - `three@0.186.1` — runtime dependency; SBOM declares MIT.
-- `electron@45.0.0` — development/runtime packaging dependency; SBOM declares MIT.
+- `electron@45.1.0` — development/runtime packaging dependency; SBOM declares MIT.
 - `electron-builder@26.15.3` — development packaging dependency; SBOM declares MIT.
 - `eslint@9.39.5` — development tooling; SBOM declares MIT.
 - `globals@17.13.0` — development tooling; SBOM declares MIT.

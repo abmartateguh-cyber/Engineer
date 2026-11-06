@@ -103,7 +103,7 @@ function runTier1TenOutOfTenTests() {
   });
 
   // [T10-3] Immutable Audit Ledger
-  runTest('[T10-3] Immutable Audit Ledger (DO-178C DAL-A & ISO 26262 ASIL-D)...', () => {
+  runTest('[T10-3] In-memory hash-chain tamper diagnostic...', () => {
     const ledger = new ImmutableAuditLedger('OmniEng_Aerospace_Seed');
     ledger.recordAction('Chief_Aerodynamicist', 'AIRFOIL_CONTOUR_LOCK', { profile: 'NACA 6412', mach: 0.78 });
     ledger.recordAction('Lead_Structural_Engineer', 'FEA_MARGIN_SIGN_OFF', {
@@ -150,7 +150,8 @@ function runTier1TenOutOfTenTests() {
 
     const info = accelerator.getBackendInfo();
     assert(info.activeTier !== undefined);
-    assert(info.hardwareAccelerationFactor >= 1.0);
+    assert.strictEqual(info.hardwareAccelerationFactor, null);
+    assert.strictEqual(info.isMeasuredBenchmark, false);
   });
 
   // [T10-5] Out-of-Core Hierarchical Spatial Octree Assembly Manager

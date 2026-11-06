@@ -1,14 +1,25 @@
 'use strict';
 
+const crypto = require('crypto');
 const { EngineAdapter } = require('../contracts/EngineAdapter');
 const { JobResult, JobStatus } = require('../contracts/JobResult');
 const { JobEvent, JobEventType } = require('../contracts/JobEvent');
-const { ValidationMaturity } = require('../contracts/ValidationRecord');
+const { Quantity } = require('../contracts/Quantity');
+const { ValidationRecord, ValidationMaturity } = require('../contracts/ValidationRecord');
 const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 const { SkewRayTracer } = require('./skew_ray_tracer');
 const { OpticalGlassCatalog } = require('./optical_glass_catalog');
+
+const MAX_OPTICS_SURFACES = 128;
+const MAX_GLASS_NAME_CHARS = 200;
+const MIN_WAVELENGTH_UM = 1e-5;
+const MAX_WAVELENGTH_UM = 1e4;
 const { PolarizationRayTracer, JonesVector, Complex } = require('./polarization_ray_tracer');
+const { TolerancingYieldCompensator } = require('./tolerancing_yield_compensator');
+const { NonSequentialTracer, OpticalRay } = require('./non_sequential_tracer');
+const { VolumeScatteringEngine } = require('./volume_scattering');
+const { OpticalThermalSoakEngine } = require('./thermal_soak');
 
 function requirePupilGenerationInputs(params) {
   const pupilRadiusMm = params.pupilRadiusMm ?? params.entrancePupilRadiusMm;
@@ -79,7 +90,7 @@ function validateOpticalSurfaces(surfaces) {
 class OpticsEngineAdapter extends EngineAdapter {
   constructor() {
     super('optics', 'optics-raytracing-engine-adapter', '2.0.0');
-    this.catalog = new OpticalGlassCatalog();
+    this.catalog = OpticalGlassCatalog.fromBundledData();
   }
 
   describeCapabilities() {
@@ -91,7 +102,11 @@ class OpticsEngineAdapter extends EngineAdapter {
         'trace_skew_rays',
         'generate_pupil_rays',
         'calculate_refractive_index',
-        'trace_polarization'
+        'trace_polarization',
+        'run_optical_tolerancing',
+        'trace_non_sequential',
+        'evaluate_volume_scattering',
+        'evaluate_thermal_soak'
       ],
       maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
@@ -237,13 +252,21 @@ class OpticsEngineAdapter extends EngineAdapter {
           const glass = params.glass ?? params.customGlassRecord?.name;
           const wavelengthUm = params.wavelengthUm;
           const temperatureC = params.temperatureC;
-          if (typeof glass !== 'string' || !glass.trim()) {
-            throw new OmniError(OmniErrorCode.INVALID_INPUT, 'An optical material name is required.');
-          }
-          if (typeof wavelengthUm !== 'number' || !Number.isFinite(wavelengthUm) || wavelengthUm <= 0) {
+          if (typeof glass !== 'string' || !glass.trim() || glass.length > MAX_GLASS_NAME_CHARS) {
             throw new OmniError(
               OmniErrorCode.INVALID_INPUT,
-              'A finite positive wavelength in micrometers is required.'
+              `An optical material name of at most ${MAX_GLASS_NAME_CHARS} characters is required.`
+            );
+          }
+          if (
+            typeof wavelengthUm !== 'number' ||
+            !Number.isFinite(wavelengthUm) ||
+            wavelengthUm < MIN_WAVELENGTH_UM ||
+            wavelengthUm > MAX_WAVELENGTH_UM
+          ) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              `A finite wavelength in micrometers from ${MIN_WAVELENGTH_UM} through ${MAX_WAVELENGTH_UM} is required.`
             );
           }
           if (typeof temperatureC !== 'number' || !Number.isFinite(temperatureC) || temperatureC <= -273.15) {
@@ -393,6 +416,90 @@ class OpticsEngineAdapter extends EngineAdapter {
           break;
         }
 
+        case 'run_optical_tolerancing': {
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Executing Monte Carlo optical tolerancing and compensator refocus optimization'
+            })
+          );
+          const trials = params.options?.trials;
+          if (trials !== undefined && (!Number.isInteger(trials) || trials < 1 || trials > 20000)) {
+            throw new OmniError(OmniErrorCode.INVALID_INPUT, 'options.trials must be an integer from 1 through 20000.');
+          }
+          const compensator = new TolerancingYieldCompensator(params.options || {});
+          outputData = compensator.runMonteCarloYield(
+            params.nominalSystem || params.system,
+            params.toleranceDefs || params.tolerances || [],
+            params.options || {}
+          );
+          break;
+        }
+
+        case 'trace_non_sequential': {
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Tracing non-sequential optical beam with Fresnel splitting and TIR detection'
+            })
+          );
+          const surfaces = Array.isArray(params.surfaces) ? params.surfaces : [];
+          if (surfaces.length > MAX_OPTICS_SURFACES) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              `Non-sequential trace is limited to ${MAX_OPTICS_SURFACES} surfaces.`
+            );
+          }
+          const ray = params.initialRay
+            ? new OpticalRay(
+                params.initialRay.origin,
+                params.initialRay.dir,
+                params.initialRay.energy,
+                params.initialRay.wavelengthNm
+              )
+            : new OpticalRay();
+          outputData = NonSequentialTracer.traceBeam(ray, surfaces, params.options || {});
+          break;
+        }
+
+        case 'evaluate_volume_scattering': {
+          if (params.type === 'beer_lambert' || params.alphaAbsorptionMm !== undefined) {
+            outputData = {
+              transmittedIntensity: VolumeScatteringEngine.evaluateBeerLambert(
+                params.I0 !== undefined ? params.I0 : 1.0,
+                params.alphaAbsorptionMm,
+                params.distanceMm
+              )
+            };
+          } else {
+            outputData = VolumeScatteringEngine.sampleHenyeyGreenstein(params.g, params.xi);
+          }
+          break;
+        }
+
+        case 'evaluate_thermal_soak': {
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 40,
+              message: 'Evaluating optical thermo-optic index shifts and housing thermal expansion'
+            })
+          );
+          outputData = OpticalThermalSoakEngine.evaluateThermalSoakFromProperties(
+            params.lensSpec,
+            params.targetTempC,
+            params.refTempC !== undefined ? params.refTempC : 20.0,
+            params.wavelengthUm !== undefined ? params.wavelengthUm : 0.55,
+            params.pressurePa !== undefined ? params.pressurePa : 101325.0
+          );
+          break;
+        }
+
         default:
           throw new OmniError(
             OmniErrorCode.UNSUPPORTED,
@@ -404,11 +511,52 @@ class OpticsEngineAdapter extends EngineAdapter {
         new JobEvent({ jobId, type: JobEventType.PROGRESS, progressPercent: 100, message: 'Optics operation complete' })
       );
 
+      const inputHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify({ operation: jobRequest.operation, parameters: params }))
+        .digest('hex');
+
+      const validationRecord = new ValidationRecord({
+        maturity: ValidationMaturity.EXPERIMENTAL,
+        benchmarkSet: `OPTICS-${jobRequest.operation.toUpperCase()}-01`,
+        errors: {
+          rmsSpotRadiusMm: Number.isFinite(outputData?.rmsRadiusMm) ? outputData.rmsRadiusMm : 0
+        },
+        tolerances: { maxRmsSpotRadiusMm: 0.5 }
+      });
+
+      if (outputData && typeof outputData === 'object' && !Array.isArray(outputData)) {
+        const quantities = {};
+        if (Number.isFinite(outputData.rmsRadiusMm)) {
+          quantities.rmsRadius = Quantity.from(outputData.rmsRadiusMm, 'mm').toJSON();
+        }
+        if (Number.isFinite(outputData.refractiveIndex)) {
+          quantities.refractiveIndex = Quantity.from(outputData.refractiveIndex, '1').toJSON();
+        }
+        if (Number.isFinite(outputData.transmittedIntensity)) {
+          quantities.transmittedIntensity = Quantity.from(outputData.transmittedIntensity, '1').toJSON();
+        }
+        if (Number.isFinite(outputData.defocusShiftMm)) {
+          quantities.defocusShift = Quantity.from(outputData.defocusShiftMm, 'mm').toJSON();
+        }
+        outputData.inputSha256 = inputHash;
+        outputData.validationRecord = validationRecord.toJSON();
+        outputData.quantities = quantities;
+      }
+
+      const outputHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(outputData || {}))
+        .digest('hex');
+
       const durationMs = Date.now() - tStart;
       const result = new JobResult({
         jobId,
         status: JobStatus.SUCCEEDED,
         outputData,
+        inputArtifactHashes: [inputHash],
+        resultArtifactHashes: [outputHash],
+        validationMaturity: ValidationMaturity.EXPERIMENTAL,
         backendName: this.name,
         backendVersion: this.version,
         executionDurationMs: durationMs,

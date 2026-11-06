@@ -14,12 +14,12 @@ class TransientWaterHammerSolver {
   /**
    * Calculates Korteweg acoustic wave speed (a) in fluid-filled elastic conduit
    * @param {Object} conduit
-   * @param {number} [conduit.fluidDensity=998.2] - rho (kg/m^3)
-   * @param {number} [conduit.fluidBulkModulus=2.19e9] - K (Pa) (e.g. 2.19 GPa for water at 20°C)
-   * @param {number} [conduit.pipeElasticModulus=2.0e11] - E (Pa) (e.g. 200 GPa for Carbon Steel)
-   * @param {number} [conduit.pipeInnerDiameter=0.30] - D (m)
-   * @param {number} [conduit.pipeWallThickness=0.008] - e (m)
-   * @param {number} [conduit.restraintFactor=1.0] - c1 (1.0 for anchored pipe against axial motion)
+   * @param {number} conduit.fluidDensity - rho (kg/m^3)
+   * @param {number} conduit.fluidBulkModulus - K (Pa)
+   * @param {number} conduit.pipeElasticModulus - E (Pa)
+   * @param {number} conduit.pipeInnerDiameter - D (m)
+   * @param {number} conduit.pipeWallThickness - e (m)
+   * @param {number} conduit.restraintFactor - c1
    * @returns {number} Acoustic wave propagation speed a (m/s)
    */
   static calculateWaveSpeed(conduit) {
@@ -58,7 +58,7 @@ class TransientWaterHammerSolver {
    * Delta_H = (a * Delta_v) / g
    * @param {number} waveSpeed - a (m/s)
    * @param {number} initialVelocity - v0 (m/s)
-   * @param {number} [density=998.2] - rho (kg/m^3)
+   * @param {number} density - rho (kg/m^3)
    * @returns {{surgePressurePa: number, surgeHeadM: number}}
    */
   static joukowskySurge(waveSpeed, initialVelocity, density) {
@@ -82,17 +82,7 @@ class TransientWaterHammerSolver {
   /**
    * Runs 1D Method of Characteristics (MOC) hydraulic transient simulation
    * @param {Object} params
-   * @param {number} [params.pipeLength=1000] - Total pipeline length L (m)
-   * @param {number} [params.pipeDiameter=0.3] - Diameter D (m)
-   * @param {number} [params.pipeWallThickness=0.008] - Thickness e (m)
-   * @param {number} [params.darcyFrictionFactor=0.018] - f (Darcy friction factor)
-   * @param {number} [params.reservoirHead=100.0] - H_res (m of fluid, constant upstream head)
-   * @param {number} [params.steadyFlowRate=0.15] - Q0 (m^3/s, steady state initial discharge)
-   * @param {number} [params.valveClosureTime=0.5] - Tc (seconds to fully close downstream valve)
-   * @param {string} [params.valveClosureLaw='linear'] - 'instantaneous', 'linear', 's_curve'
-   * @param {number} [params.simulationDuration=5.0] - Total simulation duration t_max (s)
-   * @param {number} [params.reaches=20] - Number of spatial reach divisions N
-   * @param {Object} [params.surgeTank] - Optional surge mitigation vessel { volumeM3, polytropicGamma }
+   * All operating conditions, conduit properties and discretization inputs are caller-supplied.
    * @returns {Object} Experimental transient estimates and sampled history
    */
   static solveTransientMOC(params) {

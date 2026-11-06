@@ -1,16 +1,17 @@
 /**
- * OmniEng Sparse Linear Algebra & Multifrontal Cholesky Solver (AMD Permuted)
- * 
- * Provides experimental sparse matrix factorization matching SuiteSparse / SuperLU:
- * 1. Compressed Sparse Row (CSR) and Compressed Sparse Column (CSC) representations.
- * 2. Approximate Minimum Degree (AMD) fill-reducing symbolic permutation.
- * 3. Exact Sparse Cholesky Factorization L * L^T = P * K * P^T for 100,000+ DOFs.
- * 4. Forward and back-substitution sparse solvers.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental CSR storage and iterative linear-system helpers. The solver
+ * uses Jacobi-preconditioned conjugate gradients or relaxed block Gauss-Seidel;
+ * it does not factor a Cholesky matrix or provide out-of-core storage. The
+ * ordering helper is a degree sort, not an AMD implementation.
  */
 
 'use strict';
+
+function norm2(values) {
+  let sumSq = 0.0;
+  for (let i = 0; i < values.length; i++) sumSq += values[i] * values[i];
+  return Math.sqrt(sumSq);
+}
 
 class SparseMatrixCSR {
   /**
@@ -28,7 +29,7 @@ class SparseMatrixCSR {
 
   addEntry(r, c, val) {
     if (r < 0 || r >= this.nRows || c < 0 || c >= this.nCols) return;
-    const key = (r << 16) | c;
+    const key = r * this.nCols + c;
     const existing = this._entries.get(key) || 0.0;
     this._entries.set(key, existing + val);
   }
@@ -37,7 +38,7 @@ class SparseMatrixCSR {
     // Build CSR sorted structure
     const rowCounts = new Int32Array(this.nRows);
     for (const key of this._entries.keys()) {
-      const r = key >> 16;
+      const r = Math.floor(key / this.nCols);
       rowCounts[r]++;
     }
 
@@ -54,8 +55,8 @@ class SparseMatrixCSR {
     // Sort entries within each row
     const rowBuckets = Array.from({ length: this.nRows }, () => []);
     for (const [key, val] of this._entries) {
-      const r = key >> 16;
-      const c = key & 0xFFFF;
+      const r = Math.floor(key / this.nCols);
+      const c = key % this.nCols;
       rowBuckets[r].push({ c, val });
     }
 
@@ -83,9 +84,10 @@ class SparseMatrixCSR {
   }
 }
 
+/** Legacy export name; this class solves systems iteratively and does not form a Cholesky factor. */
 class SparseCholeskySolver {
   /**
-   * Computes fill-reducing Approximate Minimum Degree (AMD) ordering
+   * Sorts rows by stored row degree as a simple ordering heuristic.
    * @param {SparseMatrixCSR} A - Symmetric positive-definite matrix
    * @returns {Int32Array} Permutation array P
    */
@@ -105,18 +107,14 @@ class SparseCholeskySolver {
   }
 
   /**
-   * Factors and solves A * x = b using Sparse Cholesky with Preconditioned Conjugate Gradient
+   * Solves A * x = b using Jacobi-preconditioned conjugate gradients (no factorization).
    * @param {SparseMatrixCSR} A - Symmetric positive definite CSR matrix
    * @param {Float64Array} b - Right hand side load vector
    * @param {Object} options
    * @returns {{x: Float64Array, converged: boolean, iterations: number, residual: number}}
    */
   static solve(A, b, options = {}) {
-    const {
-      maxIterations = 1000,
-      tolerance = 1e-8,
-      preconditioned = true
-    } = options;
+    const { maxIterations = 1000, tolerance = 1e-8, preconditioned = true } = options;
 
     const n = A.nRows;
     const x = new Float64Array(n);
@@ -149,7 +147,7 @@ class SparseCholeskySolver {
     let rzOld = 0.0;
     for (let i = 0; i < n; i++) rzOld += r[i] * z[i];
 
-    let r0Norm = Math.hypot(...b);
+    let r0Norm = norm2(b);
     if (r0Norm < 1e-12) r0Norm = 1.0;
 
     let converged = false;
@@ -169,7 +167,7 @@ class SparseCholeskySolver {
         r[i] -= alpha * Ap[i];
       }
 
-      const resNorm = Math.hypot(...r);
+      const resNorm = norm2(r);
       if (resNorm / r0Norm < tolerance) {
         converged = true;
         break;
@@ -194,14 +192,13 @@ class SparseCholeskySolver {
       x,
       converged,
       iterations: iter,
-      residualNorm: Math.hypot(...r)
+      residualNorm: norm2(r)
     };
   }
 
   /**
-   * Block-Tiled Out-of-Core Sparse Solver.
-   * Divides massive sparse systems into cache-conscious / disk-streamed blocks to bypass V8 heap limits.
-   * Uses block-Jacobi preconditioned relaxation with sub-block Cholesky factorizations.
+   * Applies relaxed block-ordered Gauss-Seidel iterations to the in-memory system.
+   * This routine does not stream data to disk or form sub-block factorizations.
    * @param {SparseMatrixCSR} A - Global sparse matrix
    * @param {Float64Array} b - Right hand side vector
    * @param {Object} [options] - blockSize, maxIterations, tolerance
@@ -220,7 +217,7 @@ class SparseCholeskySolver {
 
     // Initial residual: r = b - A * x (with x = 0, r = b)
     r.set(b);
-    let r0Norm = Math.hypot(...b);
+    let r0Norm = norm2(b);
     if (r0Norm < 1e-12) r0Norm = 1.0;
 
     let converged = false;
@@ -278,7 +275,7 @@ class SparseCholeskySolver {
       x,
       converged,
       iterations: iter,
-      residualNorm: Math.hypot(...r)
+      residualNorm: norm2(r)
     };
   }
 }

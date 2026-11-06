@@ -14,13 +14,30 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const TEST_TIMEOUT_MS = 3 * 60 * 1000;
+// The integrated root suite now includes the previously standalone suites, the
+// remaining-module coverage suite, the MMS/convergence harness, the FVM
+// stretched-projection suite, and the 100 Gold Regulatory Benchmarks suite;
+// the default budget is raised accordingly (2400s / 40 minutes).
+const DEFAULT_TEST_TIMEOUT_MS = 2400 * 1000;
+const parsedTestTimeoutMs = Number.parseInt(process.env.TEST_TIMEOUT_MS ?? '', 10);
+const TEST_TIMEOUT_MS =
+  Number.isInteger(parsedTestTimeoutMs) && parsedTestTimeoutMs > 0 ? parsedTestTimeoutMs : DEFAULT_TEST_TIMEOUT_MS;
 const TEST_TERMINATION_GRACE_MS = 5000;
-const MIN_NODE_VERSION = [22, 12];
+const declaredNodeRange = require('../package.json').engines.node;
+const minimumNodeMatch = /^>=(\d+)\.(\d+)\.(\d+)$/.exec(declaredNodeRange);
+if (!minimumNodeMatch) {
+  throw new Error(`Unsupported package Node engine declaration: ${declaredNodeRange}`);
+}
+const MIN_NODE_VERSION = minimumNodeMatch.slice(1).map(Number);
 
-function hasSupportedNodeVersion() {
-  const [major, minor] = process.versions.node.split('.').map(Number);
-  return major > MIN_NODE_VERSION[0] || (major === MIN_NODE_VERSION[0] && minor >= MIN_NODE_VERSION[1]);
+function hasSupportedNodeVersion(version = process.versions.node) {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return false;
+  const actual = version.split('.').map(Number);
+  for (let index = 0; index < MIN_NODE_VERSION.length; index++) {
+    if (actual[index] > MIN_NODE_VERSION[index]) return true;
+    if (actual[index] < MIN_NODE_VERSION[index]) return false;
+  }
+  return true;
 }
 
 function snapshotWorktree() {
@@ -164,4 +181,4 @@ function run() {
 
 if (require.main === module) run();
 
-module.exports = { watchChildProcess };
+module.exports = { hasSupportedNodeVersion, watchChildProcess };

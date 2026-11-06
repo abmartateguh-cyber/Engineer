@@ -394,6 +394,183 @@ class CSGSolid {
   }
 }
 
+function requireVector3(value, label) {
+  const vector = Array.isArray(value)
+    ? value
+    : value && typeof value === 'object'
+      ? [value.x, value.y, value.z]
+      : null;
+  if (!vector || vector.length !== 3 || !vector.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))) {
+    throw new TypeError(`${label} must contain exactly three finite numeric coordinates.`);
+  }
+  return [...vector];
+}
+
+function validateCSGSolid(solid, label = 'CSG operand') {
+  if (!(solid instanceof CSGSolid) || !Array.isArray(solid.polygons) || solid.polygons.length === 0) {
+    throw new TypeError(`${label} must contain at least one polygon.`);
+  }
+  for (const [polygonIndex, polygon] of solid.polygons.entries()) {
+    if (!polygon || !Array.isArray(polygon.vertices) || polygon.vertices.length < 3) {
+      throw new TypeError(`${label} polygon ${polygonIndex} must contain at least three vertices.`);
+    }
+    for (const [vertexIndex, vertex] of polygon.vertices.entries()) {
+      requireVector3(vertex?.pos, `${label} polygon ${polygonIndex} vertex ${vertexIndex}`);
+    }
+  }
+  return solid;
+}
+
+const CSGMeshBooleans = {
+  toCSGSolid(input) {
+    if (!input || typeof input !== 'object') {
+      throw new TypeError('CSG boolean operand must be a non-null solid or mesh object.');
+    }
+    if (input instanceof CSGSolid || (Array.isArray(input.polygons) && typeof input.union === 'function')) {
+      return validateCSGSolid(input);
+    }
+    if (typeof input.toTriangles === 'function') {
+      return validateCSGSolid(CSGSolid.fromBRep(input));
+    }
+    if (Array.isArray(input.polygons) && input.polygons.length > 0) {
+      const polys = input.polygons.map((p) => {
+        if (p instanceof CSGPolygon) return p.clone();
+        if (!p || !Array.isArray(p.vertices) || p.vertices.length < 3) {
+          throw new TypeError('Each CSG polygon must contain at least three vertices.');
+        }
+        const verts = p.vertices.map((v, index) => {
+          const position = v?.pos ?? v?.point ?? v;
+          const pos = requireVector3(position, `CSG polygon vertex ${index}`);
+          const normal = v?.normal === undefined ? undefined : requireVector3(v.normal, `CSG polygon vertex ${index} normal`);
+          return new CSGVertex(pos, normal);
+        });
+        return new CSGPolygon(verts);
+      });
+      return validateCSGSolid(new CSGSolid(polys));
+    }
+    if (Array.isArray(input.faces) && input.faces.length > 0) {
+      if (Array.isArray(input.faces[0]) && Array.isArray(input.vertices)) {
+        const vertices = input.vertices.map((vertex, index) => requireVector3(vertex, `Mesh vertex ${index}`));
+        for (const [faceIndex, face] of input.faces.entries()) {
+          if (!Array.isArray(face) || face.length < 3 || face.some((index) => !Number.isInteger(index) || index < 0 || index >= vertices.length)) {
+            throw new TypeError(`Mesh face ${faceIndex} must reference at least three valid vertex indices.`);
+          }
+        }
+        return validateCSGSolid(CSGSolid.fromMesh(vertices, input.faces));
+      }
+      if (input.faces[0] && Array.isArray(input.faces[0].vertices)) {
+        const polys = [];
+        for (const [faceIndex, face] of input.faces.entries()) {
+          if (!Array.isArray(face.vertices) || face.vertices.length < 3) {
+            throw new TypeError(`Face-list face ${faceIndex} must contain at least three vertices.`);
+          }
+          const verts = face.vertices.map((vertex, vertexIndex) => {
+            const pos = requireVector3(vertex?.point ?? vertex, `Face-list face ${faceIndex} vertex ${vertexIndex}`);
+            return new CSGVertex(pos);
+          });
+          polys.push(new CSGPolygon(verts));
+        }
+        return validateCSGSolid(new CSGSolid(polys));
+      }
+    }
+    if (
+      input.type === 'box' ||
+      (Array.isArray(input.size) && input.size.length === 3) ||
+      (Number.isFinite(input.dx) && Number.isFinite(input.dy) && Number.isFinite(input.dz))
+    ) {
+      const size = Array.isArray(input.size) ? input.size : [input.dx, input.dy, input.dz];
+      const dimensions = requireVector3(size, 'CSG box size');
+      if (dimensions.some((dimension) => dimension <= 0)) {
+        throw new RangeError('CSG box dimensions must be positive.');
+      }
+      const center = requireVector3(input.center ?? { x: input.cx, y: input.cy, z: input.cz }, 'CSG box center');
+      return validateCSGSolid(CSGSolid.createBox(dimensions, center));
+    }
+    if (input.type === 'cylinder' || (Number.isFinite(input.radius) && Number.isFinite(input.height))) {
+      if (!Number.isFinite(input.radius) || input.radius <= 0 || !Number.isFinite(input.height) || input.height <= 0) {
+        throw new RangeError('CSG cylinder radius and height must be positive finite values.');
+      }
+      if (!Number.isInteger(input.segments) || input.segments < 3 || input.segments > 2048) {
+        throw new RangeError('CSG cylinder segments must be an integer from 3 through 2048.');
+      }
+      const center = requireVector3(input.center, 'CSG cylinder center');
+      return validateCSGSolid(CSGSolid.createCylinder(input.radius, input.height, input.segments, center));
+    }
+    throw new TypeError('Unsupported CSG solid format. Provide a valid CSG solid, B-Rep, mesh, polygon set, box, or cylinder.');
+  },
+
+  union(bodyA, bodyB) {
+    const a = this.toCSGSolid(bodyA);
+    const b = this.toCSGSolid(bodyB);
+    return a.union(b);
+  },
+
+  subtract(bodyA, bodyB) {
+    const a = this.toCSGSolid(bodyA);
+    const b = this.toCSGSolid(bodyB);
+    return a.subtract(b);
+  },
+
+  intersect(bodyA, bodyB) {
+    const a = this.toCSGSolid(bodyA);
+    const b = this.toCSGSolid(bodyB);
+    return a.intersect(b);
+  },
+
+  computeMetrics(csgSolid) {
+    let signedVolume = 0.0;
+    let surfaceArea = 0.0;
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    if (!csgSolid || !Array.isArray(csgSolid.polygons)) {
+      throw new TypeError('CSG metrics require a solid with a polygon array.');
+    }
+    for (const poly of csgSolid.polygons) {
+      const verts = poly.vertices;
+      if (!Array.isArray(verts) || verts.length < 3) {
+        throw new TypeError('CSG result polygons must contain at least three vertices.');
+      }
+      for (const v of verts) {
+        const [x, y, z] = requireVector3(v?.pos, 'CSG result vertex');
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (z < minZ) minZ = z;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        if (z > maxZ) maxZ = z;
+      }
+      for (let i = 1; i < verts.length - 1; i++) {
+        const v0 = verts[0].pos;
+        const v1 = verts[i].pos;
+        const v2 = verts[i + 1].pos;
+        const e1 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
+        const e2 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
+        const cx = e1[1] * e2[2] - e1[2] * e2[1];
+        const cy = e1[2] * e2[0] - e1[0] * e2[2];
+        const cz = e1[0] * e2[1] - e1[1] * e2[0];
+        surfaceArea += 0.5 * Math.hypot(cx, cy, cz);
+        signedVolume += (v0[0] * (v1[1] * v2[2] - v1[2] * v2[1]) +
+                         v0[1] * (v1[2] * v2[0] - v1[0] * v2[2]) +
+                         v0[2] * (v1[0] * v2[1] - v1[1] * v2[0])) / 6.0;
+      }
+    }
+    return {
+      volume: Math.abs(signedVolume),
+      surfaceArea,
+      boundingBox: Number.isFinite(minX) ? { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] } : null
+    };
+  }
+};
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CSGSolid, CSGNode, CSGPolygon, CSGPlane, CSGVertex };
+  module.exports = {
+    CSGSolid,
+    CSGNode,
+    CSGPolygon,
+    CSGPlane,
+    CSGVertex,
+    CSGMeshBooleans,
+    toCSGSolid: CSGMeshBooleans.toCSGSolid.bind(CSGMeshBooleans)
+  };
 }

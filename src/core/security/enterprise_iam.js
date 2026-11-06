@@ -190,9 +190,297 @@ class EnterpriseIAM {
   }
 }
 
+// =============================================================================
+// Enterprise SSO verification gate (SAML 2.0 assertions + OIDC ID tokens)
+//
+// Pure Node.js (crypto only) verification utilities used by the SSO module:
+//   - SAML assertion parsing, canonicalization, RSA-SHA256 signature
+//     verification, and issuer/audience/time-window validation.
+//   - OIDC ID token (compact JWT) signature verification (HS256 / RS256)
+//     plus exp / iss / aud validation and `groups` claim extraction.
+//   - Group-to-role mapping into the RBAC role table above.
+// All verifiers are fail-closed: malformed input yields { valid: false }
+// and never throws.
+// =============================================================================
+
+const SSO_PROVIDERS = Object.freeze({
+  SAML: 'saml',
+  OIDC: 'oidc'
+});
+
+const JWT_ALGORITHMS = Object.freeze({
+  HS256: 'HS256',
+  RS256: 'RS256'
+});
+
+const GROUP_TO_ROLE = Object.freeze({
+  designers: 'EdaEngineer',
+  stress: 'StressAnalyst',
+  thermal: 'ThermalEngineer',
+  optics: 'OpticsSpecialist',
+  approvers: 'ChiefEngineer',
+  auditors: 'QualityAuditor',
+  guest: 'Guest'
+});
+
+function canonicalizeSAMLAssertion(xml) {
+  return String(xml)
+    .replace(/<\?xml[^?]*\?>/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/>\s+</g, '><')
+    .replace(/\s+>/g, '>')
+    .replace(/<\s+/g, '<')
+    .trim();
+}
+
+function stripSAMLSignature(xml) {
+  return String(xml).replace(/<(?:ds:)?Signature\b[^>]*>[\s\S]*?<\/(?:ds:)?Signature>/g, '');
+}
+
+function encodeBase64URL(buffer) {
+  return Buffer.from(buffer).toString('base64url');
+}
+
+function decodeBase64URL(text) {
+  return Buffer.from(String(text).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+}
+
+function extractSAMLTag(xml, name) {
+  const match = String(xml).match(
+    new RegExp(`<(?:[a-zA-Z0-9]+:)?${name}\\b[^>]*>([\\s\\S]*?)</(?:[a-zA-Z0-9]+:)?${name}>`)
+  );
+  return match ? match[1].trim() : null;
+}
+
+function extractSAMLAttributes(xml) {
+  const attributes = {};
+  const attributeRe =
+    /<(?:[a-zA-Z0-9]+:)?Attribute\b[^>]*Name="([^"]+)"[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Attribute>/g;
+  const valueRe = /<(?:[a-zA-Z0-9]+:)?AttributeValue\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?AttributeValue>/g;
+  const xmlString = String(xml);
+  let attributeMatch;
+  while ((attributeMatch = attributeRe.exec(xmlString)) !== null) {
+    const name = attributeMatch[1];
+    const values = [];
+    let valueMatch;
+    const valueSrc = attributeMatch[2];
+    while ((valueMatch = valueRe.exec(valueSrc)) !== null) {
+      values.push(valueMatch[1].trim());
+    }
+    attributes[name] = values.length === 1 ? values[0] : values;
+  }
+  return attributes;
+}
+
+function parseSAMLAssertion(xml) {
+  const xmlString = String(xml == null ? '' : xml);
+  const signedData = Buffer.from(canonicalizeSAMLAssertion(stripSAMLSignature(xmlString)), 'utf8');
+
+  const conditionsMatch = xmlString.match(/<(?:[a-zA-Z0-9]+:)?Conditions\b[^>]*>/);
+  let notBefore = null;
+  let notOnOrAfter = null;
+  if (conditionsMatch) {
+    const beforeMatch = /NotBefore="([^"]+)"/.exec(conditionsMatch[0]);
+    const afterMatch = /NotOnOrAfter="([^"]+)"/.exec(conditionsMatch[0]);
+    notBefore = beforeMatch ? beforeMatch[1] : null;
+    notOnOrAfter = afterMatch ? afterMatch[1] : null;
+  }
+
+  const signatureMatch = xmlString.match(/<(?:ds:)?SignatureValue\b[^>]*>([\s\S]*?)<\/(?:ds:)?SignatureValue>/);
+  const signature = signatureMatch ? Buffer.from(signatureMatch[1].trim(), 'base64') : null;
+
+  return {
+    issuer: extractSAMLTag(xmlString, 'Issuer'),
+    audience: extractSAMLTag(xmlString, 'Audience'),
+    subject: extractSAMLTag(xmlString, 'NameID'),
+    notBefore,
+    notOnOrAfter,
+    signature,
+    signedData,
+    attributes: extractSAMLAttributes(xmlString)
+  };
+}
+
+function normalizeGroups(groups) {
+  if (Array.isArray(groups)) {
+    return groups.map(String);
+  }
+  if (typeof groups === 'string') {
+    return groups.split(/[,\s]+/).filter(Boolean);
+  }
+  return [];
+}
+
+function resolveRolesFromGroups(groups) {
+  const roles = normalizeGroups(groups)
+    .map((group) => GROUP_TO_ROLE[group])
+    .filter(Boolean);
+  return roles.length > 0 ? roles : ['Guest'];
+}
+
+function verifySAMLAssertion({ xml, issuer, audience, certificate, now }) {
+  try {
+    const parsed = parseSAMLAssertion(xml);
+    if (!parsed.signature || parsed.signature.length === 0) {
+      return { valid: false, reason: 'missing signature' };
+    }
+    if (!certificate || parsed.signedData.length === 0) {
+      return { valid: false, reason: 'missing signed data or certificate' };
+    }
+    if (!crypto.verify('sha256', parsed.signedData, certificate, parsed.signature)) {
+      return { valid: false, reason: 'signature verification failed' };
+    }
+    if (parsed.issuer !== issuer) {
+      return { valid: false, reason: 'issuer mismatch' };
+    }
+    if (parsed.audience !== audience) {
+      return { valid: false, reason: 'audience mismatch' };
+    }
+    const nowMs = now != null ? new Date(now).getTime() : Date.now();
+    if (parsed.notBefore) {
+      const beforeMs = Date.parse(parsed.notBefore);
+      if (Number.isNaN(beforeMs) || nowMs < beforeMs) {
+        return { valid: false, reason: 'assertion not yet valid (notBefore)' };
+      }
+    }
+    if (parsed.notOnOrAfter) {
+      const afterMs = Date.parse(parsed.notOnOrAfter);
+      if (Number.isNaN(afterMs) || nowMs >= afterMs) {
+        return { valid: false, reason: 'assertion expired (notOnOrAfter)' };
+      }
+    }
+    if (!parsed.subject) {
+      return { valid: false, reason: 'missing subject' };
+    }
+    const groups = parsed.attributes.groups != null ? parsed.attributes.groups : [];
+    return {
+      valid: true,
+      reason: 'ok',
+      subject: parsed.subject,
+      groups,
+      roles: resolveRolesFromGroups(groups),
+      attributes: parsed.attributes,
+      issuer: parsed.issuer,
+      audience: parsed.audience
+    };
+  } catch (error) {
+    return { valid: false, reason: 'malformed assertion: ' + error.message };
+  }
+}
+
+function signCompactJWT(header, payload, key, algorithm) {
+  const signingInput = encodeBase64URL(JSON.stringify(header)) + '.' + encodeBase64URL(JSON.stringify(payload));
+  let signature;
+  if (algorithm === JWT_ALGORITHMS.HS256) {
+    signature = crypto.createHmac('sha256', key).update(signingInput, 'utf8').digest();
+  } else if (algorithm === JWT_ALGORITHMS.RS256) {
+    signature = crypto.sign('sha256', Buffer.from(signingInput, 'utf8'), key);
+  } else {
+    throw new Error('Unsupported JWT signing algorithm: ' + algorithm);
+  }
+  return signingInput + '.' + encodeBase64URL(signature);
+}
+
+function validateOIDCIDToken({ token, issuer, audience, secret, publicKey, now }) {
+  try {
+    const parts = String(token == null ? '' : token).split('.');
+    if (parts.length !== 3 || parts.some((part) => part.length === 0)) {
+      return { valid: false, reason: 'malformed token' };
+    }
+    const [encodedHeader, encodedPayload, encodedSignature] = parts;
+    const header = JSON.parse(decodeBase64URL(encodedHeader).toString('utf8'));
+    const payload = JSON.parse(decodeBase64URL(encodedPayload).toString('utf8'));
+    const algorithm = header.alg;
+    const signingInput = encodedHeader + '.' + encodedPayload;
+    const signatureBytes = decodeBase64URL(encodedSignature);
+
+    let signatureOk = false;
+    if (algorithm === JWT_ALGORITHMS.HS256) {
+      if (!secret) {
+        return { valid: false, reason: 'no verification secret configured' };
+      }
+      const expected = crypto.createHmac('sha256', secret).update(signingInput, 'utf8').digest();
+      if (expected.length !== signatureBytes.length) {
+        return { valid: false, reason: 'signature verification failed' };
+      }
+      signatureOk = crypto.timingSafeEqual(expected, signatureBytes);
+    } else if (algorithm === JWT_ALGORITHMS.RS256) {
+      if (!publicKey) {
+        return { valid: false, reason: 'no verification key configured' };
+      }
+      signatureOk = crypto.verify('sha256', Buffer.from(signingInput, 'utf8'), publicKey, signatureBytes);
+    } else {
+      return { valid: false, reason: 'unsupported algorithm: ' + algorithm };
+    }
+
+    if (!signatureOk) {
+      return { valid: false, reason: 'signature verification failed' };
+    }
+
+    const nowMs = now != null ? new Date(now).getTime() : Date.now();
+    if (typeof payload.exp !== 'number' || nowMs >= payload.exp * 1000) {
+      return { valid: false, reason: 'token expired or missing exp' };
+    }
+    if (payload.iss !== issuer) {
+      return { valid: false, reason: 'issuer mismatch' };
+    }
+    const audiences = Array.isArray(payload.aud) ? payload.aud : payload.aud != null ? [payload.aud] : [];
+    if (!audiences.includes(audience)) {
+      return { valid: false, reason: 'audience mismatch' };
+    }
+
+    const groups = payload.groups;
+    return {
+      valid: true,
+      reason: 'ok',
+      header,
+      payload,
+      subject: payload.sub != null ? payload.sub : null,
+      groups,
+      roles: resolveRolesFromGroups(groups)
+    };
+  } catch (error) {
+    return { valid: false, reason: 'malformed token: ' + error.message };
+  }
+}
+
+function authorizeWithIdentity(identity, request) {
+  const roles = identity && Array.isArray(identity.roles) && identity.roles.length > 0 ? identity.roles : ['Guest'];
+  const results = roles.map((role) =>
+    EnterpriseIAM.evaluateAccess(Object.assign({}, request, { user: Object.assign({}, request.user, { role }) }))
+  );
+  const granted = results.some((result) => result.granted);
+  const firstDenied = results.find((result) => !result.granted);
+  return {
+    granted,
+    roles,
+    results,
+    reason: granted
+      ? 'GRANTED via enterprise SSO role mapping'
+      : firstDenied
+        ? firstDenied.reason
+        : 'DENIED: no mapped role permits action'
+  };
+}
+
+const EnterpriseSSO = Object.freeze({
+  canonicalizeSAMLAssertion,
+  parseSAMLAssertion,
+  verifySAMLAssertion,
+  signCompactJWT,
+  validateOIDCIDToken,
+  resolveRolesFromGroups,
+  normalizeGroups,
+  authorizeWithIdentity
+});
+
 module.exports = {
   EnterpriseIAM,
+  EnterpriseSSO,
   ACTIONS,
   CLEARANCE_LEVELS,
-  ROLE_PERMISSIONS
+  ROLE_PERMISSIONS,
+  SSO_PROVIDERS,
+  JWT_ALGORITHMS,
+  GROUP_TO_ROLE
 };

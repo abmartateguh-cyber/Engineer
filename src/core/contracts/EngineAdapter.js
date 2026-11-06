@@ -1,7 +1,7 @@
 'use strict';
 
 const { OmniError, OmniErrorCode } = require('./OmniError');
-const { JobResult, JobStatus } = require('./JobResult');
+const { JobResult } = require('./JobResult');
 const { ValidationMaturity } = require('./ValidationRecord');
 
 /**
@@ -60,6 +60,29 @@ class EngineAdapter {
         `Operation "${jobRequest.operation}" not supported by adapter "${this.name}". Available: ${caps.supportedOperations.join(', ')}`
       );
     }
+    const supportedBackends = Array.isArray(caps.supportedBackends) ? caps.supportedBackends : ['js'];
+    const requestedBackend = jobRequest.backend ?? 'js';
+    if (!supportedBackends.includes(requestedBackend)) {
+      throw new OmniError(
+        OmniErrorCode.UNSUPPORTED,
+        `Backend "${requestedBackend}" not supported by adapter "${this.name}". Available: ${supportedBackends.join(', ')}`
+      );
+    }
+    if (jobRequest.backendVersion && jobRequest.backendVersion !== this.version) {
+      throw new OmniError(
+        OmniErrorCode.UNSUPPORTED,
+        `Requested adapter version "${jobRequest.backendVersion}" does not match "${this.name}" version "${this.version}"`
+      );
+    }
+    if (jobRequest.solver) {
+      const supportedSolvers = Array.isArray(caps.supportedSolvers) ? caps.supportedSolvers : [];
+      if (!supportedSolvers.includes(jobRequest.solver)) {
+        throw new OmniError(
+          OmniErrorCode.UNSUPPORTED,
+          `Solver "${jobRequest.solver}" not supported by adapter "${this.name}". Available: ${supportedSolvers.join(', ') || 'none'}`
+        );
+      }
+    }
     return true;
   }
 
@@ -80,7 +103,7 @@ class EngineAdapter {
    * @param {AbortSignal} [signal]
    * @returns {Promise<JobResult>}
    */
-  async execute(jobRequest, onEvent = () => {}, signal = null) {
+  async execute(jobRequest, onEvent = null, signal = null) {
     throw new OmniError(OmniErrorCode.UNSUPPORTED, `${this.name}.execute() not implemented`);
   }
 

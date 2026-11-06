@@ -1,12 +1,12 @@
 /**
  * Flowsheet Tear-Stream Recycle Convergence Accelerator
  * 
- * Implements high-performance algorithms for solving cyclic recycle loops in process flowsheets:
+ * Implements iterative methods for solving cyclic recycle loops in process flowsheets:
  * - Direct Successive Substitution: x_{k+1} = g(x_k)
  * - Bounded Wegstein Method: s = (g_k - g_{k-1}) / (x_k - x_{k-1}), q = s / (s - 1), clamped to [q_min, q_max]
  * - Multi-variable Broyden Quasi-Newton Method: Inverted Jacobian rank-1 update
  * 
- * Provides robust convergence tracking, oscillation dampening, and residual diagnostics.
+ * Provides configurable stopping checks, Wegstein bounds, and residual history.
  */
 
 'use strict';

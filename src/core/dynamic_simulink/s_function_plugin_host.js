@@ -94,6 +94,21 @@ class SFunctionPluginHost {
   }
 
   /**
+   * Loads a C / C-MEX style S-Function plugin definition.
+   * @param {string} pluginName
+   * @param {Object} blockDef
+   * @returns {SFunctionPluginHost} this
+   */
+  loadCPlugin(pluginName, blockDef) {
+    if (typeof pluginName === 'object' && !blockDef) {
+      blockDef = pluginName;
+      pluginName = 'CPlugin';
+    }
+    this.name = pluginName || this.name;
+    return this.registerDefinition(blockDef);
+  }
+
+  /**
    * Loads a compiled WebAssembly S-Function binary module.
    * Expected Wasm exports: mdlInitializeSizes, mdlOutputs, mdlDerivatives, etc.
    * 
@@ -154,12 +169,37 @@ class SFunctionPluginHost {
       this.callbacks.mdlInitializeSampleTimes(this.simStruct);
     }
 
-    // Allocate memory vectors
-    this.continuousStates = new Float64Array(this.simStruct.numContStates);
-    this.discreteStates = new Float64Array(this.simStruct.numDiscStates);
-    this.derivatives = new Float64Array(this.simStruct.numContStates);
+    // Allocate memory vectors, preserving any pre-set initial conditions
+    const prevCont = this.continuousStates;
+    const prevDisc = this.discreteStates;
+    const prevInputs = this.inputs;
+
+    const numCont = Math.max(this.simStruct.numContStates, prevCont ? prevCont.length : 0);
+    const numDisc = Math.max(this.simStruct.numDiscStates, prevDisc ? prevDisc.length : 0);
+    this.simStruct.numContStates = numCont;
+    this.simStruct.numDiscStates = numDisc;
+
+    this.continuousStates = new Float64Array(numCont);
+    this.discreteStates = new Float64Array(numDisc);
+    this.derivatives = new Float64Array(numCont);
     this.inputs = new Float64Array(this.simStruct.numInputs);
     this.outputs = new Float64Array(this.simStruct.numOutputs);
+
+    if (prevCont) {
+      for (let i = 0; i < Math.min(this.continuousStates.length, prevCont.length); i++) {
+        this.continuousStates[i] = prevCont[i];
+      }
+    }
+    if (prevDisc) {
+      for (let i = 0; i < Math.min(this.discreteStates.length, prevDisc.length); i++) {
+        this.discreteStates[i] = prevDisc[i];
+      }
+    }
+    if (prevInputs) {
+      for (let i = 0; i < Math.min(this.inputs.length, prevInputs.length); i++) {
+        this.inputs[i] = prevInputs[i];
+      }
+    }
 
     if (typeof this.callbacks.mdlStart === 'function') {
       this.callbacks.mdlStart(this.simStruct, {
@@ -177,8 +217,13 @@ class SFunctionPluginHost {
    * @param {number[]|Float64Array} states
    */
   setContinuousStates(states) {
-    for (let i = 0; i < Math.min(this.continuousStates.length, states.length); i++) {
-      this.continuousStates[i] = states[i];
+    if (!this.continuousStates || this.continuousStates.length < states.length) {
+      this.continuousStates = new Float64Array(states);
+      this.simStruct.numContStates = states.length;
+    } else {
+      for (let i = 0; i < Math.min(this.continuousStates.length, states.length); i++) {
+        this.continuousStates[i] = states[i];
+      }
     }
   }
 
@@ -187,8 +232,13 @@ class SFunctionPluginHost {
    * @param {number[]|Float64Array} states
    */
   setDiscreteStates(states) {
-    for (let i = 0; i < Math.min(this.discreteStates.length, states.length); i++) {
-      this.discreteStates[i] = states[i];
+    if (!this.discreteStates || this.discreteStates.length < states.length) {
+      this.discreteStates = new Float64Array(states);
+      this.simStruct.numDiscStates = states.length;
+    } else {
+      for (let i = 0; i < Math.min(this.discreteStates.length, states.length); i++) {
+        this.discreteStates[i] = states[i];
+      }
     }
   }
 

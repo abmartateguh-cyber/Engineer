@@ -8,7 +8,6 @@
 const { SymbolicReasoner } = require('../../core/ai/symbolic_reasoner');
 const { DropTestSimulator } = require('../../core/cae/drop_test');
 const { OpticalEngine } = require('../../core/optics/optical_engine');
-const { GerberExporter } = require('../../core/eda/gerber_exporter');
 
 /**
  * Plain-English summary for diagnostic context only.

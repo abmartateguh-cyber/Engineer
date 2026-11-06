@@ -1,0 +1,756 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1189mm" height="841mm" viewBox="0 0 1189 841" font-family="Arial, Helvetica, sans-serif" font-size="3">
+<rect width="1189" height="841" fill="#ffffff"/>
+<path d="M30 20L30 821M40 20L40 821M50 20L50 821M60 20L60 821M80 20L80 821M90 20L90 821M100 20L100 821M110 20L110 821M130 20L130 821M140 20L140 821M150 20L150 821M160 20L160 821M180 20L180 821M190 20L190 821M200 20L200 821M210 20L210 821M230 20L230 821M240 20L240 821M250 20L250 821M260 20L260 821M280 20L280 821M290 20L290 821M300 20L300 821M310 20L310 821M330 20L330 821M340 20L340 821M350 20L350 821M360 20L360 821M380 20L380 821M390 20L390 821M400 20L400 821M410 20L410 821M430 20L430 821M440 20L440 821M450 20L450 821M460 20L460 821M480 20L480 821M490 20L490 821M500 20L500 821M510 20L510 821M530 20L530 821M540 20L540 821M550 20L550 821M560 20L560 821M580 20L580 821M590 20L590 821M600 20L600 821M610 20L610 821M630 20L630 821M640 20L640 821M650 20L650 821M660 20L660 821M680 20L680 821M690 20L690 821M700 20L700 821M710 20L710 821M730 20L730 821M740 20L740 821M750 20L750 821M760 20L760 821M780 20L780 821M790 20L790 821M800 20L800 821M810 20L810 821M830 20L830 821M840 20L840 821M850 20L850 821M860 20L860 821M880 20L880 821M890 20L890 821M900 20L900 821M910 20L910 821M930 20L930 821M940 20L940 821M950 20L950 821M960 20L960 821M980 20L980 821M990 20L990 821M1000 20L1000 821M1010 20L1010 821M1030 20L1030 821M1040 20L1040 821M1050 20L1050 821M1060 20L1060 821M1080 20L1080 821M1090 20L1090 821M1100 20L1100 821M1110 20L1110 821M1130 20L1130 821M1140 20L1140 821M1150 20L1150 821M1160 20L1160 821M20 30L1169 30M20 40L1169 40M20 50L1169 50M20 60L1169 60M20 80L1169 80M20 90L1169 90M20 100L1169 100M20 110L1169 110M20 130L1169 130M20 140L1169 140M20 150L1169 150M20 160L1169 160M20 180L1169 180M20 190L1169 190M20 200L1169 200M20 210L1169 210M20 230L1169 230M20 240L1169 240M20 250L1169 250M20 260L1169 260M20 280L1169 280M20 290L1169 290M20 300L1169 300M20 310L1169 310M20 330L1169 330M20 340L1169 340M20 350L1169 350M20 360L1169 360M20 380L1169 380M20 390L1169 390M20 400L1169 400M20 410L1169 410M20 430L1169 430M20 440L1169 440M20 450L1169 450M20 460L1169 460M20 480L1169 480M20 490L1169 490M20 500L1169 500M20 510L1169 510M20 530L1169 530M20 540L1169 540M20 550L1169 550M20 560L1169 560M20 580L1169 580M20 590L1169 590M20 600L1169 600M20 610L1169 610M20 630L1169 630M20 640L1169 640M20 650L1169 650M20 660L1169 660M20 680L1169 680M20 690L1169 690M20 700L1169 700M20 710L1169 710M20 730L1169 730M20 740L1169 740M20 750L1169 750M20 760L1169 760M20 780L1169 780M20 790L1169 790M20 800L1169 800M20 810L1169 810" stroke="#f0f0f0" stroke-width="0.2" fill="none"/>
+<path d="M20 20L20 821M70 20L70 821M120 20L120 821M170 20L170 821M220 20L220 821M270 20L270 821M320 20L320 821M370 20L370 821M420 20L420 821M470 20L470 821M520 20L520 821M570 20L570 821M620 20L620 821M670 20L670 821M720 20L720 821M770 20L770 821M820 20L820 821M870 20L870 821M920 20L920 821M970 20L970 821M1020 20L1020 821M1070 20L1070 821M1120 20L1120 821M20 20L1169 20M20 70L1169 70M20 120L1169 120M20 170L1169 170M20 220L1169 220M20 270L1169 270M20 320L1169 320M20 370L1169 370M20 420L1169 420M20 470L1169 470M20 520L1169 520M20 570L1169 570M20 620L1169 620M20 670L1169 670M20 720L1169 720M20 770L1169 770M20 820L1169 820" stroke="#e2e2e2" stroke-width="0.35" fill="none"/>
+<rect x="20" y="20" width="1149" height="801" fill="none" stroke="#1a1a1a" stroke-width="1.8"/>
+<rect x="25" y="25" width="1139" height="791" fill="none" stroke="#1a1a1a" stroke-width="0.6"/>
+<rect x="26.4" y="24" width="781.7" height="616" fill="none" stroke="#999" stroke-width="0.4" stroke-dasharray="2 2"/>
+<line x1="221.8" y1="24" x2="221.8" y2="640" stroke="#aaa" stroke-width="0.5" stroke-dasharray="1.5 2.5"/>
+<line x1="417.2" y1="24" x2="417.2" y2="640" stroke="#aaa" stroke-width="0.5" stroke-dasharray="1.5 2.5"/>
+<line x1="612.6" y1="24" x2="612.6" y2="640" stroke="#aaa" stroke-width="0.5" stroke-dasharray="1.5 2.5"/>
+<text x="124.1" y="32" font-size="4" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Inlet Manifold &amp; ESD Reception</text>
+<text x="319.5" y="32" font-size="4" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Slug Catching &amp; Bulk Phase Separation</text>
+<text x="514.9" y="32" font-size="4" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Condensate Flash &amp; Booster Pumping</text>
+<text x="710.3" y="32" font-size="4" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Gas Coalescing &amp; Discharge to AGRU</text>
+<polyline points="80.6,89 66.6,89 66.6,332 77.6,332 63.6,332" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="64.5,212.8 66.6,219.2 68.7,212.8" fill="#111827"/>
+<text x="66.6" y="207.9" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 66.6 207.9)">L-1001-36-CS-600-IH</text>
+<polygon points="66.6,199.7 71.1,203.2 66.6,206.7 62.1,203.2" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="66.6" y="204.1" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">101</text>
+<text x="66.6" y="214.7" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 66.6 214.7)">75 barg | 35 °C | 675 t/h</text>
+<polyline points="137.6,332 151.6,332 151.6,575 82.6,575 68.6,575" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="149.5,484.8 151.6,491.2 153.7,484.8" fill="#111827"/>
+<text x="151.6" y="450.9" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 151.6 450.9)">L-1002-36-CS-600-IH</text>
+<polygon points="151.6,471.7 156.1,475.2 151.6,478.7 147.1,475.2" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="151.6" y="476.1" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">102</text>
+<text x="151.6" y="457.7" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 151.6 457.7)">75 barg | 35 °C | 675 t/h</text>
+<polyline points="132.6,575 146.6,575 146.6,89 264,89 250,89" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="148.7,276.5 146.6,270.1 144.5,276.5" fill="#111827"/>
+<text x="146.6" y="329.4" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 146.6 329.4)">L-1003-36-CS-600-IH</text>
+<polygon points="146.6,282.6 151.1,286.1 146.6,289.6 142.1,286.1" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="146.6" y="287" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">103</text>
+<text x="146.6" y="336.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 146.6 336.2)">74.8 barg | 34.8 °C | 675 t/h</text>
+<polyline points="342,89 356,89 356,575 290,575 276,575" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="353.9,361.8 356,368.2 358.1,361.8" fill="#111827"/>
+<text x="356" y="329.4" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 356 329.4)">L-1004-30-CS-600-IH</text>
+<polygon points="356,348.7 360.5,352.2 356,355.7 351.5,352.2" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="356" y="353.1" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">104</text>
+<text x="356" y="336.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 356 336.2)">74.5 barg | 34.5 °C | 668 t/h</text>
+<polyline points="296,106 296,120 465.4,120 465.4,89 451.4,89" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="393,122.1 399.4,120 393,117.9" fill="#111827"/>
+<text x="380.7" y="117.4" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937">L-1005-08-CS-600-IH</text>
+<polygon points="383.4,116.5 387.9,120 383.4,123.5 378.9,120" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="383.4" y="120.9" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">105</text>
+<text x="380.7" y="124.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699">74.5 barg | 34 °C | 7 t/h</text>
+<polyline points="316,575 330,575 330,89 676.8,89 662.8,89" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="332.1,161.8 330,155.4 327.9,161.8" fill="#111827"/>
+<text x="330" y="329.4" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 330 329.4)">L-1006-28-CS-600-IH</text>
+<polygon points="330,167.9 334.5,171.4 330,174.9 325.5,171.4" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="330" y="172.3" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">106</text>
+<text x="330" y="336.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 330 336.2)">74.2 barg | 34.2 °C | 665 t/h</text>
+<polyline points="296,610 296,624 296,89 465.4,89 451.4,89" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="298.1,275 296,268.6 293.9,275" fill="#111827"/>
+<text x="296" y="353.9" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 296 353.9)">L-1007-06-CS-600-IH</text>
+<polygon points="296,281.1 300.5,284.6 296,288.1 291.5,284.6" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="296" y="285.5" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">107</text>
+<text x="296" y="360.7" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 296 360.7)">74 barg | 34 °C | 3 t/h</text>
+<polyline points="531.4,89 545.4,89 545.4,332 490.4,332 476.4,332" stroke="#374151" stroke-width="1.0" fill="none"/>
+<polygon points="543.3,234.8 545.4,241.2 547.5,234.8" fill="#374151"/>
+<text x="545.4" y="207.9" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 545.4 207.9)">L-1008-04-CS-300-IH</text>
+<polygon points="545.4,221.7 549.9,225.2 545.4,228.7 540.9,225.2" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="545.4" y="226.1" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">108</text>
+<text x="545.4" y="214.7" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 545.4 214.7)">25 barg | 32 °C | 10 t/h</text>
+<polyline points="506.4,332 520.4,332 520.4,575 490.4,575 476.4,575" stroke="#374151" stroke-width="1.0" fill="none"/>
+<polygon points="518.3,465.3 520.4,471.7 522.5,465.3" fill="#374151"/>
+<text x="520.4" y="450.9" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 520.4 450.9)">L-1009-04-CS-300-IH</text>
+<polygon points="520.4,452.2 524.9,455.7 520.4,459.2 515.9,455.7" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="520.4" y="456.6" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">109</text>
+<text x="520.4" y="457.7" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 520.4 457.7)">35 barg | 33 °C | 10 t/h</text>
+<polyline points="710.8,89 724.8,89 724.8,575 680.8,575 666.8,575" stroke="#111827" stroke-width="1.5" fill="none"/>
+<polygon points="722.7,350.8 724.8,357.2 726.9,350.8" fill="#111827"/>
+<text x="724.8" y="329.4" font-size="2.8" font-weight="normal" text-anchor="middle" fill="#1f2937" transform="rotate(90 724.8 329.4)">L-1010-28-CS-600-IH</text>
+<polygon points="724.8,337.7 729.3,341.2 724.8,344.7 720.3,341.2" fill="#ffffff" stroke="#004488" stroke-width="0.8"/>
+<text x="724.8" y="342.1" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">110</text>
+<text x="724.8" y="336.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#006699" transform="rotate(90 724.8 336.2)">74 barg | 34 °C | 665 t/h</text>
+<g transform="translate(66.6,125.5) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="66.6" y="112.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1001A</text>
+<text x="66.6" y="137" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">36&quot; LO</text>
+<g transform="translate(66.6,198.4) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-8" stroke="#1a1a1a" stroke-width="1.0"/>
+  <rect x="-4.5" y="-15" width="9" height="7" rx="1" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <text x="0" y="-10.2" font-size="3.2" font-weight="bold" text-anchor="middle" fill="#1a1a1a">S</text>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <rect x="-4" y="-14" width="8" height="6" fill="#ffffff" stroke-width="1.1"/>
+  <text x="0" y="-9.8" font-size="3.2" font-weight="bold" text-anchor="middle" fill="#1a1a1a">S</text>
+</g>
+<text x="66.6" y="185.4" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">ESDV-1001</text>
+<text x="66.6" y="209.9" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">36&quot; FC</text>
+<g transform="translate(66.6,271.3) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="66.6" y="258.3" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1001B</text>
+<text x="66.6" y="282.8" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">36&quot; LO</text>
+<g transform="translate(66.6,307.7) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-9 -4 L-2 0 L-9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M9 -4 L2 0 L9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="6" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M-3 6 L3 6 L0 9.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="0.9"/>
+  <line x1="-3" y1="11" x2="3" y2="11" stroke="#1a1a1a" stroke-width="1.2"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="66.6" y="294.7" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">BSV-1001</text>
+<text x="66.6" y="319.2" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">2&quot; NC</text>
+<g transform="translate(330,502.1) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="330" y="489.1" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1006A</text>
+<text x="330" y="513.6" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">28&quot; LO</text>
+<g transform="translate(330,356.3) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <path d="M-5 -13 A5 5 0 0 1 5 -13 Z" fill="#ffffff" stroke-width="1.1"/>
+  <line x1="-5" y1="-13" x2="5" y2="-13" stroke-width="1.1"/>
+  <path d="M-2 -10 L2 -10 L0 -7.5 Z" fill="#1a1a1a"/>
+</g>
+<text x="330" y="343.3" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">PCV-1001</text>
+<text x="330" y="367.8" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">28&quot; FO</text>
+<g transform="translate(330,210.5) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="330" y="197.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1006B</text>
+<text x="330" y="222" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">28&quot; LO</text>
+<g transform="translate(330,137.6) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-9 -4 L-2 0 L-9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M9 -4 L2 0 L9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="6" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M-3 6 L3 6 L0 9.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="0.9"/>
+  <line x1="-3" y1="11" x2="3" y2="11" stroke="#1a1a1a" stroke-width="1.2"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="330" y="124.6" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">BSV-1006</text>
+<text x="330" y="149.1" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">2&quot; NC</text>
+<g transform="translate(330,575) rotate(0)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-4.5 7 L4.5 7 L0 0 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M0 0 L7 -4.5 L7 4.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-4" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M0 -4 L-2.5 -5.5 L2.5 -7 L-2.5 -8.5 L2.5 -10 L0 -11.5" fill="none" stroke="#1a1a1a" stroke-width="1.1"/>
+  <rect x="-3" y="-14" width="6" height="3" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="-14" x2="4" y2="-17" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="-4" stroke-width="1.0"/>
+  <path d="M0 -4 L-2.5 -6 L2.5 -8 L-2.5 -10 L2.5 -12 L0 -14" fill="none" stroke-width="1.1"/>
+</g>
+<text x="330" y="562" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">PSV-1002</text>
+<text x="330" y="586.5" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">8&quot; Set: 75 barg</text>
+<g transform="translate(296,543.8) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="296" y="530.8" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1007A</text>
+<text x="296" y="555.3" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">6&quot; LO</text>
+<g transform="translate(296,383.3) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <path d="M-5 -13 A5 5 0 0 1 5 -13 Z" fill="#ffffff" stroke-width="1.1"/>
+  <line x1="-5" y1="-13" x2="5" y2="-13" stroke-width="1.1"/>
+  <path d="M-2 -7 L2 -7 L0 -9.5 Z" fill="#1a1a1a"/>
+</g>
+<text x="296" y="370.3" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">LCV-1001</text>
+<text x="296" y="394.8" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">6&quot; FC</text>
+<g transform="translate(296,222.8) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="296" y="209.8" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1007B</text>
+<text x="296" y="234.3" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">6&quot; LO</text>
+<g transform="translate(296,142.5) rotate(-90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-9 -4 L-2 0 L-9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M9 -4 L2 0 L9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="6" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M-3 6 L3 6 L0 9.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="0.9"/>
+  <line x1="-3" y1="11" x2="3" y2="11" stroke="#1a1a1a" stroke-width="1.2"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="296" y="129.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">BSV-1007</text>
+<text x="296" y="154" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">2&quot; NC</text>
+<g transform="translate(520.4,404.9) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="-5.5" x2="0" y2="5.5" stroke="#1a1a1a" stroke-width="1.6"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <path d="M-5 -13 A5 5 0 0 1 5 -13 Z" fill="#ffffff" stroke-width="1.1"/>
+  <line x1="-5" y1="-13" x2="5" y2="-13" stroke-width="1.1"/>
+  <path d="M-2 -7 L2 -7 L0 -9.5 Z" fill="#1a1a1a"/>
+</g>
+<text x="520.4" y="391.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">NRV-1001</text>
+<text x="520.4" y="416.4" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">4&quot; NO</text>
+<g transform="translate(520.4,502.1) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="520.4" y="489.1" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">HV-1009</text>
+<text x="520.4" y="513.6" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">4&quot; LO</text>
+<g transform="translate(520.4,545.8) rotate(90)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-9 -4 L-2 0 L-9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M9 -4 L2 0 L9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="6" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M-3 6 L3 6 L0 9.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="0.9"/>
+  <line x1="-3" y1="11" x2="3" y2="11" stroke="#1a1a1a" stroke-width="1.2"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="520.4" y="532.8" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">BSV-1009</text>
+<text x="520.4" y="557.3" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">2&quot; NC</text>
+<g transform="translate(356,89) rotate(0)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <path d="M-4.5 7 L4.5 7 L0 0 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M0 0 L7 -4.5 L7 4.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-4" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M0 -4 L-2.5 -5.5 L2.5 -7 L-2.5 -8.5 L2.5 -10 L0 -11.5" fill="none" stroke="#1a1a1a" stroke-width="1.1"/>
+  <rect x="-3" y="-14" width="6" height="3" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="-14" x2="4" y2="-17" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="-4" stroke-width="1.0"/>
+  <path d="M0 -4 L-2.5 -6 L2.5 -8 L-2.5 -10 L2.5 -12 L0 -14" fill="none" stroke-width="1.1"/>
+</g>
+<text x="356" y="76" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">PSV-1001</text>
+<text x="356" y="100.5" font-size="2.2" font-weight="bold" text-anchor="middle" fill="#004488">6&quot; Set: 75 barg</text>
+<g transform="translate(100.6,89)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <polygon points="-16,-12 8,-12 18,0 8,12 -16,12" fill="#f8fafc" stroke="#1e3a8a" stroke-width="1.3"/>
+  <line x1="-16" y1="-14" x2="-16" y2="14" stroke="#1e3a8a" stroke-width="2.6"/>
+  <line x1="8" y1="-12" x2="8" y2="12" stroke="#93c5fd" stroke-width="0.8" stroke-dasharray="1 1.5"/>
+</g>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="80.6" cy="89" r="1.3"/>
+</g>
+<text x="100.6" y="70" font-size="2.8" font-weight="bold" text-anchor="middle" fill="#1e3a8a">BL-1000</text>
+<text x="98.6" y="87.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#0f172a">FROM OFFSHORE PL</text>
+<text x="98.6" y="93.5" font-size="2" font-weight="bold" text-anchor="middle" fill="#2563eb">DWG: PL-FEED-001</text>
+<text x="100.6" y="110" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">Raw Sour Feed Gas Battery Limit (75 barg)</text>
+<g transform="translate(100.6,332)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <rect x="-30" y="-10" width="60" height="20" rx="6"/>
+  <path d="M30 -10 L42 0 L30 10 Z"/>
+  <line x1="-24" y1="-10" x2="-24" y2="10"/>
+  <circle cx="-24" cy="10" r="1.8"/>
+  <path d="M42 0 L50 0"/>
+</g>
+<text x="100.6" y="356" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">PR-1001</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="63.6" cy="332" r="1.3"/>
+  <circle cx="137.6" cy="332" r="1.3"/>
+</g>
+<g transform="translate(100.6,575)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <rect x="-30" y="-18" width="60" height="36"/>
+  <line x1="-26" y1="-18" x2="-26" y2="18"/>
+  <line x1="26" y1="-18" x2="26" y2="18"/>
+  <path d="M0 -8 L8 0 L0 8 L-8 0 Z"/>
+  <line x1="-42" y1="0" x2="-30" y2="0"/>
+  <line x1="30" y1="0" x2="42" y2="0"/>
+</g>
+<text x="100.6" y="602" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">M-1001</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="68.6" cy="575" r="1.3"/>
+  <circle cx="132.6" cy="575" r="1.3"/>
+</g>
+<g transform="translate(296,89)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="-42" cy="0" rx="9" ry="12"/>
+  <ellipse cx="42" cy="0" rx="9" ry="12"/>
+  <line x1="-42" y1="-12" x2="42" y2="-12"/>
+  <line x1="-42" y1="12" x2="42" y2="8"/>
+  <path d="M-20 11 L-20 19"/>
+  <path d="M20 9 L20 17"/>
+  <path d="M-24 19 L-16 19"/>
+  <path d="M16 17 L24 17"/>
+</g>
+<text x="296" y="113" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">SC-1001</text>
+<text x="296" y="68" font-size="2.2" font-weight="normal" text-anchor="middle" fill="#666">slug catcher</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="250" cy="89" r="1.3"/>
+  <circle cx="342" cy="89" r="1.3"/>
+  <circle cx="296" cy="106" r="1.3"/>
+</g>
+<g transform="translate(296,575)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="0" cy="-30" rx="14" ry="6"/>
+  <ellipse cx="0" cy="30" rx="14" ry="6"/>
+  <line x1="-14" y1="-30" x2="-14" y2="30"/>
+  <line x1="14" y1="-30" x2="14" y2="30"/>
+  <path d="M-8 30 L-4 38 L-12 38 Z"/>
+  <path d="M8 30 L12 38 L4 38 Z"/>
+</g>
+<text x="296" y="617" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">V-1001</text>
+<text x="296" y="536" font-size="2.2" font-weight="normal" text-anchor="middle" fill="#666">vertical separator</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="276" cy="575" r="1.3"/>
+  <circle cx="316" cy="575" r="1.3"/>
+  <circle cx="296" cy="540" r="1.3"/>
+  <circle cx="296" cy="610" r="1.3"/>
+</g>
+<g transform="translate(491.4,89)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="-40" cy="0" rx="8" ry="14"/>
+  <ellipse cx="40" cy="0" rx="8" ry="14"/>
+  <line x1="-40" y1="-14" x2="40" y2="-14"/>
+  <line x1="-40" y1="14" x2="40" y2="14"/>
+  <path d="M-24 14 L-18 20 L-30 20 Z"/>
+  <path d="M24 14 L30 20 L18 20 Z"/>
+</g>
+<text x="491.4" y="114" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">V-1002</text>
+<text x="491.4" y="67" font-size="2.2" font-weight="normal" text-anchor="middle" fill="#666">horizontal vessel</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="451.4" cy="89" r="1.3"/>
+  <circle cx="531.4" cy="89" r="1.3"/>
+  <circle cx="491.4" cy="71" r="1.3"/>
+</g>
+<g transform="translate(491.4,332)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <circle cx="0" cy="0" r="11"/>
+  <path d="M0 -6 L7 5 L-7 5 Z"/>
+</g>
+<text x="491.4" y="354" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">P-1001A</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="476.4" cy="332" r="1.3"/>
+  <circle cx="506.4" cy="332" r="1.3"/>
+</g>
+<g transform="translate(491.4,575)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <circle cx="0" cy="0" r="11"/>
+  <path d="M0 -6 L7 5 L-7 5 Z"/>
+</g>
+<text x="491.4" y="597" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">P-1001B</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="476.4" cy="575" r="1.3"/>
+  <circle cx="506.4" cy="575" r="1.3"/>
+</g>
+<g transform="translate(686.8,89)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="0" cy="-26" rx="16" ry="5"/>
+  <ellipse cx="0" cy="26" rx="16" ry="5"/>
+  <line x1="-16" y1="-26" x2="-16" y2="26"/>
+  <line x1="16" y1="-26" x2="16" y2="26"/>
+  <line x1="-12" y1="-18" x2="12" y2="-8" stroke-dasharray="3 2"/>
+  <line x1="-12" y1="-8" x2="12" y2="-18" stroke-dasharray="3 2"/>
+  <path d="M-8 26 L-4 33 L-12 33 Z"/>
+  <path d="M8 26 L12 33 L4 33 Z"/>
+</g>
+<text x="686.8" y="122" font-size="3.5" font-weight="bold" text-anchor="middle" fill="#1a1a1a">F-1001</text>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="662.8" cy="89" r="1.3"/>
+  <circle cx="710.8" cy="89" r="1.3"/>
+  <circle cx="686.8" cy="63" r="1.3"/>
+</g>
+<g transform="translate(686.8,575)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <polygon points="-16,-12 8,-12 18,0 8,12 -16,12" fill="#f8fafc" stroke="#1e3a8a" stroke-width="1.3"/>
+  <line x1="-16" y1="-14" x2="-16" y2="14" stroke="#1e3a8a" stroke-width="2.6"/>
+  <line x1="8" y1="-12" x2="8" y2="12" stroke="#93c5fd" stroke-width="0.8" stroke-dasharray="1 1.5"/>
+</g>
+<g stroke="#1a1a1a" stroke-width="0.5" fill="#ffffff">
+  <circle cx="666.8" cy="575" r="1.3"/>
+</g>
+<text x="686.8" y="556" font-size="2.8" font-weight="bold" text-anchor="middle" fill="#1e3a8a">BL-1001</text>
+<text x="684.8" y="573.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#0f172a">TO UNIT 20 AGRU</text>
+<text x="684.8" y="579.5" font-size="2" font-weight="bold" text-anchor="middle" fill="#2563eb">DWG: PID-U20-001</text>
+<text x="686.8" y="596" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">Sour Gas to AGRU Unit 20 Battery Limit</text>
+<g transform="translate(132.6,69)" stroke="#1a1a1a" stroke-width="1.0" fill="none">
+  <circle cx="0" cy="0" r="4"/>
+  <text x="0" y="0.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">PT</text>
+</g>
+<text x="138.1" y="69.9" font-size="2.2" font-weight="normal" text-anchor="start" fill="#333">PT-1001</text>
+<g transform="translate(142.6,82)" stroke="#1a1a1a" stroke-width="1.0" fill="none">
+  <rect x="-4.5" y="-4.5" width="9" height="9"/>
+  <text x="0" y="0.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">PIC</text>
+</g>
+<text x="148.1" y="82.9" font-size="2.2" font-weight="normal" text-anchor="start" fill="#333">PIC-1001</text>
+<g transform="translate(144.6,549)" stroke="#1a1a1a" stroke-width="1.0" fill="none">
+  <circle cx="0" cy="0" r="4"/>
+  <text x="0" y="0.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">FT</text>
+</g>
+<text x="150.1" y="549.9" font-size="2.2" font-weight="normal" text-anchor="start" fill="#333">FT-1001</text>
+<g transform="translate(328,534)" stroke="#1a1a1a" stroke-width="1.0" fill="none">
+  <circle cx="0" cy="0" r="4"/>
+  <text x="0" y="0.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">LT</text>
+</g>
+<text x="333.5" y="534.9" font-size="2.2" font-weight="normal" text-anchor="start" fill="#333">LT-1001</text>
+<g transform="translate(338,547)" stroke="#1a1a1a" stroke-width="1.0" fill="none">
+  <rect x="-4.5" y="-4.5" width="9" height="9"/>
+  <text x="0" y="0.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">LIC</text>
+</g>
+<text x="343.5" y="547.9" font-size="2.2" font-weight="normal" text-anchor="start" fill="#333">LIC-1001</text>
+<g transform="translate(722.8,57)" stroke="#1a1a1a" stroke-width="1.0" fill="none">
+  <circle cx="0" cy="0" r="4"/>
+  <text x="0" y="0.9" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">TT</text>
+</g>
+<text x="728.3" y="57.9" font-size="2.2" font-weight="normal" text-anchor="start" fill="#333">TT-1001</text>
+<line x1="132.6" y1="69" x2="142.6" y2="82" stroke="#555" stroke-width="0.7" stroke-dasharray="6 3"/>
+<line x1="142.6" y1="82" x2="330" y2="356.3" stroke="#666" stroke-width="0.7" stroke-dasharray="6 3"/>
+<text x="236.3" y="217.2" font-size="2" font-weight="normal" text-anchor="middle" fill="#777">PNEUMATIC SIGNAL</text>
+<line x1="328" y1="534" x2="338" y2="547" stroke="#555" stroke-width="0.7" stroke-dasharray="6 3"/>
+<line x1="338" y1="547" x2="296" y2="383.3" stroke="#666" stroke-width="0.7" stroke-dasharray="6 3"/>
+<text x="317" y="463.1" font-size="2" font-weight="normal" text-anchor="middle" fill="#777">PNEUMATIC SIGNAL</text>
+<rect x="20" y="650" width="380" height="170" fill="#fbfbfb" stroke="#1a1a1a" stroke-width="0.8"/>
+<text x="30" y="659" font-size="3.2" font-weight="bold" text-anchor="start" fill="#1a1a1a">EQUIPMENT SYMBOLS</text>
+<line x1="210" y1="654" x2="210" y2="816" stroke="#cbd5e1" stroke-width="0.8"/>
+<text x="220" y="659" font-size="3.2" font-weight="bold" text-anchor="start" fill="#003366">VALVE &amp; PIPING SYMBOL KEY (ISA-5.1)</text>
+<g transform="translate(34,674.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <polygon points="-16,-12 8,-12 18,0 8,12 -16,12" fill="#f8fafc" stroke="#1e3a8a" stroke-width="1.3"/>
+  <line x1="-16" y1="-14" x2="-16" y2="14" stroke="#1e3a8a" stroke-width="2.6"/>
+  <line x1="8" y1="-12" x2="8" y2="12" stroke="#93c5fd" stroke-width="0.8" stroke-dasharray="1 1.5"/>
+</g>
+<text x="48" y="675.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">battery limit</text>
+<g transform="translate(119,674.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <rect x="-30" y="-10" width="60" height="20" rx="6"/>
+  <path d="M30 -10 L42 0 L30 10 Z"/>
+  <line x1="-24" y1="-10" x2="-24" y2="10"/>
+  <circle cx="-24" cy="10" r="1.8"/>
+  <path d="M42 0 L50 0"/>
+</g>
+<text x="133" y="675.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">pig receiver</text>
+<g transform="translate(34,687.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <rect x="-30" y="-18" width="60" height="36"/>
+  <line x1="-26" y1="-18" x2="-26" y2="18"/>
+  <line x1="26" y1="-18" x2="26" y2="18"/>
+  <path d="M0 -8 L8 0 L0 8 L-8 0 Z"/>
+  <line x1="-42" y1="0" x2="-30" y2="0"/>
+  <line x1="30" y1="0" x2="42" y2="0"/>
+</g>
+<text x="48" y="688.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">meter skid</text>
+<g transform="translate(119,687.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="-42" cy="0" rx="9" ry="12"/>
+  <ellipse cx="42" cy="0" rx="9" ry="12"/>
+  <line x1="-42" y1="-12" x2="42" y2="-12"/>
+  <line x1="-42" y1="12" x2="42" y2="8"/>
+  <path d="M-20 11 L-20 19"/>
+  <path d="M20 9 L20 17"/>
+  <path d="M-24 19 L-16 19"/>
+  <path d="M16 17 L24 17"/>
+</g>
+<text x="133" y="688.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">slug catcher</text>
+<g transform="translate(34,700.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="0" cy="-30" rx="14" ry="6"/>
+  <ellipse cx="0" cy="30" rx="14" ry="6"/>
+  <line x1="-14" y1="-30" x2="-14" y2="30"/>
+  <line x1="14" y1="-30" x2="14" y2="30"/>
+  <path d="M-8 30 L-4 38 L-12 38 Z"/>
+  <path d="M8 30 L12 38 L4 38 Z"/>
+</g>
+<text x="48" y="701.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">vertical separator</text>
+<g transform="translate(119,700.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="-40" cy="0" rx="8" ry="14"/>
+  <ellipse cx="40" cy="0" rx="8" ry="14"/>
+  <line x1="-40" y1="-14" x2="40" y2="-14"/>
+  <line x1="-40" y1="14" x2="40" y2="14"/>
+  <path d="M-24 14 L-18 20 L-30 20 Z"/>
+  <path d="M24 14 L30 20 L18 20 Z"/>
+</g>
+<text x="133" y="701.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">horizontal vessel</text>
+<g transform="translate(34,713.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <circle cx="0" cy="0" r="11"/>
+  <path d="M0 -6 L7 5 L-7 5 Z"/>
+</g>
+<text x="48" y="714.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">pump</text>
+<g transform="translate(119,713.5) scale(0.20)" stroke="#1a1a1a" stroke-width="1.1" fill="none">
+  <ellipse cx="0" cy="-26" rx="16" ry="5"/>
+  <ellipse cx="0" cy="26" rx="16" ry="5"/>
+  <line x1="-16" y1="-26" x2="-16" y2="26"/>
+  <line x1="16" y1="-26" x2="16" y2="26"/>
+  <line x1="-12" y1="-18" x2="12" y2="-8" stroke-dasharray="3 2"/>
+  <line x1="-12" y1="-8" x2="12" y2="-18" stroke-dasharray="3 2"/>
+  <path d="M-8 26 L-4 33 L-12 33 Z"/>
+  <path d="M8 26 L12 33 L4 33 Z"/>
+</g>
+<text x="133" y="714.5" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1a1a1a">filter separator</text>
+<g transform="translate(228,672) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <circle cx="0" cy="0" r="2.6" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+</g>
+<text x="248" y="673.2" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Ball Valve (Full Bore, ISA-5.1)</text>
+<g transform="translate(228,687.5) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke="#1a1a1a" stroke-width="1.8"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <line x1="-5" y1="-7" x2="5" y2="-7" stroke-width="1.8"/>
+</g>
+<text x="248" y="688.7" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Manual Gate Valve (Handwheel, LO)</text>
+<g transform="translate(228,703) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="-5.5" x2="0" y2="5.5" stroke="#1a1a1a" stroke-width="1.6"/>
+</g>
+<text x="248" y="704.2" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Check Valve (Non-Return Swing)</text>
+<g transform="translate(228,718.5) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-4.5 7 L4.5 7 L0 0 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M0 0 L7 -4.5 L7 4.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-4" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M0 -4 L-2.5 -5.5 L2.5 -7 L-2.5 -8.5 L2.5 -10 L0 -11.5" fill="none" stroke="#1a1a1a" stroke-width="1.1"/>
+  <rect x="-3" y="-14" width="6" height="3" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="-14" x2="4" y2="-17" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="-4" stroke-width="1.0"/>
+  <path d="M0 -4 L-2.5 -6 L2.5 -8 L-2.5 -10 L2.5 -12 L0 -14" fill="none" stroke-width="1.1"/>
+</g>
+<text x="248" y="719.7" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Pressure Safety Relief Valve (API 520)</text>
+<g transform="translate(228,734) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-9 -4 L-2 0 L-9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M9 -4 L2 0 L9 4 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="0" y1="0" x2="0" y2="6" stroke="#1a1a1a" stroke-width="1.0"/>
+  <path d="M-3 6 L3 6 L0 9.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="0.9"/>
+  <line x1="-3" y1="11" x2="3" y2="11" stroke="#1a1a1a" stroke-width="1.2"/>
+</g>
+<text x="248" y="735.2" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Bleed Safety Valve / DBB Station</text>
+<g transform="translate(228,749.5) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <path d="M-5 -13 A5 5 0 0 1 5 -13 Z" fill="#ffffff" stroke-width="1.1"/>
+  <line x1="-5" y1="-13" x2="5" y2="-13" stroke-width="1.1"/>
+  <path d="M-2 -7 L2 -7 L0 -9.5 Z" fill="#1a1a1a"/>
+</g>
+<text x="248" y="750.7" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Control Valve (Pneumatic Fail-Close)</text>
+<g transform="translate(228,765) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="-3" y1="4" x2="3" y2="-4" stroke="#1a1a1a" stroke-width="1.8"/>
+</g>
+<text x="248" y="766.2" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Butterfly Throttle Valve</text>
+<g transform="translate(228,780.5) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <circle cx="-4" cy="0" r="3.2" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <circle cx="4" cy="0" r="3.2" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="-4" y1="-3.2" x2="4" y2="-3.2" stroke="#1a1a1a" stroke-width="1.0"/>
+  <line x1="-4" y1="3.2" x2="4" y2="3.2" stroke="#1a1a1a" stroke-width="1.0"/>
+</g>
+<text x="248" y="781.7" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Spectacle Blind (Open / Blind)</text>
+<g transform="translate(228,796) scale(0.7)" stroke="#1a1a1a" stroke-width="1.2" fill="none">
+  <path d="M-8 -5 L0 0 L-8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <path d="M8 -5 L0 0 L8 5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <line x1="0" y1="0" x2="0" y2="-8" stroke="#1a1a1a" stroke-width="1.0"/>
+  <rect x="-4.5" y="-15" width="9" height="7" rx="1" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.1"/>
+  <text x="0" y="-10.2" font-size="3.2" font-weight="bold" text-anchor="middle" fill="#1a1a1a">S</text>
+  <line x1="0" y1="0" x2="0" y2="-7" stroke-width="1.0"/>
+  <rect x="-4" y="-14" width="8" height="6" fill="#ffffff" stroke-width="1.1"/>
+  <text x="0" y="-9.8" font-size="3.2" font-weight="bold" text-anchor="middle" fill="#1a1a1a">S</text>
+</g>
+<text x="248" y="797.2" font-size="2.3" font-weight="normal" text-anchor="start" fill="#1f2937">Emergency Shutdown Valve (ESV / Solenoid)</text>
+<g transform="translate(228,811.5) scale(0.5)" stroke="#1e3a8a" stroke-width="1.4" fill="none">
+  <polygon points="-16,-12 8,-12 18,0 8,12 -16,12" fill="#f8fafc" stroke="#1e3a8a" stroke-width="1.3"/>
+  <line x1="-16" y1="-14" x2="-16" y2="14" stroke="#1e3a8a" stroke-width="2.6"/>
+  <line x1="8" y1="-12" x2="8" y2="12" stroke="#93c5fd" stroke-width="0.8" stroke-dasharray="1 1.5"/>
+</g>
+<text x="248" y="812.7" font-size="2.3" font-weight="bold" text-anchor="start" fill="#1e3a8a">Off-Page Continuation Chevron (ISO 10628)</text>
+<rect x="410" y="650" width="398" height="60" fill="#fbfbfb" stroke="#1a1a1a" stroke-width="0.8"/>
+<text x="420" y="659" font-size="3.4" font-weight="bold" text-anchor="start" fill="#1a1a1a">LINE CLASSES</text>
+<line x1="418" y1="668" x2="800" y2="668" stroke="#1a1a1a" stroke-width="0.5"/>
+<text x="452" y="665.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Class</text>
+<text x="515" y="665.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Material</text>
+<text x="586" y="665.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Insulation</text>
+<text x="716" y="665.5" font-size="2.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">Typical Service</text>
+<text x="452" y="672.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">300</text>
+<text x="515" y="672.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">CS</text>
+<text x="586" y="672.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">IH</text>
+<text x="716" y="672.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">Flashed Condensate</text>
+<text x="452" y="680.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">600</text>
+<text x="515" y="680.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">CS</text>
+<text x="586" y="680.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">IH</text>
+<text x="716" y="680.5" font-size="2.4" font-weight="normal" text-anchor="middle" fill="#333">Raw Sour Feed Gas</text>
+<rect x="810" y="24" width="359" height="484" fill="#fcfcfc" stroke="#1a1a1a" stroke-width="0.8"/>
+<rect x="810" y="24" width="359" height="14" fill="#003366"/>
+<text x="989.5" y="33.5" font-size="3.4" font-weight="bold" text-anchor="middle" fill="#ffffff">HEAT &amp; MATERIAL BALANCE (H&amp;MB) — STREAM SUMMARY</text>
+<text x="820" y="44" font-size="2.3" font-weight="bold" text-anchor="start" fill="#333333">PROCESS DESIGN OPERATING CONDITIONS (ISO 10628 / PIP PIC001)</text>
+<rect x="816" y="48" width="347" height="8" fill="#eef2f7" stroke="#cbd5e1" stroke-width="0.4"/>
+<text x="832" y="53.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#002244">Str</text>
+<text x="846" y="53.5" font-size="2.3" font-weight="bold" text-anchor="start" fill="#002244">Service / Description</text>
+<text x="972" y="53.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#002244">Ph</text>
+<text x="1009" y="53.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#002244">P (barg)</text>
+<text x="1055" y="53.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#002244">T (°C)</text>
+<text x="1103" y="53.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#002244">Flow (t/h)</text>
+<text x="1148" y="53.5" font-size="2.3" font-weight="bold" text-anchor="middle" fill="#002244">β (Vap)</text>
+<line x1="816" y1="66.7" x2="1163" y2="66.7" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,57.4 835.5,60 832,62.6 828.5,60" fill="#004488"/>
+<text x="832" y="60.8" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">101</text>
+<text x="846" y="60.8" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Raw Sour Feed Gas</text>
+<text x="972" y="60.8" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#b45309">V</text>
+<text x="1009" y="60.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">75.0</text>
+<text x="1055" y="60.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">35.0</text>
+<text x="1103" y="60.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">675.0</text>
+<text x="1148" y="60.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">1.00</text>
+<rect x="816" y="66.7" width="347" height="11.2" fill="#f8fafc" opacity="0.7"/>
+<line x1="816" y1="77.9" x2="1163" y2="77.9" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,68.6 835.5,71.2 832,73.8 828.5,71.2" fill="#004488"/>
+<text x="832" y="72" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">102</text>
+<text x="846" y="72" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Raw Sour Gas</text>
+<text x="972" y="72" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#b45309">V</text>
+<text x="1009" y="72" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">75.0</text>
+<text x="1055" y="72" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">35.0</text>
+<text x="1103" y="72" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">675.0</text>
+<text x="1148" y="72" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">1.00</text>
+<line x1="816" y1="89.1" x2="1163" y2="89.1" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,79.8 835.5,82.4 832,85 828.5,82.4" fill="#004488"/>
+<text x="832" y="83.2" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">103</text>
+<text x="846" y="83.2" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Gas to Slug Catcher</text>
+<text x="972" y="83.2" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#b45309">V</text>
+<text x="1009" y="83.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">74.8</text>
+<text x="1055" y="83.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">34.8</text>
+<text x="1103" y="83.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">675.0</text>
+<text x="1148" y="83.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">1.00</text>
+<rect x="816" y="89.1" width="347" height="11.2" fill="#f8fafc" opacity="0.7"/>
+<line x1="816" y1="100.3" x2="1163" y2="100.3" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,91 835.5,93.6 832,96.2 828.5,93.6" fill="#004488"/>
+<text x="832" y="94.4" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">104</text>
+<text x="846" y="94.4" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Vessel Feed Gas</text>
+<text x="972" y="94.4" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#b45309">V</text>
+<text x="1009" y="94.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">74.5</text>
+<text x="1055" y="94.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">34.5</text>
+<text x="1103" y="94.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">668.0</text>
+<text x="1148" y="94.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">1.00</text>
+<line x1="816" y1="111.5" x2="1163" y2="111.5" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,102.2 835.5,104.8 832,107.4 828.5,104.8" fill="#004488"/>
+<text x="832" y="105.6" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">105</text>
+<text x="846" y="105.6" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Condensate Slugs</text>
+<text x="972" y="105.6" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#0369a1">L</text>
+<text x="1009" y="105.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">74.5</text>
+<text x="1055" y="105.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">34.0</text>
+<text x="1103" y="105.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">7.0</text>
+<text x="1148" y="105.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">0.00</text>
+<rect x="816" y="111.5" width="347" height="11.2" fill="#f8fafc" opacity="0.7"/>
+<line x1="816" y1="122.7" x2="1163" y2="122.7" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,113.4 835.5,116 832,118.6 828.5,116" fill="#004488"/>
+<text x="832" y="116.8" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">106</text>
+<text x="846" y="116.8" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Gas to Coalescer</text>
+<text x="972" y="116.8" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#b45309">V</text>
+<text x="1009" y="116.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">74.2</text>
+<text x="1055" y="116.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">34.2</text>
+<text x="1103" y="116.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">665.0</text>
+<text x="1148" y="116.8" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">1.00</text>
+<line x1="816" y1="133.9" x2="1163" y2="133.9" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,124.6 835.5,127.2 832,129.8 828.5,127.2" fill="#004488"/>
+<text x="832" y="128" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">107</text>
+<text x="846" y="128" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Separator Liquids</text>
+<text x="972" y="128" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#0369a1">L</text>
+<text x="1009" y="128" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">74.0</text>
+<text x="1055" y="128" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">34.0</text>
+<text x="1103" y="128" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">3.0</text>
+<text x="1148" y="128" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">0.00</text>
+<rect x="816" y="133.9" width="347" height="11.2" fill="#f8fafc" opacity="0.7"/>
+<line x1="816" y1="145.1" x2="1163" y2="145.1" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,135.8 835.5,138.4 832,141 828.5,138.4" fill="#004488"/>
+<text x="832" y="139.2" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">108</text>
+<text x="846" y="139.2" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Flashed Condensate</text>
+<text x="972" y="139.2" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#0369a1">L</text>
+<text x="1009" y="139.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">25.0</text>
+<text x="1055" y="139.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">32.0</text>
+<text x="1103" y="139.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">10.0</text>
+<text x="1148" y="139.2" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">0.00</text>
+<line x1="816" y1="156.3" x2="1163" y2="156.3" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,147 835.5,149.6 832,152.2 828.5,149.6" fill="#004488"/>
+<text x="832" y="150.4" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">109</text>
+<text x="846" y="150.4" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Condensate Export H…</text>
+<text x="972" y="150.4" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#0369a1">L</text>
+<text x="1009" y="150.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">35.0</text>
+<text x="1055" y="150.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">33.0</text>
+<text x="1103" y="150.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">10.0</text>
+<text x="1148" y="150.4" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">0.00</text>
+<rect x="816" y="156.3" width="347" height="11.2" fill="#f8fafc" opacity="0.7"/>
+<line x1="816" y1="167.5" x2="1163" y2="167.5" stroke="#e2e8f0" stroke-width="0.3"/>
+<polygon points="832,158.2 835.5,160.8 832,163.4 828.5,160.8" fill="#004488"/>
+<text x="832" y="161.6" font-size="1.9" font-weight="bold" text-anchor="middle" fill="#ffffff">110</text>
+<text x="846" y="161.6" font-size="2.1" font-weight="normal" text-anchor="start" fill="#1e293b">Sour Gas to AGRU</text>
+<text x="972" y="161.6" font-size="2.1" font-weight="bold" text-anchor="middle" fill="#b45309">V</text>
+<text x="1009" y="161.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">74.0</text>
+<text x="1055" y="161.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">34.0</text>
+<text x="1103" y="161.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#0f172a">665.0</text>
+<text x="1148" y="161.6" font-size="2.1" font-weight="normal" text-anchor="middle" fill="#475569">1.00</text>
+<text x="820" y="504" font-size="2" font-weight="normal" text-anchor="start" fill="#64748b">Notes: Operating conditions at 100% design throughput (MCR). Thermo calculated via Peng-Robinson PR-78.</text>
+<rect x="810" y="518" width="359" height="158" fill="#fbfbfb" stroke="#1a1a1a" stroke-width="0.8"/>
+<text x="820" y="527" font-size="3.4" font-weight="bold" text-anchor="start" fill="#1a1a1a">NOTES</text>
+<circle cx="822" cy="538.5" r="1.2" fill="#1a1a1a"/>
+<text x="830" y="540" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">SYMBOLOGY PER ISA-5.1 / ISO 14617</text>
+<circle cx="822" cy="552.5" r="1.2" fill="#1a1a1a"/>
+<text x="830" y="554" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">NOMINAL SIZES IN INCHES</text>
+<circle cx="822" cy="566.5" r="1.2" fill="#1a1a1a"/>
+<text x="830" y="568" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">INSTRUMENT LOCATIONS: FIELD/LOCAL/PANEL/DCS</text>
+<circle cx="822" cy="580.5" r="1.2" fill="#1a1a1a"/>
+<text x="830" y="582" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">All PSV set pressures are design basis values; verification required before fabrication</text>
+<rect x="810" y="680" width="359" height="141" fill="#fbfbfb" stroke="#1a1a1a" stroke-width="1.0"/>
+<text x="989.5" y="688" font-size="3.6" font-weight="bold" text-anchor="middle" fill="#1a1a1a">OmniEng P&amp;ID</text>
+<line x1="810" y1="696" x2="1169" y2="696" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="701.9" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Project Name</text>
+<line x1="915" y1="696" x2="915" y2="706.3" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="701.9" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">Unit 10 - Feed Gas Reception &amp; Slug Catcher</text>
+<line x1="810" y1="706.3" x2="1169" y2="706.3" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="712.2" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Project Number</text>
+<line x1="915" y1="706.3" x2="915" y2="716.5" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="712.2" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">LNG-FEED-U10</text>
+<line x1="810" y1="716.5" x2="1169" y2="716.5" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="722.4" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Client</text>
+<line x1="915" y1="716.5" x2="915" y2="726.8" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="722.4" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a"></text>
+<line x1="810" y1="726.8" x2="1169" y2="726.8" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="732.7" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Location</text>
+<line x1="915" y1="726.8" x2="915" y2="737" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="732.7" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a"></text>
+<line x1="810" y1="737" x2="1169" y2="737" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="742.9" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Document Number</text>
+<line x1="915" y1="737" x2="915" y2="747.3" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="742.9" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">LNG-FEED-U10-PID-1</text>
+<line x1="810" y1="747.3" x2="1169" y2="747.3" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="753.2" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Revision</text>
+<line x1="915" y1="747.3" x2="915" y2="757.5" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="753.2" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">0</text>
+<line x1="810" y1="757.5" x2="1169" y2="757.5" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="763.4" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Date</text>
+<line x1="915" y1="757.5" x2="915" y2="767.8" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="763.4" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">2026-11-06</text>
+<line x1="810" y1="767.8" x2="1169" y2="767.8" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="773.7" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Drawn</text>
+<line x1="915" y1="767.8" x2="915" y2="778" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="773.7" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a"></text>
+<line x1="810" y1="778" x2="1169" y2="778" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="783.9" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Checked</text>
+<line x1="915" y1="778" x2="915" y2="788.3" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="783.9" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a"></text>
+<line x1="810" y1="788.3" x2="1169" y2="788.3" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="794.2" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Approved</text>
+<line x1="915" y1="788.3" x2="915" y2="798.5" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="794.2" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a"></text>
+<line x1="810" y1="798.5" x2="1169" y2="798.5" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="804.4" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Scale</text>
+<line x1="915" y1="798.5" x2="915" y2="808.8" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="804.4" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">1:50</text>
+<line x1="810" y1="808.8" x2="1169" y2="808.8" stroke="#bbb" stroke-width="0.3"/>
+<text x="816" y="814.7" font-size="2.6" font-weight="bold" text-anchor="start" fill="#1a1a1a">Sheet</text>
+<line x1="915" y1="808.8" x2="915" y2="819" stroke="#bbb" stroke-width="0.3"/>
+<text x="921" y="814.7" font-size="2.6" font-weight="normal" text-anchor="start" fill="#1a1a1a">Sheet 1 of 1</text>
+<line x1="810" y1="821" x2="1169" y2="821" stroke="#1a1a1a" stroke-width="0.6"/>
+</svg>

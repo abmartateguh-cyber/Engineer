@@ -1,7 +1,6 @@
 /**
- * OmniEng Binary GDSII / OASIS Layout Stream Engine
- * High-performance binary serialization and deserialization of integrated circuit layouts.
- * Supports GDSII Stream Format (Release 6.0) specification with full record type encoding/decoding.
+ * Experimental GDSII common-record subset serializer and parser for layout records.
+ * It does not encode, decode, or preserve every GDSII record type.
  * 
  * Experimental implementation; release maturity and provenance are not established.
  */

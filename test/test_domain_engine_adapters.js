@@ -3,6 +3,7 @@
 const assert = require('assert');
 const { GeometryEngineAdapter } = require('../src/core/cad/geometry_engine_adapter');
 const { FEAEngineAdapter } = require('../src/core/cae/fea_engine_adapter');
+const { SYNTHETIC_LINEAR_ELASTIC_MATERIAL } = require('./support/synthetic_cae_materials');
 const { CFDEngineAdapter } = require('../src/core/cae/cfd_engine_adapter');
 const { JobRequest } = require('../src/core/contracts/JobRequest');
 const { JobStatus } = require('../src/core/contracts/JobResult');
@@ -67,7 +68,7 @@ console.log('================================================================\n'
       elements: [
         {
           nodes: [0, 1, 2, 3],
-          material: { E: 70e9, nu: 0.33, yieldStress: 270e6, name: 'Al 6061-T6' }
+          material: SYNTHETIC_LINEAR_ELASTIC_MATERIAL
         }
       ]
     }

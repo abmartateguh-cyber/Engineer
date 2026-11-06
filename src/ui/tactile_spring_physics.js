@@ -67,13 +67,13 @@
         // c = 2 * sqrt(m * k)
         this.k = 220.0;
         this.c = 2 * Math.sqrt(this.mass * this.k);
-      } else if (name === 'SPRINGY_SNAP') {
+      } else if (name === 'SPRINGY_SNAP' || name === 'BOUNCY') {
         this.k = 240.0;
         this.c = 14.0; // Under-damped (zeta ~ 0.45)
-      } else if (name === 'HEAVY_INSTRUMENT') {
-        this.mass = 2.5;
-        this.k = 120.0;
-        this.c = 34.0;
+      } else if (name === 'HEAVY_INSTRUMENT' || name === 'STIFF') {
+        this.mass = name === 'STIFF' ? 1.0 : 2.5;
+        this.k = name === 'STIFF' ? 450.0 : 120.0;
+        this.c = name === 'STIFF' ? 42.0 : 34.0;
       }
     }
 
@@ -100,6 +100,47 @@
 
     isSettled() {
       return (Math.abs(this.value - this.target) < this.settledThreshold) && (Math.abs(this.velocity) < this.velocityThreshold);
+    }
+  }
+
+  class TactileSpring2D {
+    /**
+     * @param {Object} options
+     * @param {number} [options.stiffness=180.0]
+     * @param {number} [options.damping=24.0]
+     */
+    constructor(options = {}) {
+      this.x = new TactileSpring1D(options);
+      this.y = new TactileSpring1D(options);
+    }
+
+    setTarget(x, y) {
+      this.x.setTarget(x);
+      this.y.setTarget(y);
+    }
+
+    setValue(x, y) {
+      this.x.setValue(x);
+      this.y.setValue(y);
+    }
+
+    setPreset(name) {
+      this.x.setPreset(name);
+      this.y.setPreset(name);
+    }
+
+    update(dt) {
+      const sx = this.x.update(dt);
+      const sy = this.y.update(dt);
+      return sx && sy;
+    }
+
+    getValues() {
+      return { x: this.x.value, y: this.y.value };
+    }
+
+    isSettled() {
+      return this.x.isSettled() && this.y.isSettled();
     }
   }
 
@@ -172,6 +213,7 @@
 
   return {
     TactileSpring1D,
+    TactileSpring2D,
     TactileSpringFollower3D,
     exponentialFollow,
     exponentialFollow3D

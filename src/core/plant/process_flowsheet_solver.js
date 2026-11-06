@@ -248,10 +248,13 @@ class ProcessFlowsheetSolver {
     ) {
       throw new TypeError('Flash drum requires pressure > 0 kPa and temperature > -273.15 °C.');
     }
-    if (
-      !config.componentProperties ||
-      typeof config.componentProperties !== 'object' ||
-      Array.isArray(config.componentProperties)
+    let compProps = config.componentProperties;
+    if (!compProps && (config.useDippr || config.flashModel === 'peng-robinson' || config.usePR)) {
+      compProps = {};
+    } else if (
+      !compProps ||
+      typeof compProps !== 'object' ||
+      Array.isArray(compProps)
     ) {
       throw new TypeError(
         'Flash drum requires explicit component property records with source and license provenance.'
@@ -264,7 +267,106 @@ class ProcessFlowsheetSolver {
       liquidStreamId: liquidId,
       temperatureC: config.temperatureC,
       pressureKPa: pKPa,
-      componentProperties: config.componentProperties
+      componentProperties: config.componentProperties,
+      useDippr: config.useDippr,
+      flashModel: config.flashModel,
+      usePR: config.usePR
+    });
+  }
+
+  /**
+   * Alias for addFlashDrum with automatic DIPPR property resolution
+   */
+  addFlashSeparator(id, feedId, vaporId, liquidId, config = {}) {
+    return this.addFlashDrum(id, feedId, vaporId, liquidId, {
+      ...config,
+      useDippr: config.useDippr !== false
+    });
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} inletId
+   * @param {string} outletId
+   * @param {{outletTemperatureC?: number, targetTemperatureC?: number, dutyKW?: number, dutyKJperH?: number, pressureDropKPa?: number}} config
+   */
+  addHeatExchanger(id, inletId, outletId, config = {}) {
+    if (typeof id !== 'string' || id.trim() === '') {
+      throw new TypeError('Heat exchanger requires a non-empty id.');
+    }
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      throw new TypeError('Heat exchanger requires a configuration object.');
+    }
+    this._requireStreamIds([inletId, outletId], `Heat exchanger ${id}`);
+    return this.addUnit('HEAT_EXCHANGER', id, {
+      inletStreamId: inletId,
+      outletStreamId: outletId,
+      outletTemperatureC: config.outletTemperatureC ?? config.targetTemperatureC,
+      dutyKW: config.dutyKW,
+      dutyKJperH: config.dutyKJperH,
+      pressureDropKPa: config.pressureDropKPa || 0.0
+    });
+  }
+
+  /** Alias for addHeatExchanger */
+  addHeater(id, inletId, outletId, config = {}) {
+    return this.addHeatExchanger(id, inletId, outletId, config);
+  }
+
+  /** Alias for addHeatExchanger */
+  addCooler(id, inletId, outletId, config = {}) {
+    return this.addHeatExchanger(id, inletId, outletId, config);
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} feedId
+   * @param {string} distillateId
+   * @param {string} bottomsId
+   * @param {{stageCount?: number, feedStage?: number, refluxRatio?: number, distillateRate?: number, pressureKPa?: number, kValueModel?: string, model?: string, tolerance?: number, maxIterations?: number}} config
+   */
+  addDistillationColumn(id, feedId, distillateId, bottomsId, config = {}) {
+    if (typeof id !== 'string' || id.trim() === '') {
+      throw new TypeError('Distillation column requires a non-empty id.');
+    }
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      throw new TypeError('Distillation column requires a configuration object.');
+    }
+    this._requireStreamIds([feedId, distillateId, bottomsId], `Distillation column ${id}`);
+    return this.addUnit('DISTILLATION_COLUMN', id, {
+      feedStreamId: feedId,
+      distillateStreamId: distillateId,
+      bottomsStreamId: bottomsId,
+      stageCount: config.stageCount || 10,
+      feedStage: config.feedStage || Math.floor((config.stageCount || 10) / 2),
+      refluxRatio: config.refluxRatio || 2.0,
+      distillateRate: config.distillateRate || 0.5,
+      pressureKPa: config.pressureKPa,
+      kValueModel: config.kValueModel || 'dippr',
+      model: config.model || 'rigorous',
+      tolerance: config.tolerance || 1e-5,
+      maxIterations: config.maxIterations || 100
+    });
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} inletId
+   * @param {string} outletId
+   * @param {{dischargePressureKPa: number, pumpEfficiency?: number, liquidDensityKgM3?: number, heatCapacityKJperKgK?: number}} config
+   */
+  addPump(id, inletId, outletId, config) {
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      throw new TypeError('Pump requires explicit discharge pressure and configuration.');
+    }
+    this._requireStreamIds([inletId, outletId], `Pump ${id}`);
+    return this.addUnit('PUMP', id, {
+      inletStreamId: inletId,
+      outletStreamId: outletId,
+      dischargePressureKPa: config.dischargePressureKPa,
+      pumpEfficiency: config.pumpEfficiency,
+      liquidDensityKgM3: config.liquidDensityKgM3,
+      heatCapacityKJperKgK: config.heatCapacityKJperKgK
     });
   }
 
@@ -283,7 +385,16 @@ class ProcessFlowsheetSolver {
       if (unit.type === 'MIXER') outIds.push(unit.config.outletStreamId);
       if (unit.type === 'SPLITTER') outIds.push(...unit.config.outletStreamIds);
       if (unit.type === 'FLASH_DRUM') outIds.push(unit.config.vaporStreamId, unit.config.liquidStreamId);
-      if (unit.type === 'COMPRESSOR' || unit.type === 'HEATER') outIds.push(unit.config.outletStreamId);
+      if (unit.type === 'DISTILLATION_COLUMN') outIds.push(unit.config.distillateStreamId, unit.config.bottomsStreamId);
+      if (
+        unit.type === 'COMPRESSOR' ||
+        unit.type === 'HEATER' ||
+        unit.type === 'HEAT_EXCHANGER' ||
+        unit.type === 'COOLER' ||
+        unit.type === 'PUMP' ||
+        unit.type === 'VALVE'
+      )
+        outIds.push(unit.config.outletStreamId);
       for (const id of outIds) if (id) producedByUnit.set(id, u);
     }
 
@@ -291,9 +402,18 @@ class ProcessFlowsheetSolver {
       const unit = this.units[u];
       const inIds = [];
       if (unit.type === 'MIXER') inIds.push(...unit.config.inletStreamIds);
-      if (unit.type === 'SPLITTER' || unit.type === 'COMPRESSOR' || unit.type === 'HEATER')
+      if (
+        unit.type === 'SPLITTER' ||
+        unit.type === 'COMPRESSOR' ||
+        unit.type === 'HEATER' ||
+        unit.type === 'HEAT_EXCHANGER' ||
+        unit.type === 'COOLER' ||
+        unit.type === 'PUMP' ||
+        unit.type === 'VALVE'
+      )
         inIds.push(unit.config.inletStreamId);
       if (unit.type === 'FLASH_DRUM') inIds.push(unit.config.feedStreamId);
+      if (unit.type === 'DISTILLATION_COLUMN') inIds.push(unit.config.feedStreamId);
 
       for (const id of inIds) {
         if (producedByUnit.has(id) && producedByUnit.get(id) >= u) {
@@ -463,6 +583,7 @@ class ProcessFlowsheetSolver {
       }
     }
 
+    const balances = this.calculateBalances();
     return {
       success: converged,
       status: converged ? 'computed' : 'non-converged',
@@ -478,6 +599,9 @@ class ProcessFlowsheetSolver {
       iterations: iteration,
       streamCount: this.streams.size,
       unitCount: this.units.length,
+      balances,
+      overallMassBalanceClosure: balances.massBalance.relError,
+      overallEnergyBalanceClosure: balances.energyBalance.relError,
       streams: Array.from(this.streams.values()).map((s) => ({
         id: s.id,
         name: s.name,
@@ -506,6 +630,8 @@ class ProcessFlowsheetSolver {
 
         let totalFlow = 0.0;
         let weightedT = 0.0;
+        let weightedH = 0.0;
+        let hasEnthalpy = true;
         let minP = validInlets[0].P_kPa;
         /** @type {Record<string, number>} */
         const compSums = {};
@@ -513,6 +639,11 @@ class ProcessFlowsheetSolver {
         for (const s of validInlets) {
           totalFlow += s.molarFlowKmolH;
           weightedT += s.T_C * s.molarFlowKmolH;
+          if (s.enthalpyKjKmol !== undefined) {
+            weightedH += s.enthalpyKjKmol * s.molarFlowKmolH;
+          } else {
+            hasEnthalpy = false;
+          }
           if (s.P_kPa < minP) minP = s.P_kPa;
 
           for (const [comp, frac] of Object.entries(s.composition)) {
@@ -531,6 +662,9 @@ class ProcessFlowsheetSolver {
           for (const comp of Object.keys(compSums)) {
             outlet.composition[comp] = compSums[comp] / totalFlow;
           }
+        }
+        if (hasEnthalpy && totalFlow > 0) {
+          outlet.enthalpyKjKmol = weightedH / totalFlow;
         }
         break;
       }
@@ -556,6 +690,9 @@ class ProcessFlowsheetSolver {
             out.P_kPa = inlet.P_kPa;
             out.composition = { ...inlet.composition };
             out.vaporFraction = inlet.vaporFraction;
+            if (inlet.enthalpyKjKmol !== undefined) {
+              out.enthalpyKjKmol = inlet.enthalpyKjKmol;
+            }
           }
         }
         break;
@@ -571,9 +708,68 @@ class ProcessFlowsheetSolver {
         const flashP = config.pressureKPa;
         const flashT = config.temperatureC;
 
+        if (config.flashModel === 'peng-robinson' || config.usePR === true) {
+          const { PengRobinsonEOS } = require('./peng_robinson_eos');
+          const comps = Object.keys(feed.composition);
+          const eos = PengRobinsonEOS.fromDippr(comps);
+          const zArr = comps.map((c) => feed.composition[c]);
+          const flash = eos.flashPT(zArr, flashT + 273.15, flashP * 1000, { maxIter: 100, tol: 1e-8 });
+
+          const vFrac = flash.beta;
+          feed.vaporFraction = vFrac;
+
+          vOut.molarFlowKmolH = feed.molarFlowKmolH * vFrac;
+          vOut.T_C = flashT;
+          vOut.P_kPa = flashP;
+          vOut.vaporFraction = 1.0;
+          const sumY = flash.y.reduce((acc, v) => acc + v, 0) || 1.0;
+          const sumX = flash.x.reduce((acc, v) => acc + v, 0) || 1.0;
+          vOut.composition = {};
+          comps.forEach((c, idx) => { vOut.composition[c] = flash.y[idx] / sumY; });
+
+          lOut.molarFlowKmolH = feed.molarFlowKmolH * (1.0 - vFrac);
+          lOut.T_C = flashT;
+          lOut.P_kPa = flashP;
+          lOut.vaporFraction = 0.0;
+          lOut.composition = {};
+          comps.forEach((c, idx) => { lOut.composition[c] = flash.x[idx] / sumX; });
+
+          const dippr = ProcessFlowsheetSolver.getDipprCatalogSafe();
+          if (dippr) {
+            try {
+              const hV = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(vOut, dippr);
+              const hL = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(lOut, dippr);
+              vOut.enthalpyKjKmol = hV;
+              lOut.enthalpyKjKmol = hL;
+              const outTotalH = vOut.molarFlowKmolH * hV + lOut.molarFlowKmolH * hL;
+              if (feed.enthalpyKjKmol === undefined) {
+                feed.enthalpyKjKmol = feed.molarFlowKmolH > 0 ? outTotalH / feed.molarFlowKmolH : 0;
+                unit.dutyKJperH = 0;
+              } else {
+                unit.dutyKJperH = outTotalH - feed.molarFlowKmolH * feed.enthalpyKjKmol;
+              }
+              unit.dutyKW = (unit.dutyKJperH || 0) / 3600.0;
+            } catch {}
+          } else {
+            try {
+              const hV = eos.calculateMixtureEnthalpy(flash.y, flashT + 273.15, flashP * 1000, 'vapor');
+              const hL = eos.calculateMixtureEnthalpy(flash.x, flashT + 273.15, flashP * 1000, 'liquid');
+              vOut.enthalpyKjKmol = hV;
+              lOut.enthalpyKjKmol = hL;
+              feed.enthalpyKjKmol = vFrac * hV + (1.0 - vFrac) * hL;
+            } catch {}
+          }
+          break;
+        }
+
+        let compProps = config.componentProperties;
+        if (!compProps && config.useDippr) {
+          compProps = ProcessFlowsheetSolver.resolveDipprProperties(Object.keys(feed.composition));
+        }
+
         const { ThermodynamicsEngine } = require('./thermodynamics');
         const pBar = flashP / 100.0; // kPa to bar
-        const flash = ThermodynamicsEngine.flashVLE(feed.composition, flashT, pBar, config.componentProperties);
+        const flash = ThermodynamicsEngine.flashVLE(feed.composition, flashT, pBar, compProps);
 
         const vFrac = flash.vaporFraction;
         if (!Number.isFinite(vFrac) || vFrac < 0 || vFrac > 1) {
@@ -596,6 +792,23 @@ class ProcessFlowsheetSolver {
         lOut.P_kPa = flashP;
         lOut.vaporFraction = 0.0;
         lOut.composition = { ...flash.liquidComposition };
+
+        const dippr = ProcessFlowsheetSolver.getDipprCatalogSafe();
+        if (dippr) {
+          try {
+            const TinK = flashT + 273.15;
+            const hV = Object.entries(vOut.composition).reduce((acc, [c, frac]) => {
+              return acc + frac * dippr.evalIdealGasEnthalpy(c, TinK, 298.15);
+            }, 0);
+            const hL = Object.entries(lOut.composition).reduce((acc, [c, frac]) => {
+              const deltaH = dippr.evalHeatOfVaporization(c, TinK);
+              return acc + frac * (dippr.evalIdealGasEnthalpy(c, TinK, 298.15) - deltaH);
+            }, 0);
+            vOut.enthalpyKjKmol = hV;
+            lOut.enthalpyKjKmol = hL;
+            feed.enthalpyKjKmol = vFrac * hV + (1.0 - vFrac) * hL;
+          } catch {}
+        }
         break;
       }
 
@@ -658,9 +871,359 @@ class ProcessFlowsheetSolver {
         break;
       }
 
+      case 'PUMP': {
+        const inlet = this.getStream(config.inletStreamId);
+        const outlet = this.getStream(config.outletStreamId);
+        if (!inlet || !outlet) {
+          throw new TypeError(`Pump ${unit.name} requires initialized inlet and outlet streams.`);
+        }
+        const eta = Number.isFinite(config.pumpEfficiency) ? config.pumpEfficiency : 0.75;
+        if (
+          !Number.isFinite(config.dischargePressureKPa) ||
+          config.dischargePressureKPa < inlet.P_kPa ||
+          eta <= 0 ||
+          eta > 1
+        ) {
+          throw new TypeError(
+            `Pump ${unit.name} requires valid discharge pressure >= inlet pressure and efficiency in (0, 1].`
+          );
+        }
+        const rho =
+          Number.isFinite(config.liquidDensityKgM3) && config.liquidDensityKgM3 > 0 ? config.liquidDensityKgM3 : 1000;
+        const cp =
+          Number.isFinite(config.heatCapacityKJperKgK) && config.heatCapacityKJperKgK > 0
+            ? config.heatCapacityKJperKgK
+            : 2.5;
+
+        const deltaPKPa = config.dischargePressureKPa - inlet.P_kPa;
+        const dTK = (deltaPKPa * (1.0 - eta)) / (rho * cp * eta);
+
+        outlet.molarFlowKmolH = inlet.molarFlowKmolH;
+        outlet.P_kPa = config.dischargePressureKPa;
+        outlet.T_C = Number((inlet.T_C + dTK).toFixed(2));
+        outlet.composition = { ...inlet.composition };
+        outlet.vaporFraction = 0.0;
+        break;
+      }
+
+      case 'HEAT_EXCHANGER':
+      case 'HEATER':
+      case 'COOLER': {
+        const inlet = this.getStream(config.inletStreamId);
+        const outlet = this.getStream(config.outletStreamId);
+        if (!inlet || !outlet) {
+          throw new TypeError(`Heat exchanger ${unit.name} requires initialized inlet and outlet streams.`);
+        }
+        const pDrop = Number.isFinite(config.pressureDropKPa) ? config.pressureDropKPa : 0.0;
+        outlet.molarFlowKmolH = inlet.molarFlowKmolH;
+        outlet.P_kPa = Math.max(1e-3, inlet.P_kPa - pDrop);
+        outlet.composition = { ...inlet.composition };
+        outlet.vaporFraction = inlet.vaporFraction;
+
+        let outT = inlet.T_C;
+        const dippr = ProcessFlowsheetSolver.getDipprCatalogSafe();
+        const targetT = config.outletTemperatureC ?? config.targetTemperatureC ?? config.temperatureC;
+        if (Number.isFinite(targetT)) {
+          outT = targetT;
+        } else if (Number.isFinite(config.dutyKW) || Number.isFinite(config.dutyKJperH)) {
+          const dutyKJperH = Number.isFinite(config.dutyKJperH) ? config.dutyKJperH : (config.dutyKW * 3600);
+          let cpMix = 50.0;
+          if (dippr) {
+            try {
+              cpMix = Object.entries(inlet.composition).reduce((acc, [c, frac]) => {
+                return acc + frac * dippr.evalIdealGasCp(c, inlet.T_C + 273.15);
+              }, 0);
+            } catch {
+              cpMix = 50.0;
+            }
+          }
+          const deltaT = inlet.molarFlowKmolH > 0 ? dutyKJperH / (inlet.molarFlowKmolH * cpMix) : 0;
+          outT = inlet.T_C + deltaT;
+        }
+        outlet.T_C = outT;
+
+        if (dippr) {
+          try {
+            const Hin = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(inlet, dippr);
+            const Hout = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(outlet, dippr);
+            inlet.enthalpyKjKmol = Hin;
+            outlet.enthalpyKjKmol = Hout;
+            unit.dutyKJperH = inlet.molarFlowKmolH * (Hout - Hin);
+            unit.dutyKW = unit.dutyKJperH / 3600.0;
+          } catch {}
+        }
+        break;
+      }
+
+      case 'DISTILLATION_COLUMN': {
+        const feed = this.getStream(config.feedStreamId);
+        const dist = this.getStream(config.distillateStreamId);
+        const bot = this.getStream(config.bottomsStreamId);
+        if (!feed || !dist || !bot) {
+          throw new TypeError(`Distillation column ${unit.name} requires initialized streams.`);
+        }
+        const { NaphtaliSandholmColumnSolver } = require('./naphtali_sandholm_mesh');
+        const colPressure = config.pressureKPa ? config.pressureKPa * 1000 : feed.P_kPa * 1000;
+        const comps = Object.keys(feed.composition);
+
+        let dRate = config.distillateRate;
+        if (Number.isFinite(dRate) && dRate >= 1.0 && feed.molarFlowKmolH > 0) {
+          dRate = dRate / feed.molarFlowKmolH;
+        }
+        if (!Number.isFinite(dRate) || dRate <= 0 || dRate >= 1.0) {
+          dRate = 0.4;
+        }
+
+        const colRes = NaphtaliSandholmColumnSolver.solve({
+          components: comps,
+          feedComposition: feed.composition,
+          stageCount: config.stageCount || 12,
+          feedStage: config.feedStage || Math.floor((config.stageCount || 12) / 2),
+          refluxRatio: config.refluxRatio || 2.0,
+          distillateRate: dRate,
+          pressurePa: colPressure,
+          feedTemperatureK: config.feedTemperatureK ?? (Number.isFinite(feed.T_C) ? feed.T_C + 273.15 : undefined),
+          feedVaporFraction: Number.isFinite(feed.vaporFraction) ? feed.vaporFraction : 0.0,
+          kValueModel: config.kValueModel || 'dippr',
+          model: config.model || 'rigorous',
+          tolerance: config.tolerance || 1e-5,
+          maxIterations: config.maxIterations || 100
+        });
+
+        if (!colRes.success) {
+          const err = new Error(`Distillation column ${unit.name} failed to converge: ${colRes.error?.message || ''}`);
+          err.code = 'NUMERICAL_FAILURE';
+          throw err;
+        }
+
+        const D_frac = colRes.products.distillate.flowKmolPerMolFeed;
+        const B_frac = colRes.products.bottoms.flowKmolPerMolFeed;
+        dist.molarFlowKmolH = feed.molarFlowKmolH * D_frac;
+        dist.composition = { ...colRes.products.distillate.composition };
+        dist.T_C = colRes.profiles.condenser.temperatureK - 273.15;
+        dist.P_kPa = colPressure / 1000.0;
+        dist.vaporFraction = 0.0;
+
+        bot.molarFlowKmolH = feed.molarFlowKmolH * B_frac;
+        bot.composition = { ...colRes.products.bottoms.composition };
+        bot.T_C = colRes.profiles.reboiler.temperatureK - 273.15;
+        bot.P_kPa = colPressure / 1000.0;
+        bot.vaporFraction = 0.0;
+
+        unit.condenserDutyKW = (colRes.profiles.condenser.dutyKJPerMolFeed * 1000.0 * feed.molarFlowKmolH) / 3600.0;
+        unit.reboilerDutyKW = (colRes.profiles.reboiler.dutyKJPerMolFeed * 1000.0 * feed.molarFlowKmolH) / 3600.0;
+        unit.dutyKJperH = (unit.reboilerDutyKW - unit.condenserDutyKW) * 3600.0;
+
+        const dippr = ProcessFlowsheetSolver.getDipprCatalogSafe();
+        if (dippr) {
+          try {
+            if (feed.enthalpyKjKmol === undefined) {
+              const TfK = colRes.input?.feedTemperatureK || (feed.T_C + 273.15);
+              feed.T_C = TfK - 273.15;
+              feed.enthalpyKjKmol = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(feed, dippr);
+            }
+            dist.enthalpyKjKmol = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(dist, dippr);
+            bot.enthalpyKjKmol = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(bot, dippr);
+          } catch {}
+        }
+        break;
+      }
+
       default:
         throw new TypeError(`Unsupported flowsheet unit operation: ${type}`);
     }
+  }
+
+  /**
+   * Calculates overall flowsheet mass and energy balance conservation metrics.
+   * Identifies boundary inlet streams (not produced by any unit) and boundary outlet streams (not consumed by any unit).
+   * Verifies total and per-component mass conservation and total energy (enthalpy + unit duties) conservation.
+   * @returns {{
+   *   massBalance: { totalInflowKmolH: number, totalOutflowKmolH: number, absErrorKmolH: number, relError: number, perComponentRelError: Record<string, number> },
+   *   energyBalance: { totalInflowEnergyKJH: number, totalOutflowEnergyKJH: number, totalDutyAddedKJperH: number, totalDutyRemovedKJperH: number, totalEnergyInKJH: number, totalEnergyOutKJH: number, absErrorKJH: number, relError: number },
+   *   boundaryInletStreams: string[],
+   *   boundaryOutletStreams: string[],
+   *   isConserved: boolean
+   * }}
+   */
+  calculateBalances() {
+    const allInlets = new Set();
+    const allOutlets = new Set();
+    let totalDutyAddedKJperH = 0;
+    let totalDutyRemovedKJperH = 0;
+
+    for (const unit of this.units) {
+      const { type, config } = unit;
+      switch (type) {
+        case 'MIXER':
+          (config.inletStreamIds || []).forEach((id) => allInlets.add(id));
+          if (config.outletStreamId) allOutlets.add(config.outletStreamId);
+          break;
+        case 'SPLITTER':
+          if (config.inletStreamId) allInlets.add(config.inletStreamId);
+          (config.outletStreamIds || []).forEach((id) => allOutlets.add(id));
+          break;
+        case 'FLASH_DRUM':
+          if (config.feedStreamId) allInlets.add(config.feedStreamId);
+          if (config.vaporStreamId) allOutlets.add(config.vaporStreamId);
+          if (config.liquidStreamId) allOutlets.add(config.liquidStreamId);
+          if (unit.dutyKJperH) {
+            if (unit.dutyKJperH > 0) totalDutyAddedKJperH += unit.dutyKJperH;
+            else totalDutyRemovedKJperH += Math.abs(unit.dutyKJperH);
+          }
+          break;
+        case 'HEAT_EXCHANGER':
+        case 'HEATER':
+        case 'COOLER':
+          if (config.inletStreamId) allInlets.add(config.inletStreamId);
+          if (config.outletStreamId) allOutlets.add(config.outletStreamId);
+          if (unit.dutyKJperH) {
+            if (unit.dutyKJperH > 0) totalDutyAddedKJperH += unit.dutyKJperH;
+            else totalDutyRemovedKJperH += Math.abs(unit.dutyKJperH);
+          }
+          break;
+        case 'COMPRESSOR':
+        case 'VALVE':
+        case 'PUMP':
+          if (config.inletStreamId) allInlets.add(config.inletStreamId);
+          if (config.outletStreamId) allOutlets.add(config.outletStreamId);
+          break;
+        case 'DISTILLATION_COLUMN':
+          if (config.feedStreamId) allInlets.add(config.feedStreamId);
+          if (config.distillateStreamId) allOutlets.add(config.distillateStreamId);
+          if (config.bottomsStreamId) allOutlets.add(config.bottomsStreamId);
+          if (unit.reboilerDutyKW) totalDutyAddedKJperH += unit.reboilerDutyKW * 3600.0;
+          if (unit.condenserDutyKW) totalDutyRemovedKJperH += unit.condenserDutyKW * 3600.0;
+          break;
+      }
+    }
+
+    const boundaryInletStreams = [];
+    const boundaryOutletStreams = [];
+
+    for (const [id, stream] of this.streams.entries()) {
+      const isInput = allInlets.has(id);
+      const isOutput = allOutlets.has(id);
+      if (isInput && !isOutput) {
+        boundaryInletStreams.push(stream);
+      } else if (isOutput && !isInput) {
+        boundaryOutletStreams.push(stream);
+      }
+    }
+
+    let totalInflowKmolH = 0;
+    let totalOutflowKmolH = 0;
+    const compIn = {};
+    const compOut = {};
+    let totalInEnthalpyKJH = 0;
+    let totalOutEnthalpyKJH = 0;
+
+    const dippr = ProcessFlowsheetSolver.getDipprCatalogSafe();
+    for (const s of boundaryInletStreams) {
+      totalInflowKmolH += s.molarFlowKmolH;
+      for (const [c, frac] of Object.entries(s.composition)) {
+        compIn[c] = (compIn[c] || 0) + s.molarFlowKmolH * frac;
+      }
+      if (s.enthalpyKjKmol === undefined && dippr) {
+        s.enthalpyKjKmol = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(s, dippr);
+      }
+      if (s.enthalpyKjKmol !== undefined) {
+        totalInEnthalpyKJH += s.molarFlowKmolH * s.enthalpyKjKmol;
+      }
+    }
+
+    for (const s of boundaryOutletStreams) {
+      totalOutflowKmolH += s.molarFlowKmolH;
+      for (const [c, frac] of Object.entries(s.composition)) {
+        compOut[c] = (compOut[c] || 0) + s.molarFlowKmolH * frac;
+      }
+      if (s.enthalpyKjKmol === undefined && dippr) {
+        s.enthalpyKjKmol = ProcessFlowsheetSolver.evalStreamEnthalpyDippr(s, dippr);
+      }
+      if (s.enthalpyKjKmol !== undefined) {
+        totalOutEnthalpyKJH += s.molarFlowKmolH * s.enthalpyKjKmol;
+      }
+    }
+
+    const massAbsErrorKmolH = Math.abs(totalInflowKmolH - totalOutflowKmolH);
+    const massRelError = totalInflowKmolH > 0 ? massAbsErrorKmolH / totalInflowKmolH : 0;
+
+    const perComponentRelError = {};
+    for (const c of Object.keys({ ...compIn, ...compOut })) {
+      const cin = compIn[c] || 0;
+      const cout = compOut[c] || 0;
+      perComponentRelError[c] = cin > 0 ? Math.abs(cin - cout) / cin : Math.abs(cin - cout);
+    }
+
+    const totalEnergyInKJH = totalInEnthalpyKJH + totalDutyAddedKJperH;
+    const totalEnergyOutKJH = totalOutEnthalpyKJH + totalDutyRemovedKJperH;
+    const energyAbsErrorKJH = Math.abs(totalEnergyInKJH - totalEnergyOutKJH);
+    const energyRelError = totalEnergyInKJH !== 0 ? energyAbsErrorKJH / Math.abs(totalEnergyInKJH) : 0;
+
+    return {
+      massBalance: {
+        totalInflowKmolH,
+        totalOutflowKmolH,
+        absErrorKmolH: massAbsErrorKmolH,
+        relError: massRelError,
+        perComponentRelError
+      },
+      energyBalance: {
+        totalInflowEnergyKJH: totalInEnthalpyKJH,
+        totalOutflowEnergyKJH: totalOutEnthalpyKJH,
+        totalDutyAddedKJperH,
+        totalDutyRemovedKJperH,
+        totalEnergyInKJH,
+        totalEnergyOutKJH,
+        absErrorKJH: energyAbsErrorKJH,
+        relError: energyRelError
+      },
+      boundaryInletStreams: boundaryInletStreams.map((s) => s.id),
+      boundaryOutletStreams: boundaryOutletStreams.map((s) => s.id),
+      isConserved: massRelError < 1e-4 && energyRelError < 1e-4
+    };
+  }
+
+  /**
+   * Evaluates the stream enthalpy in kJ/kmol (= J/mol) using DIPPR pure-component correlations.
+   * Basis: ideal gas enthalpy at T_C relative to 298.15 K, minus latent heat of vaporization for liquid fraction.
+   * @param {ProcessStream} stream
+   * @param {object} [dipprCatalog]
+   * @returns {number}
+   */
+  static evalStreamEnthalpyDippr(stream, dipprCatalog = null) {
+    const dippr = dipprCatalog || ProcessFlowsheetSolver.getDipprCatalogSafe();
+    if (!dippr || !stream || !stream.composition) return 0.0;
+    const TK = (stream.T_C !== undefined ? stream.T_C : 25) + 273.15;
+    const vf = Number.isFinite(stream.vaporFraction) ? stream.vaporFraction : 0.0;
+    let hTotal = 0.0;
+    for (const [c, frac] of Object.entries(stream.composition)) {
+      if (!frac) continue;
+      const hig = dippr.evalIdealGasEnthalpy(c, TK, 298.15);
+      const hvap = dippr.evalHeatOfVaporization(c, TK);
+      const hPhase = hig - (1.0 - vf) * hvap;
+      hTotal += frac * hPhase;
+    }
+    return hTotal;
+  }
+
+  static getDipprCatalogSafe() {
+    try {
+      const { getDipprCatalog } = require('./dippr_expanded_catalog');
+      return getDipprCatalog();
+    } catch {
+      return null;
+    }
+  }
+
+  static resolveDipprProperties(componentNames) {
+    const dippr = ProcessFlowsheetSolver.getDipprCatalogSafe();
+    if (!dippr) throw new Error('DIPPRExpandedCatalog is not available.');
+    const result = {};
+    for (const name of componentNames) {
+      result[name] = dippr.resolveProperties(name);
+    }
+    return result;
   }
 
   /** Experimental capability placeholder: no sourced cryogenic process model is available. */
@@ -669,7 +1232,7 @@ class ProcessFlowsheetSolver {
       success: false,
       status: 'unavailable',
       validationLevel: 'experimental',
-      error: 'No sourced cryogenic property set, validated process model, or independent reference is available.'
+      error: 'No sourced cryogenic property set, verified process model, or independent reference is available.'
     };
   }
 }

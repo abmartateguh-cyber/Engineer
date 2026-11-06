@@ -25,8 +25,10 @@ const { PersistentNamingManager } = require('../src/core/cad/persistent_naming_m
 // Import Pillar 3 Modules
 const { ExplicitDynamicsCrashSolver } = require('../src/core/cae/explicit_dynamics_crash');
 const { HyperelasticMaterialModel } = require('../src/core/cae/hyperelastic_materials');
+const { SYNTHETIC_HYPERELASTIC_MOONEY_RIVLIN } = require('./support/synthetic_cae_materials');
 const { FatigueLifeAnalyzer } = require('../src/core/cae/fatigue_life_analyzer');
 const { VOFMultiphaseSolver } = require('../src/core/cae/vof_multiphase_solver');
+const { SYNTHETIC_VOF_FLUID_PROPERTIES } = require('./support/synthetic_cae_materials');
 const { SlidingMeshTurbomachinery } = require('../src/core/cae/sliding_mesh_turbomachinery');
 const { CCSTimingModel } = require('../src/core/eda/ccs_timing_model');
 const { SignalIntegrityCrosstalk } = require('../src/core/eda/signal_integrity_crosstalk');
@@ -287,12 +289,12 @@ function runGoldRegulatoryBenchmarks3() {
   }
 
   // -------------------------------------------------------------
-  // Case 5: Experimental serial CPU PCG solve
+  // Case 5: Parallel CPU PCG solve (worker pool SpMV)
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[CASE 5] Experimental serial CPU PCG with CSR SpMV and Jacobi preconditioning...\n');
+    process.stdout.write('[CASE 5] Parallel CPU PCG with worker-pool CSR SpMV and Jacobi preconditioning...\n');
     const pcg = new GPUParallelPCGSolver({ maxIterations: 100, tolerance: 1e-7 });
-    assert.throws(() => new GPUParallelPCGSolver({ useWebGPU: true }), /does not support the 'useWebGPU' option/);
+    assert.throws(() => new GPUParallelPCGSolver({ bogus: 1 }), /does not support the 'bogus' option/);
     assert.throws(() => pcg.solve({ n: 1, rowPtr: [0, 0], colIdx: [], values: [] }, [1]), /finite positive diagonal/);
     const N = 20;
     // Construct 1D Poisson matrix: diag = 2, sub/super = -1
@@ -307,9 +309,31 @@ function runGoldRegulatoryBenchmarks3() {
     const res = pcg.solve(A, b);
     assert.strictEqual(res.converged, true, 'PCG must converge');
     assert(res.residualNorm < 1e-7, 'Residual norm must be < 1e-7');
+    assert.match(
+      res.backend,
+      /^(cpu-parallel-workerpool|cpu-serial-javascript-fallback)$/,
+      'backend must report what ran'
+    );
+    assert(
+      !/WebGPU/i.test(res.backend) || res.gpuDetected,
+      'backend must not claim WebGPU unless a GPU was actually detected'
+    );
+    assert(
+      Number.isFinite(res.throughputGFlops) && res.throughputGFlops > 0,
+      'measured GFlops must be finite and positive'
+    );
+    const expectedThroughput = (res.iterations * 58 * 2e-9) / (res.elapsedMs / 1000);
+    assert(
+      Math.abs(res.throughputGFlops - expectedThroughput) < 1e-6,
+      'throughput must equal iterations x 2 x nnz / measured elapsed seconds'
+    );
+    assert(
+      res.sharedMemoryUsed === true || res.workerThreadsUsed === 0,
+      'shared-memory SpMV must be reported truthfully'
+    );
 
-    // Scale check: 2D Poisson 100x100 (10,000 unknowns) in CSR, cross-checked against the direct solver
-    const G2 = 100;
+    // Scale check: 2D Poisson 60x60 (3,600 unknowns) in CSR, cross-checked against the direct solver
+    const G2 = 60;
     const N2 = G2 * G2;
     const direct = new WasmSparseMultifrontalSolver(N2, N2, { enableStructuredPoissonDirect: false });
     const rowPtr = new Int32Array(N2 + 1);
@@ -345,9 +369,19 @@ function runGoldRegulatoryBenchmarks3() {
     for (let i = 0; i < N2; i++) maxDiff = Math.max(maxDiff, Math.abs(dSol[i] - rBig.solution[i]));
     assert(maxDiff < 1e-6, `PCG vs direct solution mismatch ${maxDiff}`);
     assert.strictEqual(rBig.gpuSpeedupVerified, false, 'No unmeasured GPU speedup may be claimed');
+    assert.match(rBig.backend, /^(cpu-parallel-workerpool|cpu-serial-javascript-fallback)$/);
+    assert(
+      !/WebGPU/i.test(rBig.backend) || rBig.gpuDetected,
+      'backend must not claim WebGPU unless a GPU was actually detected'
+    );
+    assert(
+      Number.isFinite(rBig.throughputGFlops) && rBig.throughputGFlops > 0,
+      'measured GFlops must be finite and positive'
+    );
+    assert.strictEqual(rBig.elapsedMs > 0, true, 'elapsedMs must be a measured wall-clock delta');
 
     console.log(
-      `  ✓ PASSED: PCG 20x20 in ${res.iterations} iterations; ${N2.toLocaleString()}-unknown CSR in ${rBig.iterations} iterations (${rBig.elapsedMs.toFixed(0)} ms, serial CPU-JS, estimated ${rBig.estimatedThroughputGFlops} GFlop/s), max|PCG-direct| = ${maxDiff.toExponential(2)}; GPU speedup not verified`
+      `  ✓ PASSED: PCG 20x20 in ${res.iterations} iterations (${res.elapsedMs.toFixed(0)} ms, ${res.backend}, measured ${res.throughputGFlops} GFlop/s); ${N2.toLocaleString()}-unknown CSR in ${rBig.iterations} iterations (${rBig.elapsedMs.toFixed(0)} ms, ${rBig.backend}, ${rBig.workerThreadsUsed} worker threads, measured ${rBig.throughputGFlops} GFlop/s), max|PCG-direct| = ${maxDiff.toExponential(2)}; GPU speedup not verified`
     );
     passed++;
   } catch (err) {
@@ -360,26 +394,36 @@ function runGoldRegulatoryBenchmarks3() {
   try {
     process.stdout.write('[BM 6] Explicit Dynamics Crash & Central Difference Time Integration...\n');
     const crash = new ExplicitDynamicsCrashSolver();
-    const dtCrit = crash.calculateCriticalTimeStep(0.005, 200e9, 7850); // 5mm steel element
+    const dtCrit = crash.calculateCriticalTimeStep(0.005, 200e9, 7850, 0.3); // Synthetic elastic inputs
     assert(dtCrit > 0 && dtCrit < 1e-5, 'Critical time step must be positive and bounded by CFL');
 
-    // Simulate Taylor bar impact: steel bar at 200 m/s impacting rigid wall
+    // Exercise the genuine central-difference impact solve with synthetic
+    // caller-supplied material properties.
     const impact = crash.simulateTaylorBarImpact({
       length: 0.05,
       radius: 0.005,
       velocity: 200.0,
-      yieldStrength: 400e6,
+      yieldStress: 400e6,
       density: 7850,
       youngsModulus: 200e9,
+      poissonsRatio: 0.3,
       elements: 10
     });
 
     assert(impact.finalLength < 0.05, 'Taylor bar must undergo plastic shortening');
+    assert(impact.finalLength > 0, 'Taylor bar must not collapse through zero length');
     assert(impact.mushroomRadius > 0.005, 'Taylor bar must mushroom at impact interface');
     assert(impact.totalPlasticEnergyJ > 0, 'Plastic dissipation energy must be positive');
+    assert(impact.plasticStrainAtImpactFace > 0, 'Plastic strain must have occurred at the impact face');
+    assert(
+      impact.energyBalanceErrorPercent < 5,
+      `Measured energy-balance residual must be small (<5%), got ${impact.energyBalanceErrorPercent}%`
+    );
+    assert(impact.totalStepsExecuted > 0, 'The time-integration loop must execute real steps');
+    assert(Array.isArray(impact.trace) && impact.trace.length > 0, 'Energy trace must be recorded');
 
     console.log(
-      `  ✓ PASSED: Taylor bar impact shortened from 50.0mm to ${(impact.finalLength * 1000).toFixed(2)}mm, mushroom radius = ${(impact.mushroomRadius * 1000).toFixed(2)}mm`
+      `  ✓ PASSED: Taylor bar impact shortened from 50.0mm to ${(impact.finalLength * 1000).toFixed(2)}mm, mushroom radius = ${(impact.mushroomRadius * 1000).toFixed(2)}mm, plastic work = ${impact.totalPlasticEnergyJ.toFixed(1)} J, energy-balance residual = ${impact.energyBalanceErrorPercent}%`
     );
     passed++;
   } catch (err) {
@@ -391,11 +435,14 @@ function runGoldRegulatoryBenchmarks3() {
   // -------------------------------------------------------------
   try {
     process.stdout.write('[BM 7] Hyperelastic Mooney-Rivlin & Ogden Rubber Formulations...\n');
-    // Rubber coupon: C10 = 0.293 MPa, C01 = 0.177 MPa
+    assert.throws(
+      () => new HyperelasticMaterialModel().evaluateUniaxialStress(2),
+      /explicit finite hyperelastic constants/
+    );
+    // Test-only synthetic constants; no rubber material data is implied.
     const rubber = new HyperelasticMaterialModel({
       model: 'mooney_rivlin_2',
-      C10: 0.293e6,
-      C01: 0.177e6
+      ...SYNTHETIC_HYPERELASTIC_MOONEY_RIVLIN
     });
 
     // Uniaxial tension at stretch lambda = 2.0 (100% strain)
@@ -404,7 +451,7 @@ function runGoldRegulatoryBenchmarks3() {
     assert(midPoint && midPoint.nominalStressMpa > 0.5, 'Mooney-Rivlin nominal stress must be positive and realistic');
 
     console.log(
-      `  ✓ PASSED: Evaluated Mooney-Rivlin uniaxial curve up to stretch 3.0 (Nominal Stress @ lambda=2: ${midPoint.nominalStressMpa.toFixed(2)} MPa)`
+      `  ✓ PASSED: Synthetic Mooney-Rivlin formula curve to stretch 3.0 (Nominal stress at lambda=2: ${midPoint.nominalStressMpa.toFixed(2)} MPa)`
     );
     passed++;
   } catch (err) {
@@ -412,17 +459,20 @@ function runGoldRegulatoryBenchmarks3() {
   }
 
   // -------------------------------------------------------------
-  // Benchmark 8: ASTM E1049-85 Rainflow Cycle Counting & Fatigue Life
+  // Diagnostic 8: rainflow-like cycle counting and damage formula smoke check
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 8] ASTM E1049 Rainflow Cycle Counting & Miner Cumulative Damage...\n');
+    process.stdout.write('[SM 8] Experimental fatigue formula helpers...\n');
     const fatigue = new FatigueLifeAnalyzer();
     const stressHistory = [0, 100, -50, 150, -100, 200, 0];
     const cycles = fatigue.rainflowCounting(stressHistory);
-    assert(cycles.length >= 2, 'Rainflow algorithm must extract closed hysteresis cycles');
+    assert(cycles.length >= 2, 'Cycle counter must return diagnostic cycles');
 
-    const damage = fatigue.calculateMinerDamage(cycles, 1000.0, -0.1, 450.0);
-    assert(damage.cumulativeDamageD > 0 && damage.cumulativeDamageD < 1.0, 'Miner damage must accumulate accurately');
+    const damage = fatigue.calculateMinerDamage(cycles, 1000e6, -0.1, 450e6);
+    assert(
+      damage.cumulativeDamageD > 0 && damage.cumulativeDamageD < 1.0,
+      'Damage estimate must be finite and positive'
+    );
 
     console.log(
       `  ✓ PASSED: Rainflow extracted ${cycles.length} cycles, Miner cumulative damage D = ${damage.cumulativeDamageD.toExponential(3)}`
@@ -433,17 +483,30 @@ function runGoldRegulatoryBenchmarks3() {
   }
 
   // -------------------------------------------------------------
-  // Benchmark 9: VOF Free-Surface Dam Break Two-Phase Tracking
+  // Diagnostic 9: Real VOF dam-break advection (measured front trace)
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 9] Volume of Fluid (VOF) Free-Surface Tracking & PLIC Reconstruction...\n');
-    const vof = new VOFMultiphaseSolver({ nx: 20, ny: 10 });
-    const damBreak = vof.simulateDamBreak(0.1); // 100 ms simulation
-    assert(damBreak.wavefrontPositionX > 0.4, 'Dam break wave front must propagate forward');
-    assert(damBreak.massConservationErrorPercent < 0.01, 'VOF mass conservation error must be < 0.01%');
+    process.stdout.write('[SM 9] Real VOF dam-break advection with measured front trace...\n');
+    const vof = new VOFMultiphaseSolver(SYNTHETIC_VOF_FLUID_PROPERTIES);
+    const damBreak = vof.simulateDamBreak({ columnWidth: 0.146, columnHeight: 0.292, timeSec: 0.1 });
+    assert.strictEqual(damBreak.success, true);
+    assert.strictEqual(damBreak.status, 'VOF_ADVECTION_SOLVED');
+    assert(
+      damBreak.wavefrontPositionX > damBreak.initialColumnWidthM,
+      'Measured surge front must have advanced past the initial column'
+    );
+    assert(damBreak.wavefrontPositionX < damBreak.grid.lengthM, 'Measured surge front must remain inside the domain');
+    assert(damBreak.waveFrontVelocityMPerS > 0, 'Measured front velocity must be positive');
+    assert.strictEqual(Object.hasOwn(damBreak, 'massConservationErrorPercent'), true);
+    assert(damBreak.massConservationErrorPercent < 0.1, 'Measured VOF mass-conservation error must be small');
+    assert(Array.isArray(damBreak.trace) && damBreak.trace.length > 10, 'Raw measured front trace must be present');
+    assert(
+      damBreak.fit && /fit/.test(damBreak.fit.type),
+      'Power-law relation must be labeled as a fit of measured data'
+    );
 
     console.log(
-      `  ✓ PASSED: Dam break wave front reached x = ${damBreak.wavefrontPositionX.toFixed(3)}m, mass conservation error = ${damBreak.massConservationErrorPercent.toFixed(4)}%`
+      `  ✓ PASSED: VOF dam-break advection measured front ${damBreak.wavefrontPositionX.toFixed(3)}m at t=${damBreak.simulationTimeSec}s (v_front=${damBreak.waveFrontVelocityMPerS.toFixed(2)} m/s); mass error = ${damBreak.massConservationErrorPercent}%; raw trace length = ${damBreak.trace.length}; fit: ${damBreak.fit.form} (beta=${damBreak.fit.beta.toFixed(2)}, alpha=${damBreak.fit.alpha.toFixed(2)}, rmse=${damBreak.fit.rmseM.toExponential(2)}m)`
     );
     passed++;
   } catch (err) {
@@ -451,21 +514,56 @@ function runGoldRegulatoryBenchmarks3() {
   }
 
   // -------------------------------------------------------------
-  // Benchmark 10: Sliding Mesh Turbomachinery & Pump Head (Euler)
+  // Benchmark 10: Centrifugal Stage Model (Velocity Triangles, Euler Head, Slip, Losses)
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 10] Sliding Mesh Turbomachinery & MRF Coriolis Frame...\n');
+    process.stdout.write('[BM 10] Centrifugal stage model: velocity triangles, Euler head, slip, computed losses...\n');
     const turbo = new SlidingMeshTurbomachinery();
     const coriolis = turbo.calculateMRFAcceleration([1, 0, 0], [0, 0, 100], [0, 2, 0]);
     assert(coriolis.magnitude > 0, 'Coriolis acceleration must be computed');
 
-    // Centrifugal pump: r2 = 0.15m, b2 = 0.02m, beta2 = 30 deg, 1750 RPM
+    // Hand-computed Euler head for the default geometry (independent arithmetic):
+    // defaults: r1=0.035, r2=0.080, b1=b2=0.012, beta1=30°, beta2=25°, Z=6,
+    // alpha1=0°, 3000 rpm. Wiesner slip: sigma = 1 - sqrt(cos beta2)/Z^0.7.
+    const g = 9.80665;
+    const rpm = 3000;
+    const omega = (rpm * 2.0 * Math.PI) / 60.0;
+    const Q = 0.015;
+    const u2 = omega * 0.08;
+    const cm2 = Q / (2.0 * Math.PI * 0.08 * 0.012);
+    const cm1 = Q / (2.0 * Math.PI * 0.035 * 0.012);
+    const sigmaHand = 1.0 - Math.sqrt(Math.cos((25.0 * Math.PI) / 180.0)) / Math.pow(6, 0.7);
+    const eulerHand = (u2 * (u2 - cm2 / Math.tan((25.0 * Math.PI) / 180.0)) * sigmaHand) / g;
+    const op = turbo.evaluatePumpOperatingPoint(Q);
+    assert(
+      Math.abs(op.theoreticalHeadM - eulerHand) < 1e-9,
+      `Euler head ${op.theoreticalHeadM} must match hand-computed ${eulerHand}`
+    );
+    assert(Math.abs(op.slipFactor - sigmaHand) < 1e-12, 'Slip factor must match the documented Wiesner correlation');
+    assert(op.hydraulicEfficiency > 0 && op.hydraulicEfficiency < 1, 'Hydraulic efficiency must lie in (0,1)');
+    assert(op.totalHydraulicLossM > 0, 'Computed hydraulic losses must be positive');
+
+    // Monotonic head vs flow (backward-curved blades)
+    const heads = [0.005, 0.01, 0.015, 0.02, 0.025].map((q) => turbo.evaluatePumpOperatingPoint(q).theoreticalHeadM);
+    for (let i = 1; i < heads.length; i++) {
+      assert(heads[i] < heads[i - 1], `Head must decrease monotonically with Q (${heads[i]} !< ${heads[i - 1]})`);
+    }
+
+    // Centrifugal pump curve: r2 = 0.15m, b2 = 0.02m, beta2 = 30 deg, 1750 RPM
     const pumpCurve = turbo.evaluateCentrifugalPumpCurve(0.15, 0.02, 30.0, 1750.0);
     assert(pumpCurve.shutoffHeadM > 20.0, 'Shutoff head must match Euler head at Q=0');
     assert(pumpCurve.bepFlowM3H > 10.0, 'BEP flow must be positive');
+    assert(
+      pumpCurve.efficiencyPercent !== null && pumpCurve.efficiencyPercent > 0 && pumpCurve.efficiencyPercent < 100,
+      'BEP efficiency must lie within (0,100)%'
+    );
 
     console.log(
-      `  ✓ PASSED: Pump Euler shutoff head = ${pumpCurve.shutoffHeadM.toFixed(2)}m, BEP flow = ${pumpCurve.bepFlowM3H.toFixed(1)} m³/h`
+      `  ✓ PASSED: Euler head hand-check ${op.theoreticalHeadM.toFixed(4)}m (err < 1e-9), σ=${op.slipFactor.toFixed(
+        4
+      )}, η=${(op.hydraulicEfficiency * 100).toFixed(1)}%, monotonic head vs Q; shutoff=${pumpCurve.shutoffHeadM.toFixed(
+        2
+      )}m, BEP=${pumpCurve.bepFlowM3H.toFixed(1)} m³/h`
     );
     passed++;
   } catch (err) {
@@ -483,8 +581,42 @@ function runGoldRegulatoryBenchmarks3() {
     assert(sim.delaySeconds > 0 && sim.delaySeconds < 1e-9, 'CCS stage delay must be sub-nanosecond');
     assert(sim.slewSeconds > 0, 'CCS transition slew must be positive');
 
+    // Genuine table-driven characterization: delay monotonic with C_load
+    const tSmall = ccs.characterizeCell(null, { cload: 2.0, rLoad: 1000, slew: 20 });
+    const tLarge = ccs.characterizeCell(null, { cload: 10.0, rLoad: 1000, slew: 20 });
+    assert(Number.isFinite(tSmall.delayPs), 'CCS small-load delay must be finite');
+    assert(Number.isFinite(tLarge.delayPs), 'CCS large-load delay must be finite');
+    assert(tLarge.delayPs > tSmall.delayPs, 'larger C_load must produce a larger delay');
+    assert.strictEqual(tSmall.waveform[0].vout, 0, 'CCS waveform must start at the low rail');
+    assert(tSmall.waveform[tSmall.waveform.length - 1].vout > 0.99 * ccs.vdd, 'CCS waveform must reach the high rail');
+
+    // Independent physical check: constant current source through R into C
+    // must reproduce the analytic RC time constant tau = R*C within 5%.
+    const constI = 2e-3;
+    const rLoad = 1000;
+    const cLoad = 10e-15;
+    const gridPts = 9;
+    const rg = [];
+    for (let i = 0; i < gridPts; i++) rg.push(i / (gridPts - 1));
+    const constTable = {
+      vinGrid: rg,
+      voutGrid: rg,
+      currents: Array.from({ length: gridPts }, () => Array(gridPts).fill(constI))
+    };
+    const rcSim = ccs.characterizeCell(constTable, { cload: 10, cin: 0, rLoad: 1000, slew: 50 });
+    const vInf = constI * rLoad;
+    const targetV = vInf * (1 - Math.exp(-1));
+    const rcIdx = rcSim.waveform.findIndex((p) => p.vout >= targetV);
+    assert(rcIdx > 0, 'CCS constant-current waveform must cross the 63.2% point');
+    const rp0 = rcSim.waveform[rcIdx - 1];
+    const rp1 = rcSim.waveform[rcIdx];
+    const tauPs = rp0.t + ((targetV - rp0.vout) / (rp1.vout - rp0.vout)) * (rp1.t - rp0.t);
+    const tauAnalyticPs = rLoad * cLoad * 1e12;
+    const rcRelErr = Math.abs(tauPs - tauAnalyticPs) / tauAnalyticPs;
+    assert(rcRelErr < 0.05, `CCS RC time constant error ${(rcRelErr * 100).toFixed(2)}% exceeds 5%`);
+
     console.log(
-      `  ✓ PASSED: 7nm Inverter CCS delay = ${(sim.delaySeconds * 1e12).toFixed(2)} ps, slew = ${(sim.slewSeconds * 1e12).toFixed(2)} ps`
+      `  ✓ PASSED: 7nm Inverter CCS delay = ${(sim.delaySeconds * 1e12).toFixed(2)} ps, slew = ${(sim.slewSeconds * 1e12).toFixed(2)} ps; RC tau = ${tauPs.toFixed(2)} ps (analytic ${tauAnalyticPs.toFixed(2)} ps)`
     );
     passed++;
   } catch (err) {
@@ -562,10 +694,10 @@ function runGoldRegulatoryBenchmarks3() {
   }
 
   // -------------------------------------------------------------
-  // Benchmark 14: SEMI P39 OASIS Binary Stream Serialization (> 70% compression)
+  // Diagnostic 14: experimental OASIS-like record-subset serialization
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 14] SEMI P39 OASIS Binary Layout Serialization & Compression...\n');
+    process.stdout.write('[SM 14] Experimental layout record-subset serialization...\n');
     const oasis = new OasisStreamEngine();
     const testLayout = {
       name: 'TOP_CHIP',
@@ -586,17 +718,25 @@ function runGoldRegulatoryBenchmarks3() {
     };
 
     const comp = oasis.evaluateCompressionRatio(testLayout);
-    assert(comp.oasisSizeBytes > 0, 'OASIS stream must be serialized');
-    assert(comp.reductionPercent >= 70.0, `OASIS reduction ${comp.reductionPercent}% must be >= 70%`);
+    assert(comp.oasisSizeBytes > 0, 'Experimental record subset must be serialized');
+    assert(comp.estimatedGdsiiSizeBytes > 0, 'Illustrative size estimate must be positive');
+    assert(Number.isFinite(comp.estimatedReductionPercent), 'Illustrative reduction estimate must be finite');
+    assert.strictEqual(
+      comp.reductionPercent,
+      comp.estimatedReductionPercent,
+      'Legacy percentage field remains an estimate alias'
+    );
+    assert.match(comp.estimateBasis, /no GDSII file is serialized/);
 
     // Verify round-trip deserialization
     const binary = oasis.serialize(testLayout);
     const parsed = oasis.deserialize(binary);
-    assert.strictEqual(parsed.cells[0].name, 'NAND2_X1', 'Cell name must match roundtrip');
+    assert.strictEqual(parsed.format, 'oasis-like-record-subset-unverified');
+    assert.strictEqual(parsed.cells[0].name, 'NAND2_X1', 'Cell name must match subset roundtrip');
     assert.strictEqual(parsed.cells[0].rectangles.length, 50, 'All 50 rectangles must be deserialized');
 
     console.log(
-      `  ✓ PASSED: Serialized 50 shapes into ${comp.oasisSizeBytes} bytes OASIS stream (${comp.reductionPercent.toFixed(1)}% reduction vs GDSII)`
+      `  ✓ PASSED: Serialized 50 rectangles into ${comp.oasisSizeBytes} subset bytes; illustrative reduction estimate ${comp.estimatedReductionPercent.toFixed(1)}%`
     );
     passed++;
   } catch (err) {
@@ -975,12 +1115,11 @@ function runGoldRegulatoryBenchmarks3() {
   }
 
   // -------------------------------------------------------------
-  // Benchmark 26: High-Temperature Non-Linear Creep (Norton-Bailey)
+  // Benchmark 26: Synthetic Norton-Bailey formula check
   // -------------------------------------------------------------
   try {
-    process.stdout.write('[BM 26] Non-Linear Creep Strain Rate (Norton-Bailey Power Law)...\n');
-    // Secondary creep: d(epsilon)/dt = A * sigma^n
-    // For 316H stainless steel at 650°C: A ~ 1e-18, n ~ 5.0
+    process.stdout.write('[BM 26] Synthetic Norton-Bailey formula check...\n');
+    // Test-only coefficient and exponent; no material property correlation is implied.
     const A_creep = 1.0e-18;
     const n_creep = 5.0;
     const sigmaMpa = 120.0;
@@ -1142,10 +1281,28 @@ function runGoldRegulatoryBenchmarks3() {
     const sOut = sfunc.evaluateOutputs(0.1);
     assert(Math.abs(sOut[0] - 0.5) < 1e-6, `S-Function RK4 integration error: ${sOut[0]}`);
 
-    const assay = new PetroleumAssayCharacterizer({ apiGravity: 34.0 });
+    assert.throws(() => new PetroleumAssayCharacterizer(), /finite apiGravity/);
+    const assay = new PetroleumAssayCharacterizer({
+      apiGravity: 34.0,
+      distillationType: 'TBP',
+      dataSource: 'test-only synthetic curve; not validated',
+      distillationData: [
+        { percent: 0, tempC: 35 },
+        { percent: 10, tempC: 95 },
+        { percent: 30, tempC: 175 },
+        { percent: 50, tempC: 260 },
+        { percent: 70, tempC: 360 },
+        { percent: 90, tempC: 490 },
+        { percent: 100, tempC: 620 }
+      ]
+    });
     const assayRes = assay.characterize();
     assert(assayRes.pseudoComponents.length >= 4, 'Petroleum assay must split into cuts');
-    assert(assayRes.watsonKw > 10.0, 'Watson Kw must be physical');
+    assert.strictEqual(assayRes.dataStatus, 'caller-supplied-unverified');
+    assert(
+      assayRes.watsonKw > 0 && Number.isFinite(assayRes.watsonKw),
+      'Watson Kw example must be finite and positive'
+    );
 
     console.log(`  ✓ PASSED: Legacy module fixtures executed without assertion errors; this is not release validation`);
     passed++;

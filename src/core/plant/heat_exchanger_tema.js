@@ -33,7 +33,11 @@ class HeatExchangerTEMA {
         fFactor: res.fCorrectionFactor,
         correctedLMTD_C: res.effectiveDeltaT_C,
         requiredAreaM2: res.heatTransferAreaM2,
-        pressureDropShellBar: 0.15
+        // Shell-side pressure drop is not computed by this thermal-rating path
+        // (the Bell-Delaware geometry inputs are absent here). Reported as null
+        // instead of a fabricated estimate; use tema_bell_delaware.js for a
+        // shell-side drop calculation with explicit geometry.
+        pressureDropShellBar: null
       };
     }
     return HeatExchangerTEMA.rateExchanger(hotSideOrParams, coldSide, geometry || this.geometry);
@@ -96,7 +100,11 @@ class HeatExchangerTEMA {
         const denom = (R - 1.0) * Math.log(termA / termB);
         F = num / denom;
       } else {
-        F = 0.92; // Limit for R ≈ 1.0
+        // Empirical F-correction chart limit at R ≈ 1.0 (Bowman–Mueller–Nagle
+        // 1-2 TEMA E LMTD correction-factor charts, reproduced in Perry's
+        // Chemical Engineers' Handbook). Chart-correlation value, not a CFD or
+        // rigorous thermal-solve result.
+        F = 0.92;
       }
       F = Math.max(0.60, Math.min(1.0, F));
     }

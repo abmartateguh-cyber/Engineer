@@ -1,0 +1,1629 @@
+{
+  "metadata": {
+    "standard": "ASME B36.10M / B16.5 / B16.9 / B16.11",
+    "version": "2026.1",
+    "generatedAt": "2026-11-05T02:47:30.442Z",
+    "source": "Scraped & synthesized industrial standards tables"
+  },
+  "pipes": {
+    "1": {
+      "nps": "1",
+      "outsideDiameter_mm": 33.4,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 2.77,
+          "insideDiameter_mm": 27.86,
+          "flowArea_mm2": 609.6,
+          "nominalMass_kg_m": 2.09
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 3.38,
+          "insideDiameter_mm": 26.64,
+          "flowArea_mm2": 557.4,
+          "nominalMass_kg_m": 2.5
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 4.55,
+          "insideDiameter_mm": 24.3,
+          "flowArea_mm2": 463.8,
+          "nominalMass_kg_m": 3.24
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 20.7,
+          "flowArea_mm2": 336.5,
+          "nominalMass_kg_m": 4.24
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 9.09,
+          "insideDiameter_mm": 15.22,
+          "flowArea_mm2": 181.9,
+          "nominalMass_kg_m": 5.45
+        }
+      }
+    },
+    "2": {
+      "nps": "2",
+      "outsideDiameter_mm": 60.3,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 2.77,
+          "insideDiameter_mm": 54.76,
+          "flowArea_mm2": 2355.1,
+          "nominalMass_kg_m": 3.93
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 3.91,
+          "insideDiameter_mm": 52.48,
+          "flowArea_mm2": 2163.1,
+          "nominalMass_kg_m": 5.44
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 5.54,
+          "insideDiameter_mm": 49.22,
+          "flowArea_mm2": 1902.7,
+          "nominalMass_kg_m": 7.48
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 8.74,
+          "insideDiameter_mm": 42.82,
+          "flowArea_mm2": 1440.1,
+          "nominalMass_kg_m": 11.11
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 11.07,
+          "insideDiameter_mm": 38.16,
+          "flowArea_mm2": 1143.7,
+          "nominalMass_kg_m": 13.44
+        }
+      }
+    },
+    "3": {
+      "nps": "3",
+      "outsideDiameter_mm": 88.9,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.05,
+          "insideDiameter_mm": 82.8,
+          "flowArea_mm2": 5384.6,
+          "nominalMass_kg_m": 6.46
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 5.49,
+          "insideDiameter_mm": 77.92,
+          "flowArea_mm2": 4768.6,
+          "nominalMass_kg_m": 11.29
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 7.62,
+          "insideDiameter_mm": 73.66,
+          "flowArea_mm2": 4261.4,
+          "nominalMass_kg_m": 15.27
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 11.13,
+          "insideDiameter_mm": 66.64,
+          "flowArea_mm2": 3487.9,
+          "nominalMass_kg_m": 21.35
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 15.24,
+          "insideDiameter_mm": 58.42,
+          "flowArea_mm2": 2680.5,
+          "nominalMass_kg_m": 27.68
+        }
+      }
+    },
+    "4": {
+      "nps": "4",
+      "outsideDiameter_mm": 114.3,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.05,
+          "insideDiameter_mm": 108.2,
+          "flowArea_mm2": 9194.8,
+          "nominalMass_kg_m": 8.37
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 6.02,
+          "insideDiameter_mm": 102.26,
+          "flowArea_mm2": 8213,
+          "nominalMass_kg_m": 16.08
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 8.56,
+          "insideDiameter_mm": 97.18,
+          "flowArea_mm2": 7417.3,
+          "nominalMass_kg_m": 22.32
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 11.13,
+          "insideDiameter_mm": 92.04,
+          "flowArea_mm2": 6653.4,
+          "nominalMass_kg_m": 28.32
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 13.49,
+          "insideDiameter_mm": 87.32,
+          "flowArea_mm2": 5988.5,
+          "nominalMass_kg_m": 33.54
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 17.12,
+          "insideDiameter_mm": 80.06,
+          "flowArea_mm2": 5034.1,
+          "nominalMass_kg_m": 41.03
+        }
+      }
+    },
+    "5": {
+      "nps": "5",
+      "outsideDiameter_mm": 141.3,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.4,
+          "insideDiameter_mm": 134.5,
+          "flowArea_mm2": 14208,
+          "nominalMass_kg_m": 11.56
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 6.55,
+          "insideDiameter_mm": 128.2,
+          "flowArea_mm2": 12908.2,
+          "nominalMass_kg_m": 21.77
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 9.53,
+          "insideDiameter_mm": 122.24,
+          "flowArea_mm2": 11735.9,
+          "nominalMass_kg_m": 30.97
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 12.7,
+          "insideDiameter_mm": 115.9,
+          "flowArea_mm2": 10550.1,
+          "nominalMass_kg_m": 40.28
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 15.88,
+          "insideDiameter_mm": 109.54,
+          "flowArea_mm2": 9424,
+          "nominalMass_kg_m": 49.12
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 19.05,
+          "insideDiameter_mm": 103.2,
+          "flowArea_mm2": 8364.7,
+          "nominalMass_kg_m": 57.43
+        }
+      }
+    },
+    "6": {
+      "nps": "6",
+      "outsideDiameter_mm": 168.3,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.4,
+          "insideDiameter_mm": 161.5,
+          "flowArea_mm2": 20485,
+          "nominalMass_kg_m": 13.83
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 7.11,
+          "insideDiameter_mm": 154.08,
+          "flowArea_mm2": 18645.9,
+          "nominalMass_kg_m": 28.26
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 10.97,
+          "insideDiameter_mm": 146.36,
+          "flowArea_mm2": 16824.2,
+          "nominalMass_kg_m": 42.56
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 14.27,
+          "insideDiameter_mm": 139.76,
+          "flowArea_mm2": 15341.1,
+          "nominalMass_kg_m": 54.21
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 18.26,
+          "insideDiameter_mm": 131.78,
+          "flowArea_mm2": 13639.2,
+          "nominalMass_kg_m": 67.57
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 21.95,
+          "insideDiameter_mm": 124.4,
+          "flowArea_mm2": 12154.3,
+          "nominalMass_kg_m": 79.22
+        }
+      }
+    },
+    "8": {
+      "nps": "8",
+      "outsideDiameter_mm": 219.1,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.76,
+          "insideDiameter_mm": 211.58,
+          "flowArea_mm2": 35159.2,
+          "nominalMass_kg_m": 19.97
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 206.4,
+          "flowArea_mm2": 33458.7,
+          "nominalMass_kg_m": 33.32
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 7.04,
+          "insideDiameter_mm": 205.02,
+          "flowArea_mm2": 33012.8,
+          "nominalMass_kg_m": 36.82
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 8.18,
+          "insideDiameter_mm": 202.74,
+          "flowArea_mm2": 32282.6,
+          "nominalMass_kg_m": 42.55
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 10.31,
+          "insideDiameter_mm": 198.48,
+          "flowArea_mm2": 30940.2,
+          "nominalMass_kg_m": 53.09
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 12.7,
+          "insideDiameter_mm": 193.7,
+          "flowArea_mm2": 29467.9,
+          "nominalMass_kg_m": 64.64
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 15.09,
+          "insideDiameter_mm": 188.92,
+          "flowArea_mm2": 28031.5,
+          "nominalMass_kg_m": 75.92
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 18.26,
+          "insideDiameter_mm": 182.58,
+          "flowArea_mm2": 26181.6,
+          "nominalMass_kg_m": 90.44
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 20.62,
+          "insideDiameter_mm": 177.86,
+          "flowArea_mm2": 24845.4,
+          "nominalMass_kg_m": 100.93
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 23.01,
+          "insideDiameter_mm": 173.08,
+          "flowArea_mm2": 23527.9,
+          "nominalMass_kg_m": 111.27
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 22.23,
+          "insideDiameter_mm": 174.64,
+          "flowArea_mm2": 23954,
+          "nominalMass_kg_m": 107.93
+        }
+      }
+    },
+    "10": {
+      "nps": "10",
+      "outsideDiameter_mm": 273,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 4.19,
+          "insideDiameter_mm": 264.62,
+          "flowArea_mm2": 54996.5,
+          "nominalMass_kg_m": 27.78
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 260.3,
+          "flowArea_mm2": 53215.5,
+          "nominalMass_kg_m": 41.76
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 7.8,
+          "insideDiameter_mm": 257.4,
+          "flowArea_mm2": 52036.4,
+          "nominalMass_kg_m": 51.01
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 9.27,
+          "insideDiameter_mm": 254.46,
+          "flowArea_mm2": 50854.4,
+          "nominalMass_kg_m": 60.29
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 12.7,
+          "insideDiameter_mm": 247.6,
+          "flowArea_mm2": 48149.4,
+          "nominalMass_kg_m": 81.53
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 15.09,
+          "insideDiameter_mm": 242.82,
+          "flowArea_mm2": 46308.3,
+          "nominalMass_kg_m": 95.98
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 18.26,
+          "insideDiameter_mm": 236.48,
+          "flowArea_mm2": 43921.7,
+          "nominalMass_kg_m": 114.71
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 21.44,
+          "insideDiameter_mm": 230.12,
+          "flowArea_mm2": 41590.9,
+          "nominalMass_kg_m": 133.01
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 25.4,
+          "insideDiameter_mm": 222.2,
+          "flowArea_mm2": 38777.3,
+          "nominalMass_kg_m": 155.1
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 28.58,
+          "insideDiameter_mm": 215.84,
+          "flowArea_mm2": 36589.3,
+          "nominalMass_kg_m": 172.27
+        }
+      }
+    },
+    "12": {
+      "nps": "12",
+      "outsideDiameter_mm": 323.8,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 4.57,
+          "insideDiameter_mm": 314.66,
+          "flowArea_mm2": 77763,
+          "nominalMass_kg_m": 35.98
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 311.1,
+          "flowArea_mm2": 76013.4,
+          "nominalMass_kg_m": 49.71
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 8.38,
+          "insideDiameter_mm": 307.04,
+          "flowArea_mm2": 74042.3,
+          "nominalMass_kg_m": 65.19
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 10.31,
+          "insideDiameter_mm": 303.18,
+          "flowArea_mm2": 72192.3,
+          "nominalMass_kg_m": 79.71
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 14.27,
+          "insideDiameter_mm": 295.26,
+          "flowArea_mm2": 68469.8,
+          "nominalMass_kg_m": 108.93
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 17.48,
+          "insideDiameter_mm": 288.84,
+          "flowArea_mm2": 65524.6,
+          "nominalMass_kg_m": 132.05
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 21.44,
+          "insideDiameter_mm": 280.92,
+          "flowArea_mm2": 61980.5,
+          "nominalMass_kg_m": 159.87
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 25.4,
+          "insideDiameter_mm": 273,
+          "flowArea_mm2": 58534.9,
+          "nominalMass_kg_m": 186.92
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 28.58,
+          "insideDiameter_mm": 266.64,
+          "flowArea_mm2": 55839.4,
+          "nominalMass_kg_m": 208.08
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 33.32,
+          "insideDiameter_mm": 257.16,
+          "flowArea_mm2": 51939.4,
+          "nominalMass_kg_m": 238.69
+        }
+      }
+    },
+    "14": {
+      "nps": "14",
+      "outsideDiameter_mm": 355.6,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 342.9,
+          "flowArea_mm2": 92347.4,
+          "nominalMass_kg_m": 54.69
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 7.92,
+          "insideDiameter_mm": 339.76,
+          "flowArea_mm2": 90663.9,
+          "nominalMass_kg_m": 67.91
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 9.53,
+          "insideDiameter_mm": 336.54,
+          "flowArea_mm2": 88953.5,
+          "nominalMass_kg_m": 81.33
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 11.13,
+          "insideDiameter_mm": 333.34,
+          "flowArea_mm2": 87270,
+          "nominalMass_kg_m": 94.55
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 15.09,
+          "insideDiameter_mm": 325.42,
+          "flowArea_mm2": 83172.2,
+          "nominalMass_kg_m": 126.72
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 19.05,
+          "insideDiameter_mm": 317.5,
+          "flowArea_mm2": 79173,
+          "nominalMass_kg_m": 158.11
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 23.83,
+          "insideDiameter_mm": 307.94,
+          "flowArea_mm2": 74477,
+          "nominalMass_kg_m": 194.98
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 27.79,
+          "insideDiameter_mm": 300.02,
+          "flowArea_mm2": 70695.3,
+          "nominalMass_kg_m": 224.66
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 31.75,
+          "insideDiameter_mm": 292.1,
+          "flowArea_mm2": 67012.1,
+          "nominalMass_kg_m": 253.58
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 35.71,
+          "insideDiameter_mm": 284.18,
+          "flowArea_mm2": 63427.4,
+          "nominalMass_kg_m": 281.72
+        }
+      }
+    },
+    "16": {
+      "nps": "16",
+      "outsideDiameter_mm": 406.4,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 393.7,
+          "flowArea_mm2": 121736.5,
+          "nominalMass_kg_m": 62.65
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 7.92,
+          "insideDiameter_mm": 390.56,
+          "flowArea_mm2": 119802.4,
+          "nominalMass_kg_m": 77.83
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 9.53,
+          "insideDiameter_mm": 387.34,
+          "flowArea_mm2": 117835.1,
+          "nominalMass_kg_m": 93.27
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 12.7,
+          "insideDiameter_mm": 381,
+          "flowArea_mm2": 114009.2,
+          "nominalMass_kg_m": 123.31
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 16.66,
+          "insideDiameter_mm": 373.08,
+          "flowArea_mm2": 109318.5,
+          "nominalMass_kg_m": 160.13
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 21.44,
+          "insideDiameter_mm": 363.52,
+          "flowArea_mm2": 103787.8,
+          "nominalMass_kg_m": 203.54
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 26.19,
+          "insideDiameter_mm": 354.02,
+          "flowArea_mm2": 98434.1,
+          "nominalMass_kg_m": 245.57
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 30.96,
+          "insideDiameter_mm": 344.48,
+          "flowArea_mm2": 93200.4,
+          "nominalMass_kg_m": 286.66
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 36.53,
+          "insideDiameter_mm": 333.34,
+          "flowArea_mm2": 87270,
+          "nominalMass_kg_m": 333.21
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 40.49,
+          "insideDiameter_mm": 325.42,
+          "flowArea_mm2": 83172.2,
+          "nominalMass_kg_m": 365.38
+        }
+      }
+    },
+    "18": {
+      "nps": "18",
+      "outsideDiameter_mm": 457,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 444.3,
+          "flowArea_mm2": 155039.6,
+          "nominalMass_kg_m": 70.57
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 7.92,
+          "insideDiameter_mm": 441.16,
+          "flowArea_mm2": 152855.9,
+          "nominalMass_kg_m": 87.71
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 11.13,
+          "insideDiameter_mm": 434.74,
+          "flowArea_mm2": 148439.4,
+          "nominalMass_kg_m": 122.38
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 14.27,
+          "insideDiameter_mm": 428.46,
+          "flowArea_mm2": 144181.8,
+          "nominalMass_kg_m": 155.81
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 19.05,
+          "insideDiameter_mm": 418.9,
+          "flowArea_mm2": 137819.5,
+          "nominalMass_kg_m": 205.75
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 23.83,
+          "insideDiameter_mm": 409.34,
+          "flowArea_mm2": 131600.7,
+          "nominalMass_kg_m": 254.57
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 29.36,
+          "insideDiameter_mm": 398.28,
+          "flowArea_mm2": 124585.3,
+          "nominalMass_kg_m": 309.64
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 34.93,
+          "insideDiameter_mm": 387.14,
+          "flowArea_mm2": 117713.4,
+          "nominalMass_kg_m": 363.58
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 39.67,
+          "insideDiameter_mm": 377.66,
+          "flowArea_mm2": 112019,
+          "nominalMass_kg_m": 408.28
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 45.24,
+          "insideDiameter_mm": 366.52,
+          "flowArea_mm2": 105508,
+          "nominalMass_kg_m": 459.4
+        }
+      }
+    },
+    "20": {
+      "nps": "20",
+      "outsideDiameter_mm": 508,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 495.3,
+          "flowArea_mm2": 192675.5,
+          "nominalMass_kg_m": 78.56
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 9.53,
+          "insideDiameter_mm": 488.94,
+          "flowArea_mm2": 187759.1,
+          "nominalMass_kg_m": 117.15
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 12.7,
+          "insideDiameter_mm": 482.6,
+          "flowArea_mm2": 182921.4,
+          "nominalMass_kg_m": 155.13
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 15.09,
+          "insideDiameter_mm": 477.82,
+          "flowArea_mm2": 179315.8,
+          "nominalMass_kg_m": 183.43
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 20.62,
+          "insideDiameter_mm": 466.76,
+          "flowArea_mm2": 171110.7,
+          "nominalMass_kg_m": 247.84
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 26.19,
+          "insideDiameter_mm": 455.62,
+          "flowArea_mm2": 163040.5,
+          "nominalMass_kg_m": 311.19
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 32.54,
+          "insideDiameter_mm": 442.92,
+          "flowArea_mm2": 154077.9,
+          "nominalMass_kg_m": 381.55
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 38.1,
+          "insideDiameter_mm": 431.8,
+          "flowArea_mm2": 146438.5,
+          "nominalMass_kg_m": 441.52
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 44.45,
+          "insideDiameter_mm": 419.1,
+          "flowArea_mm2": 137951.1,
+          "nominalMass_kg_m": 508.15
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 50.01,
+          "insideDiameter_mm": 407.98,
+          "flowArea_mm2": 130727.7,
+          "nominalMass_kg_m": 564.85
+        }
+      }
+    },
+    "24": {
+      "nps": "24",
+      "outsideDiameter_mm": 610,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 597.3,
+          "flowArea_mm2": 280204.4,
+          "nominalMass_kg_m": 94.53
+        },
+        "20": {
+          "schedule": "20",
+          "wallThickness_mm": 9.53,
+          "insideDiameter_mm": 590.94,
+          "flowArea_mm2": 274269,
+          "nominalMass_kg_m": 141.12
+        },
+        "30": {
+          "schedule": "30",
+          "wallThickness_mm": 14.27,
+          "insideDiameter_mm": 581.46,
+          "flowArea_mm2": 265539.8,
+          "nominalMass_kg_m": 209.65
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 17.48,
+          "insideDiameter_mm": 575.04,
+          "flowArea_mm2": 259708.4,
+          "nominalMass_kg_m": 255.43
+        },
+        "60": {
+          "schedule": "60",
+          "wallThickness_mm": 24.61,
+          "insideDiameter_mm": 560.78,
+          "flowArea_mm2": 246987.5,
+          "nominalMass_kg_m": 355.28
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 30.96,
+          "insideDiameter_mm": 548.08,
+          "flowArea_mm2": 235927.1,
+          "nominalMass_kg_m": 442.11
+        },
+        "100": {
+          "schedule": "100",
+          "wallThickness_mm": 38.89,
+          "insideDiameter_mm": 532.22,
+          "flowArea_mm2": 222470.4,
+          "nominalMass_kg_m": 547.74
+        },
+        "120": {
+          "schedule": "120",
+          "wallThickness_mm": 46.02,
+          "insideDiameter_mm": 517.96,
+          "flowArea_mm2": 210708.6,
+          "nominalMass_kg_m": 640.07
+        },
+        "140": {
+          "schedule": "140",
+          "wallThickness_mm": 52.37,
+          "insideDiameter_mm": 505.26,
+          "flowArea_mm2": 200502.5,
+          "nominalMass_kg_m": 720.19
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 59.54,
+          "insideDiameter_mm": 490.92,
+          "flowArea_mm2": 189282.9,
+          "nominalMass_kg_m": 808.27
+        }
+      }
+    },
+    "30": {
+      "nps": "30",
+      "outsideDiameter_mm": 762,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 38.1,
+          "insideDiameter_mm": 685.8,
+          "flowArea_mm2": 369389.8,
+          "nominalMass_kg_m": 680.18
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 60.96,
+          "insideDiameter_mm": 640.08,
+          "flowArea_mm2": 321779.5,
+          "nominalMass_kg_m": 1053.92
+        }
+      }
+    },
+    "36": {
+      "nps": "36",
+      "outsideDiameter_mm": 914,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 45.7,
+          "insideDiameter_mm": 822.6,
+          "flowArea_mm2": 531456,
+          "nominalMass_kg_m": 978.6
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 73.12,
+          "insideDiameter_mm": 767.76,
+          "flowArea_mm2": 462957.2,
+          "nominalMass_kg_m": 1516.32
+        }
+      }
+    },
+    "42": {
+      "nps": "42",
+      "outsideDiameter_mm": 1067,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 53.35,
+          "insideDiameter_mm": 960.3,
+          "flowArea_mm2": 724275.4,
+          "nominalMass_kg_m": 1333.65
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 85.36,
+          "insideDiameter_mm": 896.28,
+          "flowArea_mm2": 630924.4,
+          "nominalMass_kg_m": 2066.46
+        }
+      }
+    },
+    "48": {
+      "nps": "48",
+      "outsideDiameter_mm": 1219,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 60.95,
+          "insideDiameter_mm": 1097.1,
+          "flowArea_mm2": 945327.5,
+          "nominalMass_kg_m": 1740.69
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 97.52,
+          "insideDiameter_mm": 1023.96,
+          "flowArea_mm2": 823485.3,
+          "nominalMass_kg_m": 2697.15
+        }
+      }
+    },
+    "1/8": {
+      "nps": "1/8",
+      "outsideDiameter_mm": 10.3,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 0.515,
+          "insideDiameter_mm": 9.27,
+          "flowArea_mm2": 67.5,
+          "nominalMass_kg_m": 0.12
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 0.8240000000000001,
+          "insideDiameter_mm": 8.65,
+          "flowArea_mm2": 58.8,
+          "nominalMass_kg_m": 0.19
+        }
+      }
+    },
+    "1/4": {
+      "nps": "1/4",
+      "outsideDiameter_mm": 13.7,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 0.685,
+          "insideDiameter_mm": 12.33,
+          "flowArea_mm2": 119.4,
+          "nominalMass_kg_m": 0.22
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 1.0959999999999999,
+          "insideDiameter_mm": 11.51,
+          "flowArea_mm2": 104,
+          "nominalMass_kg_m": 0.34
+        }
+      }
+    },
+    "3/8": {
+      "nps": "3/8",
+      "outsideDiameter_mm": 17.1,
+      "schedules": {
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 0.8550000000000001,
+          "insideDiameter_mm": 15.39,
+          "flowArea_mm2": 186,
+          "nominalMass_kg_m": 0.34
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 1.368,
+          "insideDiameter_mm": 14.36,
+          "flowArea_mm2": 162,
+          "nominalMass_kg_m": 0.53
+        }
+      }
+    },
+    "1/2": {
+      "nps": "1/2",
+      "outsideDiameter_mm": 21.3,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 2.11,
+          "insideDiameter_mm": 17.08,
+          "flowArea_mm2": 229.1,
+          "nominalMass_kg_m": 1
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 2.77,
+          "insideDiameter_mm": 15.76,
+          "flowArea_mm2": 195.1,
+          "nominalMass_kg_m": 1.27
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 3.73,
+          "insideDiameter_mm": 13.84,
+          "flowArea_mm2": 150.4,
+          "nominalMass_kg_m": 1.62
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 4.78,
+          "insideDiameter_mm": 11.74,
+          "flowArea_mm2": 108.2,
+          "nominalMass_kg_m": 1.95
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 7.47,
+          "insideDiameter_mm": 6.36,
+          "flowArea_mm2": 31.8,
+          "nominalMass_kg_m": 2.55
+        }
+      }
+    },
+    "3/4": {
+      "nps": "3/4",
+      "outsideDiameter_mm": 26.7,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 2.11,
+          "insideDiameter_mm": 22.48,
+          "flowArea_mm2": 396.9,
+          "nominalMass_kg_m": 1.28
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 2.87,
+          "insideDiameter_mm": 20.96,
+          "flowArea_mm2": 345,
+          "nominalMass_kg_m": 1.69
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 3.91,
+          "insideDiameter_mm": 18.88,
+          "flowArea_mm2": 280,
+          "nominalMass_kg_m": 2.2
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 5.56,
+          "insideDiameter_mm": 15.58,
+          "flowArea_mm2": 190.6,
+          "nominalMass_kg_m": 2.9
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 7.82,
+          "insideDiameter_mm": 11.06,
+          "flowArea_mm2": 96.1,
+          "nominalMass_kg_m": 3.64
+        }
+      }
+    },
+    "1-1/4": {
+      "nps": "1-1/4",
+      "outsideDiameter_mm": 42.2,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 2.77,
+          "insideDiameter_mm": 36.66,
+          "flowArea_mm2": 1055.5,
+          "nominalMass_kg_m": 2.69
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 3.56,
+          "insideDiameter_mm": 35.08,
+          "flowArea_mm2": 966.5,
+          "nominalMass_kg_m": 3.39
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 4.85,
+          "insideDiameter_mm": 32.5,
+          "flowArea_mm2": 829.6,
+          "nominalMass_kg_m": 4.47
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 6.35,
+          "insideDiameter_mm": 29.5,
+          "flowArea_mm2": 683.5,
+          "nominalMass_kg_m": 5.61
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 9.7,
+          "insideDiameter_mm": 22.8,
+          "flowArea_mm2": 408.3,
+          "nominalMass_kg_m": 7.77
+        }
+      }
+    },
+    "1-1/2": {
+      "nps": "1-1/2",
+      "outsideDiameter_mm": 48.3,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 2.77,
+          "insideDiameter_mm": 42.76,
+          "flowArea_mm2": 1436,
+          "nominalMass_kg_m": 3.11
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 3.68,
+          "insideDiameter_mm": 40.94,
+          "flowArea_mm2": 1316.4,
+          "nominalMass_kg_m": 4.05
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 5.08,
+          "insideDiameter_mm": 38.14,
+          "flowArea_mm2": 1142.5,
+          "nominalMass_kg_m": 5.41
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 7.14,
+          "insideDiameter_mm": 34.02,
+          "flowArea_mm2": 909,
+          "nominalMass_kg_m": 7.25
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 10.15,
+          "insideDiameter_mm": 28,
+          "flowArea_mm2": 615.8,
+          "nominalMass_kg_m": 9.55
+        }
+      }
+    },
+    "2-1/2": {
+      "nps": "2-1/2",
+      "outsideDiameter_mm": 73,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.05,
+          "insideDiameter_mm": 66.9,
+          "flowArea_mm2": 3515.1,
+          "nominalMass_kg_m": 5.26
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 5.16,
+          "insideDiameter_mm": 62.68,
+          "flowArea_mm2": 3085.7,
+          "nominalMass_kg_m": 8.63
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 7.01,
+          "insideDiameter_mm": 58.98,
+          "flowArea_mm2": 2732.1,
+          "nominalMass_kg_m": 11.41
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 9.53,
+          "insideDiameter_mm": 53.94,
+          "flowArea_mm2": 2285.1,
+          "nominalMass_kg_m": 14.92
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 14.02,
+          "insideDiameter_mm": 44.96,
+          "flowArea_mm2": 1587.6,
+          "nominalMass_kg_m": 20.39
+        }
+      }
+    },
+    "3-1/2": {
+      "nps": "3-1/2",
+      "outsideDiameter_mm": 101.6,
+      "schedules": {
+        "10": {
+          "schedule": "10",
+          "wallThickness_mm": 3.05,
+          "insideDiameter_mm": 95.5,
+          "flowArea_mm2": 7163,
+          "nominalMass_kg_m": 7.41
+        },
+        "40": {
+          "schedule": "40",
+          "wallThickness_mm": 5.74,
+          "insideDiameter_mm": 90.12,
+          "flowArea_mm2": 6378.7,
+          "nominalMass_kg_m": 13.57
+        },
+        "80": {
+          "schedule": "80",
+          "wallThickness_mm": 8.08,
+          "insideDiameter_mm": 85.44,
+          "flowArea_mm2": 5733.4,
+          "nominalMass_kg_m": 18.64
+        },
+        "160": {
+          "schedule": "160",
+          "wallThickness_mm": 12,
+          "insideDiameter_mm": 77.6,
+          "flowArea_mm2": 4729.5,
+          "nominalMass_kg_m": 26.52
+        },
+        "XXS": {
+          "schedule": "XXS",
+          "wallThickness_mm": 16,
+          "insideDiameter_mm": 69.6,
+          "flowArea_mm2": 3804.6,
+          "nominalMass_kg_m": 33.78
+        }
+      }
+    }
+  },
+  "flanges": {
+    "1": {
+      "150": {
+        "OD": 108,
+        "T": 14.2,
+        "BCD": 79.2,
+        "bolts": 4,
+        "boltHole": 15.7,
+        "RF": 50.8,
+        "hubDiam": 49.3,
+        "L_WN": 55.6
+      },
+      "300": {
+        "OD": 124,
+        "T": 17.5,
+        "BCD": 88.9,
+        "bolts": 4,
+        "boltHole": 19.1,
+        "RF": 50.8,
+        "hubDiam": 54,
+        "L_WN": 61.9
+      },
+      "600": {
+        "OD": 124,
+        "T": 17.5,
+        "BCD": 88.9,
+        "bolts": 4,
+        "boltHole": 19.1,
+        "RF": 50.8,
+        "hubDiam": 54,
+        "L_WN": 61.9
+      }
+    },
+    "2": {
+      "150": {
+        "OD": 152.4,
+        "T": 19.1,
+        "BCD": 120.7,
+        "bolts": 4,
+        "boltHole": 19.1,
+        "RF": 92,
+        "hubDiam": 77.7,
+        "L_WN": 63.5
+      },
+      "300": {
+        "OD": 165.1,
+        "T": 22.4,
+        "BCD": 127,
+        "bolts": 8,
+        "boltHole": 19.1,
+        "RF": 92,
+        "hubDiam": 84,
+        "L_WN": 69.9
+      },
+      "600": {
+        "OD": 165.1,
+        "T": 25.4,
+        "BCD": 127,
+        "bolts": 8,
+        "boltHole": 19.1,
+        "RF": 92,
+        "hubDiam": 84,
+        "L_WN": 73
+      }
+    },
+    "3": {
+      "150": {
+        "OD": 190.5,
+        "T": 23.9,
+        "BCD": 152.4,
+        "bolts": 4,
+        "boltHole": 19.1,
+        "RF": 127,
+        "hubDiam": 108,
+        "L_WN": 69.9
+      },
+      "300": {
+        "OD": 209.6,
+        "T": 28.4,
+        "BCD": 168.1,
+        "bolts": 8,
+        "boltHole": 22.4,
+        "RF": 127,
+        "hubDiam": 117,
+        "L_WN": 79.2
+      }
+    },
+    "4": {
+      "150": {
+        "OD": 228.6,
+        "T": 23.9,
+        "BCD": 190.5,
+        "bolts": 8,
+        "boltHole": 19.1,
+        "RF": 157.2,
+        "hubDiam": 135,
+        "L_WN": 76.2
+      },
+      "300": {
+        "OD": 254,
+        "T": 31.8,
+        "BCD": 200.2,
+        "bolts": 8,
+        "boltHole": 22.4,
+        "RF": 157.2,
+        "hubDiam": 146,
+        "L_WN": 85.9
+      },
+      "600": {
+        "OD": 273.1,
+        "T": 38.1,
+        "BCD": 215.9,
+        "bolts": 8,
+        "boltHole": 25.4,
+        "RF": 157.2,
+        "hubDiam": 152,
+        "L_WN": 101.6
+      }
+    },
+    "6": {
+      "150": {
+        "OD": 279.4,
+        "T": 25.4,
+        "BCD": 241.3,
+        "bolts": 8,
+        "boltHole": 22.4,
+        "RF": 215.9,
+        "hubDiam": 192,
+        "L_WN": 88.9
+      },
+      "300": {
+        "OD": 317.5,
+        "T": 36.6,
+        "BCD": 269.7,
+        "bolts": 12,
+        "boltHole": 22.4,
+        "RF": 215.9,
+        "hubDiam": 206,
+        "L_WN": 98.6
+      },
+      "600": {
+        "OD": 355.6,
+        "T": 47.8,
+        "BCD": 292.1,
+        "bolts": 12,
+        "boltHole": 28.4,
+        "RF": 215.9,
+        "hubDiam": 222,
+        "L_WN": 117.3
+      }
+    },
+    "8": {
+      "150": {
+        "OD": 342.9,
+        "T": 28.4,
+        "BCD": 298.5,
+        "bolts": 8,
+        "boltHole": 22.4,
+        "RF": 269.7,
+        "hubDiam": 246,
+        "L_WN": 101.6
+      },
+      "300": {
+        "OD": 381,
+        "T": 41.1,
+        "BCD": 330.2,
+        "bolts": 12,
+        "boltHole": 25.4,
+        "RF": 269.7,
+        "hubDiam": 260,
+        "L_WN": 111.3
+      }
+    },
+    "10": {
+      "150": {
+        "OD": 406.4,
+        "T": 30.2,
+        "BCD": 362,
+        "bolts": 12,
+        "boltHole": 25.4,
+        "RF": 323.8,
+        "hubDiam": 305,
+        "L_WN": 101.6
+      },
+      "300": {
+        "OD": 444.5,
+        "T": 47.8,
+        "BCD": 387.4,
+        "bolts": 16,
+        "boltHole": 28.4,
+        "RF": 323.8,
+        "hubDiam": 321,
+        "L_WN": 117.3
+      }
+    },
+    "12": {
+      "150": {
+        "OD": 482.6,
+        "T": 31.8,
+        "BCD": 431.8,
+        "bolts": 12,
+        "boltHole": 25.4,
+        "RF": 381,
+        "hubDiam": 365,
+        "L_WN": 114.3
+      },
+      "300": {
+        "OD": 520.7,
+        "T": 50.8,
+        "BCD": 450.9,
+        "bolts": 16,
+        "boltHole": 31.8,
+        "RF": 381,
+        "hubDiam": 375,
+        "L_WN": 130
+      }
+    },
+    "1/2": {
+      "150": {
+        "OD": 89,
+        "T": 11.2,
+        "BCD": 60.5,
+        "bolts": 4,
+        "boltHole": 15.7,
+        "RF": 35,
+        "hubDiam": 30,
+        "L_WN": 47.6
+      },
+      "300": {
+        "OD": 95,
+        "T": 14.2,
+        "BCD": 66.5,
+        "bolts": 4,
+        "boltHole": 15.7,
+        "RF": 35,
+        "hubDiam": 38,
+        "L_WN": 52.3
+      },
+      "600": {
+        "OD": 95,
+        "T": 14.2,
+        "BCD": 66.5,
+        "bolts": 4,
+        "boltHole": 15.7,
+        "RF": 35,
+        "hubDiam": 38,
+        "L_WN": 52.3
+      }
+    },
+    "3/4": {
+      "150": {
+        "OD": 98.6,
+        "T": 12.7,
+        "BCD": 69.9,
+        "bolts": 4,
+        "boltHole": 15.7,
+        "RF": 43,
+        "hubDiam": 38,
+        "L_WN": 52.3
+      },
+      "300": {
+        "OD": 117.3,
+        "T": 15.7,
+        "BCD": 82.6,
+        "bolts": 4,
+        "boltHole": 19.1,
+        "RF": 43,
+        "hubDiam": 48,
+        "L_WN": 57.2
+      }
+    }
+  },
+  "fittings": {
+    "1": {
+      "elbow90_LR": 38.1,
+      "elbow90_SR": 25.4,
+      "elbow45": 22.4,
+      "teeCenter": 38.1,
+      "capLength": 38.1
+    },
+    "2": {
+      "elbow90_LR": 76.2,
+      "elbow90_SR": 50.8,
+      "elbow45": 35.1,
+      "teeCenter": 63.5,
+      "capLength": 38.1
+    },
+    "3": {
+      "elbow90_LR": 114.3,
+      "elbow90_SR": 76.2,
+      "elbow45": 50.8,
+      "teeCenter": 85.9,
+      "capLength": 50.8
+    },
+    "4": {
+      "elbow90_LR": 152.4,
+      "elbow90_SR": 101.6,
+      "elbow45": 63.5,
+      "teeCenter": 104.6,
+      "capLength": 63.5
+    },
+    "6": {
+      "elbow90_LR": 228.6,
+      "elbow90_SR": 152.4,
+      "elbow45": 95.3,
+      "teeCenter": 142.7,
+      "capLength": 88.9
+    },
+    "8": {
+      "elbow90_LR": 304.8,
+      "elbow90_SR": 203.2,
+      "elbow45": 127,
+      "teeCenter": 177.8,
+      "capLength": 101.6
+    },
+    "10": {
+      "elbow90_LR": 381,
+      "elbow90_SR": 254,
+      "elbow45": 158.8,
+      "teeCenter": 215.9,
+      "capLength": 127
+    },
+    "12": {
+      "elbow90_LR": 457.2,
+      "elbow90_SR": 304.8,
+      "elbow45": 190.5,
+      "teeCenter": 254,
+      "capLength": 152.4
+    },
+    "1/2": {
+      "elbow90_LR": 38.1,
+      "elbow90_SR": 25.4,
+      "elbow45": 15.7,
+      "teeCenter": 25.4,
+      "capLength": 25.4
+    },
+    "3/4": {
+      "elbow90_LR": 38.1,
+      "elbow90_SR": 25.4,
+      "elbow45": 19.1,
+      "teeCenter": 28.4,
+      "capLength": 31.8
+    },
+    "1-1/2": {
+      "elbow90_LR": 57.2,
+      "elbow90_SR": 38.1,
+      "elbow45": 28.4,
+      "teeCenter": 57.2,
+      "capLength": 38.1
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 const { StenographerSupervisor } = require('../src/main/stenographer_supervisor');
-const { ToolClassification } = require('../src/core/contracts/ToolDefinition');
+const { ToolDefinition, ToolClassification } = require('../src/core/contracts/ToolDefinition');
 const { ProposalStatus } = require('../src/core/contracts/ToolProposal');
 const { ApprovalDecision } = require('../src/core/contracts/ApprovalRecord');
 
@@ -12,6 +12,20 @@ console.log('================================================================\n'
 
 (async () => {
   const supervisor = new StenographerSupervisor({ mockMode: true });
+  for (const [name, classification] of [
+    ['read_mesh_summary', ToolClassification.READ_ONLY],
+    ['mutate_geometry_parameter', ToolClassification.MUTATION_PREVIEW],
+    ['execute_fea_solve', ToolClassification.COMPUTE_JOB]
+  ]) {
+    supervisor.registerTool(
+      new ToolDefinition({
+        name,
+        description: 'Test-only policy gateway fixture',
+        classification,
+        modifiesState: classification === ToolClassification.MUTATION_PREVIEW
+      })
+    );
+  }
 
   // 1. Connect and verify status
   console.log('[1] Connecting supervisor...');
@@ -23,9 +37,15 @@ console.log('================================================================\n'
 
   // 2. Query with read-only request
   console.log('[2] Querying read-only mesh stats...');
-  const res1 = await supervisor.query('Show me the active mesh statistics and node count');
-  assert.strictEqual(res1.proposals.length, 1);
-  const readProp = res1.proposals[0];
+  await assert.rejects(
+    () => supervisor.query('Show me the active mesh statistics and node count'),
+    /daemon query transport is unavailable/
+  );
+  const readProp = supervisor.proposeToolCall({
+    toolName: 'read_mesh_summary',
+    originatingProjectRevision: 1,
+    args: {}
+  });
   assert.strictEqual(readProp.toolName, 'read_mesh_summary');
   assert.strictEqual(readProp.classification, ToolClassification.READ_ONLY);
   assert.strictEqual(readProp.requiresApproval, false);
@@ -39,9 +59,11 @@ console.log('================================================================\n'
 
   // 3. Query with mutation request and test FAIL-CLOSED security gate
   console.log('[3] Testing FAIL-CLOSED gate on unapproved mutation proposal...');
-  const res2 = await supervisor.query('Extrude the main boss cylinder by 50mm');
-  assert.strictEqual(res2.proposals.length, 1);
-  const mutateProp = res2.proposals[0];
+  const mutateProp = supervisor.proposeToolCall({
+    toolName: 'mutate_geometry_parameter',
+    originatingProjectRevision: 1,
+    args: { feature: 'main_boss', param: 'depth', value: 50 }
+  });
   assert.strictEqual(mutateProp.toolName, 'mutate_geometry_parameter');
   assert.strictEqual(mutateProp.classification, ToolClassification.MUTATION_PREVIEW);
   assert.strictEqual(mutateProp.requiresApproval, true);
@@ -80,8 +102,11 @@ console.log('================================================================\n'
 
   // 5. Test rejection flow
   console.log('[5] Testing proposal rejection flow...');
-  const res3 = await supervisor.query('Run FEA structural solve on body');
-  const feaProp = res3.proposals.find((p) => p.toolName === 'execute_fea_solve');
+  const feaProp = supervisor.proposeToolCall({
+    toolName: 'execute_fea_solve',
+    originatingProjectRevision: 1,
+    args: { meshId: 'caller_mesh', solver: 'continuum_plasticity_3d' }
+  });
   assert(feaProp, 'FEA solve proposal must be generated');
   assert.strictEqual(feaProp.requiresApproval, true);
 

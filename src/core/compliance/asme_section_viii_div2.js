@@ -1,12 +1,251 @@
 /**
- * Experimental through-thickness stress integration and caller-limit screening.
- * This legacy ASME-labeled API does not implement an ASME BPVC assessment.
+ * Experimental through-thickness stress integration, Part 5-style stress
+ * linearization, and caller-limit screening.
+ *
+ * This module implements the numerical mechanics described in ASME BPVC
+ * Section VIII Division 2 Part 5 (elastic stress classification): restoring a
+ * linear (membrane + bending) distribution from stresses sampled along a line
+ * through the wall thickness and isolating the nonlinear (peak/local) residual.
+ * It is a development aid. It is not a certified ASME BPVC assessment, a Form
+ * A-1, or professional engineering approval.
  */
 
 function inputError(message, code = 'INVALID_INPUT') {
   const error = new Error(message);
   error.code = code;
   return error;
+}
+
+const TENSOR_COMPONENT_KEYS = ['σxx', 'σyy', 'σzz', 'τxy', 'τyz', 'τzx'];
+
+function requireFiniteNumber(value, label) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`);
+  }
+  return value;
+}
+
+/**
+ * Part 5 through-thickness stress linearization by least-squares regression.
+ *
+ * Given stress tensor samples taken along a line through the wall thickness
+ * (coordinate `s` is the through-thickness position in mm), the procedure
+ * restores, for each tensor component:
+ *
+ *   σ(s) = σ_m + b·s + σ_F(s)
+ *
+ * where:
+ *   σ_m  = membrane  = mean of the samples (constant term)
+ *   b    = least-squares slope of the linear fit
+ *   σ_b  = bending   = |b|·t/2, the linear-part amplitude at the wall surface
+ *   σ_F  = local     = max over samples of |σ(s) − (σ_m + b·s)|
+ *
+ * The least-squares estimators (equal weights, N samples) are:
+ *
+ *   σ_m  = (1/N)·Σ σ_i
+ *   b    = Σ (s_i − s̄)(σ_i − σ̄) / Σ (s_i − s̄)²
+ *
+ * with s̄ = (1/N)·Σ s_i and σ̄ = (1/N)·Σ σ_i. For a strictly linear field this
+ * reduces to the closed-form ASME integrals:
+ *
+ *   σ_m = (1/t)·∫σ ds,   σ_b = (6/t²)·∫σ·s ds = |b|·t/2.
+ *
+ * @param {Array<{s: number, σxx: number, σyy: number, σzz: number, τxy: number, τyz: number, τzx: number}>} stressField
+ *   Ordered nodal stress samples along the through-thickness line. `s` must be
+ *   strictly increasing and every tensor value finite.
+ * @param {Object} [options]
+ * @param {string} [options.direction='through-thickness'] Label for the SCL
+ *   direction (informational; does not change the math, which runs along `s`).
+ * @param {Array|string|number|null} [options.sectionLines=null] Optional SCL
+ *   identifier/label for traceability (informational).
+ * @returns {Object} Per-component membrane/bending/local results plus a
+ *   conservative scalar envelope for screening.
+ */
+function linearizeStressThroughThickness(stressField, options = {}) {
+  const direction = options.direction ?? 'through-thickness';
+  if (typeof direction !== 'string' || direction.trim().length === 0) {
+    throw new TypeError('options.direction must be a non-empty string.');
+  }
+  if (!Array.isArray(stressField)) {
+    throw new TypeError('stressField must be an array of stress samples.');
+  }
+  if (stressField.length < 2) {
+    throw inputError('At least two stress samples are required for linearization.');
+  }
+  if (stressField.length > 10000) {
+    throw inputError('The stress line must contain at most 10,000 samples.');
+  }
+
+  let previousS = null;
+  for (let i = 0; i < stressField.length; i++) {
+    const sample = stressField[i];
+    if (typeof sample !== 'object' || sample === null) {
+      throw new TypeError(`Stress sample ${i} must be an object.`);
+    }
+    requireFiniteNumber(sample.s, `Stress sample ${i} coordinate s`);
+    if (previousS !== null && sample.s <= previousS) {
+      throw inputError(`Stress sample ${i} coordinate s must be strictly increasing across the line.`);
+    }
+    previousS = sample.s;
+    for (const key of TENSOR_COMPONENT_KEYS) {
+      requireFiniteNumber(sample[key], `Stress sample ${i} component ${key}`);
+    }
+  }
+
+  const n = stressField.length;
+  const thicknessMm = stressField[n - 1].s - stressField[0].s;
+  if (!(thicknessMm > 0)) {
+    throw inputError('The stress line must span a positive thickness.');
+  }
+
+  const sMean = (stressField[0].s + stressField[n - 1].s) / 2;
+
+  const components = {};
+  for (const key of TENSOR_COMPONENT_KEYS) {
+    let sumSigma = 0;
+    for (const sample of stressField) sumSigma += sample[key];
+    const sigmaMean = sumSigma / n;
+
+    let numerator = 0;
+    let denominator = 0;
+    for (const sample of stressField) {
+      const dx = sample.s - sMean;
+      numerator += dx * (sample[key] - sigmaMean);
+      denominator += dx * dx;
+    }
+    const slope = denominator > 0 ? numerator / denominator : 0;
+    const membrane = sigmaMean;
+    const bendingSigned = (slope * thicknessMm) / 2;
+    const bending = Math.abs(bendingSigned);
+
+    let localMax = 0;
+    for (const sample of stressField) {
+      const fitted = sigmaMean + slope * (sample.s - sMean);
+      const residual = sample[key] - fitted;
+      const magnitude = Math.abs(residual);
+      if (!Number.isFinite(magnitude)) {
+        throw inputError('Stress residual exceeded finite numeric range.', 'NUMERICAL_FAILURE');
+      }
+      if (magnitude > localMax) localMax = magnitude;
+    }
+
+    components[key] = {
+      membrane,
+      bending,
+      bendingSigned,
+      local: localMax,
+      fitSlope: slope,
+      fitIntercept: sigmaMean - slope * sMean
+    };
+  }
+
+  const P_m = Math.max(...TENSOR_COMPONENT_KEYS.map((key) => Math.abs(components[key].membrane)));
+  const P_b = Math.max(...TENSOR_COMPONENT_KEYS.map((key) => Math.abs(components[key].bending)));
+  const F_local = Math.max(...TENSOR_COMPONENT_KEYS.map((key) => components[key].local));
+
+  return {
+    dataStatus: 'computed',
+    method: 'least-squares-linear-regression',
+    basis: 'ASME BPVC Section VIII Division 2 Part 5 elastic stress classification procedure',
+    direction,
+    sectionLines: options.sectionLines ?? null,
+    thicknessMm,
+    sampleCount: n,
+    components,
+    envelope: { P_m, P_b, F_local }
+  };
+}
+
+/**
+ * Part 5 screening of a membrane/bending/local stress classification against
+ * caller-supplied allowables.
+ *
+ * Classic Part 5 elastic stress-classification thresholds (for the primary and
+ * secondary categories) are applied to the scalar envelope magnitudes:
+ *
+ *   membrane-only        Pm         ≤ S       (general primary membrane)
+ *   membrane + bending   Pm + Pb    ≤ 1.5·S  (primary membrane + bending)
+ *   primary + secondary  Pm + Pb + Q ≤ 3·S   (when Q is supplied)
+ *
+ * The local/peak component F is not compared with S: Part 5 requires a fatigue
+ * assessment (5.5.3) for peak stress, which is outside this module's scope.
+ * `Sy` (yield) is accepted as an informational non-code sanity bound only.
+ *
+ * @param {number} membrane Scalar Pm magnitude (MPa), e.g. envelope.P_m.
+ * @param {number} bending Scalar Pb magnitude (MPa), e.g. envelope.P_b.
+ * @param {number} local Scalar local/peak magnitude (MPa), e.g. envelope.F_local.
+ * @param {Object} options
+ * @param {number} options.S Design stress intensity allowable S (MPa), > 0.
+ * @param {number} [options.Sy] Yield strength (MPa), > 0, informational only.
+ * @param {number} [options.secondaryQ=0] Secondary stress magnitude Q (MPa), >= 0.
+ * @returns {Object} Acceptance flags per threshold with utilization ratios.
+ */
+function evaluatePart5Allowables(membrane, bending, local, options = {}) {
+  requireFiniteNumber(membrane, 'membrane');
+  requireFiniteNumber(bending, 'bending');
+  requireFiniteNumber(local, 'local');
+  const S = requireFiniteNumber(options.S, 'S');
+  if (S <= 0) {
+    throw inputError('Allowable S must be positive.');
+  }
+  const Sy = options.Sy === undefined ? null : requireFiniteNumber(options.Sy, 'Sy');
+  if (Sy !== null && Sy <= 0) {
+    throw inputError('Allowable Sy must be positive.');
+  }
+  const Q = options.secondaryQ === undefined ? 0 : requireFiniteNumber(options.secondaryQ, 'secondaryQ');
+  if (Q < 0) {
+    throw inputError('Secondary stress Q must be non-negative.');
+  }
+
+  const limitOnePointFiveS = 1.5 * S;
+  const limitThreeS = 3 * S;
+
+  const pm = Math.abs(membrane);
+  const pb = Math.abs(bending);
+  const q = Math.abs(Q);
+  const f = Math.abs(local);
+
+  const primaryMembrane = pm <= S;
+  const primaryMembranePlusBending = pm + pb <= limitOnePointFiveS;
+  const primaryPlusSecondary = pm + pb + q <= limitThreeS;
+  const overallAcceptable = primaryMembrane && primaryMembranePlusBending && primaryPlusSecondary;
+
+  const yieldSanity = Sy === null ? null : pm + pb + q <= Sy;
+
+  return {
+    basis: 'ASME BPVC Section VIII Division 2 Part 5 elastic stress classification screening',
+    input: { Pm: pm, Pb: pb, F: f, Q: q },
+    allowables: { S, onePointFiveS: limitOnePointFiveS, threeS: limitThreeS, yieldSy: Sy },
+    checks: {
+      primaryMembrane: { acceptable: primaryMembrane, limit: S, rule: 'Pm ≤ S' },
+      primaryMembranePlusBending: {
+        acceptable: primaryMembranePlusBending,
+        limit: limitOnePointFiveS,
+        rule: 'Pm + Pb ≤ 1.5·S'
+      },
+      primaryPlusSecondary: {
+        acceptable: primaryPlusSecondary,
+        limit: limitThreeS,
+        rule: 'Pm + Pb + Q ≤ 3·S'
+      },
+      peakLocal: {
+        assessed: false,
+        reason:
+          'Peak/local stress F is compared against fatigue allowables (Part 5 section 5.5.3), not against S; fatigue assessment is out of scope for this module.'
+      },
+      yieldSanity: {
+        assessed: yieldSanity !== null,
+        acceptable: yieldSanity,
+        rule: 'Informational only (Pm + Pb + Q ≤ Sy); not a Part 5 allowable.'
+      }
+    },
+    overallAcceptable,
+    utilization: {
+      PmOverS: S > 0 ? pm / S : null,
+      PmPbOverOnePointFiveS: limitOnePointFiveS > 0 ? (pm + pb) / limitOnePointFiveS : null,
+      PmPbQOverThreeS: limitThreeS > 0 ? (pm + pb + q) / limitThreeS : null
+    }
+  };
 }
 
 class ASMESectionVIIIDiv2Analyzer {
@@ -194,6 +433,22 @@ class ASMESectionVIIIDiv2Analyzer {
     return res;
   }
 
+  /**
+   * Part 5 through-thickness stress linearization (least-squares).
+   * See the standalone `linearizeStressThroughThickness` function.
+   */
+  static linearizeStressThroughThickness(stressField, options) {
+    return linearizeStressThroughThickness(stressField, options);
+  }
+
+  /**
+   * Part 5 membrane/bending/local screening against caller-supplied allowables.
+   * See the standalone `evaluatePart5Allowables` function.
+   */
+  static evaluatePart5Allowables(membrane, bending, local, options) {
+    return evaluatePart5Allowables(membrane, bending, local, options);
+  }
+
   /** Deprecated compatibility method. It never emits an ASME certificate. */
   generateComplianceCertificate(equipmentTag) {
     const tag = typeof equipmentTag === 'string' ? equipmentTag : equipmentTag?.vesselTag || 'unspecified';
@@ -218,8 +473,14 @@ This diagnostic is experimental and is not an ASME BPVC report, Form A-1, code a
 
 // Isomorphic Export
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ASMESectionVIIIDiv2Analyzer };
+  module.exports = {
+    ASMESectionVIIIDiv2Analyzer,
+    linearizeStressThroughThickness,
+    evaluatePart5Allowables
+  };
 }
 if (typeof window !== 'undefined') {
   window.ASMESectionVIIIDiv2Analyzer = ASMESectionVIIIDiv2Analyzer;
+  window.linearizeStressThroughThickness = linearizeStressThroughThickness;
+  window.evaluatePart5Allowables = evaluatePart5Allowables;
 }

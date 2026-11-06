@@ -1200,6 +1200,684 @@ class NasaRocketPropulsion {
   }
 
   // =========================================================================
+  // 7b. Isentropic nozzle compilation (Rao parabolic bell contour)
+  // =========================================================================
+
+  /**
+   * Compiles a rocket nozzle design (exit Mach, static exit pressure/velocity,
+   * ideal thrust coefficient, choked mass flow, and a Rao-parabolic-style
+   * contour table normalized to the throat radius).
+   *
+   * Assumptions documented with the result:
+   * - One-dimensional isentropic perfect-gas nozzle relations.
+   * - Chamber gas constant R defaults to 287 J/(kg·K) (air) unless a molar mass
+   *   is supplied (R = R_universal / M). Chamber temperature defaults to 3000 K.
+   * - The divergent contour is the classic Rao-style parabolic arc: matched at
+   *   the throat to the divergent half-angle tangent and resolving to the exit
+   *   radius with zero exit slope. The convergent section is a straight cone.
+   */
+  compileRocketNozzle(params = {}) {
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      return this.invalidInput('Rocket nozzle compilation', ['parameter object']);
+    }
+
+    const pc =
+      params.chamberPressurePa ??
+      params.pc ??
+      (Number.isFinite(params.chamberPressureBar) ? params.chamberPressureBar * 1e5 : undefined);
+    const pa = Number.isFinite(params.ambientPressurePa) ? params.ambientPressurePa : (params.pa ?? 101325.0);
+    const eps = params.expansionRatio ?? params.eps ?? params.areaRatio;
+    const gamma = Number.isFinite(params.gamma) && params.gamma > 1 ? params.gamma : 1.2;
+    const Tc = Number.isFinite(params.chamberTempK)
+      ? params.chamberTempK
+      : Number.isFinite(params.Tc)
+        ? params.Tc
+        : 3000.0;
+
+    let rt;
+    if (Number.isFinite(params.throatRadiusM) && params.throatRadiusM > 0) rt = params.throatRadiusM;
+    else if (Number.isFinite(params.throatDiameterM) && params.throatDiameterM > 0) rt = params.throatDiameterM / 2;
+    else if (Number.isFinite(params.throatAreaM2) && params.throatAreaM2 > 0)
+      rt = Math.sqrt(params.throatAreaM2 / Math.PI);
+    else rt = undefined;
+
+    let R;
+    if (Number.isFinite(params.specificGasConstantJ_KgK) && params.specificGasConstantJ_KgK > 0) {
+      R = params.specificGasConstantJ_KgK;
+    } else if (Number.isFinite(params.molarMassKgMol) && params.molarMassKgMol > 0) {
+      R = this.R_UNIVERSAL / (1000.0 * params.molarMassKgMol);
+    } else {
+      R = 287.0;
+    }
+
+    const missingInputs = [];
+    if (!Number.isFinite(pc) || pc <= 0) missingInputs.push('chamberPressurePa');
+    if (!Number.isFinite(eps) || eps < 1) missingInputs.push('expansionRatio >= 1');
+    if (!Number.isFinite(rt) || rt <= 0) missingInputs.push('throatRadiusM | throatDiameterM | throatAreaM2');
+    if (!Number.isFinite(pa) || pa < 0) missingInputs.push('ambientPressurePa >= 0');
+    if (!Number.isFinite(Tc) || Tc <= 0) missingInputs.push('chamberTempK');
+    if (missingInputs.length > 0) return this.invalidInput('Rocket nozzle compilation', missingInputs);
+
+    let Me;
+    try {
+      Me = solveNozzleExitMach(eps, gamma);
+    } catch (err) {
+      return this.numericalFailure('Rocket nozzle compilation', `exit Mach inversion failed: ${err.message}`);
+    }
+
+    const totalToStatic = 1.0 + 0.5 * (gamma - 1.0) * Me * Me;
+    const pe = pc * Math.pow(totalToStatic, -gamma / (gamma - 1.0));
+    const Te = Tc / totalToStatic;
+    const ve = Math.sqrt(((2.0 * gamma) / (gamma - 1.0)) * R * Tc * (1.0 - Math.pow(pe / pc, (gamma - 1.0) / gamma)));
+
+    const At = Math.PI * rt * rt;
+    const Ae = At * eps;
+    const re = rt * Math.sqrt(eps);
+
+    // Ideal thrust coefficient: momentum + pressure terms.
+    const gp1 = gamma + 1.0;
+    const gm1 = gamma - 1.0;
+    const cfMomentum = Math.sqrt(
+      ((2.0 * gamma * gamma) / gm1) * Math.pow(2.0 / gp1, gp1 / gm1) * (1.0 - Math.pow(pe / pc, gm1 / gamma))
+    );
+    const cfPressure = ((pe - pa) / pc) * eps;
+    const cf = cfMomentum + cfPressure;
+    const cfVacuum = cfMomentum + (pe / pc) * eps;
+
+    // Choked flow mass flow estimate: mdot = pc*At*sqrt(gamma/(R*Tc))*(2/(gamma+1))^((gamma+1)/(2(gamma-1)))
+    let mdot = Number.isFinite(params.massFlowKgS) && params.massFlowKgS > 0 ? params.massFlowKgS : undefined;
+    if (mdot === undefined) {
+      mdot = pc * At * Math.sqrt(gamma / (R * Tc)) * Math.pow(2.0 / gp1, gp1 / (2.0 * gm1));
+    }
+    const thrustN = mdot * ve + (pe - pa) * Ae;
+    const thrustVacuumN = mdot * ve + pe * Ae;
+
+    // Rao-parabolic-style contour (x in metres from throat, r normalized by throat radius).
+    const thetaConv =
+      ((Number.isFinite(params.convergentAngleDeg) ? params.convergentAngleDeg : 45.0) * Math.PI) / 180.0;
+    const thetaDiv = ((Number.isFinite(params.divergentAngleDeg) ? params.divergentAngleDeg : 15.0) * Math.PI) / 180.0;
+    const rc =
+      Number.isFinite(params.chamberRadiusM) && params.chamberRadiusM > 0
+        ? params.chamberRadiusM
+        : (params.chamberRadiusRatio ?? 2.5) * rt;
+    const Lc = (rc - rt) / Math.tan(thetaConv);
+    const Ld = (2.0 * (re - rt)) / Math.tan(thetaDiv);
+    const contourPoints = 48;
+    const contour = [];
+    const contourMeters = [];
+    for (let i = 0; i < contourPoints; i++) {
+      const t = i / (contourPoints - 1);
+      const x = -Lc + t * (Lc + Ld);
+      let r;
+      if (x < 0) {
+        r = rc - ((rc - rt) * (x + Lc)) / Lc;
+      } else {
+        r = rt + Math.tan(thetaDiv) * x - (Math.tan(thetaDiv) / (2.0 * Ld)) * x * x;
+      }
+      contour.push({ x: +x.toPrecision(8), r: +(r / rt).toPrecision(8) });
+      contourMeters.push({ x: +x.toPrecision(8), r: +r.toPrecision(8) });
+    }
+
+    const outputs = [Me, pe, ve, cf, mdot, thrustN, Te];
+    if (!outputs.every(Number.isFinite) || outputs.some((value) => value <= 0)) {
+      return this.numericalFailure(
+        'Rocket nozzle compilation',
+        'one or more calculated quantities are non-finite or non-positive'
+      );
+    }
+
+    return {
+      success: true,
+      status: 'computed',
+      validationLevel: 'experimental',
+      inputs: {
+        chamberPressurePa: pc,
+        ambientPressurePa: pa,
+        expansionRatio: eps,
+        throatRadiusM: rt,
+        gamma,
+        chamberTempK: Tc,
+        specificGasConstantJ_KgK: R,
+        convergentAngleDeg: (thetaConv * 180) / Math.PI,
+        divergentAngleDeg: (thetaDiv * 180) / Math.PI,
+        chamberRadiusRatio: rc / rt
+      },
+      assumptions: [
+        'One-dimensional ideal isentropic nozzle relations; boundary layer, separation, and losses are not modeled',
+        `Specific gas constant R = ${R.toFixed(1)} J/(kg·K) (molar-mass-derived or default air 287); chamber temperature Tc = ${Tc.toFixed(1)} K`,
+        'Divergent contour is a Rao-parabolic arc matched to the divergent half-angle at the throat and resolving to the exit radius with zero exit slope; convergent section is a straight cone',
+        'Mass flow is the choked-flow estimate mdot = pc*At*sqrt(gamma/(R*Tc))*(2/(gamma+1))^((gamma+1)/(2(gamma-1))) unless a massFlowKgS input overrides it',
+        'Contour r values are normalized by the throat radius; x is metres from the throat plane'
+      ],
+      exitMach: Me,
+      exitPressurePa: pe,
+      exitPressureBar: pe / 1e5,
+      exitTemperatureK: Te,
+      exitVelocityMps: ve,
+      areaRatio: eps,
+      contour,
+      contourMeters,
+      throatRadiusM: rt,
+      throatAreaM2: At,
+      exitAreaM2: Ae,
+      exitDiameterM: 2.0 * re,
+      massFlowKgS: mdot,
+      thrustCoefficient: cf,
+      thrustCoefficientVacuum: cfVacuum,
+      thrustN,
+      thrustVacuumN,
+      thrustSeaLevelKN: thrustN / 1000.0,
+      thrustVacuumKN: thrustVacuumN / 1000.0
+    };
+  }
+
+  // =========================================================================
+  // 7c. Supersonic shock-expansion aerodynamic analysis
+  // =========================================================================
+
+  /**
+   * Supersonic shock-expansion analysis around a symmetric double-wedge airfoil
+   * or an axisymmetric cone:
+   * - Double wedge: leading-edge oblique shocks (lower surface), Prandtl-Meyer
+   *   expansions, trailing-edge expansion (lower) / compression (upper), with
+   *   surface pressures integrated to CL, CD, and CM about the leading edge.
+   * - Cone: Taylor-Maccoll conical flow at zero angle of attack with a
+   *   linearized supersonic angle-of-attack correction; forces integrated over
+   *   the conical surface and referenced to the base area.
+   */
+  runAerospaceCFD(params = {}) {
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      return this.invalidInput('Aerospace CFD analysis', ['parameter object']);
+    }
+
+    const MInf = params.machNumber ?? params.MInf ?? params.mach;
+    const gamma = Number.isFinite(params.gamma) && params.gamma > 1 ? params.gamma : 1.4;
+    const alphaDeg = Number.isFinite(params.angleOfAttackDeg)
+      ? params.angleOfAttackDeg
+      : Number.isFinite(params.alphaDeg)
+        ? params.alphaDeg
+        : 0.0;
+    const altitudeM = Number.isFinite(params.altitudeM) ? params.altitudeM : 0.0;
+    const wedgeDeg = params.wedgeHalfAngleDeg ?? params.deflectionAngleDeg;
+    const coneDeg = params.coneAngleDeg ?? params.coneHalfAngleDeg;
+    const geometry = params.geometry === 'cone' || Number.isFinite(coneDeg) ? 'cone' : 'double-wedge';
+
+    const missingInputs = [];
+    if (!Number.isFinite(MInf) || MInf <= 1) missingInputs.push('machNumber > 1');
+    const halfAngleDeg = geometry === 'cone' ? coneDeg : wedgeDeg;
+    if (!Number.isFinite(halfAngleDeg) || halfAngleDeg <= 0) {
+      missingInputs.push(geometry === 'cone' ? 'coneAngleDeg' : 'wedgeHalfAngleDeg | deflectionAngleDeg');
+    }
+    const chordM = params.chordM ?? params.lengthM ?? params.referenceLengthM;
+    if (!Number.isFinite(chordM) || chordM <= 0) missingInputs.push('chordM | lengthM');
+    if (missingInputs.length > 0) return this.invalidInput('Aerospace CFD analysis', missingInputs);
+
+    const atm = this.get1976Atmosphere(altitudeM);
+    if (!atm.success) return this.invalidInput('Aerospace CFD analysis', ['altitudeM within 1976 atmosphere range']);
+    const pInf = atm.pressurePa;
+    const TInf = atm.temperatureK;
+    const rhoInf = atm.densityKgM3;
+    const aInf = atm.speedOfSoundM_s;
+    const VInf = MInf * aInf;
+    const qInf = 0.5 * rhoInf * VInf * VInf;
+
+    const halfAngleRad = (halfAngleDeg * Math.PI) / 180.0;
+    const alphaRad = (alphaDeg * Math.PI) / 180.0;
+
+    let result;
+    if (geometry === 'double-wedge') {
+      result = this._doubleWedgeShockExpansion(
+        MInf,
+        gamma,
+        alphaRad,
+        halfAngleRad,
+        chordM,
+        pInf,
+        qInf,
+        params.referenceAreaM2
+      );
+    } else {
+      result = this._conicalFlowShockExpansion(
+        MInf,
+        gamma,
+        alphaRad,
+        halfAngleRad,
+        chordM,
+        pInf,
+        qInf,
+        params.referenceAreaM2
+      );
+    }
+    if (result.success === false) return result;
+    return {
+      success: true,
+      status: 'computed',
+      validationLevel: 'experimental',
+      geometry,
+      machNumber: MInf,
+      angleOfAttackDeg: alphaDeg,
+      alphaRad,
+      altitudeM,
+      freestreamPressurePa: pInf,
+      freestreamTemperatureK: TInf,
+      freestreamDensityKgM3: rhoInf,
+      freestreamVelocityMps: VInf,
+      dynamicPressurePa: qInf,
+      ...result,
+      assumptions: [
+        'Inviscid supersonic shock-expansion theory; no boundary layer, viscosity, or finite-wall effects are modeled',
+        'Double wedge: leading-edge oblique shock, Prandtl-Meyer expansion, and trailing-edge processes per surface; forces per unit span referenced to chord',
+        'Cone: Taylor-Maccoll conical-flow surface pressure at alpha = 0 with a linearized supersonic angle-of-attack correction; forces referenced to the base area',
+        'All coefficients are experimental estimates, not wind-tunnel or flight-derived data'
+      ]
+    };
+  }
+
+  _doubleWedgeShockExpansion(MInf, gamma, alphaRad, deltaRad, chordM, pInf, qInf, referenceAreaM2) {
+    const twoDelta = 2.0 * deltaRad;
+    const turning = alphaRad + deltaRad;
+
+    // Lower fore surface: oblique compression shock (attached) for turning > 0.
+    let lowerForeP;
+    let lowerForeM;
+    if (turning > 1e-12) {
+      const beta = solveObliqueShockBeta(MInf, turning, gamma);
+      if (!Number.isFinite(beta)) {
+        return {
+          success: false,
+          status: 'numerical-failure',
+          error: {
+            code: 'NUMERICAL_FAILURE',
+            message: `Detached leading-edge lower shock for deflection ${(turning * 180) / Math.PI} deg at M = ${MInf}.`
+          }
+        };
+      }
+      const st = obliqueShockState(MInf, beta, turning, gamma);
+      lowerForeP = st.pRatio * pInf;
+      lowerForeM = st.M2;
+    } else {
+      lowerForeP = pInf;
+      lowerForeM = MInf;
+    }
+
+    // Upper fore surface: compression shock by (delta - alpha) when the
+    // incidence is positive, Prandtl-Meyer expansion of (alpha - delta) when
+    // the upper surface is leeward (alpha > delta).
+    const upperTurn = deltaRad - alphaRad;
+    let upperForeP;
+    let upperForeM;
+    if (Math.abs(upperTurn) < 1e-12) {
+      upperForeP = pInf;
+      upperForeM = MInf;
+    } else if (upperTurn > 0) {
+      const beta = solveObliqueShockBeta(MInf, upperTurn, gamma);
+      if (!Number.isFinite(beta)) {
+        return {
+          success: false,
+          status: 'numerical-failure',
+          error: {
+            code: 'NUMERICAL_FAILURE',
+            message: `Detached upper-surface shock for deflection ${(upperTurn * 180) / Math.PI} deg at M = ${MInf}.`
+          }
+        };
+      }
+      const st = obliqueShockState(MInf, beta, upperTurn, gamma);
+      upperForeP = st.pRatio * pInf;
+      upperForeM = st.M2;
+    } else {
+      const nuTarget = prandtlMeyerFunction(MInf, gamma) - upperTurn;
+      const MUpper = inversePrandtlMeyerFunction(nuTarget, gamma);
+      if (!Number.isFinite(MUpper)) {
+        return {
+          success: false,
+          status: 'numerical-failure',
+          error: {
+            code: 'NUMERICAL_FAILURE',
+            message: 'Upper-surface expansion angle exceeds the Prandtl-Meyer maximum.'
+          }
+        };
+      }
+      upperForeM = MUpper;
+      upperForeP = pInf * isentropicPressureRatio(MInf, MUpper, gamma);
+    }
+
+    // Lower aft: expansion by 2*delta after the lower fore shock.
+    let lowerAftP;
+    let lowerAftM;
+    if (lowerForeM > 1.0001) {
+      const nuTarget = prandtlMeyerFunction(lowerForeM, gamma) + twoDelta;
+      const MAft = inversePrandtlMeyerFunction(nuTarget, gamma);
+      if (!Number.isFinite(MAft)) {
+        return {
+          success: false,
+          status: 'numerical-failure',
+          error: {
+            code: 'NUMERICAL_FAILURE',
+            message: 'Lower aft-surface expansion angle exceeds the Prandtl-Meyer maximum.'
+          }
+        };
+      }
+      lowerAftM = MAft;
+      lowerAftP = lowerForeP * isentropicPressureRatio(lowerForeM, MAft, gamma);
+    } else {
+      lowerAftM = lowerForeM;
+      lowerAftP = lowerForeP;
+    }
+
+    // Upper aft: expansion by 2*delta after the upper fore process (the
+    // trailing-edge surfaces turn the flow back toward the freestream
+    // direction, which is a convex corner: an expansion fan).
+    let upperAftP;
+    let upperAftM;
+    if (upperForeM > 1.0001) {
+      const nuTarget = prandtlMeyerFunction(upperForeM, gamma) + twoDelta;
+      const MAft = inversePrandtlMeyerFunction(nuTarget, gamma);
+      if (!Number.isFinite(MAft)) {
+        return {
+          success: false,
+          status: 'numerical-failure',
+          error: {
+            code: 'NUMERICAL_FAILURE',
+            message: 'Upper aft-surface expansion angle exceeds the Prandtl-Meyer maximum.'
+          }
+        };
+      }
+      upperAftM = MAft;
+      upperAftP = upperForeP * isentropicPressureRatio(upperForeM, MAft, gamma);
+    } else {
+      upperAftP = upperForeP;
+      upperAftM = upperForeM;
+    }
+
+    const pressures = [lowerForeP, lowerAftP, upperForeP, upperAftP];
+    if (!pressures.every(Number.isFinite) || pressures.some((p) => p <= 0)) {
+      return {
+        success: false,
+        status: 'numerical-failure',
+        error: { code: 'NUMERICAL_FAILURE', message: 'Surface pressures are non-finite or non-positive.' }
+      };
+    }
+
+    // Per unit span:
+    const liftPerSpan = (chordM / 2.0) * (lowerForeP + lowerAftP - upperForeP - upperAftP);
+    const dragPerSpan = (chordM / 2.0) * Math.tan(deltaRad) * (lowerForeP - lowerAftP + upperAftP - upperForeP);
+
+    // Thin-body pitching moment about the leading edge from the integrated
+    // pressure on the chordwise (planform) projection. The y*Fx cross terms
+    // of a full surface integration cancel by symmetry for the symmetric
+    // wedge and are neglected per standard slender-body practice.
+    const momentAboutLE =
+      ((chordM * chordM) / 8.0) * (lowerForeP - upperForeP) + ((3.0 * chordM * chordM) / 8.0) * (lowerAftP - upperAftP);
+
+    const refArea = Number.isFinite(referenceAreaM2) && referenceAreaM2 > 0 ? referenceAreaM2 : chordM;
+    const cl = liftPerSpan / (qInf * refArea);
+    const cd = dragPerSpan / (qInf * refArea);
+    const cm = momentAboutLE / (qInf * refArea * chordM);
+
+    return {
+      surfacePressuresPa: { lowerFore: lowerForeP, lowerAft: lowerAftP, upperFore: upperForeP, upperAft: upperAftP },
+      surfaceMachNumbers: { lowerFore: lowerForeM, lowerAft: lowerAftM, upperFore: upperForeM, upperAft: upperAftM },
+      referenceAreaM2: refArea,
+      referenceLengthM: chordM,
+      liftPerSpanN: liftPerSpan,
+      dragPerSpanN: dragPerSpan,
+      cl,
+      cd,
+      cm,
+      cL: cl,
+      cD: cd,
+      cM: cm
+    };
+  }
+
+  _conicalFlowShockExpansion(MInf, gamma, alphaRad, thetaRad, lengthM, pInf, qInf, referenceAreaM2) {
+    const surface = this._solveConicalFlowSurfacePressure(MInf, gamma, thetaRad);
+    if (!surface) {
+      return {
+        success: false,
+        status: 'numerical-failure',
+        error: {
+          code: 'NUMERICAL_FAILURE',
+          message: 'Taylor-Maccoll conical flow did not converge to an attached shock solution.'
+        }
+      };
+    }
+    const p0 = surface.pSurface * pInf;
+    const pShocked = surface.p2 * pInf;
+    const baseRadiusM = lengthM * Math.tan(thetaRad);
+    const refArea =
+      Number.isFinite(referenceAreaM2) && referenceAreaM2 > 0 ? referenceAreaM2 : Math.PI * baseRadiusM * baseRadiusM;
+
+    // Linearized supersonic angle-of-attack correction: Cp(phi) = Cp0 + (2*alpha/sqrt(M^2-1))*cos(phi)
+    const deltaCp = (2.0 * alphaRad) / Math.sqrt(MInf * MInf - 1.0);
+    const deltaP = qInf * deltaCp;
+
+    const dragN = Math.PI * lengthM * lengthM * Math.tan(thetaRad) * Math.tan(thetaRad) * p0;
+    const liftN = (Math.PI / 2.0) * lengthM * lengthM * Math.tan(thetaRad) * deltaP;
+    const momentAboutApex = -(2.0 / 3.0) * lengthM * liftN;
+
+    const cl = liftN / (qInf * refArea);
+    const cd = dragN / (qInf * refArea);
+    const cm = momentAboutApex / (qInf * refArea * lengthM);
+
+    return {
+      surfacePressuresPa: { coneSurface: p0, shocked: pShocked, freestream: pInf },
+      coneShockAngleDeg: (surface.beta * 180) / Math.PI,
+      surfaceMach: surface.MSurface,
+      baseAreaM2: Math.PI * baseRadiusM * baseRadiusM,
+      baseRadiusM,
+      referenceAreaM2: refArea,
+      referenceLengthM: lengthM,
+      liftN,
+      dragN,
+      cl,
+      cd,
+      cm,
+      cL: cl,
+      cD: cd,
+      cM: cm
+    };
+  }
+
+  _solveConicalFlowSurfacePressure(M1, gamma, thetaC) {
+    // Taylor-Maccoll conical flow. Velocities are normalized by the
+    // freestream speed V_inf = 1. Across the oblique shock the total enthalpy
+    // is conserved but the static enthalpy rises, so the flow speed drops to
+    // V2 = M2*a2 < 1 and stays constant through the isentropic conical field.
+    const aInfSq = 1.0 / (M1 * M1);
+    const a0Sq = aInfSq * (1.0 + ((gamma - 1.0) / 2.0) * M1 * M1);
+
+    const mu = Math.asin(1.0 / M1);
+    const limit = Math.PI / 2.0 - 1e-9;
+
+    const f = (beta) => {
+      const delta = thetaFromBeta(M1, beta, gamma);
+      if (!Number.isFinite(delta)) return null;
+      const sinB = Math.sin(beta);
+      const M1n = M1 * sinB;
+      const M2nSq = (M1n * M1n + 2.0 / (gamma - 1.0)) / (((2.0 * gamma) / (gamma - 1.0)) * M1n * M1n - 1.0);
+      if (M2nSq <= 0) return null;
+      const M2 = Math.sqrt(M2nSq) / Math.sin(beta - delta);
+      const T2OverT1 = (1.0 + ((gamma - 1.0) / 2.0) * M1 * M1) / (1.0 + ((gamma - 1.0) / 2.0) * M2 * M2);
+      const a2Sq = aInfSq * T2OverT1;
+      const V2 = M2 * Math.sqrt(a2Sq);
+      const aSq = a2Sq;
+
+      // Just downstream of the oblique shock the flow direction makes angle
+      // delta with the axis, while the spherical coordinate there is the
+      // shock cone angle beta, so the velocity components are:
+      let vr = V2 * Math.cos(beta - delta);
+      let vtheta = -V2 * Math.sin(beta - delta);
+      const steps = 500;
+      const h = (beta - thetaC) / steps;
+      for (let i = 0; i < steps; i++) {
+        const theta = beta - i * h;
+        const deriv = (th, vr0, vt0) => {
+          const denom = aSq - vt0 * vt0;
+          if (Math.abs(denom) < 1e-12) return null;
+          // Taylor-Maccoll radial/angular momentum system:
+          //   dvr/dtheta = vtheta
+          //   dvtheta/dtheta = [a^2*(vtheta*cot(theta) + 2*vr) - vtheta^2*vr] / (a^2 - vtheta^2)
+          const dvth = (aSq * ((vt0 * Math.cos(th)) / Math.sin(th) + 2.0 * vr0) - vt0 * vt0 * vr0) / denom;
+          return { vr: vt0, vth: dvth };
+        };
+        const k1 = deriv(theta, vr, vtheta);
+        if (!k1) return null;
+        const k2 = deriv(theta - h / 2, vr + (h / 2) * k1.vr, vtheta + (h / 2) * k1.vth);
+        if (!k2) return null;
+        const k3 = deriv(theta - h / 2, vr + (h / 2) * k2.vr, vtheta + (h / 2) * k2.vth);
+        if (!k3) return null;
+        const k4 = deriv(theta - h, vr + h * k3.vr, vtheta + h * k3.vth);
+        if (!k4) return null;
+        vr += (h / 6.0) * (k1.vr + 2.0 * k2.vr + 2.0 * k3.vr + k4.vr);
+        vtheta += (h / 6.0) * (k1.vth + 2.0 * k2.vth + 2.0 * k3.vth + k4.vth);
+      }
+      const MSurface = Math.sqrt((vr * vr + vtheta * vtheta) / aSq);
+      const pRatioFrom2 = Math.pow(
+        (1.0 + ((gamma - 1.0) / 2.0) * M2 * M2) / (1.0 + ((gamma - 1.0) / 2.0) * MSurface * MSurface),
+        gamma / (gamma - 1.0)
+      );
+      const p2Ratio = 1.0 + ((2.0 * gamma) / (gamma + 1.0)) * (M1n * M1n - 1.0);
+      return { vthetaSurface: vtheta, MSurface, pSurfaceRatio: p2Ratio * pRatioFrom2, beta, delta, M2 };
+    };
+
+    // Scan for first sign change of vtheta(thetaC) as beta increases from the Mach angle.
+    let previous = null;
+    let previousBeta = mu + 1e-6;
+    for (let i = 1; i <= 400; i++) {
+      const beta = mu + (limit - mu) * (i / 400.0);
+      const state = f(beta);
+      if (!state) {
+        previous = null;
+        previousBeta = beta;
+        continue;
+      }
+      if (previous !== null && previous.vthetaSurface * state.vthetaSurface < 0) {
+        let lo = previousBeta;
+        let hi = beta;
+        let loState = previous;
+        for (let iter = 0; iter < 80; iter++) {
+          const mid = 0.5 * (lo + hi);
+          const midState = f(mid);
+          if (!midState) break;
+          if (midState.vthetaSurface * loState.vthetaSurface <= 0) {
+            hi = mid;
+          } else {
+            lo = mid;
+            loState = midState;
+          }
+        }
+        const root = 0.5 * (lo + hi);
+        const rootState = f(root);
+        if (rootState) {
+          return {
+            beta: root,
+            p2: pInf2Ratio(M1, root, gamma),
+            MSurface: rootState.MSurface,
+            vthetaSurface: rootState.vthetaSurface,
+            delta: rootState.delta,
+            pSurface: rootState.pSurfaceRatio * pInf2Ratio(M1, root, gamma)
+          };
+        }
+      }
+      previous = state;
+      previousBeta = beta;
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // 7d. Orbital transfer (Hohmann and bi-elliptic)
+  // =========================================================================
+
+  /**
+   * Two-impulse Hohmann (and optional bi-elliptic) orbital transfer analysis.
+   * Default gravitational parameter mu = 3.986004418e14 m^3/s^2 (Earth).
+   */
+  calculateOrbitalTransfer(params = {}) {
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      return this.invalidInput('Orbital transfer analysis', ['parameter object']);
+    }
+    const r1 = params.r1Meters ?? params.r1;
+    const r2 = params.r2Meters ?? params.r2;
+    const mu = Number.isFinite(params.mu) && params.mu > 0 ? params.mu : 3.986004418e14;
+
+    const missingInputs = [];
+    if (!Number.isFinite(r1) || r1 <= 0) missingInputs.push('r1Meters');
+    if (!Number.isFinite(r2) || r2 <= 0) missingInputs.push('r2Meters');
+
+    const biElliptic = Boolean(params.biElliptic) || Number.isFinite(params.intermediateRadiusM);
+    const rA = biElliptic
+      ? Number.isFinite(params.intermediateRadiusM)
+        ? params.intermediateRadiusM
+        : params.rA
+      : undefined;
+    if (biElliptic && (!Number.isFinite(rA) || rA <= Math.max(r1, r2))) {
+      missingInputs.push('intermediateRadiusM > max(r1Meters, r2Meters) for bi-elliptic');
+    }
+    if (!biElliptic && r2 <= r1) {
+      missingInputs.push('r2Meters > r1Meters for outbound Hohmann transfer');
+    }
+    if (missingInputs.length > 0) return this.invalidInput('Orbital transfer analysis', missingInputs);
+
+    const sqrtMuOverR1 = Math.sqrt(mu / r1);
+    const sqrtMuOverR2 = Math.sqrt(mu / r2);
+    const deltaV1 = sqrtMuOverR1 * (Math.sqrt((2.0 * r2) / (r1 + r2)) - 1.0);
+    const deltaV2 = sqrtMuOverR2 * (1.0 - Math.sqrt((2.0 * r1) / (r1 + r2)));
+    const deltaVTotal = deltaV1 + deltaV2;
+    const timeOfFlightS = Math.PI * Math.sqrt(Math.pow(r1 + r2, 3) / (8.0 * mu));
+
+    const output = {
+      success: true,
+      status: 'computed',
+      validationLevel: 'experimental',
+      inputs: { r1Meters: r1, r2Meters: r2, mu, biElliptic },
+      assumptions: [
+        'Ideal impulsive two-burn orbital transfers in a point-mass central gravity field',
+        'Hohmann transfer assumes coplanar circular orbits with no plane change; phasing and perturbations are ignored',
+        'Bi-elliptic uses the supplied intermediate radius rA; preference over Hohmann depends on rA/r1 and the mission delta-V budget'
+      ],
+      transferType: biElliptic ? 'bi-elliptic' : 'hohmann',
+      mu,
+      r1Meters: r1,
+      r2Meters: r2,
+      r1Km: r1 / 1000.0,
+      r2Km: r2 / 1000.0,
+      deltaV1,
+      deltaV2,
+      deltaVTotal,
+      deltaV1KmS: deltaV1 / 1000.0,
+      deltaV2KmS: deltaV2 / 1000.0,
+      deltaVTotalKmS: deltaVTotal / 1000.0,
+      timeOfFlightS,
+      timeOfFlightHours: timeOfFlightS / 3600.0
+    };
+
+    if (biElliptic) {
+      const sqr1 = Math.sqrt(mu / r1);
+      const sqrA = Math.sqrt(mu / rA);
+      const sqr2 = Math.sqrt(mu / r2);
+      const b1 = sqr1 * (Math.sqrt((2.0 * rA) / (r1 + rA)) - 1.0);
+      const b2 = sqrA * (Math.sqrt((2.0 * r2) / (rA + r2)) - Math.sqrt((2.0 * r1) / (rA + r1)));
+      const b3 = sqr2 * (1.0 - Math.sqrt((2.0 * rA) / (r2 + rA)));
+      const bTotal = b1 + b2 + b3;
+      const bTof =
+        Math.PI * (Math.sqrt(Math.pow(r1 + rA, 3) / (8.0 * mu)) + Math.sqrt(Math.pow(rA + r2, 3) / (8.0 * mu)));
+      output.intermediateRadiusM = rA;
+      output.intermediateRadiusKm = rA / 1000.0;
+      output.biEllipticDeltaV1 = b1;
+      output.biEllipticDeltaV2 = b2;
+      output.biEllipticDeltaV3 = b3;
+      output.biEllipticDeltaVTotal = bTotal;
+      output.biEllipticDeltaVTotalKmS = bTotal / 1000.0;
+      output.biEllipticTimeOfFlightS = bTof;
+      output.biEllipticTimeOfFlightHours = bTof / 3600.0;
+    }
+
+    return output;
+  }
+
+  // =========================================================================
   // 8. Source-verified aerospace subsystem registry
   // =========================================================================
 
@@ -1324,10 +2002,159 @@ class NasaRocketPropulsion {
   }
 }
 
+// =========================================================================
+// Standalone compressible-flow helpers (exported for tests and reuse)
+// =========================================================================
+
+/**
+ * Inverts the isentropic area-Mach relation A/A* = f(M) for a given area
+ * expansion ratio eps = Ae/At by bisection on [1.0001, 20].
+ */
+function solveNozzleExitMach(expansionRatio, gamma) {
+  if (!Number.isFinite(expansionRatio) || expansionRatio < 1 || !Number.isFinite(gamma) || gamma <= 1) {
+    throw new RangeError('Nozzle estimate requires expansionRatio >= 1 and gamma > 1.');
+  }
+  if (expansionRatio <= 1.0) return 1.0;
+  const areaRatio = (mach) => {
+    const term = (2.0 / (gamma + 1.0)) * (1.0 + 0.5 * (gamma - 1.0) * mach * mach);
+    return Math.pow(term, (gamma + 1.0) / (2.0 * (gamma - 1.0))) / mach;
+  };
+  let lower = 1.0001;
+  let upper = 20.0;
+  if (areaRatio(upper) < expansionRatio) {
+    throw new RangeError('Nozzle area ratio is outside the supported M <= 20 bisection range.');
+  }
+  for (let iteration = 0; iteration < 200; iteration++) {
+    const mach = 0.5 * (lower + upper);
+    const ratio = areaRatio(mach);
+    if (!Number.isFinite(ratio)) throw new RangeError('Nozzle Mach inversion produced a non-finite result.');
+    if (Math.abs(ratio - expansionRatio) <= 1e-12 * expansionRatio || upper - lower <= 1e-12 * mach) return mach;
+    if (ratio < expansionRatio) lower = mach;
+    else upper = mach;
+  }
+  throw new Error('Nozzle Mach inversion did not converge within 200 bisection steps.');
+}
+
+/**
+ * Oblique-shock deflection angle delta(M1, beta, gamma).
+ * Returns NaN when beta is below the Mach angle.
+ */
+function thetaFromBeta(M1, beta, gamma) {
+  const sinB = Math.sin(beta);
+  const term = M1 * M1 * sinB * sinB - 1.0;
+  if (term <= 0) return NaN;
+  const numerator = 2.0 * (Math.cos(beta) / sinB) * term;
+  const denominator = M1 * M1 * (gamma + Math.cos(2.0 * beta)) + 2.0;
+  return Math.atan(numerator / denominator);
+}
+
+/**
+ * Solves the theta-beta-M relation for the weak attached oblique-shock angle.
+ * Returns null when the deflection exceeds the maximum for an attached shock.
+ */
+function solveObliqueShockBeta(M1, theta, gamma) {
+  if (!Number.isFinite(M1) || M1 <= 1 || !Number.isFinite(theta) || theta <= 0) return null;
+  const mu = Math.asin(1.0 / M1);
+  const limit = Math.PI / 2.0 - 1e-9;
+  const target = Math.tan(theta);
+  let previousF = null;
+  let previousBeta = mu + 1e-6;
+  const b = (beta) => target - Math.tan(thetaFromBeta(M1, beta, gamma));
+  for (let i = 1; i <= 400; i++) {
+    const beta = mu + (limit - mu) * (i / 400.0);
+    const val = b(beta);
+    if (!Number.isFinite(val)) {
+      previousF = null;
+      previousBeta = beta;
+      continue;
+    }
+    if (previousF !== null && previousF > 0 && val < 0) {
+      let lo = previousBeta;
+      let hi = beta;
+      for (let iter = 0; iter < 100; iter++) {
+        const mid = 0.5 * (lo + hi);
+        const midVal = b(mid);
+        if (!Number.isFinite(midVal)) break;
+        if (midVal > 0) lo = mid;
+        else hi = mid;
+      }
+      return 0.5 * (lo + hi);
+    }
+    previousF = val;
+    previousBeta = beta;
+  }
+  return null;
+}
+
+/**
+ * Post-shock state for an attached oblique shock: downstream Mach number and
+ * static pressure ratio p2/p1.
+ */
+function obliqueShockState(M1, beta, theta, gamma) {
+  const sinB = Math.sin(beta);
+  const M1n = M1 * sinB;
+  const M2nSq = (M1n * M1n + 2.0 / (gamma - 1.0)) / (((2.0 * gamma) / (gamma - 1.0)) * M1n * M1n - 1.0);
+  const pRatio = 1.0 + ((2.0 * gamma) / (gamma + 1.0)) * (M1n * M1n - 1.0);
+  if (M2nSq <= 0) return { M2: NaN, pRatio: NaN };
+  return { M2: Math.sqrt(M2nSq) / Math.sin(beta - theta), pRatio };
+}
+
+function pInf2Ratio(M1, beta, gamma) {
+  const sinB = Math.sin(beta);
+  const M1n = M1 * sinB;
+  return 1.0 + ((2.0 * gamma) / (gamma + 1.0)) * (M1n * M1n - 1.0);
+}
+
+/**
+ * Prandtl-Meyer expansion angle nu(M).
+ */
+function prandtlMeyerFunction(M, gamma) {
+  const gm1 = gamma - 1.0;
+  const gp1 = gamma + 1.0;
+  return Math.sqrt(gp1 / gm1) * Math.atan(Math.sqrt((gm1 * (M * M - 1.0)) / gp1)) - Math.atan(Math.sqrt(M * M - 1.0));
+}
+
+/**
+ * Inverse Prandtl-Meyer function: returns M for a target expansion angle.
+ * Returns NaN when the target exceeds the maximum expansion angle.
+ */
+function inversePrandtlMeyerFunction(targetNu, gamma) {
+  const maxNu = (Math.PI / 2.0) * (Math.sqrt((gamma + 1.0) / (gamma - 1.0)) - 1.0);
+  if (!Number.isFinite(targetNu) || targetNu < 0 || targetNu >= maxNu) return NaN;
+  let lo = 1.0;
+  let hi = 2000.0;
+  for (let iter = 0; iter < 200; iter++) {
+    const mid = 0.5 * (lo + hi);
+    const nu = prandtlMeyerFunction(mid, gamma);
+    if (Math.abs(nu - targetNu) <= 1e-12 * (1.0 + targetNu) || hi - lo <= 1e-12 * mid) return mid;
+    if (nu < targetNu) lo = mid;
+    else hi = mid;
+  }
+  return NaN;
+}
+
+function isentropicPressureRatio(M1, M2, gamma) {
+  const top = 1.0 + 0.5 * (gamma - 1.0) * M1 * M1;
+  const bottom = 1.0 + 0.5 * (gamma - 1.0) * M2 * M2;
+  return Math.pow(top / bottom, gamma / (gamma - 1.0));
+}
+
 // Module export for Node.js test environment and browser window globals
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { NasaRocketPropulsion };
+  module.exports = {
+    NasaRocketPropulsion,
+    solveNozzleExitMach,
+    solveObliqueShockBeta,
+    obliqueShockState,
+    thetaFromBeta,
+    prandtlMeyerFunction,
+    inversePrandtlMeyerFunction,
+    isentropicPressureRatio
+  };
 }
 if (typeof window !== 'undefined') {
   window.NasaRocketPropulsion = NasaRocketPropulsion;
+  window.solveNozzleExitMach = solveNozzleExitMach;
+  window.solveObliqueShockBeta = solveObliqueShockBeta;
+  window.prandtlMeyerFunction = prandtlMeyerFunction;
 }

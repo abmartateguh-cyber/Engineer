@@ -32,6 +32,7 @@ const { PlaceAndRouteEngine } = require('../src/core/eda/place_and_route_engine'
 const { EngineeringBOMManager } = require('../src/core/pdm/engineering_bom_manager');
 const { ActivityCoefficientModels } = require('../src/core/plant/activity_coefficient_models');
 const { OpticalThermalSoakEngine } = require('../src/core/optics/thermal_soak');
+const { RCWAGratingSolver } = require('../src/core/optics/rcwa_grating');
 const {
   CAD_PRIMITIVE_SCHEMA,
   CAD_EXPORT_OBJ_SCHEMA,
@@ -77,6 +78,7 @@ const {
   runHybridPrismTetMesh,
   runHex20Analysis
 } = require('../src/main/ipc/cae_ipc');
+const { SYNTHETIC_CONTINUUM_MATERIAL } = require('./support/synthetic_cae_materials');
 
 function runIndustrialGapClosureTests() {
   console.log('\n================================================================');
@@ -600,6 +602,23 @@ function runIndustrialGapClosureTests() {
     assert.strictEqual(stokes.stokes.DOP, 1);
   });
 
+  runTest('Unvalidated RCWA estimates fail closed instead of returning synthetic efficiencies', () => {
+    const result = RCWAGratingSolver.solveDiffractionOrders({
+      periodUm: 0.8,
+      grooveDepthUm: 0.3,
+      dutyCycle: 0.5,
+      nSubstrate: 1.5,
+      nIncident: 1,
+      wavelengthUm: 0.55,
+      incidentAngleDeg: 0
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, 'unavailable');
+    assert.strictEqual(result.validationLevel, 'experimental');
+    assert.strictEqual(result.error.code, 'UNSUPPORTED');
+    assert.strictEqual(Object.hasOwn(result, 'transmittedOrders'), false);
+  });
+
   runTest('3D beam route rejects implicit geometry and material defaults', () => {
     const missing = runTimoshenkoBeam({});
     assert.strictEqual(missing.success, false);
@@ -644,6 +663,15 @@ function runIndustrialGapClosureTests() {
   runTest('Shell, plasticity, and transonic routes require explicit model inputs', () => {
     assert.strictEqual(runShellMITC4({}).error.code, 'INVALID_INPUT');
     assert.strictEqual(runContinuumPlasticity({}).error.code, 'INVALID_INPUT');
+    assert.strictEqual(
+      runContinuumPlasticity({
+        material: { E: 210e9, nu: 0.3, yieldStress: 250e6 },
+        strainIncrement: [0, 0, 0, 0, 0, 0],
+        strainRate: 1,
+        temperature: 300
+      }).error.code,
+      'INVALID_INPUT'
+    );
     assert.strictEqual(runTransonicRiemann({}).error.code, 'INVALID_INPUT');
 
     const shell = runShellMITC4({
@@ -659,20 +687,7 @@ function runIndustrialGapClosureTests() {
     assert.strictEqual(shell.matrixSize, 576);
 
     const plasticity = runContinuumPlasticity({
-      material: {
-        E: 70e9,
-        nu: 0.33,
-        yieldStress: 270e6,
-        hardeningModulus: 500e6,
-        A: 270e6,
-        B: 450e6,
-        n: 0.42,
-        C: 0.015,
-        m: 1,
-        refStrainRate: 1,
-        Tmelt: 873.15,
-        Troom: 293.15
-      },
+      material: SYNTHETIC_CONTINUUM_MATERIAL,
       strainIncrement: [1e-4, 0, 0, 0, 0, 0],
       strainRate: 1,
       temperature: 293.15
@@ -976,13 +991,16 @@ function runIndustrialGapClosureTests() {
   // ----------------------------------------------------
   // Test 5: 3-Axis CAM Planar Roughing & ISO G-Code
   // ----------------------------------------------------
-  runTest('CNCToolpathEngine: 3-Axis planar roughing and ISO 6983 G-code post-processor', () => {
+  runTest('CNCToolpathEngine: 3-Axis planar roughing and illustrative G-code text', () => {
     const cam = new CNCToolpathEngine({
       toolDiameter: 8.0,
+      toolType: 'flat_endmill',
       stepdownMm: 4.0,
       stepoverMm: 4.8,
       feedRateMmMin: 1000,
-      spindleRpm: 8000
+      plungeRateMmMin: 250,
+      spindleRpm: 8000,
+      safeZ: 25
     });
 
     const bounds = { minX: -30, maxX: 30, minY: -20, maxY: 20, minZ: 0, maxZ: 20 };

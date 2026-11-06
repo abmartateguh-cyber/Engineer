@@ -14,19 +14,25 @@ const path = require('path');
 const { FEASolver } = require('../core/cae/fea_structural');
 const { FVMNavierStokes3D } = require('../core/cae/fvm_navier_stokes_3d');
 const { PolarizationRayTracer } = require('../core/optics/polarization_ray_tracer');
-const { OpticalGlassCatalog } = require('../core/optics/optical_glass_catalog');
 const { NaphtaliSandholmColumnSolver, WaterHammerMOC } = require('../core/plant/naphtali_sandholm_mesh');
-const { LefDefParser } = require('../core/eda/lef_def_parser');
-const { Sky130PdkAdapter } = require('../core/eda/sky130_pdk_adapter');
 const { StaticTimingAnalysis } = require('../core/eda/static_timing_analysis');
 const { AutocoderCRust } = require('../core/dynamic_simulink/autocoder_c_rust');
 const { MCDCCoverageAnalyzer } = require('../core/dynamic_simulink/mcdc_coverage');
-const { FmiMasterEngine, FmuSlave } = require('../core/cosim/fmi_master_engine');
 const { DomainDecompositionEngine } = require('../core/math/domain_decomposition');
+const { defaultEngineRegistry } = require('../core/contracts/engine_registry');
+
+function getOrCreateRoboticsAdapter(registry = defaultEngineRegistry) {
+  return registry?.hasAdapter?.('robotics') ? registry.getAdapter('robotics') : null;
+}
+
+function ensureRoboticsRegistered(registry = defaultEngineRegistry) {
+  return getOrCreateRoboticsAdapter(registry);
+}
 
 class HeadlessSolverDaemon {
   /** Returns a static process description, not a cluster readiness check. */
   static getHealth() {
+    ensureRoboticsRegistered(defaultEngineRegistry);
     return {
       status: 'experimental',
       releaseApproved: false,
@@ -34,6 +40,7 @@ class HeadlessSolverDaemon {
       platform: process.platform,
       arch: process.arch,
       nodeVersion: process.version,
+      registeredDomains: defaultEngineRegistry.listRegisteredDomains(),
       timestamp: new Date().toISOString()
     };
   }
@@ -75,7 +82,7 @@ class HeadlessSolverDaemon {
   /**
    * Dispatches and solves a batch engineering job
    * @param {Object} jobSpec
-   * @param {string} jobSpec.discipline - 'fea' | 'cfd' | 'plant' | 'optics' | 'eda' | 'controls'
+   * @param {string} jobSpec.discipline - 'fea' | 'cfd' | 'plant' | 'optics' | 'eda' | 'controls' | 'robotics'
    * @param {Object} jobSpec.parameters - Solver-specific input specification
    * @returns {Object} Solution results and execution telemetry
    */
@@ -103,24 +110,76 @@ class HeadlessSolverDaemon {
         break;
       }
       case 'cfd': {
+        if (!Number.isInteger(parameters.steps) || parameters.steps < 1) {
+          throw new TypeError('CFD headless dispatch requires an explicit positive integer steps value.');
+        }
         const cfd = new FVMNavierStokes3D(parameters);
-        result = cfd.solveSteps(parameters.steps || 50);
+        result = cfd.solveSteps(parameters.steps);
         break;
       }
       case 'plant': {
-        if (parameters.type === 'water_hammer') {
+        if (
+          parameters.operation === 'calculate_steam_properties' ||
+          parameters.type === 'steam' ||
+          parameters.type === 'iapws_if97'
+        ) {
+          const { IAPWS_IF97 } = require('../core/plant/iapws_if97');
+          result = IAPWS_IF97.calculateProperties(parameters.pressurePa, parameters.temperatureK);
+        } else if (parameters.operation === 'calculate_pinch_targets' || parameters.type === 'pinch') {
+          const { PinchEnergyTargeter } = require('../core/plant/pinch_energy_targeter');
+          result = PinchEnergyTargeter.calculateTargets(parameters.streams, parameters.deltaTmin);
+        } else if (parameters.operation === 'characterize_petroleum_assay' || parameters.type === 'assay') {
+          const { PetroleumAssayCharacterizer } = require('../core/plant/petroleum_assay_characterizer');
+          const assayParams = parameters.options || parameters;
+          const assay = new PetroleumAssayCharacterizer(assayParams);
+          result = assay.characterize(assayParams);
+        } else if (parameters.type === 'water_hammer') {
           result = WaterHammerMOC.solve(parameters);
         } else {
           result = NaphtaliSandholmColumnSolver.solve(parameters);
         }
         break;
       }
+      case 'pdm': {
+        const { EngineeringBOMManager } = require('../core/pdm/engineering_bom_manager');
+        const { GitCADVisualDiffEngine } = require('../core/pdm/git_cad_visual_diff');
+        if (parameters.operation === 'visual_diff_cad' || parameters.type === 'visual_diff') {
+          if (!Number.isFinite(parameters.toleranceMm) || !Number.isFinite(parameters.modificationThresholdMm)) {
+            throw new TypeError('CAD visual diff requires explicit toleranceMm and modificationThresholdMm.');
+          }
+          const diff = new GitCADVisualDiffEngine({
+            toleranceMm: parameters.toleranceMm,
+            modificationThresholdMm: parameters.modificationThresholdMm
+          });
+          result = diff.compareRevisions(parameters.revisionA, parameters.revisionB);
+        } else {
+          const manager = new EngineeringBOMManager();
+          manager.setRootAssembly(parameters.rootAssembly || parameters.rootItem || parameters.bom);
+          result = manager.computeRollUp();
+        }
+        break;
+      }
+      case 'hpc': {
+        const { HpcClusterGateway } = require('../core/hpc/hpc_cluster_gateway');
+        if (parameters.operation === 'generate_slurm_script' || parameters.type === 'slurm') {
+          result = HpcClusterGateway.generateSlurmScript(parameters);
+        } else if (parameters.operation === 'generate_pbs_script' || parameters.type === 'pbs') {
+          result = HpcClusterGateway.generatePbsScript(parameters);
+        } else if (parameters.operation === 'partition_rcb' || parameters.type === 'rcb') {
+          result = HpcClusterGateway.partitionRcb(parameters.points, parameters.numPartitions);
+        } else if (parameters.operation === 'plan_out_of_core' || parameters.type === 'plan_out_of_core') {
+          result = HpcClusterGateway.planOutOfCoreFrontal(
+            parameters.dofCount,
+            parameters.availableRamBytes,
+            parameters.assumptions
+          );
+        } else {
+          result = { status: 'unavailable', code: 'UNSUPPORTED', reason: 'An explicit HPC operation is required.' };
+        }
+        break;
+      }
       case 'optics': {
-        result = PolarizationRayTracer.evaluateFresnel(
-          parameters.n1 || 1.0,
-          parameters.n2 || 1.5,
-          parameters.thetaI || 0.0
-        );
+        result = PolarizationRayTracer.evaluateFresnel(parameters.n1, parameters.n2, parameters.thetaI);
         break;
       }
       case 'eda': {
@@ -133,16 +192,31 @@ class HeadlessSolverDaemon {
         } else if (parameters.action === 'autocode') {
           result = AutocoderCRust.generateMisraC(parameters);
         } else {
-          const master = new FmiMasterEngine(parameters.config || {});
-          result = master.solveAlgebraicLoop();
+          result = {
+            status: 'unavailable',
+            code: 'UNSUPPORTED',
+            reason: 'Headless controls co-simulation requires an explicit reviewed FMI model and is unavailable.'
+          };
         }
         break;
       }
+      case 'robotics': {
+        result = {
+          status: 'unavailable',
+          code: 'UNSUPPORTED',
+          reason:
+            'The synchronous headless robotics route has no validated adapter. Use EngineRegistry.dispatch for explicit experimental jobs.'
+        };
+        break;
+      }
       case 'partition': {
+        if (!Number.isInteger(parameters.numPartitions) || parameters.numPartitions < 1) {
+          throw new TypeError('Mesh partitioning requires an explicit positive integer numPartitions.');
+        }
         result = DomainDecompositionEngine.partitionMesh(
           parameters.nodes,
           parameters.elements,
-          parameters.numPartitions || 4
+          parameters.numPartitions
         );
         break;
       }
@@ -220,5 +294,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  HeadlessSolverDaemon
+  HeadlessSolverDaemon,
+  ensureRoboticsRegistered,
+  getOrCreateRoboticsAdapter
 };

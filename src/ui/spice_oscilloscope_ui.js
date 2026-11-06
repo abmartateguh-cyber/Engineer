@@ -7,7 +7,9 @@
 
 class SpiceOscilloscopeUI {
   constructor(containerId, solveCircuit) {
-    this.container = document.getElementById(containerId);
+    this.container = typeof containerId === 'string'
+      ? (typeof document !== 'undefined' && document ? document.getElementById(containerId) : null)
+      : (containerId || (typeof document !== 'undefined' && document ? document.getElementById(containerId) : null));
     this.solveCircuit = solveCircuit;
     this.canvas = null;
     this.ctx = null;
@@ -56,18 +58,18 @@ class SpiceOscilloscopeUI {
   }
 
   async _submitRequest(event) {
-    event.preventDefault();
-    const status = this.container.querySelector('#spice-run-status');
-    const button = this.container.querySelector('#spice-run-button');
-    const input = this.container.querySelector('#spice-request-json');
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    const status = this.container?.querySelector('#spice-run-status');
+    const button = this.container?.querySelector('#spice-run-button');
+    const input = this.container?.querySelector('#spice-request-json');
     if (!this.solveCircuit) {
-      status.textContent = 'The SPICE service is unavailable.';
+      if (status) status.textContent = 'The SPICE service is unavailable.';
       return;
     }
 
     let request;
     try {
-      request = JSON.parse(input.value);
+      request = JSON.parse(input ? input.value : '{}');
     } catch (error) {
       status.textContent = `Invalid JSON: ${error.message}`;
       return;

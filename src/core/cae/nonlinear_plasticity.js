@@ -1,7 +1,8 @@
 /**
  * OmniEng J2 von Mises Non-Linear Plasticity Solver
  * Standard: 3D Radial Return Mapping Algorithm with Isotropic Hardening
- * Experimental implementation: Ansys Mechanical / Abaqus Standard & Explicit material constitutive models.
+ * Experimental radial-return calculations using caller-supplied material properties.
+ * No material database or validated vendor implementation is provided.
  */
 
 class J2Plasticity {
@@ -19,7 +20,16 @@ class J2Plasticity {
    *   hardeningModulus: Plastic hardening slope H = d(sigma_y)/d(eps_p) (MPa)
    */
   static integrateStress(stressState, deltaStrain, materialProps) {
-    const { E, nu, yieldStress0, hardeningModulus = 0 } = materialProps;
+    if (!materialProps || typeof materialProps !== 'object') {
+      throw new TypeError('Explicit material properties are required.');
+    }
+    const { E, nu, yieldStress0, hardeningModulus } = materialProps;
+    if (
+      ![E, nu, yieldStress0, hardeningModulus].every(Number.isFinite) ||
+      E <= 0 || nu <= -1 || nu >= 0.5 || yieldStress0 <= 0 || hardeningModulus < 0
+    ) {
+      throw new RangeError('Provide finite E > 0, -1 < nu < 0.5, yieldStress0 > 0, and hardeningModulus >= 0 in consistent units.');
+    }
 
     const G = E / (2.0 * (1.0 + nu)); // Shear modulus
     const K = E / (3.0 * (1.0 - 2.0 * nu)); // Bulk modulus
@@ -132,55 +142,35 @@ class J2Plasticity {
   }
 
   /**
-   * Pre-configured high-performance aerospace and consumer materials.
-   */
-  static MATERIALS = {
-    'Al7075-T6': {
-      yieldStressMPa: 503.0,
-      hardeningModulusMPa: 1200.0,
-      E_MPa: 71700.0,
-      nu: 0.33
-    },
-    'Aluminum_7075_T6': {
-      yieldStressMPa: 503.0,
-      hardeningModulusMPa: 1200.0,
-      E_MPa: 71700.0,
-      nu: 0.33
-    },
-    'SS316L': {
-      yieldStressMPa: 290.0,
-      hardeningModulusMPa: 2100.0,
-      E_MPa: 193000.0,
-      nu: 0.28
-    },
-    'Ti-6Al-4V': {
-      yieldStressMPa: 880.0,
-      hardeningModulusMPa: 1800.0,
-      E_MPa: 114000.0,
-      nu: 0.34
-    }
-  };
-
-  /**
    * Direct radial return mapping on a 3D stress vector.
-   * @param {number[]} stress [sxx, syy, szz, sxy, syz, szx] in Pa or MPa
+   * @param {number[]} stressMPa [sxx, syy, szz, sxy, syz, szx] in MPa
    * @param {number} ep Cumulative plastic strain
-   * @param {string|Object} material Key or material props
+   * @param {Object} material Explicit material properties in MPa: yieldStressMPa,
+   *   hardeningModulusMPa, E_MPa, and nu.
    */
-  static radialReturnMapping(stress, ep = 0.0, material = 'Al7075-T6') {
-    const mat = (typeof material === 'string') ? (this.MATERIALS[material] || this.MATERIALS['Al7075-T6']) : material;
-    const isPa = Math.max(...stress.map(Math.abs)) > 1e5;
-    const s = isPa ? stress.map(v => v / 1e6) : [...stress]; // Convert to MPa
+  static radialReturnMapping(stressMPa, ep, material) {
+    if (
+      !Array.isArray(stressMPa) || stressMPa.length !== 6 || !stressMPa.every(Number.isFinite) ||
+      !Number.isFinite(ep) || ep < 0 || !material || typeof material !== 'object'
+    ) {
+      throw new TypeError('Provide six stress components in MPa, non-negative plastic strain, and explicit material properties.');
+    }
+    const y0 = material.yieldStressMPa;
+    const H = material.hardeningModulusMPa;
+    const E = material.E_MPa;
+    const nu = material.nu;
+    if (
+      ![y0, H, E, nu].every(Number.isFinite) || y0 <= 0 || H < 0 || E <= 0 || nu <= -1 || nu >= 0.5
+    ) {
+      throw new RangeError('Provide finite yieldStressMPa > 0, hardeningModulusMPa >= 0, E_MPa > 0, and -1 < nu < 0.5.');
+    }
+    const s = [...stressMPa];
 
     const p = (s[0] + s[1] + s[2]) / 3.0;
     const dev = [s[0] - p, s[1] - p, s[2] - p, s[3], s[4], s[5]];
     const J2 = 0.5 * (dev[0]*dev[0] + dev[1]*dev[1] + dev[2]*dev[2]) + (dev[3]*dev[3] + dev[4]*dev[4] + dev[5]*dev[5]);
     const vmTrial = Math.sqrt(3.0 * Math.max(0, J2));
 
-    const y0 = mat.yieldStressMPa || mat.yieldStress0 || 500.0;
-    const H = mat.hardeningModulusMPa !== undefined ? mat.hardeningModulusMPa : (mat.hardeningModulus || 0.0);
-    const E = mat.E_MPa || mat.E || 70000.0;
-    const nu = mat.nu || 0.33;
     const G = E / (2.0 * (1.0 + nu));
 
     const currentYield = y0 + H * ep;

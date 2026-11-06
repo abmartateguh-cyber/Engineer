@@ -1,0 +1,295 @@
+{
+  "pipingMaterialSpecification": {
+    "governingCodes": [
+      "ASME B31.3 (Process Piping)",
+      "ASME B16.5 (Pipe Flanges and Flanged Fittings)",
+      "ASME B16.9 (Factory-Made Wrought Buttwelding Fittings)",
+      "ASME B36.10M (Welded and Seamless Wrought Steel Pipe)",
+      "ASME B36.19M (Stainless Steel Pipe)",
+      "NACE MR0175 / ISO 15156 (Petroleum and Natural Gas Industries - Materials for use in H2S-containing environments)",
+      "API 600 / API 602 / API 6D (Pipeline and Piping Valves)",
+      "BS 6364 (Specification for Valves for Cryogenic Service)"
+    ],
+    "lineClasses": [
+      {
+        "classCode": "150L",
+        "service": "Cryogenic LNG, Cold BOG, Liquid Nitrogen",
+        "rating": "ASME Class 150",
+        "designPressureBarg": 19.6,
+        "designTemperatureRangeC": [-196.0, 65.0],
+        "corrosionAllowanceMm": 0.0,
+        "baseMetallurgy": "Austenitic Stainless Steel (ASTM A312 TP304L / TP316L)",
+        "pipeSpecification": {
+          "npsRange": "1/2\" to 48\"",
+          "standard": "ASME B36.19M",
+          "schedules": {
+            "smallBore_halfTo2Inch": "Sch 40S (seamless)",
+            "mediumBore_3To12Inch": "Sch 10S / 40S (seamless)",
+            "largeBore_14To48Inch": "Sch 10S (welded 100% RT)"
+          },
+          "impactTest": "Charpy V-notch impact tested at -196 °C (> 27 J average per ASTM A320)"
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5 / B16.47 Series A",
+          "facing": "Raised Face (RF, 125-250 AARH)",
+          "material": "ASTM A182 F304L / F316L",
+          "gasket": "Spiral wound SS316L with PTFE filler and SS316L inner/outer guide rings"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A320 Gr B8M Class 2 (Strain-hardened SS316)",
+          "nuts": "ASTM A194 Gr 8M"
+        },
+        "valveSpecification": {
+          "type": "Extended bonnet cryogenic valves per BS 6364 / API 6D",
+          "trim": "Stellite 6 hard-faced seats, Kel-F / PCTFE soft inserts for bubble-tight shutoff",
+          "stemPacking": "Die-formed flexible graphite with braided carbon anti-extrusion rings"
+        },
+        "insulation": "PIR (Polyisocyanurate) or Cryogenic Aerogel blanket with double aluminized Mylar vapor barrier and 0.8 mm stainless steel 316 cladding"
+      },
+      {
+        "classCode": "300L",
+        "service": "Cryogenic Precooled Natural Gas, Propane Chilling (-105 °C to +65 °C)",
+        "rating": "ASME Class 300",
+        "designPressureBarg": 51.0,
+        "designTemperatureRangeC": [-105.0, 65.0],
+        "corrosionAllowanceMm": 0.0,
+        "baseMetallurgy": "Austenitic Stainless Steel (ASTM A312 TP316L) or 9% Nickel Steel (ASTM A333 Gr 8)",
+        "pipeSpecification": {
+          "npsRange": "1/2\" to 36\"",
+          "standard": "ASME B36.19M / B36.10M",
+          "schedules": {
+            "smallBore": "Sch 80S",
+            "mediumBore": "Sch 40S",
+            "largeBore": "Sch 40S / Sch 80"
+          }
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5",
+          "facing": "Raised Face (RF)",
+          "material": "ASTM A182 F316L",
+          "gasket": "Spiral wound SS316L with Flexible Graphite filler and inner/outer rings"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A320 Gr L7M or B8M Cl 2",
+          "nuts": "ASTM A194 Gr 7M or 8M"
+        },
+        "valveSpecification": {
+          "type": "Cryogenic extended bonnet ball and globe valves",
+          "trim": "SS316L with satellite overlay"
+        },
+        "insulation": "PIR foam with multi-layer vapor barrier"
+      },
+      {
+        "classCode": "600L",
+        "service": "High-Pressure Cryogenic LNG Sendout (Booster Pump Discharge)",
+        "rating": "ASME Class 600",
+        "designPressureBarg": 102.0,
+        "designTemperatureRangeC": [-162.0, 65.0],
+        "corrosionAllowanceMm": 0.0,
+        "baseMetallurgy": "Heavy-Wall Austenitic Stainless Steel (ASTM A312 TP316L)",
+        "pipeSpecification": {
+          "npsRange": "2\" to 24\"",
+          "standard": "ASME B36.19M",
+          "schedules": {
+            "smallBore": "Sch 160",
+            "mediumBore": "Sch 80S",
+            "largeBore": "Sch 80S / Sch 160"
+          }
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5",
+          "facing": "Ring Type Joint (RTJ)",
+          "material": "ASTM A182 F316L",
+          "gasket": "Octagonal Soft Iron / SS316 Ring Joint Gasket per ASME B16.20"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A320 Gr B8M Class 2",
+          "nuts": "ASTM A194 Gr 8M"
+        },
+        "valveSpecification": {
+          "type": "High-pressure cryogenic top-entry ball and axial flow check valves",
+          "trim": "Solid Stellite 6 with tungsten carbide coating"
+        },
+        "insulation": "Cryogenic Aerogel blankets with 1.0 mm SS316 protective jacket"
+      },
+      {
+        "classCode": "600S",
+        "service": "High-Pressure Sour Feed Gas (Wet H2S + CO2 Service, NACE MR0175)",
+        "rating": "ASME Class 600",
+        "designPressureBarg": 102.0,
+        "designTemperatureRangeC": [-29.0, 120.0],
+        "corrosionAllowanceMm": 3.0,
+        "baseMetallurgy": "NACE HIC-Resistant Carbon Steel (ASTM A106 Gr B / ASTM A333 Gr 6)",
+        "pipeSpecification": {
+          "npsRange": "1/2\" to 36\"",
+          "standard": "ASME B36.10M",
+          "specialRequirements": [
+            "NACE MR0175 / ISO 15156 compliant",
+            "Hydrogen Induced Cracking (HIC) tested per NACE TM0284 (CLR <= 15%, CTR <= 5%)",
+            "Sulfide Stress Corrosion Cracking (SSCC) tested per NACE TM0177 Method A",
+            "Hardness strictly capped at <= 22 HRC (248 HV10)",
+            "Carbon equivalent CE <= 0.42%",
+            "Sulfur content <= 0.002%, Calcium treated for inclusion shape control"
+          ],
+          "schedules": {
+            "smallBore": "Sch 160",
+            "mediumBore": "Sch 80",
+            "largeBore": "Sch 80 / Sch 100"
+          }
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5",
+          "facing": "Raised Face (RF)",
+          "material": "ASTM A105N (Normalized, NACE compliant)",
+          "gasket": "Spiral wound SS316 with Flexible Graphite filler and inner ring"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A193 Gr B7M (100% hardness tested <= 235 HBW)",
+          "nuts": "ASTM A194 Gr 2HM"
+        },
+        "valveSpecification": {
+          "type": "Trunnion-mounted ball valves with double block and bleed (DBB)",
+          "body": "ASTM A216 WCB / WCC (NACE)",
+          "trim": "Electroless Nickel Plated (ENP 75 um) or Inconel 625 overlaid seats/ball"
+        },
+        "insulation": "Hot conservation / acoustic insulation where required"
+      },
+      {
+        "classCode": "150A",
+        "service": "Amine Solution (45 wt% aMDEA + 5 wt% Piperazine)",
+        "rating": "ASME Class 150",
+        "designPressureBarg": 19.6,
+        "designTemperatureRangeC": [0.0, 150.0],
+        "corrosionAllowanceMm": 3.0,
+        "baseMetallurgy": "Carbon Steel ASTM A106 Gr B with 100% PWHT per API RP 945",
+        "pipeSpecification": {
+          "npsRange": "1/2\" to 30\"",
+          "standard": "ASME B36.10M",
+          "specialRequirements": [
+            "100% Post-Weld Heat Treatment (PWHT) for all welds regardless of thickness to prevent Amine Stress Corrosion Cracking (ASCC)",
+            "Maximum velocity limited to <= 1.8 m/s for carbon steel to prevent erosion-corrosion",
+            "ASTM A312 TP316L used for rich amine piping exceeding 1.8 m/s and regenerator overhead vapor lines"
+          ],
+          "schedules": {
+            "smallBore": "Sch 80",
+            "mediumBore": "Sch 40",
+            "largeBore": "Sch 40"
+          }
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5",
+          "facing": "Raised Face (RF)",
+          "material": "ASTM A105N (PWHT)",
+          "gasket": "Spiral wound SS316 with Flexible Graphite filler"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A193 Gr B7",
+          "nuts": "ASTM A194 Gr 2H"
+        },
+        "valveSpecification": {
+          "type": "Full bore ball and gate valves with PWHT carbon steel bodies",
+          "trim": "Full 316 Stainless Steel trim (API Trim 10)"
+        },
+        "insulation": "Thermal conservation insulation (Rockwool / Mineral wool with aluminum jacket)"
+      },
+      {
+        "classCode": "150SJ",
+        "service": "Liquid Elemental Sulfur (Steam Jacketed)",
+        "rating": "ASME Class 150",
+        "designPressureBarg": 10.0,
+        "designTemperatureRangeC": [130.0, 160.0],
+        "corrosionAllowanceMm": 1.5,
+        "baseMetallurgy": "Seamless Carbon Steel ASTM A106 Gr B with Concentric Steam Jacket",
+        "pipeSpecification": {
+          "corePipe": "ASTM A106 Gr B Sch 40 (carries molten sulfur at 135 - 145 °C)",
+          "jacketPipe": "ASTM A106 Gr B Sch 40 (carries 4.0 barg saturated steam at 151 °C)",
+          "sizingRule": "Core NPS 2\" has Jacket NPS 3\"; Core NPS 3\" has Jacket NPS 4\"; Core NPS 4\" has Jacket NPS 6\""
+        },
+        "flangeSpecification": {
+          "standard": "Modified jacketed ASME B16.5 flanges",
+          "facing": "Raised Face",
+          "material": "ASTM A105N",
+          "gasket": "Corrugated SS316 with flexible graphite"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A193 Gr B7",
+          "nuts": "ASTM A194 Gr 2H"
+        },
+        "valveSpecification": {
+          "type": "Full jacketed plug valves with steam heating jacket surrounding body and bonnet",
+          "trim": "Hardened alloy with anti-seize sulfur sealing"
+        },
+        "insulation": "Mineral wool preformed pipe sections with embossed aluminum jacketing"
+      },
+      {
+        "classCode": "150SW",
+        "service": "Seawater Cooling Water (Intake, Distribution, and Return)",
+        "rating": "ASME Class 150",
+        "designPressureBarg": 10.0,
+        "designTemperatureRangeC": [5.0, 45.0],
+        "corrosionAllowanceMm": 0.0,
+        "baseMetallurgy": "25% Cr Super Duplex Stainless Steel (UNS S32750 / ASTM A790) or Titanium Grade 2",
+        "pipeSpecification": {
+          "npsRange": "2\" to 60\"",
+          "standard": "ASME B36.19M / ASME B36.10M",
+          "pittingResistanceIndex": "PREN = Cr + 3.3 Mo + 16 N >= 42.0 (guarantees zero pitting in marine seawater up to 45 °C)",
+          "schedules": {
+            "smallBore": "Sch 40S Super Duplex",
+            "mediumBore": "Sch 10S Super Duplex",
+            "largeBore_header": "Sch 10S Super Duplex or GRP (Glass Reinforced Plastic) for underground mains"
+          }
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5 / B16.47",
+          "facing": "Flat Face (FF) or Raised Face (RF)",
+          "material": "ASTM A182 F53 (UNS S32750 Super Duplex)",
+          "gasket": "EPDM full-face elastomeric or PTFE envelope with non-asbestos core"
+        },
+        "boltingSpecification": {
+          "studs": "Super Duplex UNS S32750 or ASTM A193 B7 fluoropolymer coated (PTFE/Xylan 1070)",
+          "nuts": "Super Duplex UNS S32750 or ASTM A194 2H coated"
+        },
+        "valveSpecification": {
+          "type": "High-performance butterfly valves with Super Duplex disc and Monel K-500 shaft",
+          "body": "Super Duplex ASTM A890 Gr 5A / 2507 or Ni-Al Bronze"
+        },
+        "insulation": "Anti-condensation insulation in indoor and high-humidity areas"
+      },
+      {
+        "classCode": "600H",
+        "service": "High-Pressure Superheated Steam (HRSG to Steam Turbine & WHB)",
+        "rating": "ASME Class 600",
+        "designPressureBarg": 45.0,
+        "designTemperatureRangeC": [20.0, 420.0],
+        "corrosionAllowanceMm": 1.5,
+        "baseMetallurgy": "Low-Alloy Chrome-Moly Steel (ASTM A335 Gr P11 / 1.25 Cr - 0.5 Mo)",
+        "pipeSpecification": {
+          "npsRange": "1/2\" to 24\"",
+          "standard": "ASME B36.10M",
+          "creepRuptureStrength": "Designed for 200,000 hours operating life at 400 °C per ASME Section II Part D",
+          "schedules": {
+            "smallBore": "Sch 80",
+            "mediumBore": "Sch 80",
+            "largeBore": "Sch 80"
+          }
+        },
+        "flangeSpecification": {
+          "standard": "ASME B16.5",
+          "facing": "Raised Face (RF)",
+          "material": "ASTM A182 F11 Class 2",
+          "gasket": "Spiral wound SS316 with expanded graphite filler and carbon steel outer ring"
+        },
+        "boltingSpecification": {
+          "studs": "ASTM A193 Gr B16 (high-temperature chrome-moly-vanadium)",
+          "nuts": "ASTM A194 Gr 4 or Gr 7"
+        },
+        "valveSpecification": {
+          "type": "Cast chrome-moly steel gate, globe, and swing check valves per API 600",
+          "body": "ASTM A217 Gr WC6",
+          "trim": "API Trim 5 (Full Stellite hardfaced seats and disc)"
+        },
+        "insulation": "Calcium Silicate / Rockwool thermal insulation with 0.8 mm stucco embossed aluminum jacket"
+      }
+    ]
+  }
+}

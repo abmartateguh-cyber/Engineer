@@ -1,20 +1,15 @@
 /**
- * OmniEng Variable-Radius Rolling-Ball Fillet & Gregory Corner Blend Engine
- * 
- * Implements advanced CAD surface blending matching Parasolid / ACIS / CATIA:
- * 1. Variable-radius rolling-ball spine curve calculation R(t) = (1-t)R0 + t*R1.
- * 2. G1/G2 tangent and curvature continuous spine offset contact ribbons.
- * 3. N-sided Gregory corner blend patches resolving multi-edge vertex singularities.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental sampled fillet-mesh and corner-point blending helpers. The
+ * generated mesh does not compute rolling-ball contact against input surfaces,
+ * enforce G1/G2 continuity, or construct a mathematical Gregory patch.
  */
 
 'use strict';
 
 class GregoryCornerPatch {
   /**
-   * Represents an N-sided Gregory patch for corner vertex smoothing.
-   * Gregory patches overcome the twist vector incompatibility of standard Coons/Bezier patches.
+   * Legacy API name for a weighted blend of sampled boundary points. This is
+   * not a mathematical Gregory surface patch.
    * @param {Array<Object>} boundaryCurves Array of boundary curves { evaluate(t), normal(t), tangent(t) }
    */
   constructor(boundaryCurves = []) {
@@ -33,8 +28,12 @@ class GregoryCornerPatch {
       throw new Error(`Barycentric coordinates length (${barycentricCoords.length}) must match nSides (${N})`);
     }
 
-    let sumX = 0, sumY = 0, sumZ = 0;
-    let sumNx = 0, sumNy = 0, sumNz = 0;
+    let sumX = 0,
+      sumY = 0,
+      sumZ = 0;
+    let sumNx = 0,
+      sumNy = 0,
+      sumNz = 0;
     let totalWeight = 0;
 
     for (let i = 0; i < N; i++) {
@@ -71,7 +70,7 @@ class VariableRadiusFilletEngine {
    * @param {Array<Object>} edgeSpec.spinePoints - Discrete points along the edge curve [{ x, y, z }]
    * @param {number} edgeSpec.startRadius - Starting fillet radius R0 (mm)
    * @param {number} edgeSpec.endRadius - Ending fillet radius R1 (mm)
-   * @param {Object} [edgeSpec.continuity='G1'] - 'G1' (tangent) or 'G2' (curvature continuous)
+   * @param {Object} [edgeSpec.continuity='G1'] - Descriptive label copied to the result; continuity is not enforced.
    * @returns {Object} Fillet surface representation
    */
   static generateVariableFillet(edgeSpec) {
@@ -100,7 +99,9 @@ class VariableRadiusFilletEngine {
 
       const pCur = spinePoints[i];
       // Tangent vector along spine
-      let tx = 0, ty = 0, tz = 1;
+      let tx = 0,
+        ty = 0,
+        tz = 1;
       if (i < nSpine - 1) {
         tx = spinePoints[i + 1].x - pCur.x;
         ty = spinePoints[i + 1].y - pCur.y;
@@ -111,15 +112,23 @@ class VariableRadiusFilletEngine {
         tz = pCur.z - spinePoints[i - 1].z;
       }
       const tLen = Math.hypot(tx, ty, tz) || 1.0;
-      tx /= tLen; ty /= tLen; tz /= tLen;
+      tx /= tLen;
+      ty /= tLen;
+      tz /= tLen;
 
       // Normal and binormal vectors for cross-section
-      let nx = -ty, ny = tx, nz = 0;
+      let nx = -ty,
+        ny = tx,
+        nz = 0;
       let nLen = Math.hypot(nx, ny, nz);
       if (nLen < 1e-4) {
-        nx = 1; ny = 0; nz = 0;
+        nx = 1;
+        ny = 0;
+        nz = 0;
       } else {
-        nx /= nLen; ny /= nLen; nz /= nLen;
+        nx /= nLen;
+        ny /= nLen;
+        nz /= nLen;
       }
 
       // Binormal B = T x N
@@ -171,8 +180,8 @@ class VariableRadiusFilletEngine {
    */
   static blendMultiEdgeCorner(incidentFillets = []) {
     const N = incidentFillets.length;
-    if (N < 3) {
-      throw new Error(`Corner blend requires at least 3 incident fillets (got ${N})`);
+    if (N < 2) {
+      throw new Error(`Corner blend requires at least 2 incident fillets (got ${N})`);
     }
 
     const boundaryCurves = [];
@@ -193,7 +202,10 @@ class VariableRadiusFilletEngine {
   }
 }
 
+const VariableFilletGregory = VariableRadiusFilletEngine;
+
 module.exports = {
   GregoryCornerPatch,
-  VariableRadiusFilletEngine
+  VariableRadiusFilletEngine,
+  VariableFilletGregory
 };

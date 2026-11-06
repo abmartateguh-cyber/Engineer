@@ -56,8 +56,45 @@ const CAD_SHELL_BODY_SCHEMA = Object.freeze({
   }
 });
 
+const CAD_SHEET_METAL_SCHEMA = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  required: ['bend', 'flanges', 'lengthUnit'],
+  properties: {
+    lengthUnit: { type: 'string', enum: ['mm'], maxLength: 2 },
+    bend: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['angleDeg', 'innerRadiusMm', 'thicknessMm', 'kFactor', 'direction'],
+      properties: {
+        angleDeg: { type: 'number', min: Number.MIN_VALUE, max: 179.999 },
+        innerRadiusMm: { type: 'number', min: Number.MIN_VALUE, max: 1e6 },
+        thicknessMm: { type: 'number', min: Number.MIN_VALUE, max: 1e6 },
+        kFactor: { type: 'number', min: 0, max: 1 },
+        direction: { type: 'string', enum: ['UP', 'DOWN'], maxLength: 4 }
+      }
+    },
+    flanges: {
+      type: 'array',
+      minItems: 2,
+      maxItems: 2,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'lengthMm', 'widthMm'],
+        properties: {
+          name: { type: 'string', maxLength: 128 },
+          lengthMm: { type: 'number', min: Number.MIN_VALUE, max: 1e6 },
+          widthMm: { type: 'number', min: Number.MIN_VALUE, max: 1e6 }
+        }
+      }
+    }
+  }
+});
+
 module.exports = {
   CAD_EXTRUDE_PROFILE_SCHEMA,
   CAD_REVOLVE_PROFILE_SCHEMA,
-  CAD_SHELL_BODY_SCHEMA
+  CAD_SHELL_BODY_SCHEMA,
+  CAD_SHEET_METAL_SCHEMA
 };

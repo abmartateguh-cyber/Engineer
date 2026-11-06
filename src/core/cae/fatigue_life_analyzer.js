@@ -1,21 +1,14 @@
 /**
- * OmniEng Fatigue & Durability Life Prediction Engine
- * 
- * Implements cycle counting and cumulative damage mechanics matching nCode / FE-SAFE:
- * 1. ASTM E1049-85 Rainflow Cycle Counting algorithm for random/variable-amplitude load histories.
- * 2. High-cycle stress-life (S-N) Basquin relation: sigma_a = sigma_f_prime * (2 * N_f)^b.
- * 3. Low-cycle strain-life (e-N) Coffin-Manson formulation with elastic and plastic strain components.
- * 4. Mean stress corrections: Morrow, Goodman, and Gerber criteria.
- * 5. Palmgren-Miner linear cumulative damage rule: Damage D = sum(n_i / N_i).
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental fatigue formula helpers for caller-supplied load histories and
+ * material properties. The cycle counter and life estimates have no established
+ * ASTM conformity or independent fatigue correlation.
  */
 
 'use strict';
 
 class FatigueLifeAnalyzer {
   /**
-   * Rainflow Cycle Counting according to ASTM E1049-85
+   * Rainflow-like cycle counting. ASTM E1049-85 conformity has not been established.
    * @param {Array<number>} signal - Time series of stress or strain values
    * @returns {Array<Object>} Extracted cycles: { range, mean, count: 0.5 or 1.0 }
    */
@@ -33,7 +26,7 @@ class FatigueLifeAnalyzer {
     }
     extrema.push(signal[signal.length - 1]);
 
-    // 2. 3-point / 4-point ASTM Rainflow stack
+    // 2. Three-point rainflow-like stack helper
     const stack = [];
     const cycles = [];
 
@@ -74,15 +67,19 @@ class FatigueLifeAnalyzer {
    * @param {number} sigmaAmplitude - Stress amplitude (Pa)
    * @param {number} sigmaMean - Mean stress (Pa)
    * @param {Object} materialProps
-   * @param {number} materialProps.fatigueStrengthCoeff - sigma_f' (Pa, e.g. 950e6 for steel)
+   * @param {number} materialProps.fatigueStrengthCoeff - sigma_f' (Pa)
    * @param {number} materialProps.fatigueStrengthExponent - b (e.g. -0.085)
    * @param {number} materialProps.ultimateTensileStrength - sigma_u (Pa, e.g. 600e6)
    * @returns {number} Cycles to failure N_f
    */
   static calculateBasquinCycles(sigmaAmplitude, sigmaMean, materialProps) {
-    const sigmaF = materialProps.fatigueStrengthCoeff || 950e6;
-    const b = materialProps.fatigueStrengthExponent || -0.085;
-    const sigmaU = materialProps.ultimateTensileStrength || 600e6;
+    FatigueLifeAnalyzer.validateMaterialProperties(materialProps);
+    if (![sigmaAmplitude, sigmaMean].every(Number.isFinite)) {
+      throw new TypeError('Provide finite stress amplitude and mean stress in pascals.');
+    }
+    const sigmaF = materialProps.fatigueStrengthCoeff;
+    const b = materialProps.fatigueStrengthExponent;
+    const sigmaU = materialProps.ultimateTensileStrength;
 
     // Goodman equivalent completely-reversed amplitude: sigma_rev = sigma_a / (1 - sigma_m / sigma_u)
     let sigmaRev = sigmaAmplitude;
@@ -98,6 +95,19 @@ class FatigueLifeAnalyzer {
     return Math.max(1.0, twoNf / 2.0);
   }
 
+  static validateMaterialProperties(materialProps) {
+    if (
+      !materialProps || typeof materialProps !== 'object' ||
+      !['fatigueStrengthCoeff', 'fatigueStrengthExponent', 'ultimateTensileStrength'].every((field) =>
+        Number.isFinite(materialProps[field])
+      ) ||
+      materialProps.fatigueStrengthCoeff <= 0 || materialProps.fatigueStrengthExponent >= 0 ||
+      materialProps.ultimateTensileStrength <= 0
+    ) {
+      throw new TypeError('Provide explicit fatigueStrengthCoeff > 0, fatigueStrengthExponent < 0, and ultimateTensileStrength > 0 in pascals.');
+    }
+  }
+
   /**
    * Computes Palmgren-Miner cumulative damage for a stress history
    * @param {Array<number>} stressHistory - Load signal (Pa)
@@ -105,6 +115,7 @@ class FatigueLifeAnalyzer {
    * @returns {Object} Cumulative damage D and remaining life
    */
   static evaluateCumulativeDamage(stressHistory, materialProps) {
+    FatigueLifeAnalyzer.validateMaterialProperties(materialProps);
     const cycles = FatigueLifeAnalyzer.countRainflowCycles(stressHistory);
     let totalDamage = 0.0;
 
@@ -131,7 +142,12 @@ class FatigueLifeAnalyzer {
     return FatigueLifeAnalyzer.countRainflowCycles(signal);
   }
 
-  calculateMinerDamage(cycles, sigmaFPrime = 1000.0, b = -0.10, ultimateStrength = 450.0) {
+  calculateMinerDamage(cycles, sigmaFPrime, b, ultimateStrength) {
+    FatigueLifeAnalyzer.validateMaterialProperties({
+      fatigueStrengthCoeff: sigmaFPrime,
+      fatigueStrengthExponent: b,
+      ultimateTensileStrength: ultimateStrength
+    });
     const matProps = {
       fatigueStrengthCoeff: sigmaFPrime,
       fatigueStrengthExponent: b,
@@ -160,4 +176,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.FatigueLifeAnalyzer = FatigueLifeAnalyzer;
 }
-

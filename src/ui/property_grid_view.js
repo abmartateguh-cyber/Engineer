@@ -34,10 +34,7 @@
       input.type = type;
       input.id = id;
       input.value = String(value);
-      for (const [key, item] of Object.entries(extra)) {
-        if (key === 'style') Object.assign(input.style, item);
-        else input[key] = item;
-      }
+      for (const [key, item] of Object.entries(extra)) input[key] = item;
       return input;
     };
 
@@ -100,10 +97,8 @@
       const row = create('div', 'prop-grid-row');
       row.appendChild(create('label', '', 'Width / Height'));
       const group = create('div', 'prop-input-group');
-      const widthInput = makeInput('number', 'prop-input-w', width);
-      widthInput.style.width = '50%';
-      const heightInput = makeInput('number', 'prop-input-h', height);
-      heightInput.style.width = '50%';
+      const widthInput = makeInput('number', 'prop-input-w', width, { className: 'pgrid-field-half' });
+      const heightInput = makeInput('number', 'prop-input-h', height, { className: 'pgrid-field-half' });
       group.appendChild(widthInput);
       group.appendChild(heightInput);
       row.appendChild(group);
@@ -113,31 +108,15 @@
     const elements = [header, transform, geometry];
 
     if (props.wbsId || props.userData?.isNasaEntity || props.userData?.isSyntheticExample) {
-      const metadata = create('div', 'prop-section');
-      Object.assign(metadata.style, {
-        border: '1px solid rgba(249,115,22,0.35)',
-        background: 'rgba(249,115,22,0.06)',
-        borderRadius: '6px',
-        padding: '10px',
-        marginTop: '10px'
-      });
-      const metadataTitle = create('div', '', 'ILLUSTRATIVE MODEL METADATA');
-      Object.assign(metadataTitle.style, {
-        fontSize: '11px',
-        fontWeight: '700',
-        color: 'var(--accent-orange)',
-        marginBottom: '6px'
-      });
-      const metadataText = create('div', '', 'This geometry is not a source-verified aerospace subsystem record.');
-      Object.assign(metadataText.style, { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' });
-      const inspectButton = create('button', 'ribbon-btn', 'View subsystem data availability');
+      const metadata = create('div', 'prop-section pgrid-metadata-section');
+      const metadataTitle = create('div', 'pgrid-metadata-title', 'ILLUSTRATIVE MODEL METADATA');
+      const metadataText = create(
+        'div',
+        'pgrid-metadata-text',
+        'This geometry is not a source-verified aerospace subsystem record.'
+      );
+      const inspectButton = create('button', 'ribbon-btn pgrid-inspect-btn', 'View subsystem data availability');
       inspectButton.id = 'btn-inspect-wbs-entity';
-      Object.assign(inspectButton.style, {
-        width: '100%',
-        fontSize: '10px',
-        justifyContent: 'center',
-        padding: '5px 8px'
-      });
       metadata.appendChild(metadataTitle);
       metadata.appendChild(metadataText);
       metadata.appendChild(inspectButton);

@@ -657,7 +657,7 @@ class NasaSpaceRocket3D {
     });
 
     const avionicsGoldMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b, // Rad-hard gold plated electronics chassis
+      color: 0xf59e0b, // Illustrative warm metallic electronics appearance
       metalness: 0.95,
       roughness: 0.18
     });
@@ -1014,7 +1014,7 @@ class NasaSpaceRocket3D {
     );
     avionicsBay.add(avionicsRack);
 
-    // 3 Gold-Anodized Rad-Hard Computers (TMR Architecture)
+    // Three illustrative avionics enclosure shapes
     [-1.6, 0, 1.6].forEach((ax, aidx) => {
       const comp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.2, 2.0), avionicsGoldMat);
       comp.position.set(ax, 0.2, 0.4);

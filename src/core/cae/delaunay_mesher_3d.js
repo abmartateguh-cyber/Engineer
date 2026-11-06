@@ -501,10 +501,10 @@ class DelaunayMesher3D {
     return {
       nodes: coreMesh.nodes,
       prisms: prismMesh.prisms,
-      tets: coreMesh.tets,
+      tets: coreMesh.tets || coreMesh.elements || [],
       statistics: {
         prismCount: prismMesh.prisms.length,
-        tetCount: coreMesh.tets.length,
+        tetCount: (coreMesh.tets || coreMesh.elements || []).length,
         totalNodes: coreMesh.nodes.length,
         firstLayerHeightM: firstLayerHeight,
         growthRatio: prismOptions.growthRatio || 1.2,

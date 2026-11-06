@@ -977,6 +977,51 @@ function registerEdaIpc() {
       description: 'Unavailable experimental ignition circuit example; no source-verified circuit model exists'
     }
   );
+
+  // 19. Caller-input signal integrity and power estimation via the EDA engine adapter
+  defineHandler(
+    'omni:evaluate-signal-integrity-power',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, params = {}) => {
+      if (!params || typeof params !== 'object' || Array.isArray(params)) {
+        throw new Error('evaluate-signal-integrity-power requires an object payload.');
+      }
+      const kind = params.kind === 'power' ? 'power' : 'signal';
+      const operation = kind === 'power' ? 'analyze_ir_drop' : 'evaluate_crosstalk';
+      if (kind === 'power' && (!Number.isFinite(params.vdd) || params.vdd <= 0)) {
+        return invalidEdaInput('Power estimation requires a positive caller-supplied vdd.');
+      }
+      const { JobRequest } = require('../../core/contracts/JobRequest');
+      const { defaultEngineRegistry } = require('../../core/contracts/engine_registry');
+      try {
+        const jobResult = await defaultEngineRegistry.dispatch(
+          new JobRequest({ domain: 'eda', operation, parameters: params })
+        );
+        return {
+          success: true,
+          kind,
+          jobId: jobResult.jobId,
+          status: jobResult.status,
+          outputData: jobResult.outputData,
+          ...(jobResult.outputData || {})
+        };
+      } catch (error) {
+        return {
+          success: false,
+          status: 'invalid-input',
+          validationLevel: 'experimental',
+          error: { code: error.code || 'INVALID_INPUT', message: error.message }
+        };
+      }
+    },
+    {
+      domain: 'eda',
+      description: 'Experimental caller-input crosstalk or power-grid IR-drop estimate; not foundry or signoff results'
+    }
+  );
 }
 
 module.exports = {

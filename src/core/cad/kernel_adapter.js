@@ -13,7 +13,7 @@
 
 'use strict';
 
-const { BRepPrimitives, SolidBody, Vertex, Edge, Face } = require('./brep_topology');
+const { BRepPrimitives, SolidBody } = require('./brep_topology');
 const { CSGMeshBooleans } = require('./csg_mesh_booleans');
 const { EdgeBlender } = require('./edge_blender');
 const { PersistentNamingManager } = require('./persistent_naming_manager');
@@ -27,7 +27,7 @@ class GeometryKernelAdapter {
    */
   constructor(options = {}) {
     this.preferredBackend = options.preferredBackend || 'legacy-mesh-brep';
-    this.occt = options.occtInstance || (typeof window !== 'undefined' ? window.occt : null);
+    this.occt = options.occtInstance || (typeof window !== 'undefined' ? window.occt : null) || null;
     this.namingManager = new PersistentNamingManager();
     this.activeBackend = 'legacy-mesh-brep';
   }
@@ -197,7 +197,15 @@ class GeometryKernelAdapter {
 // Global default adapter
 const defaultGeometryKernel = new GeometryKernelAdapter();
 
+GeometryKernelAdapter.applyFillet = function(body, edgeIndices, radius, featureId = 'Fillet') {
+  return defaultGeometryKernel.applyFillet(body, edgeIndices, radius, featureId);
+};
+
+const KernelAdapter = GeometryKernelAdapter;
+
 module.exports = {
   GeometryKernelAdapter,
-  defaultGeometryKernel
+  KernelAdapter,
+  defaultGeometryKernel,
+  CSGMeshBooleans
 };

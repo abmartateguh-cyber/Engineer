@@ -1,11 +1,7 @@
 /**
- * OmniEng Edge Blender: Rolling-Ball Fillet & Chamfer Generation Engine
- * Experimental implementation: Siemens NX / CATIA B-Rep Edge Blending & Chamfering
- *
- * Implements spherical envelope rolling-ball offset fillets, variable radius blends,
- * and asymmetric planar chamfers on 3D B-Rep solids and meshes.
- *
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental mesh edge-blend and planar chamfer helpers. Output topology,
+ * geometric continuity, and behavior on general B-rep solids have not been
+ * independently validated.
  */
 
 const { Vector3 } = require('../math/linear_algebra');
@@ -21,21 +17,170 @@ class EdgeBlender {
    * @param {number} [options.subdivisions=8] - Radial cross-section angular segments
    * @returns {SolidBody} The modified solid body with blend faces
    */
+  static _readPoint(value, label) {
+    const coordinates = Array.isArray(value)
+      ? value
+      : value && typeof value === 'object'
+        ? [value.x, value.y, value.z]
+        : null;
+    if (
+      !coordinates ||
+      coordinates.length !== 3 ||
+      !coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))
+    ) {
+      throw new TypeError(`${label} must contain exactly three finite numeric coordinates.`);
+    }
+    return value instanceof Vector3 ? value.clone() : new Vector3(...coordinates);
+  }
+
+  static _hydrateSolid(solid) {
+    if (!solid || typeof solid !== 'object' || Array.isArray(solid)) {
+      throw new TypeError('Edge blending requires a solid object.');
+    }
+
+    if (!(solid instanceof SolidBody)) {
+      if (!Array.isArray(solid.vertices) || !Array.isArray(solid.faces) || solid.faces.length === 0) {
+        throw new TypeError('Serialized edge-blend solids require vertex and face arrays.');
+      }
+
+      const hydrated = new SolidBody(
+        typeof solid.name === 'string' && solid.name.trim() ? solid.name : 'HydratedSolid'
+      );
+      if (typeof solid.id === 'string') hydrated.id = solid.id;
+      const vertexMap = new Map();
+
+      for (const [index, sourceVertex] of solid.vertices.entries()) {
+        if (!sourceVertex || typeof sourceVertex !== 'object') {
+          throw new TypeError(`Serialized vertex ${index} must be an object.`);
+        }
+        const point = EdgeBlender._readPoint(sourceVertex.point ?? sourceVertex, `Serialized vertex ${index}`);
+        const vertex = new Vertex(point.x, point.y, point.z);
+        if (sourceVertex.id !== undefined) {
+          if (vertexMap.has(sourceVertex.id)) throw new TypeError(`Duplicate serialized vertex id: ${sourceVertex.id}`);
+          vertex.id = sourceVertex.id;
+          vertexMap.set(sourceVertex.id, vertex);
+        }
+        hydrated.vertices.push(vertex);
+      }
+
+      const resolveFaceVertex = (reference, faceIndex, vertexIndex) => {
+        const referenceId = typeof reference === 'string' || typeof reference === 'number' ? reference : reference?.id;
+        if (referenceId !== undefined) {
+          const match = vertexMap.get(referenceId);
+          if (!match) throw new TypeError(`Face ${faceIndex} references unknown vertex id: ${referenceId}`);
+          return match;
+        }
+        const point = EdgeBlender._readPoint(reference?.point ?? reference, `Face ${faceIndex} vertex ${vertexIndex}`);
+        const vertex = new Vertex(point.x, point.y, point.z);
+        hydrated.vertices.push(vertex);
+        return vertex;
+      };
+
+      for (const [faceIndex, sourceFace] of solid.faces.entries()) {
+        if (!sourceFace || !Array.isArray(sourceFace.vertices) || sourceFace.vertices.length < 3) {
+          throw new TypeError(`Serialized face ${faceIndex} must contain at least three vertices.`);
+        }
+        const faceVertices = sourceFace.vertices.map((reference, vertexIndex) =>
+          resolveFaceVertex(reference, faceIndex, vertexIndex)
+        );
+        const normal =
+          sourceFace.normal === undefined || sourceFace.normal === null
+            ? null
+            : EdgeBlender._readPoint(sourceFace.normal, `Serialized face ${faceIndex} normal`);
+        const face = new Face(faceVertices, normal);
+        if (sourceFace.id !== undefined) face.id = sourceFace.id;
+        if (sourceFace.material && typeof sourceFace.material === 'object') face.material = { ...sourceFace.material };
+        hydrated.faces.push(face);
+      }
+
+      if (solid.edges !== undefined && !Array.isArray(solid.edges)) {
+        throw new TypeError('Serialized edges must be an array when supplied.');
+      }
+      if (Array.isArray(solid.edges) && solid.edges.length > 0) {
+        const resolveEndpoint = (endpoint, edgeIndex, label) => {
+          const referenceId = typeof endpoint === 'string' || typeof endpoint === 'number' ? endpoint : endpoint?.id;
+          if (referenceId !== undefined) {
+            const match = vertexMap.get(referenceId);
+            if (!match)
+              throw new TypeError(`Serialized edge ${edgeIndex} references unknown vertex id: ${referenceId}`);
+            return match;
+          }
+          const point = EdgeBlender._readPoint(endpoint?.point ?? endpoint, `Serialized edge ${edgeIndex} ${label}`);
+          return new Vertex(point.x, point.y, point.z);
+        };
+        for (const [edgeIndex, sourceEdge] of solid.edges.entries()) {
+          if (!sourceEdge || sourceEdge.start === undefined || sourceEdge.end === undefined) {
+            throw new TypeError(`Serialized edge ${edgeIndex} requires start and end vertices.`);
+          }
+          const edge = new Edge(
+            resolveEndpoint(sourceEdge.start, edgeIndex, 'start'),
+            resolveEndpoint(sourceEdge.end, edgeIndex, 'end')
+          );
+          if (sourceEdge.id !== undefined) edge.id = sourceEdge.id;
+          hydrated.edges.push(edge);
+        }
+      } else {
+        hydrated.buildEdges();
+      }
+      return hydrated;
+    }
+
+    if (!Array.isArray(solid.vertices) || !Array.isArray(solid.faces)) {
+      throw new TypeError('SolidBody vertex and face collections must be arrays.');
+    }
+    for (const [index, vertex] of solid.vertices.entries()) {
+      if (!vertex || !vertex.point) throw new TypeError(`Solid vertex ${index} is missing its point.`);
+      vertex.point = EdgeBlender._readPoint(vertex.point, `Solid vertex ${index}`);
+    }
+    for (const [faceIndex, face] of solid.faces.entries()) {
+      if (!face || !Array.isArray(face.vertices) || face.vertices.length < 3) {
+        throw new TypeError(`Solid face ${faceIndex} must contain at least three vertices.`);
+      }
+      for (const [vertexIndex, vertex] of face.vertices.entries()) {
+        if (!vertex || !vertex.point)
+          throw new TypeError(`Solid face ${faceIndex} vertex ${vertexIndex} is missing its point.`);
+        vertex.point = EdgeBlender._readPoint(vertex.point, `Solid face ${faceIndex} vertex ${vertexIndex}`);
+      }
+      if (face.normal !== undefined && face.normal !== null) {
+        face.normal = EdgeBlender._readPoint(face.normal, `Solid face ${faceIndex} normal`);
+      }
+    }
+    if (!Array.isArray(solid.edges)) throw new TypeError('Solid edge collection must be an array.');
+    for (const [edgeIndex, edge] of solid.edges.entries()) {
+      if (!edge?.start?.point || !edge?.end?.point) {
+        throw new TypeError(`Solid edge ${edgeIndex} requires start and end points.`);
+      }
+      edge.start.point = EdgeBlender._readPoint(edge.start.point, `Solid edge ${edgeIndex} start`);
+      edge.end.point = EdgeBlender._readPoint(edge.end.point, `Solid edge ${edgeIndex} end`);
+    }
+    if (solid.edges.length === 0) solid.buildEdges();
+    return solid;
+  }
+
   static applyFillet(solid, targetEdge, radius, options = {}) {
     if (radius <= 0) {
       throw new Error(`Fillet radius must be strictly positive, got ${radius}`);
     }
 
     const { subdivisions = 8 } = options;
+    solid = EdgeBlender._hydrateSolid(solid);
     if (!solid.edges || solid.edges.length === 0) {
       if (typeof solid.buildEdges === 'function') solid.buildEdges();
     }
-    const edge = typeof targetEdge === 'string'
-      ? solid.edges.find(e => e.id === targetEdge)
-      : targetEdge;
+    const edge =
+      typeof targetEdge === 'string'
+        ? solid.edges.find((e) => e.id === targetEdge)
+        : solid.edges.find((e) => e.id === targetEdge?.id) || targetEdge;
 
     if (!edge) {
       throw new Error(`Target edge not found in solid: ${targetEdge}`);
+    }
+
+    if (edge.start && !(edge.start.point instanceof Vector3)) {
+      edge.start.point = new Vector3(edge.start.point.x || 0, edge.start.point.y || 0, edge.start.point.z || 0);
+    }
+    if (edge.end && !(edge.end.point instanceof Vector3)) {
+      edge.end.point = new Vector3(edge.end.point.x || 0, edge.end.point.y || 0, edge.end.point.z || 0);
     }
 
     // Step 1: Locate the two adjacent faces sharing this edge
@@ -47,8 +192,18 @@ class EdgeBlender {
     const f1 = adjacentFaces[0];
     const f2 = adjacentFaces[1];
 
-    const n1 = f1.normal || f1.computeNormal();
-    const n2 = f2.normal || f2.computeNormal();
+    const n1 =
+      f1.normal instanceof Vector3
+        ? f1.normal
+        : typeof f1.computeNormal === 'function'
+          ? f1.computeNormal()
+          : new Vector3(f1.normal?.x || 0, f1.normal?.y || 0, f1.normal?.z || 1);
+    const n2 =
+      f2.normal instanceof Vector3
+        ? f2.normal
+        : typeof f2.computeNormal === 'function'
+          ? f2.computeNormal()
+          : new Vector3(f2.normal?.x || 0, f2.normal?.y || 0, f2.normal?.z || 1);
 
     // Edge direction vector
     const edgeDir = edge.end.point.clone().sub(edge.start.point);
@@ -120,7 +275,9 @@ class EdgeBlender {
         const currentAngle = frac * arcAngle;
         // Slerp or Rodrigues rotation of vF1 towards vF2 around tHat
         const ptArc = pSpine.clone().add(
-          vF1.clone().scale(Math.cos(currentAngle))
+          vF1
+            .clone()
+            .scale(Math.cos(currentAngle))
             .add(tHat.cross(vF1).scale(Math.sin(currentAngle)))
             .scale(radius)
         );
@@ -158,6 +315,19 @@ class EdgeBlender {
     };
   }
 
+  static blendEdges(solid, edgeIndices, radius, options = {}) {
+    let result = solid;
+    const indices = Array.isArray(edgeIndices) ? edgeIndices : [edgeIndices];
+    for (const idx of indices) {
+      const targetEdge = typeof idx === 'number' ? result.edges?.[idx] : idx;
+      if (targetEdge) {
+        const res = EdgeBlender.applyFillet(result, targetEdge, radius, options);
+        result = res?.solid || res || result;
+      }
+    }
+    return result;
+  }
+
   /**
    * Applies an asymmetric or 45-degree planar chamfer to an edge on a SolidBody.
    * @param {SolidBody} solid - The target solid body
@@ -173,15 +343,24 @@ class EdgeBlender {
     const d1Dist = distance1;
     const d2Dist = distance2 !== null && distance2 > 0 ? distance2 : distance1;
 
+    solid = EdgeBlender._hydrateSolid(solid);
     if (!solid.edges || solid.edges.length === 0) {
       if (typeof solid.buildEdges === 'function') solid.buildEdges();
     }
-    const edge = typeof targetEdge === 'string'
-      ? solid.edges.find(e => e.id === targetEdge)
-      : targetEdge;
+    const edge =
+      typeof targetEdge === 'string'
+        ? solid.edges.find((e) => e.id === targetEdge)
+        : solid.edges.find((e) => e.id === targetEdge?.id) || targetEdge;
 
     if (!edge) {
       throw new Error(`Target edge not found: ${targetEdge}`);
+    }
+
+    if (edge.start && !(edge.start.point instanceof Vector3)) {
+      edge.start.point = new Vector3(edge.start.point.x || 0, edge.start.point.y || 0, edge.start.point.z || 0);
+    }
+    if (edge.end && !(edge.end.point instanceof Vector3)) {
+      edge.end.point = new Vector3(edge.end.point.x || 0, edge.end.point.y || 0, edge.end.point.z || 0);
     }
 
     const adjacentFaces = EdgeBlender._findAdjacentFaces(solid, edge);
@@ -192,8 +371,18 @@ class EdgeBlender {
     const f1 = adjacentFaces[0];
     const f2 = adjacentFaces[1];
 
-    const n1 = f1.normal || f1.computeNormal();
-    const n2 = f2.normal || f2.computeNormal();
+    const n1 =
+      f1.normal instanceof Vector3
+        ? f1.normal
+        : typeof f1.computeNormal === 'function'
+          ? f1.computeNormal()
+          : new Vector3(f1.normal?.x || 0, f1.normal?.y || 0, f1.normal?.z || 1);
+    const n2 =
+      f2.normal instanceof Vector3
+        ? f2.normal
+        : typeof f2.computeNormal === 'function'
+          ? f2.computeNormal()
+          : new Vector3(f2.normal?.x || 0, f2.normal?.y || 0, f2.normal?.z || 1);
 
     const edgeDir = edge.end.point.clone().sub(edge.start.point);
     const tHat = edgeDir.clone().normalize();
@@ -232,7 +421,7 @@ class EdgeBlender {
     solid.faces.push(chamferFace1, chamferFace2);
 
     const bevelArea = chamferFace1.area() + chamferFace2.area();
-    const bevelNormal = chamferFace1.normal || chamferFace1.computeNormal();
+    const bevelNormal = chamferFace1.normal instanceof Vector3 ? chamferFace1.normal : chamferFace1.computeNormal();
 
     return {
       solid,
@@ -246,15 +435,19 @@ class EdgeBlender {
 
   static _findAdjacentFaces(solid, edge) {
     const adj = [];
-    const pStart = edge.start.point;
-    const pEnd = edge.end.point;
+    const pStart = edge.start?.point;
+    const pEnd = edge.end?.point;
+    if (!pStart || !pEnd) return adj;
 
-    for (const face of solid.faces) {
+    const dist = (p1, p2) =>
+      Math.hypot((p1.x || 0) - (p2.x || 0), (p1.y || 0) - (p2.y || 0), (p1.z || 0) - (p2.z || 0));
+
+    for (const face of solid.faces || []) {
       let hasStart = false;
       let hasEnd = false;
-      for (const v of face.vertices) {
-        if (v.point.distanceTo(pStart) < 1e-4) hasStart = true;
-        if (v.point.distanceTo(pEnd) < 1e-4) hasEnd = true;
+      for (const v of face.vertices || []) {
+        if (v.point && dist(v.point, pStart) < 1e-4) hasStart = true;
+        if (v.point && dist(v.point, pEnd) < 1e-4) hasEnd = true;
       }
       if (hasStart && hasEnd) {
         adj.push(face);
@@ -264,10 +457,13 @@ class EdgeBlender {
   }
 
   static _faceCentroid(face) {
-    if (face.vertices.length === 0) return new Vector3(0, 0, 0);
+    if (!face || !face.vertices || face.vertices.length === 0) return new Vector3(0, 0, 0);
     const sum = new Vector3(0, 0, 0);
     for (const v of face.vertices) {
-      sum.add(v.point);
+      const p = v.point || { x: 0, y: 0, z: 0 };
+      sum.x += p.x || 0;
+      sum.y += p.y || 0;
+      sum.z += p.z || 0;
     }
     return sum.scale(1 / face.vertices.length);
   }

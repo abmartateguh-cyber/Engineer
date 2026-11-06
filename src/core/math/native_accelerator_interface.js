@@ -1,15 +1,13 @@
 /**
  * OmniEng Native Accelerator Interface
  * 
- * Provides an adaptive 3-Tier high-performance linear algebra and compute abstraction:
- *   Tier 1: Native N-API C++ / CUDA kernels (20x-100x speedup when compiled)
- *   Tier 2: WebAssembly SIMD128 kernels (5x-15x speedup without external toolchains)
- *   Tier 3: Cache-friendly pure JavaScript Float64Array fallback (Universal zero-dependency)
+ * Selects available native-addon, WebAssembly and JavaScript typed-array kernels.
+ * Backend selection is reported; relative performance has not been measured.
  */
 
 'use strict';
 
-const { buildOmniEngWasmBinary, WasmKernelEngine } = require('./wasm_kernel_engine');
+const { WasmKernelEngine } = require('./wasm_kernel_engine');
 
 class NativeAcceleratorInterface {
   constructor() {
@@ -17,6 +15,7 @@ class NativeAcceleratorInterface {
     this.nativeModule = null;
     this.wasmInstance = null;
     this.wasmEngine = null;
+    this.hardwareAccelerationFactor = null;
     this._initializeBackend();
   }
 
@@ -40,40 +39,6 @@ class NativeAcceleratorInterface {
       this.activeTier = 'js_typedarrays_optimized';
     }
 
-    // Measure real benchmark factor compared to unoptimized loop
-    this.hardwareAccelerationFactor = this._measureBenchmarkFactor();
-  }
-
-  _measureBenchmarkFactor() {
-    try {
-      const N = 64;
-      const a = new Float64Array(N * N).fill(1.05);
-      const b = new Float64Array(N * N).fill(0.95);
-      const c1 = new Float64Array(N * N);
-      const c2 = new Float64Array(N * N);
-
-      // Measure unoptimized naive triple loop
-      const t0 = (typeof performance !== 'undefined' ? performance : Date).now();
-      for (let i = 0; i < N; i++) {
-        for (let k = 0; k < N; k++) {
-          const aVal = a[i * N + k];
-          for (let j = 0; j < N; j++) {
-            c1[i * N + j] += aVal * b[k * N + j];
-          }
-        }
-      }
-      const tNaive = Math.max(0.001, (typeof performance !== 'undefined' ? performance : Date).now() - t0);
-
-      // Measure tiled optimized GEMM
-      const t1 = (typeof performance !== 'undefined' ? performance : Date).now();
-      this.gemm(N, N, N, 1.0, a, b, 0.0, c2);
-      const tOptimized = Math.max(0.001, (typeof performance !== 'undefined' ? performance : Date).now() - t1);
-
-      const ratio = tNaive / tOptimized;
-      return Math.max(1.0, Math.min(25.0, parseFloat(ratio.toFixed(2))));
-    } catch (e) {
-      return 1.25;
-    }
   }
 
   /**
@@ -231,9 +196,10 @@ class NativeAcceleratorInterface {
       activeTier: this.activeTier,
       isNativeAccelerated: this.activeTier === 'native_napi',
       isWasmSimd: this.activeTier === 'wasm_simd128',
-      hardwareAccelerationFactor: this.hardwareAccelerationFactor || 1.0,
-      isMeasuredBenchmark: true,
-      optimizationStrategy: 'Cache-tiled L1/L2 blocking with 4x unrolled BLAS kernels',
+      hardwareAccelerationFactor: null,
+      isMeasuredBenchmark: false,
+      performanceEvidence: 'not measured',
+      optimizationStrategy: 'backend-selected kernels; relative performance not measured',
       simdCapabilities: typeof WebAssembly !== 'undefined' ? ['WASM-SIMD128-Ready', 'TypedArray-F64'] : ['TypedArray-F64']
     };
   }

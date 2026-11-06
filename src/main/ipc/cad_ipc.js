@@ -22,7 +22,14 @@ const { EngineeringBOMManager } = require('../../core/pdm/engineering_bom_manage
 const { StandardPartsLibrary } = require('../../core/cad/standard_parts_library');
 const { defaultGeometryKernel } = require('../../core/cad/kernel_adapter');
 const { Vector3 } = require('../../core/math/linear_algebra');
-const { CAD_EXTRUDE_PROFILE_SCHEMA, CAD_REVOLVE_PROFILE_SCHEMA, CAD_SHELL_BODY_SCHEMA } = require('./cad_schemas');
+const { SlvsSolver } = require('../../core/cad/slvs_solver');
+const { getOpenCascadeKernel, TopoSolid } = require('../../core/cad/opencascade_kernel');
+const {
+  CAD_EXTRUDE_PROFILE_SCHEMA,
+  CAD_REVOLVE_PROFILE_SCHEMA,
+  CAD_SHELL_BODY_SCHEMA,
+  CAD_SHEET_METAL_SCHEMA
+} = require('./cad_schemas');
 
 const CAD_DIFF_CENTROID_SCHEMA = Object.freeze({
   type: 'object',
@@ -158,6 +165,59 @@ const CAD_EXPORT_STEP_SCHEMA = Object.freeze({
   }
 });
 
+const CAD_SOLVE_SLVS_SCHEMA = Object.freeze({
+  type: 'object',
+  required: ['constraints'],
+  properties: {
+    points: {
+      optional: true
+    },
+    constraints: {
+      type: 'array',
+      minItems: 1
+    },
+    options: {
+      type: 'object',
+      optional: true
+    }
+  }
+});
+
+const CAD_OCC_OPERATION_SCHEMA = Object.freeze({
+  type: 'object',
+  required: ['operation'],
+  properties: {
+    operation: {
+      type: 'string'
+    },
+    params: {
+      type: 'object',
+      optional: true
+    },
+    solidA: {
+      optional: true
+    },
+    solidB: {
+      optional: true
+    },
+    solid: {
+      optional: true
+    },
+    edgeIds: {
+      type: 'array',
+      optional: true
+    },
+    radius: {
+      type: 'number',
+      optional: true
+    },
+    distance: {
+      type: 'number',
+      optional: true
+    }
+  }
+});
+
 function runCadPrimitive(params) {
   validateSchema(params, CAD_PRIMITIVE_SCHEMA);
   const requiredByType = {
@@ -193,6 +253,336 @@ function runCadPrimitive(params) {
     volumeMm3: body.computeVolume(),
     triangles: body.toTriangles(),
     bbox: body.getBoundingBox()
+  };
+}
+
+function runSolveSlvsConstraints(params) {
+  validateSchema(params, CAD_SOLVE_SLVS_SCHEMA);
+  const solver = new SlvsSolver();
+
+  if (Array.isArray(params.points)) {
+    for (const pt of params.points) {
+      if (typeof pt === 'object' && pt !== null) {
+        solver.addPoint(pt.id, pt.x ?? 0, pt.y ?? 0, pt.z ?? 0, Boolean(pt.isFixed ?? pt.fixed));
+      }
+    }
+  } else if (params.points && typeof params.points === 'object') {
+    for (const [id, pt] of Object.entries(params.points)) {
+      if (Array.isArray(pt)) {
+        solver.addPoint(id, pt[0] ?? 0, pt[1] ?? 0, pt[2] ?? 0, false);
+      } else if (typeof pt === 'object' && pt !== null) {
+        solver.addPoint(id, pt.x ?? 0, pt.y ?? 0, pt.z ?? 0, Boolean(pt.isFixed ?? pt.fixed));
+      }
+    }
+  }
+
+  const ensurePoint = (id, defX = 0, defY = 0, defZ = 0) => {
+    if (id !== undefined && id !== null && !solver.points.has(id)) {
+      solver.addPoint(id, defX, defY, defZ, false);
+    }
+  };
+
+  for (const c of params.constraints) {
+    if (!c || typeof c !== 'object') continue;
+    const type = String(c.type || '').toLowerCase();
+
+    switch (type) {
+      case 'coincident':
+      case 'coincident_x':
+      case 'coincident_y':
+      case 'coincident_z': {
+        ensurePoint(c.p1);
+        ensurePoint(c.p2);
+        solver.addCoincidentConstraint(c.p1, c.p2);
+        break;
+      }
+      case 'distance': {
+        ensurePoint(c.p1);
+        ensurePoint(c.p2);
+        const targetDist = c.value ?? c.distance ?? c.val ?? 0;
+        solver.addDistanceConstraint(c.p1, c.p2, targetDist);
+        break;
+      }
+      case 'horizontal': {
+        ensurePoint(c.p1);
+        ensurePoint(c.p2);
+        solver.addHorizontalConstraint(c.p1, c.p2);
+        break;
+      }
+      case 'vertical': {
+        ensurePoint(c.p1);
+        ensurePoint(c.p2);
+        solver.addVerticalConstraint(c.p1, c.p2);
+        break;
+      }
+      case 'concentric': {
+        const c1 = c.p1 ?? c.c1;
+        const c2 = c.p2 ?? c.c2;
+        ensurePoint(c1);
+        ensurePoint(c2);
+        solver.addConcentricConstraint(c1, c2);
+        break;
+      }
+      case 'perpendicular': {
+        const p1 = c.p1 ?? c.line1?.[0];
+        const p2 = c.p2 ?? c.line1?.[1];
+        const p3 = c.p3 ?? c.line2?.[0];
+        const p4 = c.p4 ?? c.line2?.[1] ?? null;
+        ensurePoint(p1);
+        ensurePoint(p2);
+        ensurePoint(p3);
+        if (p4) ensurePoint(p4);
+        solver.addPerpendicularConstraint(p1, p2, p3, p4);
+        break;
+      }
+      case 'tangent': {
+        const p1 = c.p1 ?? c.line?.[0];
+        const p2 = c.p2 ?? c.line?.[1];
+        const center = c.center ?? c.circle?.center ?? c.p3;
+        const radius = c.radius ?? c.circle?.radius ?? c.value ?? 0;
+        ensurePoint(p1);
+        ensurePoint(p2);
+        ensurePoint(center);
+        solver.addTangentConstraint(p1, p2, center, radius);
+        break;
+      }
+      case 'angle': {
+        const p1 = c.p1 ?? c.line1?.[0];
+        const p2 = c.p2 ?? c.line1?.[1];
+        const p3 = c.p3 ?? c.line2?.[0];
+        const p4 = c.p4 ?? c.line2?.[1] ?? null;
+        const angle = c.angle ?? c.angleRad ?? c.value ?? 0;
+        ensurePoint(p1);
+        ensurePoint(p2);
+        ensurePoint(p3);
+        if (p4) ensurePoint(p4);
+        solver.addAngleConstraint(p1, p2, p3, p4, angle);
+        break;
+      }
+      default:
+        throw new Error(`Unsupported constraint type: '${c.type}'`);
+    }
+  }
+
+  const solution = solver.solve(params.options || {});
+  return {
+    success: true,
+    converged: solution.converged,
+    iterations: solution.iterations,
+    residualNorm: solution.residualNorm,
+    dof: solution.dof,
+    effectiveDof: solution.effectiveDof,
+    rank: solution.rank,
+    parameterCount: solution.parameterCount,
+    constraintCount: solution.constraintCount,
+    points: solution.points,
+    constraintsEvaluated: params.constraints.length,
+    status: solution.converged ? 'converged' : 'iteration-limit-reached'
+  };
+}
+
+const occSolidRegistry = new Map();
+
+function resolveSolid(kernel, descriptor) {
+  if (!descriptor) return null;
+  if (descriptor instanceof TopoSolid) return descriptor;
+  if (typeof descriptor === 'string') {
+    if (occSolidRegistry.has(descriptor)) return occSolidRegistry.get(descriptor);
+    throw new Error(`Solid ID '${descriptor}' not found in registry.`);
+  }
+  if (descriptor.id && occSolidRegistry.has(descriptor.id)) {
+    return occSolidRegistry.get(descriptor.id);
+  }
+  const type = String(descriptor.type || descriptor.operation || '').toLowerCase();
+  const p = descriptor.params || descriptor;
+  if (type === 'box') {
+    const dx = p.dx ?? p.width ?? p.x ?? 10;
+    const dy = p.dy ?? p.height ?? p.y ?? 10;
+    const dz = p.dz ?? p.depth ?? p.z ?? 10;
+    return kernel.makeBox(Number(dx), Number(dy), Number(dz));
+  }
+  if (type === 'cylinder') {
+    const radius = p.radius ?? p.r ?? 5;
+    const height = p.height ?? p.h ?? 10;
+    return kernel.makeCylinder(Number(radius), Number(height));
+  }
+  if (type === 'sphere') {
+    const radius = p.radius ?? p.r ?? 5;
+    return kernel.makeSphere(Number(radius));
+  }
+  if (type === 'cone') {
+    const r1 = p.r1 ?? p.radius1 ?? p.radius ?? 5;
+    const r2 = p.r2 ?? p.radius2 ?? 0;
+    const height = p.height ?? p.h ?? 10;
+    return kernel.makeCone(Number(r1), Number(r2), Number(height));
+  }
+  if (Array.isArray(descriptor.faces)) {
+    const s = new TopoSolid(descriptor.faces);
+    s.shells = descriptor.shells ?? 1;
+    s.genus = descriptor.genus ?? 0;
+    s.properties = descriptor.properties || {};
+    return s;
+  }
+  throw new Error(`Cannot resolve solid operand: ${JSON.stringify(descriptor)}`);
+}
+
+function runOccBrepOperation(params) {
+  validateSchema(params, CAD_OCC_OPERATION_SCHEMA);
+  const kernel = getOpenCascadeKernel();
+  const op = String(params.operation || '').toLowerCase();
+  const p = params.params || {};
+
+  let resultSolid;
+  let opName = params.operation;
+
+  switch (op) {
+    case 'makebox':
+    case 'box': {
+      opName = 'makeBox';
+      const dx = p.dx ?? p.width ?? p.x ?? params.dx ?? params.width;
+      const dy = p.dy ?? p.height ?? p.y ?? params.dy ?? params.height;
+      const dz = p.dz ?? p.depth ?? p.z ?? params.dz ?? params.depth;
+      if (dx === undefined || dy === undefined || dz === undefined) {
+        throw new TypeError('Box operation requires dx, dy, and dz dimensions.');
+      }
+      resultSolid = kernel.makeBox(Number(dx), Number(dy), Number(dz));
+      break;
+    }
+    case 'makecylinder':
+    case 'cylinder': {
+      opName = 'makeCylinder';
+      const radius = p.radius ?? p.r ?? params.radius;
+      const height = p.height ?? p.h ?? params.height;
+      if (radius === undefined || height === undefined) {
+        throw new TypeError('Cylinder operation requires radius and height.');
+      }
+      resultSolid = kernel.makeCylinder(Number(radius), Number(height));
+      break;
+    }
+    case 'makesphere':
+    case 'sphere': {
+      opName = 'makeSphere';
+      const radius = p.radius ?? p.r ?? params.radius;
+      if (radius === undefined) {
+        throw new TypeError('Sphere operation requires radius.');
+      }
+      resultSolid = kernel.makeSphere(Number(radius));
+      break;
+    }
+    case 'makecone':
+    case 'cone': {
+      opName = 'makeCone';
+      const r1 = p.r1 ?? p.radius1 ?? p.radius ?? params.r1 ?? params.radius;
+      const r2 = p.r2 ?? p.radius2 ?? (params.r2 !== undefined ? params.r2 : 0);
+      const height = p.height ?? p.h ?? params.height;
+      if (r1 === undefined || height === undefined) {
+        throw new TypeError('Cone operation requires r1 and height.');
+      }
+      resultSolid = kernel.makeCone(Number(r1), Number(r2), Number(height));
+      break;
+    }
+    case 'booleancut':
+    case 'cut': {
+      opName = 'booleanCut';
+      const solidA = resolveSolid(kernel, params.solidA ?? params.solid ?? p.solidA);
+      const solidB = resolveSolid(kernel, params.solidB ?? p.solidB);
+      if (!solidA || !solidB) throw new TypeError('Boolean cut requires both solidA and solidB operands.');
+      resultSolid = kernel.booleanCut(solidA, solidB);
+      break;
+    }
+    case 'booleanfuse':
+    case 'fuse': {
+      opName = 'booleanFuse';
+      const solidA = resolveSolid(kernel, params.solidA ?? params.solid ?? p.solidA);
+      const solidB = resolveSolid(kernel, params.solidB ?? p.solidB);
+      if (!solidA || !solidB) throw new TypeError('Boolean fuse requires both solidA and solidB operands.');
+      resultSolid = kernel.booleanFuse(solidA, solidB);
+      break;
+    }
+    case 'booleancommon':
+    case 'common': {
+      opName = 'booleanCommon';
+      const solidA = resolveSolid(kernel, params.solidA ?? params.solid ?? p.solidA);
+      const solidB = resolveSolid(kernel, params.solidB ?? p.solidB);
+      if (!solidA || !solidB) throw new TypeError('Boolean common requires both solidA and solidB operands.');
+      resultSolid = kernel.booleanCommon(solidA, solidB);
+      break;
+    }
+    case 'makefillet':
+    case 'fillet': {
+      opName = 'makeFillet';
+      const solid = resolveSolid(kernel, params.solid ?? params.solidA ?? p.solid);
+      const edgeIds = params.edgeIds ?? p.edgeIds ?? solid?.faces[0]?.edges.map((e) => e.id) ?? [];
+      const radius = params.radius ?? p.radius ?? 1.0;
+      if (!solid) throw new TypeError('Fillet operation requires a solid.');
+      resultSolid = kernel.makeFillet(solid, edgeIds, Number(radius));
+      break;
+    }
+    case 'makechamfer':
+    case 'chamfer': {
+      opName = 'makeChamfer';
+      const solid = resolveSolid(kernel, params.solid ?? params.solidA ?? p.solid);
+      const edgeIds = params.edgeIds ?? p.edgeIds ?? solid?.faces[0]?.edges.map((e) => e.id) ?? [];
+      const distance = params.distance ?? p.distance ?? 1.0;
+      if (!solid) throw new TypeError('Chamfer operation requires a solid.');
+      resultSolid = kernel.makeChamfer(solid, edgeIds, Number(distance));
+      break;
+    }
+    case 'verifyeulerpoincare':
+    case 'checkeulerpoincare': {
+      opName = 'verifyEulerPoincare';
+      const solid = resolveSolid(kernel, params.solid ?? params.solidA ?? p.solid);
+      if (!solid) throw new TypeError('verifyEulerPoincare requires a solid.');
+      resultSolid = solid;
+      break;
+    }
+    case 'shapefix': {
+      opName = 'shapeFix';
+      const solid = resolveSolid(kernel, params.solid ?? params.solidA ?? p.solid);
+      if (!solid) throw new TypeError('shapeFix requires a solid.');
+      const fixReport = kernel.shapeFix(solid);
+      return {
+        success: true,
+        operation: 'shapeFix',
+        ...fixReport
+      };
+    }
+    default:
+      throw new Error(`Unsupported OCC B-Rep operation: '${params.operation}'`);
+  }
+
+  occSolidRegistry.set(resultSolid.id, resultSolid);
+
+  const ep = resultSolid.verifyEulerPoincare();
+  const stats = resultSolid.getTopologyStats();
+
+  return {
+    success: true,
+    operation: opName,
+    solid: {
+      id: resultSolid.id,
+      type: resultSolid.properties?.type || 'Solid',
+      volume: resultSolid.properties?.volume,
+      surfaceArea: resultSolid.properties?.surfaceArea,
+      facesCount: resultSolid.faces.length,
+      edgesCount: stats.E,
+      verticesCount: stats.V,
+      shells: resultSolid.shells,
+      genus: resultSolid.genus,
+      properties: resultSolid.properties
+    },
+    eulerPoincare: {
+      valid: ep.valid,
+      lhs: ep.lhs,
+      rhs: ep.rhs,
+      formula: 'V - E + F = 2(S - G)',
+      V: ep.V,
+      E: ep.E,
+      F: ep.F,
+      S: ep.S,
+      G: ep.G
+    },
+    topology: stats
   };
 }
 
@@ -464,29 +854,65 @@ function registerCadIpc(deps = {}) {
     },
     async (event, params = {}) => {
       const solver = new AssemblyMateSolver();
-      const base = new AssemblyComponent('comp_base', 'BasePlate', { fixed: true });
-      const part = new AssemblyComponent('comp_part', 'MountedPart', {
-        position: new Vector3(params.initX || 5, params.initY || 5, params.initZ || 20),
-        fixed: false
-      });
-      solver.addComponent(base);
-      solver.addComponent(part);
-      solver.addConcentric(
-        'comp_base',
-        new Vector3(0, 0, 0),
-        new Vector3(0, 0, 1),
-        'comp_part',
-        new Vector3(0, 0, 0),
-        new Vector3(0, 0, 1)
-      );
-      solver.addCoincidentPlanes(
-        'comp_base',
-        new Vector3(0, 0, params.targetZ || 10),
-        new Vector3(0, 0, 1),
-        'comp_part',
-        new Vector3(0, 0, 0),
-        new Vector3(0, 0, -1)
-      );
+      if (Array.isArray(params.components) && params.components.length > 0) {
+        for (const c of params.components) {
+          const pos = c.position
+            ? new Vector3(c.position.x || 0, c.position.y || 0, c.position.z || 0)
+            : new Vector3(0, 0, 0);
+          const comp = new AssemblyComponent(c.id, c.name || c.id, {
+            position: pos,
+            fixed: !!c.fixed
+          });
+          solver.addComponent(comp);
+        }
+        if (Array.isArray(params.constraints)) {
+          for (const cn of params.constraints) {
+            if (cn.type === 'concentric') {
+              solver.addConcentric(
+                cn.compId1,
+                new Vector3(cn.pt1?.x || 0, cn.pt1?.y || 0, cn.pt1?.z || 0),
+                new Vector3(cn.axis1?.x || 0, cn.axis1?.y || 0, cn.axis1?.z || 1),
+                cn.compId2,
+                new Vector3(cn.pt2?.x || 0, cn.pt2?.y || 0, cn.pt2?.z || 0),
+                new Vector3(cn.axis2?.x || 0, cn.axis2?.y || 0, cn.axis2?.z || 1)
+              );
+            } else if (cn.type === 'coincident_planes') {
+              solver.addCoincidentPlanes(
+                cn.compId1,
+                new Vector3(cn.pt1?.x || 0, cn.pt1?.y || 0, cn.pt1?.z || 0),
+                new Vector3(cn.n1?.x || 0, cn.n1?.y || 0, cn.n1?.z || 1),
+                cn.compId2,
+                new Vector3(cn.pt2?.x || 0, cn.pt2?.y || 0, cn.pt2?.z || 0),
+                new Vector3(cn.n2?.x || 0, cn.n2?.y || 0, cn.n2?.z || -1)
+              );
+            }
+          }
+        }
+      } else {
+        const base = new AssemblyComponent('comp_base', 'BasePlate', { fixed: true });
+        const part = new AssemblyComponent('comp_part', 'MountedPart', {
+          position: new Vector3(params.initX || 5, params.initY || 5, params.initZ || 20),
+          fixed: false
+        });
+        solver.addComponent(base);
+        solver.addComponent(part);
+        solver.addConcentric(
+          'comp_base',
+          new Vector3(0, 0, 0),
+          new Vector3(0, 0, 1),
+          'comp_part',
+          new Vector3(0, 0, 0),
+          new Vector3(0, 0, 1)
+        );
+        solver.addCoincidentPlanes(
+          'comp_base',
+          new Vector3(0, 0, params.targetZ || 10),
+          new Vector3(0, 0, 1),
+          'comp_part',
+          new Vector3(0, 0, 0),
+          new Vector3(0, 0, -1)
+        );
+      }
       const result = solver.solve(params.maxIter || 40, 1e-4);
       return { success: true, result };
     },
@@ -531,24 +957,27 @@ function registerCadIpc(deps = {}) {
   // 10. Sheet Metal Unfolding
   defineHandler(
     'omni:unfold-sheet-metal',
-    {
-      type: 'object',
-      optional: true
-    },
-    async (event, params = {}) => {
-      const bend = new SheetMetalBend(
-        params.bend || { angleDeg: 90.0, innerRadiusMm: 2.0, thicknessMm: 2.0, kFactor: 0.44 }
-      );
-      const flanges = (
-        params.flanges || [
-          { name: 'F1', lengthMm: 50, widthMm: 50 },
-          { name: 'F2', lengthMm: 50, widthMm: 50 }
-        ]
-      ).map((f) => new SheetMetalFlange(f.name, f.lengthMm, f.widthMm));
+    CAD_SHEET_METAL_SCHEMA,
+    async (event, params) => {
+      const bend = new SheetMetalBend(params.bend);
+      const flanges = params.flanges.map((f) => new SheetMetalFlange(f.name, f.lengthMm, f.widthMm));
       const flat = SheetMetalUnfolder.unfoldPart({ flanges, bends: [bend] });
-      return { success: true, flat, bendAllowanceMm: bend.bendAllowanceMm, bendDeductionMm: bend.bendDeductionMm };
+      return {
+        success: true,
+        lengthUnit: params.lengthUnit,
+        flat,
+        bendAllowanceMm: bend.bendAllowanceMm,
+        bendDeductionMm: bend.bendDeductionMm,
+        maturity: 'experimental',
+        warning:
+          'Illustrative K-factor formula only; no material-specific bend data, standards conformance, springback correction, or manufacturing validation.'
+      };
     },
-    { domain: 'cad', description: 'Compute DIN 6935 K-factor developed blank flat sheet' }
+    {
+      domain: 'cad',
+      description:
+        'Compute an experimental two-flange K-factor flat-length example from explicit millimeter inputs; no standard conformance is established'
+    }
   );
 
   // 11. GD&T Evaluation
@@ -667,7 +1096,13 @@ function registerCadIpc(deps = {}) {
     },
     async (event, params = {}) => {
       if (!outOfCoreOctree) {
-        return { success: true, visibleCount: 0, items: [] };
+        return {
+          success: false,
+          error: {
+            code: 'UNSUPPORTED',
+            message: 'The out-of-core spatial octree LOD engine is not configured on this host.'
+          }
+        };
       }
       const { cameraPosition = [0, 0, 100], frustumBounds = [-200, -200, -200, 200, 200, 200] } = params;
       const res = outOfCoreOctree.evaluateVisibleLODs(cameraPosition, frustumBounds);
@@ -793,23 +1228,76 @@ function registerCadIpc(deps = {}) {
     'omni:cam-generate-toolpath',
     {
       type: 'object',
-      optional: true
+      required: ['bounds', 'options', 'programNumber'],
+      additionalProperties: false,
+      properties: {
+        bounds: {
+          type: 'object',
+          required: ['minX', 'maxX', 'minY', 'maxY', 'minZ', 'maxZ'],
+          additionalProperties: false,
+          properties: Object.fromEntries(
+            ['minX', 'maxX', 'minY', 'maxY', 'minZ', 'maxZ'].map((key) => [key, { type: 'number' }])
+          )
+        },
+        options: {
+          type: 'object',
+          required: [
+            'toolDiameter',
+            'toolType',
+            'spindleRpm',
+            'feedRateMmMin',
+            'plungeRateMmMin',
+            'stepoverMm',
+            'stepdownMm',
+            'safeZ'
+          ],
+          additionalProperties: false,
+          properties: {
+            toolDiameter: { type: 'number', min: 0 },
+            toolType: { type: 'string', enum: ['flat_endmill', 'ball_nose'] },
+            spindleRpm: { type: 'number', min: 0 },
+            feedRateMmMin: { type: 'number', min: 0 },
+            plungeRateMmMin: { type: 'number', min: 0 },
+            stepoverMm: { type: 'number', min: 0 },
+            stepdownMm: { type: 'number', min: 0 },
+            safeZ: { type: 'number' }
+          }
+        },
+        programNumber: { type: 'string', maxLength: 9 }
+      }
     },
-    async (event, params = {}) => {
-      const { CNCToolpathEngine } = require('../../core/cam/cnc_toolpath_engine');
-      const cam = new CNCToolpathEngine(params.options || {});
-      const bounds = params.bounds || { minX: -50, maxX: 50, minY: -30, maxY: 30, minZ: 0, maxZ: 25 };
-      const toolpathData = cam.planRoughingToolpath(bounds);
-      const gcode = cam.generateGCode(toolpathData, params.programNumber || 'O1001');
+    async (event, params) => {
+      if (!/^O\d{1,8}$/.test(params.programNumber)) {
+        throw new Error('CAM programNumber must be an O-number followed by 1-8 digits.');
+      }
+      const { JobRequest } = require('../../core/contracts/JobRequest');
+      const { defaultEngineRegistry } = require('../../core/contracts/engine_registry');
+      const toolpathResult = await defaultEngineRegistry.dispatch(
+        new JobRequest({
+          domain: 'cam',
+          operation: 'plan_roughing_toolpath',
+          parameters: { bounds: params.bounds, toolOptions: params.options }
+        })
+      );
+      const toolpathData = toolpathResult.outputData;
+      const gcodeResult = await defaultEngineRegistry.dispatch(
+        new JobRequest({
+          domain: 'cam',
+          operation: 'generate_gcode',
+          parameters: { toolpaths: toolpathData, toolOptions: params.options, programNumber: params.programNumber }
+        })
+      );
+      const gcodeData = gcodeResult.outputData;
       return {
         success: true,
+        validationLevel: 'experimental',
         telemetry: toolpathData.telemetry,
         layers: toolpathData.layers,
         toolpath: toolpathData,
         machiningTimeMin: toolpathData.telemetry?.estimatedTimeMin,
-        gcode,
-        gcodePreview: gcode.split('\n').slice(0, 30).join('\n'),
-        totalGcodeLines: gcode.split('\n').length
+        gcode: gcodeData.gcode,
+        gcodePreview: gcodeData.gcode.split('\n').slice(0, 30).join('\n'),
+        totalGcodeLines: gcodeData.lineCount
       };
     },
     {
@@ -841,6 +1329,30 @@ function registerCadIpc(deps = {}) {
       description: 'Aerospace feature history is unavailable pending source-reviewed or caller-supplied model data'
     }
   );
+
+  // 24. SolveSpace Variational 2D/3D Constraint Solver
+  defineHandler(
+    'cad:solve-slvs-constraints',
+    CAD_SOLVE_SLVS_SCHEMA,
+    async (event, params) => runSolveSlvsConstraints(params),
+    {
+      domain: 'cad',
+      description:
+        'Solve 2D/3D geometric variational constraints (coincident, distance, horizontal, vertical, concentric, perpendicular, tangent, angle) using SolveSpace SLVS'
+    }
+  );
+
+  // 25. OpenCASCADE Technology B-Rep Modeling, Booleans & Invariant Verification
+  defineHandler(
+    'cad:execute-occ-brep-operation',
+    CAD_OCC_OPERATION_SCHEMA,
+    async (event, params) => runOccBrepOperation(params),
+    {
+      domain: 'cad',
+      description:
+        'Execute OpenCASCADE B-Rep geometric modeling operations (box, cylinder, sphere, cone, cut, fuse, common, fillet, chamfer) and verify Euler-Poincare invariant'
+    }
+  );
 }
 
 module.exports = {
@@ -848,9 +1360,14 @@ module.exports = {
   CAD_PRIMITIVE_SCHEMA,
   CAD_EXPORT_OBJ_SCHEMA,
   CAD_EXPORT_STEP_SCHEMA,
+  CAD_SOLVE_SLVS_SCHEMA,
+  CAD_OCC_OPERATION_SCHEMA,
   runCadPrimitive,
   runCadExportOBJ,
   runCadExportSTEP,
+  runSolveSlvsConstraints,
+  runOccBrepOperation,
+  occSolidRegistry,
   runEngineeringBOMRollup,
   CAD_DRAFTING_SHEET_SCHEMA,
   runDraftingSheet,

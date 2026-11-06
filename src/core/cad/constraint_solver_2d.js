@@ -1,7 +1,7 @@
 /**
- * OmniEng 2D Variational Geometric Constraint Solver
- * Standard: Non-linear Least-Squares Levenberg-Marquardt Solver
- * Experimental implementation: Siemens D-Cubed 2D DCM / FreeCAD Sketcher solver.
+ * Experimental 2D geometric constraint solver using damped least-squares
+ * iterations. Constraint coverage and numerical behavior have not been
+ * independently validated.
  */
 
 class ConstraintSolver2D {
@@ -17,7 +17,7 @@ class ConstraintSolver2D {
 
   _getPointIndex(id) {
     if (typeof id === 'number') return id;
-    const idx = this.points.findIndex(p => p.id === id);
+    const idx = this.points.findIndex((p) => p.id === id);
     if (idx === -1) throw new Error(`Point id not found: ${id}`);
     return idx;
   }
@@ -145,9 +145,12 @@ class ConstraintSolver2D {
         case 'TANGENT_LINE_CIRCLE': {
           // Perpendicular distance from circle center to line equals radius R
           const { p1, p2, pCenter, radius } = params;
-          const x1 = getX(p1), y1 = getY(p1);
-          const x2 = getX(p2), y2 = getY(p2);
-          const xc = getX(pCenter), yc = getY(pCenter);
+          const x1 = getX(p1),
+            y1 = getY(p1);
+          const x2 = getX(p2),
+            y2 = getY(p2);
+          const xc = getX(pCenter),
+            yc = getY(pCenter);
 
           const dx = x2 - x1;
           const dy = y2 - y1;

@@ -12,6 +12,11 @@ const { ModernControlSynthesis } = require('../../core/dynamic_simulink/multi_ra
 const { AutocoderCRust } = require('../../core/dynamic_simulink/autocoder_c_rust');
 const { ModelPredictiveController } = require('../../core/dynamic_simulink/model_predictive_control');
 const { SimscapeDAESolver } = require('../../core/dynamic_simulink/simscape_dae_solver');
+const { AerospaceEngineAdapter } = require('../../core/aerospace/aerospace_engine_adapter');
+const { JobRequest } = require('../../core/contracts/JobRequest');
+const { getOrCreateRoboticsAdapter } = require('../headless_solver_daemon');
+
+const sharedAerospaceAdapter = new AerospaceEngineAdapter();
 function unavailableControlRoute(message) {
   return {
     success: false,
@@ -547,25 +552,75 @@ function registerControlsIpc() {
     }
   );
 
-  // 14. Experimental aerospace route, unavailable pending independent validation
+  const executeAerospaceOperation = async (operation, params = {}) => {
+    const jobReq = new JobRequest({
+      jobId: `job_aero_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      domain: 'aerospace',
+      operation,
+      parameters: params
+    });
+    const jobResult = await sharedAerospaceAdapter.execute(jobReq);
+    return {
+      success: true,
+      jobId: jobResult.jobId,
+      status: jobResult.status,
+      outputData: jobResult.outputData,
+      provenance: jobResult.provenance,
+      metrics: jobResult.metrics,
+      ...(jobResult.outputData || {})
+    };
+  };
+
+  // 14. Aerospace Rocket Nozzle / Compressible Flow / Orbital Transfer Route
   defineHandler(
     'omni:solve-nasa-rocket',
     {
       type: 'object',
       optional: true
     },
-    async () => ({
-      success: false,
-      validationLevel: 'experimental',
-      error: {
-        code: 'UNSUPPORTED',
-        message:
-          'Aerospace calculations are unavailable until the legacy models have independent reference data and review.'
+    async (event, params = {}) => {
+      if (params && typeof params === 'object' && params.chamberPressurePa !== undefined) {
+        return executeAerospaceOperation('compile_rocket_nozzle', {
+          gamma: 1.22,
+          molarMassKgMol: 0.022,
+          ambientPressurePa: 101325,
+          chamberRadiusRatio: 2.5,
+          convergentAngleDeg: 30,
+          bellFraction: 0.8,
+          throatAreaM2: 0.05,
+          expansionRatio: 16,
+          chamberTempK: 3400,
+          ...params
+        });
       }
-    }),
+      if (params && typeof params === 'object' && params.machNumber !== undefined) {
+        return executeAerospaceOperation('run_aerospace_cfd', {
+          gamma: 1.4,
+          angleOfAttackDeg: 5.0,
+          altitudeM: 10000,
+          deflectionAngleDeg: 10.0,
+          ...params
+        });
+      }
+      if (params && typeof params === 'object' && (params.r1Meters !== undefined || params.r2Meters !== undefined)) {
+        return executeAerospaceOperation('calculate_orbital_transfer', {
+          mu: 3.986004418e14,
+          ...params
+        });
+      }
+      return {
+        success: false,
+        validationLevel: 'experimental',
+        error: {
+          code: 'UNSUPPORTED',
+          message:
+            'Aerospace calculations are unavailable until the legacy models have independent reference data and review.'
+        }
+      };
+    },
     {
       domain: 'aerospace',
-      description: 'Unavailable experimental legacy aerospace route; no independent validation is established'
+      description: 'Execute explicit-parameter aerospace nozzle, compressible flow, or orbital transfer analysis'
     }
   );
 
@@ -587,6 +642,188 @@ function registerControlsIpc() {
     {
       domain: 'aerospace',
       description: 'Unavailable: no sourced, independently reviewed spacecraft specification exists'
+    }
+  );
+
+  // 16. Aerospace De Laval / Rao Bell Rocket Nozzle Contour & Thrust Compilation
+  defineHandler(
+    'omni:compile-rocket-nozzle',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, params = {}) => {
+      if (!params || typeof params !== 'object' || params.chamberPressurePa === undefined) {
+        throw new Error('compile-rocket-nozzle requires explicit chamberPressurePa and nozzle parameters.');
+      }
+      return executeAerospaceOperation('compile_rocket_nozzle', {
+        gamma: 1.22,
+        molarMassKgMol: 0.022,
+        ambientPressurePa: 101325,
+        chamberRadiusRatio: 2.5,
+        convergentAngleDeg: 30,
+        bellFraction: 0.8,
+        throatAreaM2: 0.05,
+        expansionRatio: 16,
+        chamberTempK: 3400,
+        ...params
+      });
+    },
+    {
+      domain: 'aerospace',
+      description: 'Compile isentropic De Laval and Rao parabolic bell rocket nozzle contour with JobResult provenance'
+    }
+  );
+
+  // 17. Aerospace Compressible Shock-Expansion & ISA Atmosphere Solver
+  defineHandler(
+    'omni:run-aerospace-cfd',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, params = {}) => {
+      if (!params || typeof params !== 'object' || params.machNumber === undefined) {
+        throw new Error('run-aerospace-cfd requires explicit machNumber parameter.');
+      }
+      return executeAerospaceOperation('run_aerospace_cfd', {
+        gamma: 1.4,
+        angleOfAttackDeg: 5.0,
+        altitudeM: 10000,
+        deflectionAngleDeg: 10.0,
+        ...params
+      });
+    },
+    {
+      domain: 'aerospace',
+      description:
+        'Evaluate normal/oblique shock relations, Prandtl-Meyer expansion, and ISA atmosphere with provenance'
+    }
+  );
+
+  // 18. Aerospace Two-Impulse Hohmann Orbital Transfer Solver
+  defineHandler(
+    'omni:calculate-orbital-transfer',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, params = {}) => {
+      if (!params || typeof params !== 'object' || params.r1Meters === undefined || params.r2Meters === undefined) {
+        throw new Error('calculate-orbital-transfer requires explicit r1Meters and r2Meters orbital radii.');
+      }
+      return executeAerospaceOperation('calculate_orbital_transfer', {
+        mu: 3.986004418e14,
+        ...params
+      });
+    },
+    {
+      domain: 'aerospace',
+      description: 'Calculate two-impulse Hohmann orbital transfer delta-V budget and transfer time with provenance'
+    }
+  );
+
+  const runControlsAdapterOperation = async (operation, parameters) => {
+    const { defaultEngineRegistry } = require('../../core/contracts/engine_registry');
+    const jobReq = new JobRequest({
+      jobId: `job_ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      domain: 'controls',
+      operation,
+      parameters
+    });
+    const jobResult = await defaultEngineRegistry.dispatch(jobReq);
+    return {
+      success: true,
+      jobId: jobResult.jobId,
+      status: jobResult.status,
+      outputData: jobResult.outputData,
+      provenance: jobResult.provenance,
+      metrics: jobResult.metrics,
+      ...(jobResult.outputData || {})
+    };
+  };
+
+  // 19. Continuous/Discrete State-Space LTI Simulation & Discretization
+  defineHandler(
+    'omni:solve-state-space-lti',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, params = {}) => {
+      if (!params || typeof params !== 'object' || Array.isArray(params)) {
+        throw new Error('solve-state-space-lti requires an object payload.');
+      }
+      if (!params.A || !params.B || !params.C || !params.D) {
+        throw new Error('solve-state-space-lti requires A, B, C, and D matrices.');
+      }
+      return runControlsAdapterOperation('solve_state_space', params);
+    },
+    {
+      domain: 'controls',
+      description: 'Simulate a continuous/discrete state-space LTI system from explicit A, B, C, D matrices'
+    }
+  );
+
+  // 20. Experimental Extended Kalman Filter State-Estimation Estimate
+  defineHandler(
+    'omni:estimate-ekf',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, params = {}) => {
+      if (!params || typeof params !== 'object' || Array.isArray(params)) {
+        throw new Error('estimate-ekf requires an object payload.');
+      }
+      return runControlsAdapterOperation('estimate_ekf', params);
+    },
+    {
+      domain: 'controls',
+      description:
+        'Run an experimental extended Kalman filter state-estimation estimate from caller-supplied sensor inputs'
+    }
+  );
+
+  // 21. Robotics Kinematics, Dynamics, Trajectory & URDF Operations
+  defineHandler(
+    'omni:run-robotics-operation',
+    {
+      type: 'object',
+      optional: true
+    },
+    async (event, payload = {}) => {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new Error('run-robotics-operation requires an object payload.');
+      }
+      const operation = payload.operation || 'forward_kinematics';
+      const parameters =
+        payload.parameters && typeof payload.parameters === 'object' && !Array.isArray(payload.parameters)
+          ? payload.parameters
+          : payload;
+      const adapter = getOrCreateRoboticsAdapter();
+      const jobReq = new JobRequest({
+        jobId: payload.jobId || `job_rob_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        domain: 'robotics',
+        operation,
+        parameters
+      });
+      const jobResult = await adapter.execute(jobReq);
+      return {
+        success: true,
+        jobId: jobResult.jobId,
+        status: jobResult.status,
+        operation,
+        outputData: jobResult.outputData,
+        provenance: jobResult.provenance,
+        metrics: jobResult.metrics,
+        ...(jobResult.outputData || {})
+      };
+    },
+    {
+      domain: 'controls',
+      description:
+        'Execute 6-DOF robotics forward/inverse kinematics, inverse dynamics, trajectory planning, or URDF parsing'
     }
   );
 }

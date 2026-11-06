@@ -1,14 +1,17 @@
 /**
- * Material property data is unavailable until its source, redistribution rights,
- * and engineering applicability have been independently reviewed.
+ * Material property database facade.
  *
- * The former bundled example values were removed because the records did not
- * carry sufficient provenance for product use.
+ * Loads the reference catalog of documented-typical values with explicit
+ * provenance and exposes the historical API shape:
+ *   { MATERIAL_DATABASE, MaterialManager }
+ * The catalog lives in ./material_database_certified.js — see that module for
+ * sourcing and validation-status caveats (values are documented-typical and
+ * are not design allowables).
  */
 
 'use strict';
 
-const MATERIAL_DATABASE = Object.freeze({});
+const { MATERIAL_DATABASE, REFERENCE_TEMPERATURE_K, interpolateProperty } = require('./material_database_certified');
 
 class MaterialManager {
   static getMaterial(key) {
@@ -17,12 +20,12 @@ class MaterialManager {
   }
 
   static listAllMaterials() {
-    return [];
+    return Object.keys(MATERIAL_DATABASE);
   }
 
   /**
-   * Compute mass and centroidal inertia only when a reviewed material record
-   * and explicit positive dimensions are available.
+   * Compute mass and centroidal inertia from a reviewed material record and
+   * explicit positive dimensions.
    */
   static computeInertiaCuboid(matKey, widthM, heightM, depthM) {
     const mat = this.getMaterial(matKey);
@@ -94,5 +97,10 @@ class MaterialManager {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { MATERIAL_DATABASE, MaterialManager };
+  module.exports = {
+    MATERIAL_DATABASE,
+    MaterialManager,
+    REFERENCE_TEMPERATURE_K,
+    interpolateProperty
+  };
 }

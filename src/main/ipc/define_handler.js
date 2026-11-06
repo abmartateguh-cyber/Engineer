@@ -1,6 +1,6 @@
 /**
  * OmniEng IPC Handler Registration and Request Validation Helpers
- * 
+ *
  * Provides centralized IPC endpoint registration and request checks where schemas are defined:
  * Applies route-defined schema checks, payload sanitation/size limits, and trusted-renderer
  * main-frame authorization. This does not establish full contract coverage.
@@ -10,7 +10,52 @@
 
 const path = require('path');
 const { fileURLToPath } = require('url');
-const { app, ipcMain } = require('electron');
+
+let electronModule = null;
+try {
+  const candidate = require('electron');
+  if (candidate && typeof candidate === 'object') {
+    electronModule = candidate;
+  }
+} catch {
+  electronModule = null;
+}
+
+const defaultIpcMain = electronModule ? electronModule.ipcMain : null;
+let activeIpcMain = defaultIpcMain;
+
+/**
+ * Runs synchronous IPC registration with an injected Electron-compatible ipcMain.
+ * The registration hub uses this for dependency injection; handlers retain the
+ * target that was active when they were registered.
+ * @param {Object} ipcMain Electron-compatible IPC registrar
+ * @param {Function} register Registration callback
+ * @returns {*} Callback result
+ */
+function withIpcMain(ipcMain, register) {
+  if (!ipcMain || typeof ipcMain.handle !== 'function' || typeof register !== 'function') {
+    throw new TypeError('withIpcMain requires an ipcMain registrar and registration callback.');
+  }
+
+  const previousIpcMain = activeIpcMain;
+  activeIpcMain = ipcMain;
+  try {
+    return register();
+  } finally {
+    activeIpcMain = previousIpcMain;
+  }
+}
+
+function getElectronApp() {
+  if (electronModule && electronModule.app) return electronModule.app;
+  try {
+    const candidate = require('electron');
+    return candidate && typeof candidate === 'object' ? candidate.app : null;
+  } catch {
+    return null;
+  }
+}
+
 const { IPCValidator } = require('../../core/security/ipc_validator');
 const { getFeatureMaturity } = require('../../core/maturity/feature_maturity');
 
@@ -19,9 +64,9 @@ const channelRegistry = new Map();
 
 /**
  * Validates a value against a lightweight, zero-dependency schema descriptor
- * @param {*} val 
- * @param {Object} schema 
- * @param {string} path 
+ * @param {*} val
+ * @param {Object} schema
+ * @param {string} path
  */
 function validateSchema(val, schema, path = 'payload') {
   if (!schema) return true;
@@ -40,10 +85,14 @@ function validateSchema(val, schema, path = 'payload') {
         throw new Error(`IPC Schema Validation Error: Expected array at '${path}', got ${typeof val}`);
       }
       if (schema.minItems !== undefined && val.length < schema.minItems) {
-        throw new Error(`IPC Schema Validation Error: Array at '${path}' has length ${val.length} < minItems ${schema.minItems}`);
+        throw new Error(
+          `IPC Schema Validation Error: Array at '${path}' has length ${val.length} < minItems ${schema.minItems}`
+        );
       }
       if (schema.maxItems !== undefined && val.length > schema.maxItems) {
-        throw new Error(`IPC Schema Validation Error: Array at '${path}' has length ${val.length} > maxItems ${schema.maxItems}`);
+        throw new Error(
+          `IPC Schema Validation Error: Array at '${path}' has length ${val.length} > maxItems ${schema.maxItems}`
+        );
       }
       if (schema.items) {
         val.forEach((item, idx) => validateSchema(item, schema.items, `${path}[${idx}]`));
@@ -102,9 +151,11 @@ function validateSchema(val, schema, path = 'payload') {
       // Validate properties
       if (schema.properties) {
         if (schema.additionalProperties === false) {
-          const unexpected = Object.keys(val).filter(property => !Object.hasOwn(schema.properties, property));
+          const unexpected = Object.keys(val).filter((property) => !Object.hasOwn(schema.properties, property));
           if (unexpected.length > 0) {
-            throw new Error(`IPC Schema Validation Error: Unexpected object properties at '${path}': ${unexpected.join(', ')}`);
+            throw new Error(
+              `IPC Schema Validation Error: Unexpected object properties at '${path}': ${unexpected.join(', ')}`
+            );
           }
         }
         for (const [propKey, propSchema] of Object.entries(schema.properties)) {
@@ -160,7 +211,23 @@ function isTrustedIpcSender(event, trustedEntryPath) {
  * @param {Function} [getTrustedEntryPath] Provider for the trusted renderer entry point
  * @returns {Function}
  */
-function createIpcHandler(channel, schema, handler, getTrustedEntryPath = () => path.join(app.getAppPath(), 'src', 'index.html')) {
+function defaultTrustedEntryPath() {
+  const electronApp = getElectronApp();
+  if (electronApp && typeof electronApp.getAppPath === 'function') {
+    return path.join(electronApp.getAppPath(), 'src', 'index.html');
+  }
+  return path.join(path.resolve(__dirname, '../../..'), 'src', 'index.html');
+}
+
+/**
+ * Builds the guarded handler registered with ipcMain and exposes the same path for focused tests.
+ * @param {string} channel IPC channel name
+ * @param {Object} schema Validation schema descriptor
+ * @param {Function} handler Implementation function
+ * @param {Function} [getTrustedEntryPath] Provider for the trusted renderer entry point
+ * @returns {Function}
+ */
+function createIpcHandler(channel, schema, handler, getTrustedEntryPath = defaultTrustedEntryPath) {
   return async (event, rawPayload) => {
     try {
       if (!isTrustedIpcSender(event, getTrustedEntryPath())) {
@@ -184,15 +251,23 @@ function createIpcHandler(channel, schema, handler, getTrustedEntryPath = () => 
 
 /**
  * Defines and registers an Electron IPC handler with route-defined checks and sanitation helpers.
- * 
+ *
  * @param {string} channel IPC channel name (e.g., 'omni:solve-drop-test')
  * @param {Object} schema Validation schema descriptor
  * @param {Function} handler Implementation function (event, cleanParams) => Promise<any>
  * @param {Object} [options] Metadata options (domain, description)
  */
 function defineHandler(channel, schema, handler, options = {}) {
-  if (typeof channel !== 'string' || !channel.startsWith('omni:')) {
-    throw new Error(`Security Violation: All OmniEng IPC channels must start with 'omni:' (got '${channel}')`);
+  if (
+    typeof channel !== 'string' ||
+    (!channel.startsWith('omni:') &&
+      !channel.startsWith('cad:') &&
+      !channel.startsWith('plant:') &&
+      !channel.startsWith('hpc:'))
+  ) {
+    throw new Error(
+      `Security Violation: All OmniEng IPC channels must start with 'omni:', 'cad:', 'plant:', or 'hpc:' (got '${channel}')`
+    );
   }
   if (!schema || typeof schema !== 'object') {
     throw new Error(`Security Violation: Channel '${channel}' must provide a validation schema`);
@@ -216,8 +291,19 @@ function defineHandler(channel, schema, handler, options = {}) {
   channelRegistry.set(channel, metadata);
 
   // Wrap with security filter and register with Electron ipcMain
-  if (ipcMain && typeof ipcMain.handle === 'function') {
-    ipcMain.handle(channel, createIpcHandler(channel, schema, handler));
+  const targetIpc =
+    activeIpcMain ||
+    (function () {
+      try {
+        const candidate = require('electron');
+        return candidate && typeof candidate === 'object' ? candidate.ipcMain : null;
+      } catch {
+        return null;
+      }
+    })();
+
+  if (targetIpc && typeof targetIpc.handle === 'function') {
+    targetIpc.handle(channel, createIpcHandler(channel, schema, handler));
   }
 
   return metadata;
@@ -233,7 +319,7 @@ function getRegisteredChannels() {
 
 /**
  * Validates whether a specific channel is registered
- * @param {string} channel 
+ * @param {string} channel
  * @returns {boolean}
  */
 function isChannelRegistered(channel) {
@@ -247,5 +333,6 @@ module.exports = {
   createIpcHandler,
   getRegisteredChannels,
   isChannelRegistered,
-  channelRegistry
+  channelRegistry,
+  withIpcMain
 };

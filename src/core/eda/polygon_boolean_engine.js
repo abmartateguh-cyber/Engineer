@@ -1,12 +1,7 @@
 /**
- * OmniEng Arbitrary Polygon Boolean & Geometric Layout Engine
- * 
- * Provides foundry mask boolean operations matching Siemens Calibre / KLayout:
- * 1. 2D Arbitrary Polygon Clipping & Booleans: UNION (OR), INTERSECTION (AND), DIFFERENCE (NOT), XOR.
- * 2. Morphological Sizing (dilation / erosion, grow / shrink by delta nm).
- * 3. Enclosure and Overlap Geometric Verification.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental polygon helpers: convex-clipper intersection and a per-vertex
+ * offset heuristic. Union, difference, XOR, foundry rule semantics, and
+ * independent geometric validation are not implemented here.
  */
 
 'use strict';
@@ -16,7 +11,7 @@ class Polygon2D {
    * @param {Array<{x: number, y: number}>} vertices - Ordered polygon boundary points
    */
   constructor(vertices = []) {
-    this.vertices = vertices.map(v => ({ x: v.x, y: v.y }));
+    this.vertices = vertices.map((v) => ({ x: v.x, y: v.y }));
   }
 
   area() {
@@ -32,10 +27,11 @@ class Polygon2D {
     let inside = false;
     const n = this.vertices.length;
     for (let i = 0, j = n - 1; i < n; j = i++) {
-      const xi = this.vertices[i].x, yi = this.vertices[i].y;
-      const xj = this.vertices[j].x, yj = this.vertices[j].y;
-      const intersect = ((yi > py) !== (yj > py)) &&
-                        (px < (xj - xi) * (py - yi) / (yj - yi + 1e-12) + xi);
+      const xi = this.vertices[i].x,
+        yi = this.vertices[i].y;
+      const xj = this.vertices[j].x,
+        yj = this.vertices[j].y;
+      const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-12) + xi;
       if (intersect) inside = !inside;
     }
     return inside;
@@ -51,7 +47,7 @@ class PolygonBooleanEngine {
    */
   static intersect(polyA, polyB) {
     // Sutherland-Hodgman convex/general polygon clipping
-    let outputList = polyA.vertices.map(v => ({ ...v }));
+    let outputList = polyA.vertices.map((v) => ({ ...v }));
     const nB = polyB.vertices.length;
 
     for (let i = 0; i < nB; i++) {
@@ -119,20 +115,25 @@ class PolygonBooleanEngine {
       const pNext = poly.vertices[(i + 1) % n];
 
       // Edge 1 normal
-      const e1x = pCur.x - pPrev.x, e1y = pCur.y - pPrev.y;
+      const e1x = pCur.x - pPrev.x,
+        e1y = pCur.y - pPrev.y;
       const l1 = Math.hypot(e1x, e1y) || 1.0;
-      const n1x = -e1y / l1, n1y = e1x / l1;
+      const n1x = -e1y / l1,
+        n1y = e1x / l1;
 
       // Edge 2 normal
-      const e2x = pNext.x - pCur.x, e2y = pNext.y - pCur.y;
+      const e2x = pNext.x - pCur.x,
+        e2y = pNext.y - pCur.y;
       const l2 = Math.hypot(e2x, e2y) || 1.0;
-      const n2x = -e2y / l2, n2y = e2x / l2;
+      const n2x = -e2y / l2,
+        n2y = e2x / l2;
 
       // Average outward bisector normal
       let bx = n1x + n2x;
       let by = n1y + n2y;
       const bLen = Math.hypot(bx, by) || 1.0;
-      bx /= bLen; by /= bLen;
+      bx /= bLen;
+      by /= bLen;
 
       newVerts.push({
         x: pCur.x + delta * bx,

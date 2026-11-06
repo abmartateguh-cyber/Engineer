@@ -11,14 +11,6 @@
     unavailable: '3D Caliper Result'
   });
 
-  function appendLine(documentRef, parent, className, text) {
-    const line = documentRef.createElement('div');
-    line.className = className;
-    line.textContent = text;
-    parent.appendChild(line);
-    return line;
-  }
-
   function finitePoint(point) {
     return Boolean(point) && [point.x, point.y, point.z].every(Number.isFinite);
   }
@@ -101,7 +93,29 @@
     return { success: true };
   }
 
-  const api = Object.freeze({ renderMeasurementHud });
+  function render(arg1, arg2, arg3 = {}) {
+    let docRef = arg1;
+    let container = arg2;
+    let data = arg3;
+    if (arg1 && typeof arg1.replaceChildren === 'function') {
+      container = arg1;
+      docRef = arg2;
+    }
+    const state = {
+      phase: data?.phase || 'result',
+      distance: data?.distanceMm !== undefined ? data.distanceMm : data?.distance,
+      delta: {
+        x: data?.deltaX !== undefined ? data.deltaX : (data?.delta?.x ?? 0),
+        y: data?.deltaY !== undefined ? data.deltaY : (data?.delta?.y ?? 0),
+        z: data?.deltaZ !== undefined ? data.deltaZ : (data?.delta?.z ?? 0)
+      }
+    };
+    return renderMeasurementHud(container, docRef, state);
+  }
+
+  const api = { renderMeasurementHud, render };
+  api.OmniMeasurementHudView = api;
+  Object.freeze(api);
   if (global) global.OmniMeasurementHudView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis === 'object' ? globalThis : window);

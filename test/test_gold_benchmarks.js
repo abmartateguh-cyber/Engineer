@@ -21,6 +21,7 @@ const { GdsiiStreamEngine, GdsLibrary } = require('../src/core/eda/gdsii_stream'
 const { AsphericSurface, ThinFilmMultilayerCoating } = require('../src/core/optics/aspheric_freeform_optics');
 const { OpticalThermalSoakEngine } = require('../src/core/optics/thermal_soak');
 const opticalExamples = require('./support/experimental_optics_examples');
+const { SYNTHETIC_CONTINUUM_MATERIAL } = require('./support/synthetic_cae_materials');
 const { AutocoderCRust } = require('../src/core/dynamic_simulink/autocoder_c_rust');
 const {
   ModelPredictiveController,
@@ -50,10 +51,14 @@ function runGoldBenchmarks() {
   {
     const E = 2.1e11;
     const nu = 0.3;
-    const tet10 = new QuadraticTet10Element(0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], { E, nu, Sy: 400.0e6, H: 2.0e9 });
+    const tet10 = new QuadraticTet10Element(0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], {
+      ...SYNTHETIC_CONTINUUM_MATERIAL,
+      E,
+      nu
+    });
     const gp = tet10.gaussPoints[0];
     const strainInc = new Float64Array([0.0004414, -0.0001324, -0.0001324, 0, 0, 0]);
-    const res = tet10.radialReturnMapping(gp, strainInc);
+    const res = tet10.radialReturnMapping(gp, strainInc, 1, 300);
     const lambda = (E * nu) / ((1 + nu) * (1 - 2 * nu));
     const shearModulus = E / (2 * (1 + nu));
     const strainSum = strainInc[0] + strainInc[1] + strainInc[2];
@@ -72,15 +77,10 @@ function runGoldBenchmarks() {
   {
     const Sy = 250.0e6; // Yield strength Pa
 
-    const tet10 = new QuadraticTet10Element(1, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], {
-      E: 2.0e11,
-      nu: 0.3,
-      Sy: 250.0e6,
-      H: 1.0e9
-    });
+    const tet10 = new QuadraticTet10Element(1, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], SYNTHETIC_CONTINUUM_MATERIAL);
     const gp = tet10.gaussPoints[0];
     const epsPlastic = new Float64Array([0.015, -0.006, -0.006, 0.002, 0, 0]);
-    const pRes = tet10.radialReturnMapping(gp, epsPlastic);
+    const pRes = tet10.radialReturnMapping(gp, epsPlastic, 1, 300);
 
     assert(
       pRes.isPlastic,

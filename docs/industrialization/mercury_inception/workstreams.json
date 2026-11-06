@@ -1,0 +1,252 @@
+{
+  "version": 1,
+  "state": "planned",
+  "workerAgent": "mercury-industrial-worker",
+  "reviewerAgent": "mercury-industrial-reviewer",
+  "supervisorAgent": "mercury-industrial-supervisor",
+  "correctorAgent": "mercury-industrial-corrector",
+  "limits": {
+    "modelRequests": 3,
+    "writingWorkers": 2,
+    "heavyProcesses": 1
+  },
+  "workstreams": [
+    {
+      "id": "WS-01",
+      "title": "Reference identity and benchmark integrity",
+      "dependsOn": [],
+      "candidatePaths": ["test/vv/", "src/core/vv/"],
+      "acceptance": "Each named benchmark matches the actual specification; substitute analytic/manufactured cases have distinct IDs and original cases remain open until genuinely run."
+    },
+    {
+      "id": "WS-02",
+      "title": "Capability inventory and reproducible baseline",
+      "dependsOn": [],
+      "candidatePaths": ["src/core/contracts/", "src/main/ipc/", "docs/industrialization/"],
+      "acceptance": "Every advertised operation has an inspected engine-to-UI/persistence path, exact availability state, validity bounds and reproduced baseline command exits."
+    },
+    {
+      "id": "WS-03",
+      "title": "Unified adapters, jobs and IPC",
+      "dependsOn": ["WS-02"],
+      "candidatePaths": ["src/core/contracts/", "src/main/ipc/", "preload.js", "src/main/compute_host.js"],
+      "acceptance": "Operation contracts, adapter dispatch, worker lifecycle, cancellation, error propagation, units and result provenance are verified through public entry points."
+    },
+    {
+      "id": "WS-04",
+      "title": "Sparse/native kernels and resource isolation",
+      "dependsOn": ["WS-01", "WS-03"],
+      "candidatePaths": ["src/core/math/", "src/main/compute_host.js"],
+      "acceptance": "SPD/indefinite/nonsymmetric systems use valid methods with bounded fallback; real backend, residuals, memory and representative performance are measured."
+    },
+    {
+      "id": "WS-05",
+      "title": "B-Rep kernel and geometry operations",
+      "dependsOn": ["WS-01", "WS-03"],
+      "candidatePaths": [
+        "src/core/cad/kernel_adapter.js",
+        "src/core/cad/geometry_engine_adapter.js",
+        "src/core/cad/feature_tree.js"
+      ],
+      "acceptance": "Pinned licensed B-Rep backend executes required features with manifold/orientation/tolerance/volume and independent geometry verification."
+    },
+    {
+      "id": "WS-06",
+      "title": "CAD exchange, constraints and topology history",
+      "dependsOn": ["WS-05"],
+      "candidatePaths": [
+        "src/core/cad/step_translator.js",
+        "src/core/cad/persistent_naming_manager.js",
+        "src/core/cad/variational_constraint_solver.js"
+      ],
+      "acceptance": "External-reader exchange round trips and feature re-evaluation preserve intended topology, assembly units/transforms and constraint diagnostics."
+    },
+    {
+      "id": "WS-07",
+      "title": "Structural continuum and constitutive verification",
+      "dependsOn": ["WS-01", "WS-04"],
+      "candidatePaths": [
+        "src/core/cae/fea_structural.js",
+        "src/core/cae/element_tet10.js",
+        "src/core/cae/element_hex20.js",
+        "src/core/cae/continuum_plasticity_3d.js"
+      ],
+      "acceptance": "Element patch/objectivity/scaling tests, quadrature, residuals, tangents and convergence hold for declared linear/nonlinear formulations and actual reference cases."
+    },
+    {
+      "id": "WS-08",
+      "title": "Discrete contact, modal and explicit dynamics",
+      "dependsOn": ["WS-07"],
+      "candidatePaths": [
+        "src/core/cae/contact_mechanics_3d.js",
+        "src/core/cae/explicit_dynamics_crash.js",
+        "src/core/cae/penalty_contact.js"
+      ],
+      "acceptance": "Actual discretized contact/mass/time integration produce independently checked pressure/modes/energy; reduced-dimensional methods retain accurate capability labels."
+    },
+    {
+      "id": "WS-09",
+      "title": "Conservative laminar FVM and pressure coupling",
+      "dependsOn": ["WS-01", "WS-04"],
+      "candidatePaths": [
+        "src/core/cae/fvm_navier_stokes_3d.js",
+        "src/core/cae/simple_navier_stokes.js",
+        "src/core/cae/cfd_engine_adapter.js"
+      ],
+      "acceptance": "Closed face topology, normal signs, density/diffusion scaling, stable pressure coupling and conservation pass constant-flow, manufactured and channel studies without masking NaNs."
+    },
+    {
+      "id": "WS-10",
+      "title": "Implicit SST RANS and NASA reference closure",
+      "dependsOn": ["WS-09"],
+      "candidatePaths": ["src/core/cae/fvm_navier_stokes_3d.js", "test/vv/nasa_tmr/"],
+      "acceptance": "Selected SST equations and wall treatment reproduce the actual NASA setup with predeclared stationarity/grid/conservation studies and unchanged reference tolerances."
+    },
+    {
+      "id": "WS-11",
+      "title": "Thermal, VOF and rotating-flow fidelity",
+      "dependsOn": ["WS-07", "WS-09"],
+      "candidatePaths": [
+        "src/core/cae/thermal_cht.js",
+        "src/core/cae/vof_multiphase_solver.js",
+        "src/core/cae/sliding_mesh_turbomachinery.js"
+      ],
+      "acceptance": "Thermal coupling and requested interface/rotating formulations conserve appropriate quantities; prescribed advection and Euler stage estimates are not relabeled as coupled 3D solvers."
+    },
+    {
+      "id": "WS-12",
+      "title": "Liberty/CCS/MCMM timing and synthesis",
+      "dependsOn": ["WS-01", "WS-03"],
+      "candidatePaths": [
+        "src/core/eda/liberty_nldm_parser.js",
+        "src/core/eda/ccs_timing_model.js",
+        "src/core/eda/static_timing_analysis.js",
+        "src/core/eda/eda_engine_adapter.js"
+      ],
+      "acceptance": "Sourced timing tables, graph propagation, corners/modes and waveform extraction match independent reference decks through production contracts."
+    },
+    {
+      "id": "WS-13",
+      "title": "Nonlinear circuits and physical EDA exchange",
+      "dependsOn": ["WS-04", "WS-12"],
+      "candidatePaths": [
+        "src/core/eda/spice_engine.js",
+        "src/core/eda/gdsii_stream.js",
+        "src/core/eda/oasis_stream_engine.js",
+        "src/core/eda/drc_engine.js"
+      ],
+      "acceptance": "Real compact-model backend and exchange/parser/DRC/LVS workflows pass independent netlists/layouts; unsupported devices and malformed files fail closed."
+    },
+    {
+      "id": "WS-14",
+      "title": "Ray/wave optics and material provenance",
+      "dependsOn": ["WS-01", "WS-03", "WS-04"],
+      "candidatePaths": ["src/core/optics/", "src/main/ipc/optics_ipc.js"],
+      "acceptance": "Geometric and wave engines satisfy energy/Snell/TIR/FFT checks and independent optical systems using source-reviewed, licensed dispersion/tolerance data."
+    },
+    {
+      "id": "WS-15",
+      "title": "Thermodynamics, flash and IF97",
+      "dependsOn": ["WS-01", "WS-03"],
+      "candidatePaths": [
+        "src/core/plant/peng_robinson_eos.js",
+        "src/core/plant/iapws_if97.js",
+        "src/core/plant/activity_coefficient_models.js",
+        "src/core/plant/plant_engine_adapter.js"
+      ],
+      "acceptance": "Explicit sourced compositions/properties satisfy material/fugacity/energy balances, all claimed IF97 regions and published boundary/reference states."
+    },
+    {
+      "id": "WS-16",
+      "title": "Columns, recycle, piping and process transients",
+      "dependsOn": ["WS-15", "WS-04"],
+      "candidatePaths": [
+        "src/core/plant/naphtali_sandholm_mesh.js",
+        "src/core/plant/process_flowsheet_solver.js",
+        "src/core/plant/transient_water_hammer.js",
+        "src/core/plant/piping_stress.js"
+      ],
+      "acceptance": "Actual unit-operation/column/recycle/transient equations close their balances and execute validated input contracts without invented evaluators or code allowables."
+    },
+    {
+      "id": "WS-17",
+      "title": "DAE, system semantics and verified code generation",
+      "dependsOn": ["WS-01", "WS-03", "WS-04"],
+      "candidatePaths": ["src/core/dynamic_simulink/", "src/core/controls/", "src/core/cosim/"],
+      "acceptance": "Residual-form DAE initialization/index bounds, chart events/concurrency, FMU lifecycle and generated target behavior have reference and compiler/static-analysis evidence."
+    },
+    {
+      "id": "WS-18",
+      "title": "P&ID authoring and drawing integrity",
+      "dependsOn": ["WS-02", "WS-03", "WS-15"],
+      "candidatePaths": [
+        "src/core/plant/pid_engine.js",
+        "src/ui/pid_studio_ui.js",
+        "scripts/generate_pid.js",
+        "test/test_pid_engine.js"
+      ],
+      "acceptance": "Editable persisted project basis, clipping-free pagination, off-page connectivity, schematic NTS labeling, readable print exports and engineer-reviewed tag/schedule consistency."
+    },
+    {
+      "id": "WS-19",
+      "title": "Professional engineering UI and accessibility",
+      "dependsOn": ["WS-03", "WS-18"],
+      "candidatePaths": ["src/ui/", "src/index.html", "src/styles/"],
+      "acceptance": "Packaged task-based workflows cover selection/edit/undo/save/export/cancel/error/recovery, keyboard/accessibility, latency and no inert or synthetic-result controls."
+    },
+    {
+      "id": "WS-20",
+      "title": "Project durability and transactional storage",
+      "dependsOn": ["WS-03"],
+      "candidatePaths": ["src/core/storage/", "src/core/contracts/ProjectManifestV2.js"],
+      "acceptance": "Actual UI project round trips, concurrent archives, torn writes, restart and interrupted job recovery preserve committed data with bounded streaming memory."
+    },
+    {
+      "id": "WS-21",
+      "title": "Authenticated HPC, identity and audit provenance",
+      "dependsOn": ["WS-03", "WS-20"],
+      "candidatePaths": ["src/core/hpc/", "src/core/security/", "src/main/stenographer_supervisor.js"],
+      "acceptance": "Real configured providers authenticate submit/poll/cancel and verify artifacts/signatures/timestamps; prepared scripts and local acknowledgements never claim remote execution."
+    },
+    {
+      "id": "WS-22",
+      "title": "Supported runtime, packaging and dependency security",
+      "dependsOn": ["WS-02"],
+      "candidatePaths": ["package.json", "package-lock.json", "electron-builder.yml", ".github/workflows/", "main.js"],
+      "acceptance": "Explicit supported deployment matrix, runtime advisory resolution, clean installs, signed packages where required, affirmative bounded smoke and update/rollback evidence."
+    },
+    {
+      "id": "WS-23",
+      "title": "Release gates, coverage and independent review",
+      "dependsOn": ["WS-01", "WS-02"],
+      "candidatePaths": [
+        "scripts/run_tests_clean.js",
+        "scripts/run_coverage.js",
+        "test/run_all_tests.js",
+        ".github/workflows/"
+      ],
+      "acceptance": "Actual failures propagate through CI and coverage; counts are finite/exact, whole scope is inventoried, references remain independent and evidence is reproducible."
+    },
+    {
+      "id": "WS-24",
+      "title": "Performance, soak and workflow-specific release qualification",
+      "dependsOn": [
+        "WS-06",
+        "WS-08",
+        "WS-10",
+        "WS-11",
+        "WS-13",
+        "WS-14",
+        "WS-16",
+        "WS-17",
+        "WS-19",
+        "WS-20",
+        "WS-21",
+        "WS-22",
+        "WS-23"
+      ],
+      "candidatePaths": ["docs/industrialization/", "src/core/compliance/", "scripts/"],
+      "acceptance": "Ratified performance/soak, traceable domain evidence and independent owner acceptance close the finite release manifest without blanket self-certification."
+    }
+  ]
+}

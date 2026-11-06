@@ -293,6 +293,23 @@ class BlockDiagramGraph {
   }
 }
 
+class BlockGraph extends BlockDiagramGraph {
+  addBlock(typeOrConfig, name, params = {}, x = 100, y = 100) {
+    if (typeOrConfig && typeof typeOrConfig === 'object' && !Array.isArray(typeOrConfig)) {
+      const id = typeOrConfig.id || `blk_${String(this.nextBlockId++).padStart(6, '0')}`;
+      const type = (typeOrConfig.type || 'gain').toLowerCase();
+      const blockName = typeOrConfig.name || name || type;
+      const blockParams = typeOrConfig.parameters || typeOrConfig.params || params;
+      const bx = typeOrConfig.x !== undefined ? typeOrConfig.x : x;
+      const by = typeOrConfig.y !== undefined ? typeOrConfig.y : y;
+      const block = new BlockNode(id, type, blockName, blockParams, bx, by);
+      this.blocks.set(id, block);
+      return block;
+    }
+    return super.addBlock(typeOrConfig, name, params, x, y);
+  }
+}
+
 const { StateSpaceEngine } = require('./state_space_engine');
 const { ExtendedKalmanFilter } = require('./extended_kalman_filter');
 const { AerodynamicCoefficients } = require('./aerodynamic_coefficients');
@@ -305,6 +322,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     BlockNode,
     BlockDiagramGraph,
+    BlockGraph,
     StateSpaceEngine,
     ExtendedKalmanFilter,
     AerodynamicCoefficients

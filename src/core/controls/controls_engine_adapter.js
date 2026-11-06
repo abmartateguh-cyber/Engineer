@@ -24,13 +24,7 @@ class ControlsEngineAdapter extends EngineAdapter {
       domain: 'controls',
       name: this.name,
       version: this.version,
-      supportedOperations: [
-        'simulate_block_diagram',
-        'solve_state_space',
-        'fmi_cosimulation',
-        'solve_mpc',
-        'estimate_ekf'
-      ],
+      supportedOperations: ['simulate_block_diagram', 'solve_state_space', 'solve_mpc', 'estimate_ekf'],
       maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
@@ -55,6 +49,7 @@ class ControlsEngineAdapter extends EngineAdapter {
 
     try {
       let outputData = null;
+      let residualHistory = [];
       const params = jobRequest.parameters || {};
 
       switch (jobRequest.operation) {
@@ -171,15 +166,76 @@ class ControlsEngineAdapter extends EngineAdapter {
               message: 'Setting up FMI 2.0/3.0 co-simulation master'
             })
           );
-          const master = new FmiMasterEngine({
-            stepSize: params.stepSize || 0.01,
-            maxIterations: params.maxIterations || 50
-          });
+          const duration = Number(params.duration ?? params.stopTime ?? params.tEnd ?? params.totalTimeSec ?? 1.0);
+          const dt = Number(params.dt ?? params.stepSize ?? params.defaultStepSize ?? 0.01);
+          if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(dt) || dt <= 0) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              'FMI co-simulation requires positive finite duration and dt (stepSize)'
+            );
+          }
 
-          // If slaves provided
-          if (Array.isArray(params.slaves)) {
-            for (const s of params.slaves) {
-              master.addSlave(new FmuSlave(s));
+          const master = new FmiMasterEngine({
+            startTime: Number(params.startTime || 0),
+            stopTime: duration,
+            defaultStepSize: dt,
+            minStepSize: params.minStepSize || 1e-6,
+            maxStepSize: params.maxStepSize || Math.max(dt, 0.01),
+            scheme: params.scheme || 'gauss_seidel',
+            adaptiveStep: params.adaptiveStep !== undefined ? Boolean(params.adaptiveStep) : false,
+            tolerance: params.tolerance || 1e-5
+          });
+          master.stepSize = dt;
+          master.stopTime = duration;
+
+          // Register slaves if provided
+          const slaveInputList = Array.isArray(params.slaves)
+            ? params.slaves
+            : Array.isArray(params.fmus)
+              ? params.fmus
+              : [];
+          const slaveByName = new Map();
+          for (let i = 0; i < slaveInputList.length; i++) {
+            const s = slaveInputList[i];
+            const slave = s instanceof FmuSlave ? s : new FmuSlave({ instanceName: `FMU_${i + 1}`, ...s });
+            if (typeof s.doStep === 'function' && !(s instanceof FmuSlave)) {
+              const customDoStep = s.doStep;
+              slave.doStep = function (t, h) {
+                const res = customDoStep.call(this, t, h, this);
+                this.time = t + h;
+                return res !== false;
+              };
+            } else if (typeof s.stepFn === 'function') {
+              const customStepFn = s.stepFn;
+              slave.doStep = function (t, h) {
+                const res = customStepFn(t, h, this);
+                this.time = t + h;
+                return res !== false;
+              };
+            }
+            master.addSlave(slave);
+            slaveByName.set(slave.instanceName, slave);
+          }
+
+          // Register connections if provided
+          if (Array.isArray(params.connections)) {
+            for (const conn of params.connections) {
+              const resolveSlave = (ref) => {
+                if (ref instanceof FmuSlave) return ref;
+                if (typeof ref === 'number') return master.slaves[ref];
+                if (typeof ref === 'string') return slaveByName.get(ref);
+                return null;
+              };
+              const srcSlave = resolveSlave(conn.sourceSlave ?? conn.fromSlave ?? conn.from);
+              const tgtSlave = resolveSlave(conn.targetSlave ?? conn.toSlave ?? conn.to);
+              if (srcSlave && tgtSlave) {
+                master.addConnection(
+                  srcSlave,
+                  Number(conn.sourceVr ?? conn.fromVr ?? 0),
+                  tgtSlave,
+                  Number(conn.targetVr ?? conn.toVr ?? 0)
+                );
+              }
             }
           }
 
@@ -188,21 +244,49 @@ class ControlsEngineAdapter extends EngineAdapter {
             new JobEvent({
               jobId,
               type: JobEventType.PROGRESS,
-              progressPercent: 70,
+              progressPercent: 60,
               message: `Algebraic loop check: ${hasLoop ? 'DETECTED' : 'NONE'}`
             })
           );
 
           let loopResolution = null;
           if (hasLoop) {
-            loopResolution = master.solveAlgebraicLoop();
+            loopResolution = master.solveAlgebraicLoop(
+              params.maxIterations || 50,
+              params.omega || 0.8,
+              params.tolerance || 1e-6
+            );
           }
+
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 80,
+              message: `Executing FMI co-simulation master loop (duration=${duration}s, dt=${dt}s)`
+            })
+          );
+          const simResult = master.simulate(duration, dt);
+
+          residualHistory = simResult.timeSeries.map((snap, idx) => ({
+            iteration: idx,
+            step: idx,
+            time: snap.t,
+            residual: loopResolution ? loopResolution.maxResidual : 0.0
+          }));
 
           outputData = {
             slaveCount: master.slaves.length,
             hasAlgebraicLoop: hasLoop,
             loopResolution,
-            stepSize: master.stepSize
+            stepSize: master.stepSize,
+            duration,
+            dt,
+            totalSteps: simResult.totalSteps,
+            rejectedSteps: simResult.rejectedSteps,
+            converged: simResult.converged,
+            timeSeries: simResult.timeSeries,
+            stepHistory: simResult.timeSeries
           };
           break;
         }
@@ -305,6 +389,10 @@ class ControlsEngineAdapter extends EngineAdapter {
               quaternion: [ekf.x[6], ekf.x[7], ekf.x[8], ekf.x[9]],
               eulerDeg: finalEuler
             },
+            attitude: {
+              quaternion: [ekf.x[6], ekf.x[7], ekf.x[8], ekf.x[9]],
+              eulerDeg: finalEuler
+            },
             stepsProcessed: steps.length,
             trajectory: params.recordTrajectory ? trajectory : undefined
           };
@@ -332,6 +420,7 @@ class ControlsEngineAdapter extends EngineAdapter {
         jobId,
         status: JobStatus.SUCCEEDED,
         outputData,
+        residualHistory,
         backendName: this.name,
         backendVersion: this.version,
         executionDurationMs: durationMs,

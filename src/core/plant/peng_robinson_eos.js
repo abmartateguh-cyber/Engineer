@@ -7,6 +7,7 @@
 'use strict';
 
 const R_GAS = 8.314462618; // J / (mol * K)
+const { getDipprCatalog } = require('./dippr_expanded_catalog');
 
 // Kept empty for compatibility. Property records must be provided by the caller.
 const COMPONENT_DB = Object.freeze({});
@@ -24,7 +25,28 @@ class PengRobinsonEOS {
       if (!component || typeof component !== 'object' || Array.isArray(component)) {
         throw new TypeError(`Component ${index} must be an explicit property record; bundled names are unavailable.`);
       }
-      const { name, criticalTemperatureK, criticalPressurePa, acentricFactor, provenance } = component;
+      let { name, criticalTemperatureK, criticalPressurePa, acentricFactor, provenance } = component;
+      if (
+        typeof name === 'string' &&
+        name.trim() &&
+        (!Number.isFinite(criticalTemperatureK) || !Number.isFinite(criticalPressurePa) || !Number.isFinite(acentricFactor))
+      ) {
+        try {
+          const dippr = getDipprCatalog();
+          const sp = dippr.getSpecies(name.trim());
+          if (sp) {
+            criticalTemperatureK = sp.Tc;
+            criticalPressurePa = sp.Pc;
+            acentricFactor = sp.omega;
+            provenance = provenance || {
+              source: 'DIPPR / ChemSep Expanded Catalog (Open PCD)',
+              license: 'Open-Access Synthesis'
+            };
+          }
+        } catch {
+          // ignore resolution error and let validation check below handle it
+        }
+      }
       if (
         typeof name !== 'string' ||
         !name.trim() ||
@@ -459,6 +481,127 @@ class PengRobinsonEOS {
     }
 
     return gamma;
+  }
+
+  /**
+   * Pure component temperature derivatives da_i/dT (J m^3 / (mol^2 K))
+   * @param {number} T Temperature in Kelvin
+   * @returns {Float64Array}
+   */
+  calculatePureTemperatureDerivatives(T) {
+    const da_dT = new Float64Array(this.N);
+    for (let i = 0; i < this.N; i++) {
+      const comp = this.components[i];
+      const Tr = T / comp.Tc;
+      const omega = comp.omega;
+
+      let m;
+      if (omega <= 0.49) {
+        m = 0.37464 + 1.54226 * omega - 0.26992 * omega * omega;
+      } else {
+        m = 0.379642 + 1.48503 * omega - 0.164423 * omega * omega + 0.016666 * omega * omega * omega;
+      }
+
+      const sqrtTr = Math.sqrt(Tr);
+      const alpha = Math.pow(1 + m * (1 - sqrtTr), 2);
+      const dAlpha = -(m * Math.sqrt(alpha)) / Math.sqrt(T * comp.Tc);
+      const ac = 0.45724 * ((R_GAS * R_GAS * comp.Tc * comp.Tc) / comp.Pc);
+      da_dT[i] = ac * dAlpha;
+    }
+    return da_dT;
+  }
+
+  /**
+   * Molar enthalpy departure (H - H^ig) in J/mol
+   * @param {Float64Array|Array<number>} z Mole fractions
+   * @param {number} T Temperature in Kelvin
+   * @param {number} P Pressure in Pascals
+   * @param {'vapor'|'liquid'} phase
+   * @returns {{ enthalpyDepartureJmol: number, Z: number, da_mix_dT: number }}
+   */
+  calculateEnthalpyDeparture(z, T, P, phase = 'vapor') {
+    const { a: a_pure, b: b_pure } = this.calculatePureParameters(T);
+    const { a_mix, b_mix } = this.calculateMixtureParameters(z, a_pure, b_pure);
+    const da_pure = this.calculatePureTemperatureDerivatives(T);
+
+    const N = this.N;
+    let da_mix_dT = 0;
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const kij = this.k_ij[i][j];
+        const denom = 2 * Math.sqrt(Math.max(1e-20, a_pure[i] * a_pure[j]));
+        const da_ij_dT = denom > 0 ? ((1 - kij) / denom) * (a_pure[i] * da_pure[j] + a_pure[j] * da_pure[i]) : 0;
+        da_mix_dT += z[i] * z[j] * da_ij_dT;
+      }
+    }
+
+    const A = (a_mix * P) / (R_GAS * R_GAS * T * T);
+    const B = (b_mix * P) / (R_GAS * T);
+    const Z = this.solveCubicZ(A, B, phase);
+
+    const sqrt2 = Math.SQRT2;
+    const termSqrt = Math.log(Math.max(1e-15, (Z + (1 + sqrt2) * B) / Math.max(1e-15, Z + (1 - sqrt2) * B)));
+    const termA = ((T * da_mix_dT - a_mix) / (2 * sqrt2 * b_mix)) * termSqrt;
+    const dep = R_GAS * T * (Z - 1) + termA;
+
+    return {
+      enthalpyDepartureJmol: dep,
+      Z,
+      da_mix_dT
+    };
+  }
+
+  /**
+   * Evaluates total molar enthalpy H(T, P, z) in J/mol (= kJ/kmol)
+   * relative to ideal gas reference at T_ref = 298.15 K
+   */
+  calculateMixtureEnthalpy(z, T, P, phase = 'vapor', catalog = null) {
+    const cat = catalog || getDipprCatalog();
+    let H_ig = 0;
+    for (let i = 0; i < this.N; i++) {
+      const compName = this.components[i].name;
+      const deltaH = cat.evalIdealGasEnthalpy(compName, T, 298.15);
+      H_ig += z[i] * deltaH;
+    }
+    const { enthalpyDepartureJmol } = this.calculateEnthalpyDeparture(z, T, P, phase);
+    return H_ig + enthalpyDepartureJmol;
+  }
+
+  /**
+   * Resolve a component property record dynamically from DIPPRExpandedCatalog
+   * @param {string|object} speciesOrId
+   */
+  static resolveComponentFromDippr(speciesOrId) {
+    const catalog = getDipprCatalog();
+    const props = catalog.resolveProperties(speciesOrId);
+    return {
+      name: props.name,
+      id: props.id,
+      criticalTemperatureK: props.criticalTemperatureK,
+      criticalPressurePa: props.criticalPressurePa,
+      acentricFactor: props.acentricFactor,
+      molecularWeightKgPerMol: props.molecularWeightKgPerMol,
+      provenance: props.provenance,
+      dipprRecord: props
+    };
+  }
+
+  /**
+   * Factory method to instantiate PengRobinsonEOS directly from DIPPR species
+   * @param {Array<string|object>} speciesList
+   * @param {Array<Array<number>>} [k_ij]
+   */
+  static fromDippr(speciesList, k_ij = null) {
+    if (!Array.isArray(speciesList) || speciesList.length === 0) {
+      throw new TypeError('fromDippr requires a non-empty array of species names or records.');
+    }
+    const components = speciesList.map((sp) => PengRobinsonEOS.resolveComponentFromDippr(sp));
+    const N = components.length;
+    const matrix =
+      Array.isArray(k_ij) && k_ij.length === N
+        ? k_ij
+        : Array.from({ length: N }, () => new Array(N).fill(0));
+    return new PengRobinsonEOS(components, matrix);
   }
 }
 

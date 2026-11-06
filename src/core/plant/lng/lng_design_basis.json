@@ -1,0 +1,127 @@
+{
+  "project": {
+    "name": "World-Scale 5.0 MTPA LNG Complex",
+    "facilityType": "Base-load LNG Liquefaction, Gas Treatment, Sulfur Recovery & Regasification",
+    "nominalCapacityMTPA": 5.0,
+    "designOperatingHoursPerYear": 8000,
+    "feedGasCapacityMMSCFD": 700.0,
+    "feedGasCapacityNm3H": 820000.0,
+    "feedGasMassFlowKgH": 675000.0,
+    "lngProductionRateKgH": 625000.0,
+    "lngProductionRateM3H": 1388.0,
+    "designCode": "ISO 16903 / NFPA 59A / ASME B31.3 / API 521"
+  },
+  "siteConditions": {
+    "elevationM": 5.0,
+    "barometricPressureKPa": 101.325,
+    "ambientTemperatureC": {
+      "design": 32.0,
+      "max": 45.0,
+      "min": 5.0
+    },
+    "relativeHumidityPercent": 70.0,
+    "seawaterTemperatureC": {
+      "design": 25.0,
+      "max": 32.0,
+      "min": 18.0
+    }
+  },
+  "feedGas": {
+    "batteryLimitPressureBarg": 75.0,
+    "batteryLimitTemperatureC": 35.0,
+    "molecularWeightKgKmol": 19.38,
+    "compositionMolPercent": {
+      "methane": 85.00,
+      "ethane": 5.20,
+      "propane": 2.60,
+      "isobutane": 0.80,
+      "n_butane": 1.10,
+      "isopentane": 0.30,
+      "n_pentane": 0.20,
+      "hexane_plus": 0.30,
+      "nitrogen": 0.90,
+      "carbon_dioxide": 3.00,
+      "hydrogen_sulfide": 0.50,
+      "water": 0.10
+    },
+    "traceContaminants": {
+      "mercuryUgNm3": 25.0,
+      "totalSulfurMgNm3": 7500.0,
+      "benzenePpmv": 350.0,
+      "toluenePpmv": 120.0
+    }
+  },
+  "productSpecifications": {
+    "lng": {
+      "temperatureC": -162.0,
+      "pressureBarg": 1.15,
+      "liquidDensityKgM3": 450.0,
+      "higherHeatingValueMJNm3": 41.2,
+      "methaneMinMolPercent": 89.5,
+      "carbonDioxideMaxPpmv": 50.0,
+      "hydrogenSulfideMaxPpmv": 4.0,
+      "totalSulfurMaxMgNm3": 30.0,
+      "waterMaxPpmv": 0.1,
+      "mercuryMaxUgNm3": 0.01,
+      "benzeneMaxPpmv": 1.0,
+      "c5PlusMaxMolPercent": 0.1
+    },
+    "ngl": {
+      "commercialPropane": {
+        "purityMinMolPercent": 96.0,
+        "c2MaxMolPercent": 2.0,
+        "c4MaxMolPercent": 2.5
+      },
+      "commercialButane": {
+        "purityMinMolPercent": 95.0,
+        "c3MaxMolPercent": 2.0,
+        "c5MaxMolPercent": 2.0
+      },
+      "condensateC5Plus": {
+        "reidVaporPressureMaxPsia": 10.0,
+        "endPointMaxC": 205.0
+      }
+    },
+    "sulfur": {
+      "liquidPurityMinWeightPercent": 99.9,
+      "dissolvedH2sMaxPpmw": 10.0,
+      "productionTonnesPerDay": 65.5
+    },
+    "regasifiedGas": {
+      "deliveryPressureBarg": 90.0,
+      "deliveryTemperatureC": 15.0,
+      "maxSendoutCapacityMMSCFD": 700.0,
+      "odorantConcentrationMgNm3": 15.0
+    }
+  },
+  "utilitiesDesign": {
+    "powerGeneration": {
+      "gasTurbines": "2 x F-Class (120 MWe each)",
+      "steamTurbine": "1 x Extraction-Condensing (80 MWe)",
+      "totalInstalledCapacityMWe": 320.0,
+      "normalPlantDemandMWe": 245.0
+    },
+    "steamGeneration": {
+      "highPressureSteamBarg": 45.0,
+      "highPressureSteamTemperatureC": 400.0,
+      "lowPressureSteamBarg": 4.0,
+      "totalSteamCapacityTonnesPerHr": 280.0
+    },
+    "seawaterCooling": {
+      "intakeFlowM3H": 60000.0,
+      "supplyTemperatureC": 25.0,
+      "returnTemperatureC": 33.0
+    },
+    "instrumentAir": {
+      "pressureBarg": 7.5,
+      "dewPointC": -40.0,
+      "capacityNm3H": 6000.0
+    },
+    "nitrogenASU": {
+      "gaseousN2PressureBarg": 8.0,
+      "purityPercent": 99.99,
+      "capacityNm3H": 5000.0,
+      "liquidStorageM3": 200.0
+    }
+  }
+}

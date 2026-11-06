@@ -1,14 +1,209 @@
 'use strict';
 
-const { generateValidationReadinessReport } = require('../src/core/vv/validation_readiness_report');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
-const outputIndex = process.argv.indexOf('--output-dir');
-const outputDir = outputIndex >= 0 ? process.argv[outputIndex + 1] : undefined;
+const { runVVVerificationBenchmarks } = require('../test/vv/run_vv.js');
 
-if (typeof outputDir !== 'string' || outputDir.trim() === '') {
-  console.error('Usage: npm run report:vv -- --output-dir <directory>');
-  process.exitCode = 2;
-} else {
-  const reportPath = generateValidationReadinessReport(outputDir);
-  console.log(`Validation evidence availability report written to ${reportPath}`);
+function resolveOutputDir(argv) {
+  const index = argv.indexOf('--output-dir');
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new TypeError('--output-dir requires a directory path.');
+  }
+  return value;
+}
+
+function assertRunnerCliOptionExists(runnerPath) {
+  const source = fs.readFileSync(runnerPath, 'utf8');
+  if (!source.includes('--output-dir')) {
+    throw new Error(`The runner ${runnerPath} does not support the --output-dir option.`);
+  }
+}
+
+function formatValue(value) {
+  if (value === undefined || value === null) return 'unavailable';
+  if (typeof value !== 'number') return String(value);
+  if (!Number.isFinite(value)) return 'unavailable';
+  if (Number.isInteger(value)) return String(value);
+  return String(parseFloat(value.toPrecision(6)));
+}
+
+function outcomeOf(result) {
+  if (result.status === 'unavailable') return 'UNAVAILABLE';
+  if (result.status === 'invalid' || result.status === 'failed' || result.passed !== true) return 'FAIL';
+  return 'PASS';
+}
+
+const FALLBACK_PROVENANCE = Object.freeze({
+  MANUFACTURED_SPARSE_SPD:
+    'Analytic manufactured sparse SPD solution with independently recomputed residual; production SparseCholeskySolver preconditioned conjugate gradient.',
+  HERTZ_ANALYTICAL_FORMULA:
+    'Independent evaluation of the Hertz (1882) closed-form contact radius, maximum pressure, and indentation depth.',
+  SPARSE_SPD_GENERATED_SUITE:
+    'Generated ill-conditioned sparse SPD systems, not the original NIST sparse matrix archive; see test/vv/nist_matrix/test_nist_sparse_robustness.js.'
+});
+
+function referenceProvenance(result) {
+  const parts = [];
+  const detailsReference = result.details && result.details.reference;
+  if (typeof detailsReference === 'string' && detailsReference.trim()) parts.push(detailsReference.trim());
+  const expectedSource = result.expected && result.expected.source;
+  if (typeof expectedSource === 'string' && expectedSource.trim()) parts.push(expectedSource.trim());
+  const metadata = result.metadata || {};
+  if (typeof metadata.referenceSource === 'string' && metadata.referenceSource.trim()) {
+    parts.push(metadata.referenceSource.trim());
+  }
+  if (typeof metadata.referenceArtifact === 'string' && metadata.referenceArtifact.trim()) {
+    parts.push(`reference artifact: ${metadata.referenceArtifact.trim()}`);
+  }
+  if (typeof metadata.referenceArtifactSha256 === 'string' && metadata.referenceArtifactSha256.trim()) {
+    parts.push(`sha-256: ${metadata.referenceArtifactSha256.trim()}`);
+  }
+  if (result.diagnostics && typeof result.diagnostics.tmrTableSha256 === 'string') {
+    parts.push(`sha-256: ${result.diagnostics.tmrTableSha256}`);
+  }
+  if (parts.length === 0 && FALLBACK_PROVENANCE[result.id]) parts.push(FALLBACK_PROVENANCE[result.id]);
+  return parts.length > 0 ? parts.join('; ') : 'Not recorded in benchmark result.';
+}
+
+function environmentNode() {
+  return `${os.platform()} ${os.arch()} | Node ${process.version} | CPUs: ${os.cpus()?.length || 'unknown'}`;
+}
+
+function renderReport(summary, results, context) {
+  const rows = results.map((result) => {
+    const error =
+      result.errorPercent === undefined || result.errorPercent === null
+        ? 'unavailable'
+        : `${formatValue(result.errorPercent)}%`;
+    const tolerance =
+      result.tolerancePercent === undefined || result.tolerancePercent === null
+        ? 'not declared'
+        : `${formatValue(result.tolerancePercent)}%`;
+    return `| ${result.id} | ${result.name} | ${formatValue(result.targetValue)} | ${formatValue(result.calculatedValue)} | ${result.units ?? 'unavailable'} | ${error} | ${tolerance} | ${outcomeOf(result)} |`;
+  });
+
+  const provenanceRows = results.map((result) => `| ${result.id} | ${referenceProvenance(result)} |`);
+
+  const failures = results.filter((result) => outcomeOf(result) === 'FAIL');
+  const openItems = failures
+    .map(
+      (result) => `### ${result.id}
+
+${result.reason ?? 'No reason recorded.'}`
+    )
+    .join('\n\n');
+
+  const generatedSparse = results.find((result) => result.id === 'SPARSE_SPD_GENERATED_SUITE');
+  const generatedSparseNote = generatedSparse
+    ? referenceProvenance(generatedSparse)
+    : 'No generated sparse SPD case is present in this report.';
+
+  return `# OmniEng V&V Verification Report
+
+## STATUS: EXPERIMENTAL — NOT VALIDATION EVIDENCE
+
+This report is a diagnostic artifact generated by the experimental V&V benchmark runner. It records assertions made by current diagnostic test code only. Passing benchmarks do not establish solver accuracy, standards compliance, certification, or release maturity, and nothing in this report may be cited as validation evidence, a sign-off record, or a compliance statement.
+
+**Generated:** ${context.generatedAt}<br>
+**Command:** ${context.command}<br>
+**Environment:** ${context.environment}
+
+## Scope
+
+The underlying runner (\`node test/vv/run_vv.js --output-dir <dir>\`) executes experimental diagnostics against selected production modules and returns unavailable when a setup does not establish its stated validity conditions. Some cases are formula, discrete-system, generated, or manufactured checks rather than independent physical validation. The benchmark implementations, reference provenance, engine execution, convergence, and tolerances have not been independently qualified.
+
+## Summary
+
+| Listed checks | Passed | Unavailable | Failed |
+|---:|---:|---:|---:|
+| ${summary.total} | ${summary.passed} | ${summary.unavailable} | ${summary.failed} |
+
+## Diagnostic results
+
+| ID | Check name | Target | Calculated | Units | Error % | Tolerance | Status |
+|---|---|---|---|---|---|---|---|
+${rows.join('\n')}
+
+## Reference provenance
+
+| ID | Source of expected values |
+|---|---|
+${provenanceRows.join('\n')}
+
+## Open items
+
+${openItems}
+
+### Generated sparse-system note
+
+\`SPARSE_SPD_GENERATED_SUITE\` runs generated ill-conditioned SPD systems; it is not the original NIST sparse matrix archive and does not constitute validation against NIST data. Recorded construction/provenance: ${generatedSparseNote} See \`docs/known_limitations.md\` for the standing limitation.
+
+## Disclaimer
+
+This file is a test diagnostic, not a verification dossier, sign-off record, certification, or compliance statement.
+`;
+}
+
+function generateVvReport(outputDir, runner = runVVVerificationBenchmarks) {
+  if (typeof outputDir !== 'string' || outputDir.trim() === '') {
+    throw new TypeError('An explicit output directory is required to generate a V&V report.');
+  }
+  if (typeof runner !== 'function') {
+    throw new TypeError('A V&V runner function is required to generate a V&V report.');
+  }
+
+  const reportDir = path.resolve(outputDir);
+  fs.mkdirSync(reportDir, { recursive: true });
+  const summary = runner({ outputDir: reportDir });
+  const reportPath = path.join(reportDir, 'vv_report.md');
+  const report = renderReport(summary, summary.results, {
+    generatedAt: new Date().toISOString(),
+    command: `node scripts/generate_vv_report.js --output-dir ${outputDir}`,
+    environment: environmentNode()
+  });
+  fs.writeFileSync(reportPath, report, 'utf8');
+  console.log(`Verification report written to ${reportPath}`);
+  return { reportPath, summary, exitCode: summary.failed > 0 ? 1 : 0 };
+}
+
+function main() {
+  let outputDir;
+  try {
+    outputDir = resolveOutputDir(process.argv);
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 2;
+    return;
+  }
+  if (outputDir === undefined) {
+    console.error('Usage: npm run report:vv -- --output-dir <directory>');
+    process.exitCode = 2;
+    return;
+  }
+
+  const runnerPath = path.join(__dirname, '..', 'test', 'vv', 'run_vv.js');
+  assertRunnerCliOptionExists(runnerPath);
+
+  try {
+    const generated = generateVvReport(outputDir);
+    if (generated.exitCode !== 0) {
+      console.error(
+        `V&V report generated with ${generated.summary.failed} failed benchmark case(s); exiting non-zero.`
+      );
+      process.exitCode = generated.exitCode;
+    }
+  } catch (error) {
+    console.error(`V&V report generation errored: ${error.stack || error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+module.exports = { renderReport, outcomeOf, formatValue, referenceProvenance, generateVvReport };
+
+if (require.main === module) {
+  main();
 }

@@ -3,9 +3,9 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "engineering-engine@1.0.0",
-  "documentNamespace": "http://spdx.org/spdxdocs/engineering-engine-1.0.0-8424a50b-2dac-47bd-a60b-876a218f503c",
+  "documentNamespace": "http://spdx.org/spdxdocs/engineering-engine-1.0.0-1b57b349-f30c-4182-a919-2bc9c032daa4",
   "creationInfo": {
-    "created": "2026-10-24T00:04:04.436Z",
+    "created": "2026-10-29T16:02:20.370Z",
     "creators": [
       "Tool: npm/cli-11.13.0"
     ]
@@ -35,24 +35,24 @@
     },
     {
       "name": "@electron-internal/extract-zip",
-      "SPDXID": "SPDXRef-Package-electron-internal.extract-zip-1.0.5",
-      "versionInfo": "1.0.5",
+      "SPDXID": "SPDXRef-Package-electron-internal.extract-zip-1.0.8",
+      "versionInfo": "1.0.8",
       "packageFileName": "node_modules/@electron-internal/extract-zip",
-      "downloadLocation": "https://registry.npmjs.org/@electron-internal/extract-zip/-/extract-zip-1.0.5.tgz",
+      "downloadLocation": "https://registry.npmjs.org/@electron-internal/extract-zip/-/extract-zip-1.0.8.tgz",
       "filesAnalyzed": false,
       "homepage": "NOASSERTION",
-      "licenseDeclared": "BSD-2-Clause",
+      "licenseDeclared": "MIT",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:npm/%40electron-internal/extract-zip@1.0.5"
+          "referenceLocator": "pkg:npm/%40electron-internal/extract-zip@1.0.8"
         }
       ],
       "checksums": [
         {
           "algorithm": "SHA512",
-          "checksumValue": "f9ba8508ff7ca4b2344edd17428d539a55edc2359c8484a77433b10a411c22e5205d6a419cbc9123ed8353e99eb2f9cc317e8bd570ea60d0349573431ddff288"
+          "checksumValue": "f226a378b15bccdc0cd26dc0b106526606111168250089b21afbc5496537e0580c5bcb079737708fd40abeff5d80dee330fe7dd4415417fb0b382dc997d6088d"
         }
       ]
     },
@@ -214,6 +214,29 @@
         {
           "algorithm": "SHA512",
           "checksumValue": "de4481b46f0e6dc4d57d76a79b9bd527a52704b115995b1193533ebc6a82b8c055f972c26c962e5907ee97ec88cb41900ec4a52b490712b8841e7ed23e4e049c"
+        }
+      ]
+    },
+    {
+      "name": "env-paths",
+      "SPDXID": "SPDXRef-Package-env-paths-3.0.0",
+      "versionInfo": "3.0.0",
+      "packageFileName": "node_modules/@electron/get/node_modules/env-paths",
+      "downloadLocation": "https://registry.npmjs.org/env-paths/-/env-paths-3.0.0.tgz",
+      "filesAnalyzed": false,
+      "homepage": "NOASSERTION",
+      "licenseDeclared": "MIT",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/env-paths@3.0.0"
+        }
+      ],
+      "checksums": [
+        {
+          "algorithm": "SHA512",
+          "checksumValue": "76d2544dea73316dcb9bf34fc517f7c0fe3ae365168632f6b10c5cfb29b660c8f59bf1f6cc33503a57b369fce41f09fab0cb2d8c74f01ba89042c72d0d6fdbd4"
         }
       ]
     },
@@ -2058,29 +2081,6 @@
       ]
     },
     {
-      "name": "env-paths",
-      "SPDXID": "SPDXRef-Package-env-paths-2.2.1",
-      "versionInfo": "2.2.1",
-      "packageFileName": "node_modules/app-builder-lib/node_modules/env-paths",
-      "downloadLocation": "https://registry.npmjs.org/env-paths/-/env-paths-2.2.1.tgz",
-      "filesAnalyzed": false,
-      "homepage": "NOASSERTION",
-      "licenseDeclared": "MIT",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceType": "purl",
-          "referenceLocator": "pkg:npm/env-paths@2.2.1"
-        }
-      ],
-      "checksums": [
-        {
-          "algorithm": "SHA512",
-          "checksumValue": "fa1d6590b2a164c4d88e8835544a49346ecd64959cb9cd830e4feab2a49345108e5e22e3790d5dd7fb9dad41a1a8cc5480097028d67471fdaea9a9f918bb92d8"
-        }
-      ]
-    },
-    {
       "name": "jsonfile",
       "SPDXID": "SPDXRef-Package-jsonfile-4.0.0",
       "versionInfo": "4.0.0",
@@ -3370,10 +3370,10 @@
     },
     {
       "name": "electron",
-      "SPDXID": "SPDXRef-Package-electron-45.0.0",
-      "versionInfo": "45.0.0",
+      "SPDXID": "SPDXRef-Package-electron-45.1.0",
+      "versionInfo": "45.1.0",
       "packageFileName": "node_modules/electron",
-      "downloadLocation": "https://registry.npmjs.org/electron/-/electron-45.0.0.tgz",
+      "downloadLocation": "https://registry.npmjs.org/electron/-/electron-45.1.0.tgz",
       "filesAnalyzed": false,
       "homepage": "NOASSERTION",
       "licenseDeclared": "MIT",
@@ -3381,13 +3381,13 @@
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:npm/electron@45.0.0"
+          "referenceLocator": "pkg:npm/electron@45.1.0"
         }
       ],
       "checksums": [
         {
           "algorithm": "SHA512",
-          "checksumValue": "ca3cf8ba130170ee8be57ec25a044ca1b7f610c24f9dbf63e33b9ffa7bbf4d4ffa1384aa7f1edf9ff6b67800a8e2a9e08e697fd099eca1987162ba092f12dddb"
+          "checksumValue": "8bba8a54087f291e6fd697f9e8d846197d9060771d8ef2e04bb9282faba2e7473ecd40c62d1ba747de675dc4e91cf51128e438183046f0199788380e43c0c3d0"
         }
       ]
     },
@@ -3554,10 +3554,10 @@
     },
     {
       "name": "env-paths",
-      "SPDXID": "SPDXRef-Package-env-paths-3.0.0",
-      "versionInfo": "3.0.0",
+      "SPDXID": "SPDXRef-Package-env-paths-2.2.1",
+      "versionInfo": "2.2.1",
       "packageFileName": "node_modules/env-paths",
-      "downloadLocation": "https://registry.npmjs.org/env-paths/-/env-paths-3.0.0.tgz",
+      "downloadLocation": "https://registry.npmjs.org/env-paths/-/env-paths-2.2.1.tgz",
       "filesAnalyzed": false,
       "homepage": "NOASSERTION",
       "licenseDeclared": "MIT",
@@ -3565,13 +3565,13 @@
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:npm/env-paths@3.0.0"
+          "referenceLocator": "pkg:npm/env-paths@2.2.1"
         }
       ],
       "checksums": [
         {
           "algorithm": "SHA512",
-          "checksumValue": "76d2544dea73316dcb9bf34fc517f7c0fe3ae365168632f6b10c5cfb29b660c8f59bf1f6cc33503a57b369fce41f09fab0cb2d8c74f01ba89042c72d0d6fdbd4"
+          "checksumValue": "fa1d6590b2a164c4d88e8835544a49346ecd64959cb9cd830e4feab2a49345108e5e22e3790d5dd7fb9dad41a1a8cc5480097028d67471fdaea9a9f918bb92d8"
         }
       ]
     },
@@ -8165,7 +8165,7 @@
       "relationshipType": "DEPENDENCY_OF"
     },
     {
-      "spdxElementId": "SPDXRef-Package-electron-45.0.0",
+      "spdxElementId": "SPDXRef-Package-electron-45.1.0",
       "relatedSpdxElement": "SPDXRef-Package-engineering-engine-1.0.0",
       "relationshipType": "DEV_DEPENDENCY_OF"
     },
@@ -9425,18 +9425,18 @@
       "relationshipType": "DEPENDENCY_OF"
     },
     {
-      "spdxElementId": "SPDXRef-Package-electron-internal.extract-zip-1.0.5",
-      "relatedSpdxElement": "SPDXRef-Package-electron-45.0.0",
+      "spdxElementId": "SPDXRef-Package-electron-internal.extract-zip-1.0.8",
+      "relatedSpdxElement": "SPDXRef-Package-electron-45.1.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-electron.get-5.1.0",
-      "relatedSpdxElement": "SPDXRef-Package-electron-45.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-electron-45.1.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-types.node-24.19.2",
-      "relatedSpdxElement": "SPDXRef-Package-electron-45.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-electron-45.1.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {

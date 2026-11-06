@@ -7,11 +7,11 @@ const { ValidationMaturity } = require('../contracts/ValidationRecord');
 const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 
 const { FEASolver } = require('./fea_structural');
-const { ContinuumPlasticity3D } = require('./continuum_plasticity_3d');
 const { DropTestSimulator } = require('./drop_test');
+const { DelaunayConstrained2D } = require('./delaunay_constrained_2d');
 
 /**
- * FEAEngineAdapter: Standard EngineAdapter for Structural FEA & Non-Linear Plasticity
+ * FEAEngineAdapter: experimental linear-elastic FEA and drop-test routes.
  */
 class FEAEngineAdapter extends EngineAdapter {
   constructor() {
@@ -23,7 +23,8 @@ class FEAEngineAdapter extends EngineAdapter {
       domain: 'cae',
       name: this.name,
       version: this.version,
-      supportedOperations: ['linear_elastic_3d', 'continuum_plasticity_3d', 'drop_test'],
+      supportedOperations: ['linear_elastic_3d', 'drop_test', 'mesh_planar_polygon_2d'],
+      supportedSolvers: ['FEASolver', 'DelaunayConstrained2D'],
       maturity: ValidationMaturity.EXPERIMENTAL,
       native: false
     };
@@ -88,36 +89,57 @@ class FEAEngineAdapter extends EngineAdapter {
             })
           );
           outputData = solver.solve();
-          convergenceHistory.push({ iteration: 1, residual: 0.0 });
-          break;
-        }
-
-        case 'continuum_plasticity_3d': {
-          onEvent(
-            new JobEvent({
-              jobId,
-              type: JobEventType.PROGRESS,
-              progressPercent: 20,
-              message: 'Initializing J2 von Mises plasticity solver'
-            })
-          );
-          const plasticity = new ContinuumPlasticity3D(params.mesh || params);
-          onEvent(
-            new JobEvent({
-              jobId,
-              type: JobEventType.PROGRESS,
-              progressPercent: 50,
-              message: 'Running radial return mapping iterations'
-            })
-          );
-          outputData = plasticity.solve(params.steps || 10);
-          if (outputData?.convergence) {
-            convergenceHistory = outputData.convergence;
+          const equilibriumResidual = solver.computeRelativeEquilibriumResidual();
+          if (Number.isFinite(equilibriumResidual)) {
+            convergenceHistory.push({ iteration: 1, residual: equilibriumResidual });
           }
           break;
         }
 
+        case 'mesh_planar_polygon_2d': {
+          const boundary = params.polygon;
+          const holes = Array.isArray(params.holes) ? params.holes : [];
+          if (!Array.isArray(boundary) || boundary.length < 3) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              'mesh_planar_polygon_2d requires a polygon with at least 3 vertices',
+              { domain: this.domain, operation: jobRequest.operation }
+            );
+          }
+          onEvent(
+            new JobEvent({
+              jobId,
+              type: JobEventType.PROGRESS,
+              progressPercent: 25,
+              message: 'Running constrained Delaunay triangulation'
+            })
+          );
+          const mesher = new DelaunayConstrained2D(params.options || {});
+          const mesh = mesher.triangulatePolygon(boundary, holes, params.options || {});
+          outputData = {
+            type: mesh.type,
+            nodes: mesh.nodes,
+            triangles: mesh.triangles,
+            constrainedEdges: mesh.constrainedEdges,
+            metrics: mesh.metrics
+          };
+          break;
+        }
+
         case 'drop_test': {
+          if (
+            !Number.isFinite(params.dropHeightM) ||
+            params.dropHeightM <= 0 ||
+            !Number.isFinite(params.phoneMassKg) ||
+            params.phoneMassKg <= 0 ||
+            !['corner', 'edge', 'face'].includes(params.impactAngle)
+          ) {
+            throw new OmniError(
+              OmniErrorCode.INVALID_INPUT,
+              'drop_test requires positive dropHeightM and phoneMassKg values and an impactAngle of corner, edge, or face',
+              { domain: this.domain, operation: jobRequest.operation }
+            );
+          }
           onEvent(
             new JobEvent({
               jobId,
@@ -126,8 +148,11 @@ class FEAEngineAdapter extends EngineAdapter {
               message: 'Simulating transient handset impact'
             })
           );
-          const sim = new DropTestSimulator(params);
-          outputData = sim.simulate();
+          outputData = DropTestSimulator.runSimulation({
+            dropHeight: params.dropHeightM,
+            phoneMass: params.phoneMassKg,
+            impactAngle: params.impactAngle
+          });
           break;
         }
 

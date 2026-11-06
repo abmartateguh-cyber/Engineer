@@ -1,14 +1,7 @@
 /**
- * OmniEng Petroleum Crude Oil Assay Characterizer
- * 
- * Provides automated distillation curve interconversion (ASTM D86, D1160, D2887 to TBP),
- * probability density spline fitting, Watson Kw characterization, and continuous
- * splitting into discrete pseudo-components with thermodynamic critical properties
- * (Tb, SG, MW, Tc, Pc, omega) for Aspen HYSYS / Aspen Plus Experimental workflow.
- * 
- * Unverified comparison target: Aspen HYSYS Oil Characterization & Petroleum Assay Manager.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental petroleum-assay formula helper for caller-supplied distillation
+ * data and API gravity. Its correlations and pseudo-component properties have
+ * no independent characterization or validation.
  */
 
 'use strict';
@@ -17,25 +10,63 @@ class PetroleumAssayCharacterizer {
   /**
    * @param {Object} options
    * @param {string} [options.name='CrudeAssay'] - Assay name
-   * @param {number} [options.apiGravity=34.0] - Standard API gravity at 60°F
-   * @param {Array<{percent: number, tempC: number}>} [options.distillationData] - Distillation curve
-   * @param {string} [options.distillationType='ASTM_D86'] - 'ASTM_D86', 'TBP', 'ASTM_D1160', 'ASTM_D2887'
+   * @param {number} options.apiGravity - Caller-supplied API gravity
+   * @param {string} options.distillationType - 'ASTM_D86' or caller-supplied 'TBP'
+   * @param {Array<{percent: number, tempC: number}>} options.distillationData - Caller-supplied distillation points
+   * @param {string} options.dataSource - Caller-supplied source label; it is not verified
    */
   constructor(options = {}) {
+    if (!options || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError('Petroleum assay inputs must be an object.');
+    }
+    if (!Number.isFinite(options.apiGravity) || options.apiGravity <= -131.5) {
+      throw new TypeError('Petroleum assay requires a finite apiGravity greater than -131.5.');
+    }
+    if (!['ASTM_D86', 'TBP'].includes(options.distillationType)) {
+      throw new TypeError('Petroleum assay requires distillationType ASTM_D86 or TBP.');
+    }
+    if (!Array.isArray(options.distillationData) || options.distillationData.length < 2) {
+      throw new TypeError('Petroleum assay requires at least two caller-supplied distillationData points.');
+    }
+    if (typeof options.dataSource !== 'string' || !options.dataSource.trim() || options.dataSource.length > 512) {
+      throw new TypeError('Petroleum assay requires a caller-supplied dataSource label of at most 512 characters.');
+    }
+
+    let previousPercent = -Infinity;
+    let previousTemperature = -Infinity;
+    const d86Percentages = new Set([0, 10, 30, 50, 70, 90, 100]);
+    for (const [index, point] of options.distillationData.entries()) {
+      if (
+        !point ||
+        !Number.isFinite(point.percent) ||
+        !Number.isFinite(point.tempC) ||
+        point.percent < 0 ||
+        point.percent > 100 ||
+        point.percent <= previousPercent ||
+        point.tempC <= previousTemperature
+      ) {
+        throw new TypeError(`Petroleum assay distillationData point ${index} must be finite and strictly increasing.`);
+      }
+      if (options.distillationType === 'ASTM_D86' && !d86Percentages.has(point.percent)) {
+        throw new TypeError(`ASTM_D86 conversion does not have a configured coefficient at ${point.percent} percent.`);
+      }
+      previousPercent = point.percent;
+      previousTemperature = point.tempC;
+    }
+    if (options.distillationData[0].percent !== 0 || options.distillationData.at(-1).percent !== 100) {
+      throw new TypeError('Petroleum assay distillationData must span 0 through 100 percent.');
+    }
+
     this.name = options.name || 'CrudeAssay';
-    this.apiGravity = options.apiGravity !== undefined ? options.apiGravity : 34.0;
-    this.distillationType = options.distillationType || 'ASTM_D86';
-    this.distillationData = options.distillationData || [
-      { percent: 0,   tempC: 35.0 },
-      { percent: 10,  tempC: 95.0 },
-      { percent: 30,  tempC: 175.0 },
-      { percent: 50,  tempC: 260.0 },
-      { percent: 70,  tempC: 360.0 },
-      { percent: 90,  tempC: 490.0 },
-      { percent: 100, tempC: 620.0 }
-    ];
+    this.apiGravity = options.apiGravity;
+    this.distillationType = options.distillationType;
+    this.distillationData = options.distillationData.map((point) => ({ ...point }));
+    this.dataSource = options.dataSource.trim();
 
     this.sg = 141.5 / (this.apiGravity + 131.5);
+    if (!Number.isFinite(this.sg) || this.sg <= 0) {
+      throw new TypeError('Petroleum assay apiGravity does not produce a finite positive specific gravity.');
+    }
     this.tbpCurve = [];
     this.pseudoComponents = [];
   }
@@ -55,7 +86,7 @@ class PetroleumAssayCharacterizer {
    * @returns {number}
    */
   static sgToAPI(sg) {
-    return (141.5 / sg) - 131.5;
+    return 141.5 / sg - 131.5;
   }
 
   /**
@@ -77,28 +108,27 @@ class PetroleumAssayCharacterizer {
   }
 
   /**
-   * Converts ASTM D86 distillation temperatures to True Boiling Point (TBP)
-   * using the API Technical Data Book / Daubert correlation:
+   * Applies the configured experimental D86-to-TBP coefficient table:
    *   TBP(K) = a * [D86(K)]^b
-   * 
+   *
    * @param {Array<{percent: number, tempC: number}>} d86Points
    * @returns {Array<{percent: number, tempC: number}>}
    */
   static convertD86ToTBP(d86Points) {
     // Daubert parameters [a, b] for volume percentages: 0, 10, 30, 50, 70, 90, 100
     const coeffs = {
-      0:   { a: 0.9167, b: 1.0019 },
-      10:  { a: 0.5277, b: 1.0900 },
-      30:  { a: 0.7429, b: 1.0425 },
-      50:  { a: 0.8920, b: 1.0176 },
-      70:  { a: 0.8705, b: 1.0226 },
-      90:  { a: 0.9490, b: 1.0110 },
-      100: { a: 0.9900, b: 1.0050 }
+      0: { a: 0.9167, b: 1.0019 },
+      10: { a: 0.5277, b: 1.09 },
+      30: { a: 0.7429, b: 1.0425 },
+      50: { a: 0.892, b: 1.0176 },
+      70: { a: 0.8705, b: 1.0226 },
+      90: { a: 0.949, b: 1.011 },
+      100: { a: 0.99, b: 1.005 }
     };
 
-    return d86Points.map(pt => {
+    return d86Points.map((pt) => {
       const p = Math.round(pt.percent);
-      const coeff = coeffs[p] || { a: 0.8920, b: 1.0176 };
+      const coeff = coeffs[p] || { a: 0.892, b: 1.0176 };
       const d86K = pt.tempC + 273.15;
       const tbpK = coeff.a * Math.pow(d86K, coeff.b);
       return {
@@ -111,7 +141,7 @@ class PetroleumAssayCharacterizer {
   /**
    * Computes Volume Average Boiling Point (VABP) from distillation points.
    * VABP = (T20 + T50 + T80) / 3 or (T10 + 2*T50 + T90) / 4
-   * 
+   *
    * @param {Array<{percent: number, tempC: number}>} curve
    * @returns {number} VABP in Rankine
    */
@@ -136,12 +166,12 @@ class PetroleumAssayCharacterizer {
    * Computes Watson Characterization Factor (Kw):
    *   Kw = (MeABP ^ (1/3)) / SG
    * where MeABP is Mean Average Boiling Point in Rankine.
-   * 
+   *
    * Typical values:
    *   10.0 - 11.5: Highly aromatic / naphthenic
    *   11.5 - 12.0: Intermediate / mixed
    *   12.0 - 13.0: Highly paraffinic
-   * 
+   *
    * @param {number} meabpR - Boiling point in Rankine
    * @param {number} sg - Specific gravity
    * @returns {number}
@@ -153,7 +183,7 @@ class PetroleumAssayCharacterizer {
   /**
    * Evaluates Molecular Weight (MW) from Normal Boiling Point Tb (K) and SG
    * using the Lee-Kesler / Riazi-Daubert correlation.
-   * 
+   *
    * @param {number} tbK - Boiling point in Kelvin
    * @param {number} sg - Specific gravity
    * @returns {number} Molecular weight (g/mol)
@@ -161,15 +191,19 @@ class PetroleumAssayCharacterizer {
   static estimateMolecularWeight(tbK, sg) {
     const tbR = tbK * 1.8;
     // Riazi-Daubert formulation: MW = a * Tb^b * SG^c
-    const mw = 42.965 * Math.exp(2.097e-4 * tbR - 7.78712 * sg + 2.08476e-3 * tbR * sg) *
-               Math.pow(tbR, 1.26007) * Math.pow(sg, 4.98308) / 100.0;
+    const mw =
+      (42.965 *
+        Math.exp(2.097e-4 * tbR - 7.78712 * sg + 2.08476e-3 * tbR * sg) *
+        Math.pow(tbR, 1.26007) *
+        Math.pow(sg, 4.98308)) /
+      100.0;
     return Math.max(50.0, Math.min(1500.0, mw));
   }
 
   /**
    * Estimates Critical Temperature (Tc in K), Critical Pressure (Pc in bar),
    * and Acentric Factor (omega) using Lee-Kesler correlations.
-   * 
+   *
    * @param {number} tbK - Normal boiling point in Kelvin
    * @param {number} sg - Specific gravity
    * @returns {{ Tc: number, Pc: number, omega: number }}
@@ -177,22 +211,29 @@ class PetroleumAssayCharacterizer {
   static estimateCriticalProperties(tbK, sg) {
     const tbR = tbK * 1.8;
     // Lee-Kesler Tc (Rankine)
-    const tcR = 341.7 + 811.1 * sg + (0.4244 + 0.1174 * sg) * tbR +
-                (0.4669 - 3.2623 * sg) * 1e5 / tbR;
+    const tcR = 341.7 + 811.1 * sg + (0.4244 + 0.1174 * sg) * tbR + ((0.4669 - 3.2623 * sg) * 1e5) / tbR;
     const Tc = tcR / 1.8; // Kelvin
 
     // Lee-Kesler Pc (psia to bar: 1 psi = 0.0689476 bar)
-    const lnPcPsi = 8.3634 - 0.0566 / sg - (0.24244 + 0.0953 / sg) * 1e-3 * tbR +
-                    (1.4685 + 0.3648 / sg) * 1e-7 * (tbR * tbR) -
-                    (0.42019 + 0.1697 / sg) * 1e-10 * Math.pow(tbR, 3);
+    const lnPcPsi =
+      8.3634 -
+      0.0566 / sg -
+      (0.24244 + 0.0953 / sg) * 1e-3 * tbR +
+      (1.4685 + 0.3648 / sg) * 1e-7 * (tbR * tbR) -
+      (0.42019 + 0.1697 / sg) * 1e-10 * Math.pow(tbR, 3);
     const PcBar = Math.exp(lnPcPsi) * 0.0689476;
 
     // Lee-Kesler Acentric Factor omega
     const theta = tbK / Tc;
     let omega = 0.2;
     if (theta < 0.8) {
-      omega = (-Math.log(PcBar / 1.01325) - 5.92714 + 6.09648 / theta + 1.28862 * Math.log(theta) - 0.169347 * Math.pow(theta, 6)) /
-              (15.2518 - 15.6875 / theta - 13.4721 * Math.log(theta) + 0.43577 * Math.pow(theta, 6));
+      omega =
+        (-Math.log(PcBar / 1.01325) -
+          5.92714 +
+          6.09648 / theta +
+          1.28862 * Math.log(theta) -
+          0.169347 * Math.pow(theta, 6)) /
+        (15.2518 - 15.6875 / theta - 13.4721 * Math.log(theta) + 0.43577 * Math.pow(theta, 6));
     } else {
       omega = -7.904 + 0.1352 * Math.pow(tbR, 1.0 / 3.0) - 0.007465 * tbK;
     }
@@ -202,7 +243,7 @@ class PetroleumAssayCharacterizer {
   }
 
   /**
-   * Characterizes the crude assay and splits into standard refinery cut pseudo-components:
+   * Creates illustrative pseudo-components using fixed temperature bands:
    *   1. Light Ends (< 65°C)
    *   2. Light Naphtha (65 - 120°C)
    *   3. Heavy Naphtha (120 - 180°C)
@@ -211,7 +252,7 @@ class PetroleumAssayCharacterizer {
    *   6. Atmospheric Gas Oil (350 - 450°C)
    *   7. Vacuum Gas Oil (450 - 560°C)
    *   8. Vacuum Residue (> 560°C)
-   * 
+   *
    * @param {Object} [options]
    * @param {number} [options.customDeltaT] - If specified, cuts by uniform temperature slice (e.g. 25°C)
    * @returns {Object} Complete assay characterization summary
@@ -228,8 +269,8 @@ class PetroleumAssayCharacterizer {
     const vabpR = PetroleumAssayCharacterizer.computeVABP(this.tbpCurve);
     const kw = PetroleumAssayCharacterizer.computeWatsonKw(vabpR, this.sg);
 
-    // Standard cut ranges (C)
-    const standardCuts = [
+    // Example temperature bands (C); not a refinery or product specification.
+    const exampleCuts = [
       { name: 'Light Ends', tMin: 20.0, tMax: 65.0 },
       { name: 'Light Naphtha', tMin: 65.0, tMax: 120.0 },
       { name: 'Heavy Naphtha', tMin: 120.0, tMax: 180.0 },
@@ -258,7 +299,7 @@ class PetroleumAssayCharacterizer {
     this.pseudoComponents = [];
     let totalYieldVolPct = 0.0;
 
-    for (const cut of standardCuts) {
+    for (const cut of exampleCuts) {
       const v1 = getVolFracAtTemp(cut.tMin);
       const v2 = getVolFracAtTemp(cut.tMax);
       const volPct = Math.max(0.0, v2 - v1);
@@ -293,6 +334,9 @@ class PetroleumAssayCharacterizer {
       assayName: this.name,
       bulkAPI: this.apiGravity,
       bulkSG: this.sg,
+      dataSource: this.dataSource,
+      dataStatus: 'caller-supplied-unverified',
+      validationLevel: 'experimental',
       watsonKw: kw,
       vabpRankine: vabpR,
       tbpDistillation: this.tbpCurve,

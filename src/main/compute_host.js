@@ -93,13 +93,15 @@ class ComputeHostProcess extends EventEmitter {
       cancellationToken: null
     };
 
-    return new Promise((resolve, reject) => {
+    const promise = new Promise((resolve, reject) => {
       job.resolve = resolve;
       job.reject = reject;
 
       this.activeJobs.set(jobId, job);
       this._enqueue(job);
     });
+    job.promise = promise;
+    return promise;
   }
 
   _enqueue(job) {
@@ -152,6 +154,9 @@ class ComputeHostProcess extends EventEmitter {
         job.completedAt = Date.now();
         this.emit('job:failed', { jobId: job.id, error: err.message });
         job.reject(err);
+        if (job.promise && typeof job.promise.catch === 'function') {
+          job.promise.catch(() => {});
+        }
       } finally {
         this.activeJobs.delete(job.id);
         this._processNext();
@@ -237,6 +242,9 @@ class ComputeHostProcess extends EventEmitter {
     const err = new Error(`Job ${jobId} was cancelled by user`);
     err.code = 'ERR_JOB_CANCELLED';
     job.reject(err);
+    if (job.promise && typeof job.promise.catch === 'function') {
+      job.promise.catch(() => {});
+    }
     this.pendingQueue.splice(queueIndex, 1);
     this.activeJobs.delete(jobId);
     this.emit('job:cancelled', { jobId });

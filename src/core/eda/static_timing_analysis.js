@@ -231,6 +231,243 @@ class StaticTimingAnalysis {
     };
   }
 
+  static _topoSort(graph, outEdges, inDegree) {
+    const queue = graph.nodes.filter((n) => (inDegree.get(n.id) || 0) === 0).map((n) => n.id);
+    const order = [];
+    const index = new Map();
+    while (queue.length > 0) {
+      const id = queue.shift();
+      index.set(id, order.length);
+      order.push(id);
+      for (const e of outEdges.get(id) || []) {
+        const d = inDegree.get(e.to) - 1;
+        inDegree.set(e.to, d);
+        if (d === 0) queue.push(e.to);
+      }
+    }
+    if (order.length !== graph.nodes.length) {
+      const err = new Error('STA graph contains a cycle; timing analysis requires a DAG');
+      err.name = 'CyclicGraphError';
+      throw err;
+    }
+    return { order, index };
+  }
+
+  static _delayFor(cornerDelay, node, isNet, key) {
+    const table = isNet ? cornerDelay.nets : cornerDelay.cells;
+    if (table && Object.prototype.hasOwnProperty.call(table, key)) {
+      const v = table[key];
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+    }
+    const def = isNet ? cornerDelay.defaultNet : cornerDelay.defaultCell;
+    if (typeof def === 'number' && Number.isFinite(def) && def >= 0) return def;
+    return 0;
+  }
+
+  /**
+   * DAG-based multi-corner multi-mode (MCMM) static timing analysis.
+   *
+   * @param {Object} graph Timing graph:
+   *   nodes: [{ id, type: 'input'|'ff'|'gate'|'output' (default 'gate'), delay? }]
+   *   edges: [{ from, to, delay? }]  (net delay, may be overridden per corner)
+   * @param {Object} [options]
+   *   corners: [{ name, delays: { cells: {id: seconds}, nets: {'from->to': seconds},
+   *                                       defaultCell?, defaultNet? } }]
+   *   modes:   [{ name, constraints: { period, setup, hold, skew, tCq } }]
+   * @returns {Object} per-corner/mode slack report
+   */
+  static analyzeTiming(graph = {}, options = {}) {
+    if (!graph || typeof graph !== 'object') {
+      throw new TypeError('analyzeTiming requires a timing graph object');
+    }
+    const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+    const edges = Array.isArray(graph.edges) ? graph.edges : [];
+    if (nodes.length === 0) {
+      throw new TypeError('analyzeTiming requires at least one node');
+    }
+
+    const nodeById = new Map();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n || typeof n.id !== 'string' || n.id.length === 0) {
+        throw new TypeError(`STA node ${i} requires a non-empty string id`);
+      }
+      if (nodeById.has(n.id)) {
+        throw new TypeError(`STA duplicate node id '${n.id}'`);
+      }
+      const type = n.type === undefined ? 'gate' : String(n.type);
+      if (!['input', 'ff', 'gate', 'output'].includes(type)) {
+        throw new TypeError(`STA node '${n.id}' has unsupported type '${type}'`);
+      }
+      nodeById.set(n.id, { ...n, type });
+    }
+
+    const outEdges = new Map();
+    const inEdges = new Map();
+    const inDegree = new Map();
+    for (const n of nodes) {
+      outEdges.set(n.id, []);
+      inEdges.set(n.id, []);
+      inDegree.set(n.id, 0);
+    }
+    for (let i = 0; i < edges.length; i++) {
+      const e = edges[i];
+      if (!e || typeof e.from !== 'string' || typeof e.to !== 'string') {
+        throw new TypeError(`STA edge ${i} requires string from/to`);
+      }
+      if (!nodeById.has(e.from) || !nodeById.has(e.to)) {
+        throw new TypeError(`STA edge ${i} references unknown node ('${e.from}' -> '${e.to}')`);
+      }
+      if (e.from === e.to) {
+        throw new TypeError(`STA edge ${i} is a self-loop on '${e.from}'; not a DAG`);
+      }
+      outEdges.get(e.from).push(e);
+      inEdges.get(e.to).push(e);
+      inDegree.set(e.to, inDegree.get(e.to) + 1);
+    }
+    const { order, index } = StaticTimingAnalysis._topoSort(graph, outEdges, inDegree);
+
+    const corners = Array.isArray(options.corners) && options.corners.length > 0 ? options.corners : [{ name: 'typical', delays: {} }];
+    const modes = Array.isArray(options.modes) && options.modes.length > 0 ? options.modes : [{ name: 'function', constraints: {} }];
+
+    const cornerReports = [];
+
+    for (const corner of corners) {
+      if (!corner || typeof corner.name !== 'string') {
+        throw new TypeError('STA corner requires a name');
+      }
+      const delay = corner.delays || {};
+      const cornerDelay = {
+        cells: delay.cells || {},
+        nets: delay.nets || {},
+        defaultCell: delay.defaultCell !== undefined ? delay.defaultCell : 0,
+        defaultNet: delay.defaultNet !== undefined ? delay.defaultNet : 0
+      };
+      const modeReports = [];
+
+      for (const mode of modes) {
+        if (!mode || typeof mode.name !== 'string') {
+          throw new TypeError('STA mode requires a name');
+        }
+        const c = mode.constraints || {};
+        const period = c.period !== undefined ? c.period : 5.0;
+        const setup = c.setup !== undefined ? c.setup : 0.15;
+        const hold = c.hold !== undefined ? c.hold : 0.08;
+        const skew = c.skew !== undefined ? c.skew : 0.0;
+        const tCq = c.tCq !== undefined ? c.tCq : 0.35;
+        if (![period, setup, hold, skew, tCq].every((v) => Number.isFinite(v) && v >= 0)) {
+          throw new TypeError(`STA mode '${mode.name}' constraints must be finite, non-negative`);
+        }
+
+        const cellDelay = (id) => {
+          const n = nodeById.get(id);
+          if (n.type === 'input') return 0;
+          if (n.type === 'ff') {
+            return typeof n.delay === 'number'
+              ? n.delay
+              : StaticTimingAnalysis._delayFor(cornerDelay, n, false, id) || tCq;
+          }
+          return typeof n.delay === 'number'
+            ? n.delay
+            : StaticTimingAnalysis._delayFor(cornerDelay, n, false, id);
+        };
+        const netDelay = (e) => {
+          if (typeof e.delay === 'number' && Number.isFinite(e.delay) && e.delay >= 0) return e.delay;
+          return StaticTimingAnalysis._delayFor(cornerDelay, null, true, `${e.from}->${e.to}`);
+        };
+
+        const atLate = new Map();
+        const atEarly = new Map();
+        for (const id of nodes.map((n) => n.id)) {
+          atLate.set(id, 0);
+          atEarly.set(id, 0);
+        }
+        for (const id of order) {
+          const node = nodeById.get(id);
+          if (node.type === 'input') continue;
+          let late = -Infinity;
+          let early = Infinity;
+          for (const e of inEdges.get(id)) {
+            const d = atLate.get(e.from) + cellDelay(e.from) + netDelay(e);
+            if (d > late) late = d;
+            const e2 = atEarly.get(e.from) + cellDelay(e.from) + netDelay(e);
+            if (e2 < early) early = e2;
+          }
+          atLate.set(id, late);
+          atEarly.set(id, early);
+        }
+
+        const endpoints = [];
+        const seen = new Set();
+        const addEndpoint = (id, kind) => {
+          if (seen.has(id)) return;
+          seen.add(id);
+          endpoints.push({ id, kind });
+        };
+        for (const n of nodes) {
+          if (n.type === 'ff') {
+            for (const e of inEdges.get(n.id)) addEndpoint(n.id, 'ff');
+          } else if (n.type === 'output') {
+            addEndpoint(n.id, 'output');
+          }
+        }
+
+        const reqSetup = period + skew - setup;
+        const reqHold = skew + hold;
+        const slacks = [];
+        for (const ep of endpoints) {
+          const late = atLate.get(ep.id);
+          const early = atEarly.get(ep.id);
+          const setupSlack = reqSetup - late;
+          const holdSlack = early - reqHold;
+          slacks.push({
+            endpoint: ep.id,
+            kind: ep.kind,
+            arrivalLate: Number(late.toFixed(6)),
+            arrivalEarly: Number(early.toFixed(6)),
+            requiredSetup: Number(reqSetup.toFixed(6)),
+            requiredHold: Number(reqHold.toFixed(6)),
+            setupSlack: Number(setupSlack.toFixed(6)),
+            holdSlack: Number(holdSlack.toFixed(6)),
+            isSetupMet: setupSlack >= 0,
+            isHoldMet: holdSlack >= 0
+          });
+        }
+
+        const worstSetup = slacks.reduce((a, b) => (b.setupSlack < a ? b.setupSlack : a), Infinity);
+        const worstHold = slacks.reduce((a, b) => (b.holdSlack < a ? b.holdSlack : a), Infinity);
+
+        modeReports.push({
+          mode: mode.name,
+          constraints: { period, setup, hold, skew, tCq },
+          slacks,
+          worstSetupSlack: worstSetup === Infinity ? null : worstSetup,
+          worstHoldSlack: worstHold === Infinity ? null : worstHold,
+          timingMet: (worstSetup === Infinity || worstSetup >= 0) && (worstHold === Infinity || worstHold >= 0)
+        });
+      }
+
+      cornerReports.push({ corner: corner.name, modes: modeReports });
+    }
+
+    let worstSetupOverall = Infinity;
+    let worstHoldOverall = Infinity;
+    for (const cr of cornerReports) {
+      for (const mr of cr.modes) {
+        if (mr.worstSetupSlack !== null && mr.worstSetupSlack < worstSetupOverall) worstSetupOverall = mr.worstSetupSlack;
+        if (mr.worstHoldSlack !== null && mr.worstHoldSlack < worstHoldOverall) worstHoldOverall = mr.worstHoldSlack;
+      }
+    }
+
+    return {
+      graph: { nodeCount: nodes.length, edgeCount: edges.length, dagOrder: order },
+      corners: cornerReports,
+      worstSetupSlackOverall: worstSetupOverall === Infinity ? null : worstSetupOverall,
+      worstHoldSlackOverall: worstHoldOverall === Infinity ? null : worstHoldOverall,
+      timingMetOverall: (worstSetupOverall === Infinity || worstSetupOverall >= 0) && (worstHoldOverall === Infinity || worstHoldOverall >= 0)
+    };
+  }
+
   constructor(opts = {}) {
     this.clockPeriodPs = opts.clockPeriodPs || 5000.0;
   }

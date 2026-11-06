@@ -1,10 +1,7 @@
 /**
- * OmniEng Exact NURBS (Non-Uniform Rational B-Splines) & SSI Engine
- * Experimental implementation: Siemens NX / CATIA B-Rep Geometry Kernel
- * Standards: Cox-de Boor Basis, Arbitrary Degree p Curve & Surface Evaluation,
- *            Exact Partial Derivatives & Normals, and Quadtree-Newton SSI Intersection.
- *
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental NURBS curve and surface evaluators with derivative helpers,
+ * plus sampled surface-intersection routines. Numerical accuracy and geometric
+ * kernel interoperability have not been independently established.
  */
 
 const { Vector3 } = require('../math/linear_algebra');
@@ -51,7 +48,7 @@ class NurbsBasis {
       if (u === U[U.length - 1] && u === uEnd) {
         return 1.0;
       }
-      return (u >= uStart && u < uEnd) ? 1.0 : 0.0;
+      return u >= uStart && u < uEnd ? 1.0 : 0.0;
     }
 
     let left = 0;
@@ -117,7 +114,7 @@ class NurbsCurve {
    */
   constructor({ degree = 3, controlPoints = [], weights = null, knots = null }) {
     this.degree = degree;
-    this.controlPoints = controlPoints.map(p => (p instanceof Vector3 ? p.clone() : new Vector3(p[0], p[1], p[2])));
+    this.controlPoints = controlPoints.map((p) => (p instanceof Vector3 ? p.clone() : new Vector3(p[0], p[1], p[2])));
     this.n = this.controlPoints.length - 1;
     if (this.n < this.degree) {
       throw new Error(`Insufficient control points (${this.controlPoints.length}) for degree ${this.degree}`);
@@ -134,7 +131,9 @@ class NurbsCurve {
    */
   evaluate(u) {
     u = Math.max(this.knots[0], Math.min(this.knots[this.knots.length - 1], u));
-    let numX = 0, numY = 0, numZ = 0;
+    let numX = 0,
+      numY = 0,
+      numZ = 0;
     let denom = 0;
 
     for (let i = 0; i <= this.n; i++) {
@@ -210,18 +209,20 @@ class NurbsSurface {
   constructor({ degreeU = 3, degreeV = 3, controlPoints = [], weights = null, knotsU = null, knotsV = null }) {
     this.degreeU = degreeU;
     this.degreeV = degreeV;
-    this.controlPoints = controlPoints.map(row =>
-      row.map(p => (p instanceof Vector3 ? p.clone() : new Vector3(p[0], p[1], p[2])))
+    this.controlPoints = controlPoints.map((row) =>
+      row.map((p) => (p instanceof Vector3 ? p.clone() : new Vector3(p[0], p[1], p[2])))
     );
     this.nu = this.controlPoints.length - 1;
     this.nv = this.controlPoints[0] ? this.controlPoints[0].length - 1 : -1;
 
     if (this.nu < this.degreeU || this.nv < this.degreeV) {
-      throw new Error(`Insufficient control point grid (${this.nu + 1}x${this.nv + 1}) for degree (${this.degreeU}, ${this.degreeV})`);
+      throw new Error(
+        `Insufficient control point grid (${this.nu + 1}x${this.nv + 1}) for degree (${this.degreeU}, ${this.degreeV})`
+      );
     }
 
     if (weights) {
-      this.weights = weights.map(row => [...row]);
+      this.weights = weights.map((row) => [...row]);
     } else {
       this.weights = Array.from({ length: this.nu + 1 }, () => new Array(this.nv + 1).fill(1.0));
     }
@@ -240,7 +241,9 @@ class NurbsSurface {
     u = Math.max(this.knotsU[0], Math.min(this.knotsU[this.knotsU.length - 1], u));
     v = Math.max(this.knotsV[0], Math.min(this.knotsV[this.knotsV.length - 1], v));
 
-    let numX = 0, numY = 0, numZ = 0;
+    let numX = 0,
+      numY = 0,
+      numZ = 0;
     let denom = 0;
 
     for (let i = 0; i <= this.nu; i++) {
@@ -271,8 +274,10 @@ class NurbsSurface {
    */
   evaluatePartials(u, v) {
     const h = 1e-5;
-    const u0 = Math.max(0, u - h), u1 = Math.min(1, u + h);
-    const v0 = Math.max(0, v - h), v1 = Math.min(1, v + h);
+    const u0 = Math.max(0, u - h),
+      u1 = Math.min(1, u + h);
+    const v0 = Math.max(0, v - h),
+      v1 = Math.min(1, v + h);
 
     const Su0 = this.evaluate(u0, v);
     const Su1 = this.evaluate(u1, v);
@@ -307,8 +312,14 @@ class NurbsSurface {
 
     const h = 1e-4;
     const p = this.evaluate(u, v);
-    const puu = this.evaluate(Math.min(1, u + h), v).add(this.evaluate(Math.max(0, u - h), v)).sub(p.clone().scale(2)).scale(1 / (h * h));
-    const pvv = this.evaluate(u, Math.min(1, v + h)).add(this.evaluate(u, Math.max(0, v - h))).sub(p.clone().scale(2)).scale(1 / (h * h));
+    const puu = this.evaluate(Math.min(1, u + h), v)
+      .add(this.evaluate(Math.max(0, u - h), v))
+      .sub(p.clone().scale(2))
+      .scale(1 / (h * h));
+    const pvv = this.evaluate(u, Math.min(1, v + h))
+      .add(this.evaluate(u, Math.max(0, v - h)))
+      .sub(p.clone().scale(2))
+      .scale(1 / (h * h));
     const puv = this.evaluate(Math.min(1, u + h), Math.min(1, v + h))
       .sub(this.evaluate(Math.min(1, u + h), Math.max(0, v - h)))
       .sub(this.evaluate(Math.max(0, u - h), Math.min(1, v + h)))
@@ -397,11 +408,7 @@ class NurbsSurface {
     const w = Math.cos(dtheta);
 
     const cp = [
-      [
-        new Vector3(radius, 0, 0),
-        new Vector3(radius, 0, height / 2),
-        new Vector3(radius, 0, height)
-      ],
+      [new Vector3(radius, 0, 0), new Vector3(radius, 0, height / 2), new Vector3(radius, 0, height)],
       [
         new Vector3(radius, radius * Math.tan(dtheta), 0),
         new Vector3(radius, radius * Math.tan(dtheta), height / 2),
@@ -528,7 +535,7 @@ class SurfaceSurfaceIntersection {
       );
 
       if (refined && refined.converged) {
-        const isDuplicate = intersectionPoints.some(pt => pt.distanceTo(refined.point) < minPointSeparation);
+        const isDuplicate = intersectionPoints.some((pt) => pt.distanceTo(refined.point) < minPointSeparation);
         if (!isDuplicate) {
           intersectionPoints.push(refined.point);
           uvPairs.push({ uv1: [refined.u1, refined.v1], uv2: [refined.u2, refined.v2] });
@@ -550,8 +557,10 @@ class SurfaceSurfaceIntersection {
    * Refines a seed point (u1, v1, u2, v2) such that S1(u1, v1) = S2(u2, v2).
    */
   static _refineNewton(surf1, surf2, u1_init, v1_init, u2_init, v2_init, tol, maxIter) {
-    let u1 = u1_init, v1 = v1_init;
-    let u2 = u2_init, v2 = v2_init;
+    let u1 = u1_init,
+      v1 = v1_init;
+    let u2 = u2_init,
+      v2 = v2_init;
 
     for (let iter = 0; iter < maxIter; iter++) {
       const p1 = surf1.evaluate(u1, v1);
@@ -563,7 +572,10 @@ class SurfaceSurfaceIntersection {
         return {
           converged: true,
           point: p1.add(p2).scale(0.5),
-          u1, v1, u2, v2,
+          u1,
+          v1,
+          u2,
+          v2,
           residual: dist
         };
       }
@@ -598,7 +610,10 @@ class SurfaceSurfaceIntersection {
     return {
       converged: finalDist < Math.max(tol * 20, 0.05),
       point: finalP1.add(finalP2).scale(0.5),
-      u1, v1, u2, v2,
+      u1,
+      v1,
+      u2,
+      v2,
       residual: finalDist
     };
   }
@@ -641,6 +656,8 @@ class SurfaceSurfaceIntersection {
 module.exports = {
   NurbsBasis,
   NurbsCurve,
+  NURBSCurve: NurbsCurve,
   NurbsSurface,
+  NURBSSurface: NurbsSurface,
   SurfaceSurfaceIntersection
 };

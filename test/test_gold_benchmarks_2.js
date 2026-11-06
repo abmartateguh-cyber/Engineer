@@ -23,6 +23,7 @@ const { SparseMatrixCSR, SparseCholeskySolver } = require('../src/core/math/spar
 const { ShellMITC4Element } = require('../src/core/cae/shell_mitc4');
 const { TimoshenkoBeam3D } = require('../src/core/cae/beam_timoshenko_3d');
 const { CompositePly, CompositeLaminateCLPT } = require('../src/core/cae/composite_clpt');
+const { SYNTHETIC_COMPOSITE_PLY } = require('./support/synthetic_cae_materials');
 const { SimpleNavierStokesSolver } = require('../src/core/cae/simple_navier_stokes');
 
 // 3. EDA modules
@@ -54,10 +55,10 @@ function runAllGoldBenchmarks2() {
   let total = 15;
 
   // -------------------------------------------------------------
-  // BENCHMARK 1: Trimmed NURBS SSI (Dome vs Horizontal Cutting Plane)
+  // Diagnostic 1: coarse surface-intersection trace
   // -------------------------------------------------------------
   try {
-    console.log('[BM 1] Trimmed NURBS Surface-to-Surface Intersection (ISO 10303 STEP AP242)...');
+    console.log('[SM 1] Experimental surface-intersection trace...');
     const surf1 = new TrimmedNurbsSurface({
       degreeU: 3,
       degreeV: 3,
@@ -106,10 +107,10 @@ function runAllGoldBenchmarks2() {
   }
 
   // -------------------------------------------------------------
-  // BENCHMARK 2: Variable Fillet Blend Continuity (ISO 128 / VDA 4900)
+  // Diagnostic 2: sampled fillet mesh generation
   // -------------------------------------------------------------
   try {
-    console.log('[BM 2] Variable Fillet Blend G1/G2 Continuity (VDA 4900 Class-A)...');
+    console.log('[SM 2] Experimental sampled fillet mesh generation; continuity is not checked...');
     const spinePoints = [
       { x: 0, y: 0, z: 0 },
       { x: 20, y: 0, z: 0 },
@@ -120,8 +121,7 @@ function runAllGoldBenchmarks2() {
     const fillet = VariableRadiusFilletEngine.generateVariableFillet({
       spinePoints,
       startRadius: 2.0,
-      endRadius: 5.0,
-      continuity: 'G1'
+      endRadius: 5.0
     });
 
     assert(fillet.success === true, 'Variable fillet generation must succeed');
@@ -130,7 +130,7 @@ function runAllGoldBenchmarks2() {
     assert(fillet.contactPointsRight.length === spinePoints.length, 'Contact right must exist');
 
     console.log(
-      `  ✓ PASSED: Variable fillet generated with G1 continuity across ${fillet.meshGrid.length} spine sections (R: 2.0mm -> 5.0mm)`
+      `  ✓ PASSED: Sampled fillet mesh has ${fillet.meshGrid.length} spine sections (R: 2.0mm -> 5.0mm); continuity is not checked`
     );
     passed++;
   } catch (err) {
@@ -138,10 +138,10 @@ function runAllGoldBenchmarks2() {
   }
 
   // -------------------------------------------------------------
-  // BENCHMARK 3: Sheet Metal K-Factor Neutral Axis (DIN 6935)
+  // Diagnostic 3: illustrative sheet-metal bend and flat-length formulas
   // -------------------------------------------------------------
   try {
-    console.log('[BM 3] Sheet Metal K-Factor Neutral Axis & Developed Length (DIN 6935)...');
+    console.log('[SM 3] Experimental sheet-metal bend and flat-length formulas; no standard assessment...');
     const bend = new SheetMetalBend({
       angleDeg: 90.0,
       innerRadiusMm: 2.0,
@@ -172,7 +172,7 @@ function runAllGoldBenchmarks2() {
     assert(Math.abs(flat.totalDevelopedLengthMm - 96.5239) < 0.02, `Developed length must be 96.5239mm`);
 
     console.log(
-      `  ✓ PASSED: BA = ${bend.bendAllowanceMm.toFixed(4)}mm, BD = ${bend.bendDeductionMm.toFixed(4)}mm, Flat Length = ${flat.totalDevelopedLengthMm.toFixed(4)}mm`
+      `  ✓ PASSED: Example BA = ${bend.bendAllowanceMm.toFixed(4)}mm, BD = ${bend.bendDeductionMm.toFixed(4)}mm, Flat Length = ${flat.totalDevelopedLengthMm.toFixed(4)}mm`
     );
     passed++;
   } catch (err) {
@@ -226,7 +226,7 @@ function runAllGoldBenchmarks2() {
   // BENCHMARK 5: Sparse Cholesky & CG Structural Solver
   // -------------------------------------------------------------
   try {
-    console.log('[BM 5] High-Capacity Sparse Matrix CG Solver (Ax = b, relative res < 1e-6)...');
+    console.log('[BM 5] Experimental serial CSR conjugate-gradient formula check...');
     const N = 200;
     const A = new SparseMatrixCSR(N, N);
     for (let i = 0; i < N; i++) {
@@ -336,24 +336,8 @@ function runAllGoldBenchmarks2() {
   // -------------------------------------------------------------
   try {
     console.log('[BM 8] Classical Laminated Plate Theory [A,B,D] & Tsai-Wu Composite Failure...');
-    const plyProps = {
-      orientationDeg: 0,
-      thicknessMm: 0.125,
-      E1: 142e9,
-      E2: 10.3e9,
-      nu12: 0.27,
-      G12: 7.2e9,
-      strengths: {
-        Xt: 2280e6,
-        Xc: 1440e6,
-        Yt: 57e6,
-        Yc: 228e6,
-        S: 71e6
-      }
-    };
-
-    const ply0 = new CompositePly({ ...plyProps, orientationDeg: 0 });
-    const ply90 = new CompositePly({ ...plyProps, orientationDeg: 90 });
+    const ply0 = new CompositePly(SYNTHETIC_COMPOSITE_PLY);
+    const ply90 = new CompositePly({ ...SYNTHETIC_COMPOSITE_PLY, orientationDeg: 90 });
 
     // [0/90]_s symmetric laminate
     const laminate = new CompositeLaminateCLPT([ply0, ply90, ply90, ply0]);

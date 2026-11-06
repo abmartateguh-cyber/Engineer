@@ -22,6 +22,21 @@
 'use strict';
 
 const { Poisson2DDirichletDirectSolver } = require('./poisson_2d_direct');
+const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
+
+function allocateTyped(Ctor, length, storageName) {
+  try {
+    return new Ctor(length);
+  } catch (cause) {
+    const error = new OmniError(
+      OmniErrorCode.RESOURCE_EXHAUSTED,
+      `Unable to allocate ${storageName} storage (${length} elements).`,
+      { elements: length, storageName },
+      cause
+    );
+    throw error;
+  }
+}
 
 class WasmSparseMultifrontalSolver {
   /**
@@ -52,9 +67,9 @@ class WasmSparseMultifrontalSolver {
     if (i < 0 || i >= this.n || j < 0 || j >= this.m) return;
     if (this._cnt === this._cap) {
       const cap = this._cap * 2;
-      const ni = new Int32Array(cap); ni.set(this._ti);
-      const nj = new Int32Array(cap); nj.set(this._tj);
-      const nv = new Float64Array(cap); nv.set(this._tv);
+      const ni = allocateTyped(Int32Array, cap, 'triplet row buffer'); ni.set(this._ti);
+      const nj = allocateTyped(Int32Array, cap, 'triplet column buffer'); nj.set(this._tj);
+      const nv = allocateTyped(Float64Array, cap, 'triplet value buffer'); nv.set(this._tv);
       this._ti = ni; this._tj = nj; this._tv = nv; this._cap = cap;
     }
     const c = this._cnt++;
@@ -71,11 +86,11 @@ class WasmSparseMultifrontalSolver {
     const n = this.n;
     const cnt = this._cnt;
     const ti = this._ti, tj = this._tj, tv = this._tv;
-    const counts = new Int32Array(n + 1);
+    const counts = allocateTyped(Int32Array, n + 1, 'counting-sort histogram');
     for (let c = 0; c < cnt; c++) counts[ti[c] + 1]++;
     for (let i = 0; i < n; i++) counts[i + 1] += counts[i];
-    const bc = new Int32Array(cnt);
-    const bv = new Float64Array(cnt);
+    const bc = allocateTyped(Int32Array, cnt, 'counting-sort column bucket');
+    const bv = allocateTyped(Float64Array, cnt, 'counting-sort value bucket');
     const fill = counts.slice(0, n);
     for (let c = 0; c < cnt; c++) {
       const p = fill[ti[c]]++;
@@ -83,9 +98,9 @@ class WasmSparseMultifrontalSolver {
       bv[p] = tv[c];
     }
     // Sort each row by column and merge duplicates into compacted output
-    const rowPtr = new Int32Array(n + 1);
-    const colIdx = new Int32Array(cnt);
-    const values = new Float64Array(cnt);
+    const rowPtr = allocateTyped(Int32Array, n + 1, 'CSR row pointer');
+    const colIdx = allocateTyped(Int32Array, cnt, 'CSR column index');
+    const values = allocateTyped(Float64Array, cnt, 'CSR value');
     let out = 0;
     for (let i = 0; i < n; i++) {
       const s = counts[i];
@@ -151,7 +166,7 @@ class WasmSparseMultifrontalSolver {
       }
     }
     for (let i = 0; i < n; i++) deg[i + 1] += deg[i];
-    const adjIdx = new Int32Array(deg[n]);
+    const adjIdx = allocateTyped(Int32Array, deg[n], 'symmetric adjacency index');
     const fillPos = deg.slice(0, n);
     for (let i = 0; i < n; i++) {
       for (let p = rp[i]; p < rp[i + 1]; p++) {
@@ -161,16 +176,15 @@ class WasmSparseMultifrontalSolver {
     }
     const adjPtr = deg;
 
-    const perm = new Int32Array(n);
+    const perm = allocateTyped(Int32Array, n, 'ordering permutation');
     let outPos = 0;
     const LEAF = this.leafSize ?? 24;
-    const mark = new Int32Array(n).fill(-1);
-    const level = new Int32Array(n).fill(-1);
+    const mark = allocateTyped(Int32Array, n, 'ordering mark').fill(-1);
+    const level = allocateTyped(Int32Array, n, 'ordering level').fill(-1);
     let stamp = 0;
-    const useBitsetLeaf = LEAF <= 30;
-    const leafAdjacency = useBitsetLeaf ? new Uint32Array(LEAF) : null;
-    const leafOwner = useBitsetLeaf ? new Int32Array(n).fill(-1) : null;
-    const leafIndex = useBitsetLeaf ? new Int32Array(n) : null;
+    const leafAdjacency = new Uint32Array(LEAF);
+    const leafOwner = allocateTyped(Int32Array, n, 'ordering leaf owner').fill(-1);
+    const leafIndex = allocateTyped(Int32Array, n, 'ordering leaf index');
     let leafStamp = 0;
 
     const bitCount = (value) => {
@@ -182,6 +196,7 @@ class WasmSparseMultifrontalSolver {
 
     // Exact minimum degree on a small node subset
     const minDegreeLeaf = (nodes) => {
+      const useBitsetLeaf = LEAF <= 30 && nodes.length <= 30;
       if (useBitsetLeaf) {
         const localSize = nodes.length;
         const localStamp = ++leafStamp;
@@ -275,64 +290,66 @@ class WasmSparseMultifrontalSolver {
       }
     };
 
+    // Nested dissection, driven by an explicit work stack so that very large
+    // systems do not exhaust the JS call stack through deep recursion.
+    const stack = [];
     const dissect = (nodes) => {
-      const size = nodes.length;
-      if (size === 0) return;
-      if (size <= LEAF) { minDegreeLeaf(nodes); return; }
+      stack.push(nodes);
+      while (stack.length > 0) {
+        const cur = stack.pop();
+        const size = cur.length;
+        if (size === 0) continue;
+        if (size <= LEAF) { minDegreeLeaf(cur); continue; }
 
-      const myStamp = ++stamp;
-      for (const v of nodes) { mark[v] = myStamp; level[v] = -1; }
+        const myStamp = ++stamp;
+        for (const v of cur) { mark[v] = myStamp; level[v] = -1; }
 
-      const order = [];
-      bfs(nodes[0], myStamp, order);
-      if (order.length < size) {
-        // disconnected subgraph: split off the first component and recurse independently
-        const comp = order.slice();
-        const compSet = new Set(comp);
-        const rest = nodes.filter(v => !compSet.has(v));
-        for (const v of nodes) level[v] = -1;
-        dissect(comp);
-        dissect(rest);
-        return;
-      }
-      // second sweep from the farthest node approximates a pseudo-peripheral start
-      let far = order[order.length - 1];
-      for (const v of nodes) level[v] = -1;
-      bfs(far, myStamp, order);
-      far = order[order.length - 1];
-      const maxLevel = level[far];
-      if (maxLevel < 2) { minDegreeLeaf(nodes); return; }
-
-      const levelCount = new Int32Array(maxLevel + 1);
-      for (const v of nodes) levelCount[level[v]]++;
-      // separator level: smallest level whose midpoint lies within 35%..65% of total mass
-      let cum = 0;
-      let best = -1;
-      let bestSize = Infinity;
-      for (let l = 0; l <= maxLevel; l++) {
-        const before = cum;
-        cum += levelCount[l];
-        const frac = (before + levelCount[l] / 2) / size;
-        if (frac >= 0.35 && frac <= 0.65 && l > 0 && l < maxLevel && levelCount[l] < bestSize) {
-          bestSize = levelCount[l];
-          best = l;
+        const order = [];
+        bfs(cur[0], myStamp, order);
+        if (order.length < size) {
+          const comp = order.slice();
+          const compSet = new Set(comp);
+          const rest = cur.filter(v => !compSet.has(v));
+          for (const v of cur) level[v] = -1;
+          stack.push(rest, comp);
+          continue;
         }
-      }
-      if (best === -1) best = Math.max(1, Math.min(maxLevel - 1, Math.floor(maxLevel / 2)));
+        let far = order[order.length - 1];
+        for (const v of cur) level[v] = -1;
+        bfs(far, myStamp, order);
+        far = order[order.length - 1];
+        const maxLevel = level[far];
+        if (maxLevel < 2) { minDegreeLeaf(cur); continue; }
 
-      const left = [];
-      const right = [];
-      const sep = [];
-      for (const v of nodes) {
-        const l = level[v];
-        if (l < best) left.push(v);
-        else if (l > best) right.push(v);
-        else sep.push(v);
+        const levelCount = new Int32Array(maxLevel + 1);
+        for (const v of cur) levelCount[level[v]]++;
+        let cum = 0;
+        let best = -1;
+        let bestSize = Infinity;
+        for (let l = 0; l <= maxLevel; l++) {
+          const before = cum;
+          cum += levelCount[l];
+          const frac = (before + levelCount[l] / 2) / size;
+          if (frac >= 0.35 && frac <= 0.65 && l > 0 && l < maxLevel && levelCount[l] < bestSize) {
+            bestSize = levelCount[l];
+            best = l;
+          }
+        }
+        if (best === -1) best = Math.max(1, Math.min(maxLevel - 1, Math.floor(maxLevel / 2)));
+
+        const left = [];
+        const right = [];
+        const sep = [];
+        for (const v of cur) {
+          const l = level[v];
+          if (l < best) left.push(v);
+          else if (l > best) right.push(v);
+          else sep.push(v);
+        }
+        for (const v of cur) level[v] = -1;
+        for (const v of sep) perm[outPos++] = v;
+        stack.push(right, left);
       }
-      for (const v of nodes) level[v] = -1;
-      dissect(left);
-      dissect(right);
-      for (const v of sep) perm[outPos++] = v;
     };
 
     const all = new Array(n);
@@ -340,7 +357,7 @@ class WasmSparseMultifrontalSolver {
     dissect(all);
 
     this.permutation = perm;
-    this.invPermutation = new Int32Array(n);
+    this.invPermutation = allocateTyped(Int32Array, n, 'inverse permutation');
     for (let i = 0; i < n; i++) this.invPermutation[perm[i]] = i;
     return perm;
   }
@@ -483,8 +500,8 @@ class WasmSparseMultifrontalSolver {
     }
     for (let j = 0; j < n; j++) cCount[j + 1] += cCount[j];
     const Cp = cCount;
-    const Ci = new Int32Array(Cp[n]);
-    const Cx = new Float64Array(Cp[n]);
+    const Ci = allocateTyped(Int32Array, Cp[n], 'permuted CSC column index');
+    const Cx = allocateTyped(Float64Array, Cp[n], 'permuted CSC value');
     const cFill = Cp.slice(0, n);
     for (let i = 0; i < n; i++) {
       const pi = inv[i];
@@ -499,8 +516,8 @@ class WasmSparseMultifrontalSolver {
     }
 
     // Elimination tree
-    const parent = new Int32Array(n).fill(-1);
-    const ancestor = new Int32Array(n).fill(-1);
+    const parent = allocateTyped(Int32Array, n, 'elimination-tree parent').fill(-1);
+    const ancestor = allocateTyped(Int32Array, n, 'elimination-tree ancestor').fill(-1);
     for (let k = 0; k < n; k++) {
       for (let p = Cp[k]; p < Cp[k + 1]; p++) {
         let i = Ci[p];
@@ -513,8 +530,8 @@ class WasmSparseMultifrontalSolver {
       }
     }
 
-    const w = new Int32Array(n).fill(-1);
-    const s = new Int32Array(n);
+    const w = allocateTyped(Int32Array, n, 'symbolic workspace flag').fill(-1);
+    const s = allocateTyped(Int32Array, n, 'symbolic workspace row');
     // nonzero pattern of row k of L is written to s[top..n-1]
     const ereach = (k) => {
       let top = n;
@@ -534,22 +551,22 @@ class WasmSparseMultifrontalSolver {
     };
 
     // Symbolic: exact column counts of L (including diagonal)
-    const colCount = new Int32Array(n).fill(1);
+    const colCount = allocateTyped(Int32Array, n, 'symbolic column counts').fill(1);
     for (let k = 0; k < n; k++) {
       const top = ereach(k);
       for (let t = top; t < n; t++) colCount[s[t]]++;
     }
     w.fill(-1);
 
-    const Lp = new Int32Array(n + 1);
+    const Lp = allocateTyped(Int32Array, n + 1, 'Cholesky column pointer');
     for (let j = 0; j < n; j++) Lp[j + 1] = Lp[j] + colCount[j];
     const nnzL = Lp[n];
-    const Li = new Int32Array(nnzL);
-    const Lx = new Float64Array(nnzL);
+    const Li = allocateTyped(Int32Array, nnzL, 'Cholesky row index');
+    const Lx = allocateTyped(Float64Array, nnzL, 'Cholesky value');
     const cnext = Lp.slice(0, n);
 
     // Numeric up-looking Cholesky
-    const x = new Float64Array(n);
+    const x = allocateTyped(Float64Array, n, 'factorization workspace');
     let flops = 0;
     for (let k = 0; k < n; k++) {
       const top = ereach(k);

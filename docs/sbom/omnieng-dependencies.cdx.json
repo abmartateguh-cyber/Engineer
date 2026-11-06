@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:801f0c00-29c2-44d6-9376-8f53ee864299",
+  "serialNumber": "urn:uuid:f9202ef4-9800-480e-9f15-ee6b222add52",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-24T00:04:00.661Z",
+    "timestamp": "2026-10-29T16:02:19.107Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -40,12 +40,12 @@
   },
   "components": [
     {
-      "bom-ref": "@electron-internal/extract-zip@1.0.5",
+      "bom-ref": "@electron-internal/extract-zip@1.0.8",
       "type": "library",
       "name": "@electron-internal/extract-zip",
-      "version": "1.0.5",
+      "version": "1.0.8",
       "scope": "optional",
-      "purl": "pkg:npm/%40electron-internal/extract-zip@1.0.5",
+      "purl": "pkg:npm/%40electron-internal/extract-zip@1.0.8",
       "properties": [
         {
           "name": "cdx:npm:package:development",
@@ -55,19 +55,19 @@
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@electron-internal/extract-zip/-/extract-zip-1.0.5.tgz"
+          "url": "https://registry.npmjs.org/@electron-internal/extract-zip/-/extract-zip-1.0.8.tgz"
         }
       ],
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "f9ba8508ff7ca4b2344edd17428d539a55edc2359c8484a77433b10a411c22e5205d6a419cbc9123ed8353e99eb2f9cc317e8bd570ea60d0349573431ddff288"
+          "content": "f226a378b15bccdc0cd26dc0b106526606111168250089b21afbc5496537e0580c5bcb079737708fd40abeff5d80dee330fe7dd4415417fb0b382dc997d6088d"
         }
       ],
       "licenses": [
         {
           "license": {
-            "id": "BSD-2-Clause"
+            "id": "MIT"
           }
         }
       ]
@@ -293,6 +293,39 @@
         {
           "alg": "SHA-512",
           "content": "de4481b46f0e6dc4d57d76a79b9bd527a52704b115995b1193533ebc6a82b8c055f972c26c962e5907ee97ec88cb41900ec4a52b490712b8841e7ed23e4e049c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "env-paths@3.0.0",
+      "type": "library",
+      "name": "env-paths",
+      "version": "3.0.0",
+      "scope": "optional",
+      "purl": "pkg:npm/env-paths@3.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/env-paths/-/env-paths-3.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "76d2544dea73316dcb9bf34fc517f7c0fe3ae365168632f6b10c5cfb29b660c8f59bf1f6cc33503a57b369fce41f09fab0cb2d8c74f01ba89042c72d0d6fdbd4"
         }
       ],
       "licenses": [
@@ -2944,39 +2977,6 @@
       ]
     },
     {
-      "bom-ref": "env-paths@2.2.1",
-      "type": "library",
-      "name": "env-paths",
-      "version": "2.2.1",
-      "scope": "optional",
-      "purl": "pkg:npm/env-paths@2.2.1",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/env-paths/-/env-paths-2.2.1.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "fa1d6590b2a164c4d88e8835544a49346ecd64959cb9cd830e4feab2a49345108e5e22e3790d5dd7fb9dad41a1a8cc5480097028d67471fdaea9a9f918bb92d8"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ]
-    },
-    {
       "bom-ref": "jsonfile@4.0.0",
       "type": "library",
       "name": "jsonfile",
@@ -4825,12 +4825,12 @@
       ]
     },
     {
-      "bom-ref": "electron@45.0.0",
+      "bom-ref": "electron@45.1.0",
       "type": "library",
       "name": "electron",
-      "version": "45.0.0",
+      "version": "45.1.0",
       "scope": "optional",
-      "purl": "pkg:npm/electron@45.0.0",
+      "purl": "pkg:npm/electron@45.1.0",
       "properties": [
         {
           "name": "cdx:npm:package:development",
@@ -4840,13 +4840,13 @@
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/electron/-/electron-45.0.0.tgz"
+          "url": "https://registry.npmjs.org/electron/-/electron-45.1.0.tgz"
         }
       ],
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "ca3cf8ba130170ee8be57ec25a044ca1b7f610c24f9dbf63e33b9ffa7bbf4d4ffa1384aa7f1edf9ff6b67800a8e2a9e08e697fd099eca1987162ba092f12dddb"
+          "content": "8bba8a54087f291e6fd697f9e8d846197d9060771d8ef2e04bb9282faba2e7473ecd40c62d1ba747de675dc4e91cf51128e438183046f0199788380e43c0c3d0"
         }
       ],
       "licenses": [
@@ -5089,12 +5089,12 @@
       ]
     },
     {
-      "bom-ref": "env-paths@3.0.0",
+      "bom-ref": "env-paths@2.2.1",
       "type": "library",
       "name": "env-paths",
-      "version": "3.0.0",
+      "version": "2.2.1",
       "scope": "optional",
-      "purl": "pkg:npm/env-paths@3.0.0",
+      "purl": "pkg:npm/env-paths@2.2.1",
       "properties": [
         {
           "name": "cdx:npm:package:development",
@@ -5104,13 +5104,13 @@
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/env-paths/-/env-paths-3.0.0.tgz"
+          "url": "https://registry.npmjs.org/env-paths/-/env-paths-2.2.1.tgz"
         }
       ],
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "76d2544dea73316dcb9bf34fc517f7c0fe3ae365168632f6b10c5cfb29b660c8f59bf1f6cc33503a57b369fce41f09fab0cb2d8c74f01ba89042c72d0d6fdbd4"
+          "content": "fa1d6590b2a164c4d88e8835544a49346ecd64959cb9cd830e4feab2a49345108e5e22e3790d5dd7fb9dad41a1a8cc5480097028d67471fdaea9a9f918bb92d8"
         }
       ],
       "licenses": [
@@ -11683,7 +11683,7 @@
       "ref": "engineering-engine@1.0.0",
       "dependsOn": [
         "three@0.186.1",
-        "electron@45.0.0",
+        "electron@45.1.0",
         "electron-builder@26.15.3",
         "eslint@9.39.5",
         "globals@17.13.0",
@@ -11692,7 +11692,7 @@
       ]
     },
     {
-      "ref": "@electron-internal/extract-zip@1.0.5",
+      "ref": "@electron-internal/extract-zip@1.0.8",
       "dependsOn": []
     },
     {
@@ -11748,6 +11748,10 @@
         "sumchecker@3.0.1",
         "undici@7.30.1"
       ]
+    },
+    {
+      "ref": "env-paths@3.0.0",
+      "dependsOn": []
     },
     {
       "ref": "@electron/notarize@2.5.0",
@@ -12251,10 +12255,6 @@
       "dependsOn": []
     },
     {
-      "ref": "env-paths@2.2.1",
-      "dependsOn": []
-    },
-    {
       "ref": "jsonfile@4.0.0",
       "dependsOn": [
         "graceful-fs@4.2.11"
@@ -12565,9 +12565,9 @@
       ]
     },
     {
-      "ref": "electron@45.0.0",
+      "ref": "electron@45.1.0",
       "dependsOn": [
-        "@electron-internal/extract-zip@1.0.5",
+        "@electron-internal/extract-zip@1.0.8",
         "@electron/get@5.1.0",
         "@types/node@24.19.2"
       ]
@@ -12639,7 +12639,7 @@
       ]
     },
     {
-      "ref": "env-paths@3.0.0",
+      "ref": "env-paths@2.2.1",
       "dependsOn": []
     },
     {

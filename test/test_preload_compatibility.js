@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const manifestPath = path.join(__dirname, 'support', 'preload_api_v1.json');
 const preloadPath = path.join(__dirname, '..', 'preload.js');
@@ -30,4 +31,33 @@ function checkPreloadCompatibility() {
   };
 }
 
-module.exports = { checkPreloadCompatibility, listPreloadApiMethods };
+function capturePreloadRoutes() {
+  const exposed = {};
+  const invocations = [];
+  const source = fs.readFileSync(preloadPath, 'utf8');
+  vm.runInNewContext(
+    source,
+    {
+      require(moduleName) {
+        if (moduleName !== 'electron') throw new Error(`Unexpected preload import: ${moduleName}`);
+        return {
+          contextBridge: {
+            exposeInMainWorld(name, api) {
+              exposed[name] = api;
+            }
+          },
+          ipcRenderer: {
+            invoke(channel, payload) {
+              invocations.push({ channel, payload });
+              return Promise.resolve({ success: true });
+            }
+          }
+        };
+      }
+    },
+    { filename: preloadPath, timeout: 1000 }
+  );
+  return { exposed, invocations };
+}
+
+module.exports = { checkPreloadCompatibility, listPreloadApiMethods, capturePreloadRoutes };

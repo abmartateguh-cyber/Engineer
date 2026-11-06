@@ -1,80 +1,26 @@
 /**
  * OmniEng Johnson-Cook Dynamic Fracture & High-Strain-Rate Failure Engine
- * Standard: Johnson-Cook Failure Model (1985)
- * Experimental implementation: LS-DYNA MAT_015 / Ansys Explicit AUTODYN dynamic impact failure.
+ * Experimental Johnson-Cook-style calculations using caller-supplied constants.
+ * No material database or validated vendor implementation is provided.
  */
 
 class JohnsonCookFracture {
-  /**
-   * Pre-configured Johnson-Cook material constants (A, B, n, C, m, D1-D5).
-   */
-  static JC_MATERIALS = {
-    'Aluminum_7075_T6': {
-      A: 546.0,      // Quasi-static yield stress (MPa)
-      B: 477.0,      // Hardening modulus (MPa)
-      n: 0.52,       // Hardening exponent
-      C: 0.001,      // Strain rate sensitivity
-      m: 1.4,        // Thermal softening exponent
-      T_room: 293.15,// K (20°C)
-      T_melt: 893.15,// K (620°C)
-      eps0_dot: 1.0, // Reference strain rate (1/s)
-      D1: 0.096,     // Triaxiality base
-      D2: 0.049,     // Triaxiality exponent multiplier
-      D3: -3.46,     // Triaxiality decay slope
-      D4: 0.016,     // Strain rate sensitivity for fracture
-      D5: 1.09       // Thermal coefficient for fracture
-    },
-    'Al7075-T6': {
-      A: 546.0,
-      B: 477.0,
-      n: 0.52,
-      C: 0.001,
-      m: 1.4,
-      T_room: 293.15,
-      T_melt: 893.15,
-      eps0_dot: 1.0,
-      D1: 0.096,
-      D2: 0.049,
-      D3: -3.46,
-      D4: 0.016,
-      D5: 1.09
-    },
-    'Titanium_Ti6Al4V': {
-      A: 862.0,
-      B: 331.0,
-      n: 0.34,
-      C: 0.012,
-      m: 0.8,
-      T_room: 293.15,
-      T_melt: 1923.15,
-      eps0_dot: 1.0,
-      D1: -0.09,
-      D2: 0.25,
-      D3: -0.5,
-      D4: 0.014,
-      D5: 3.87
-    },
-    'OFHC_Copper': {
-      A: 90.0,
-      B: 292.0,
-      n: 0.31,
-      C: 0.025,
-      m: 1.09,
-      T_room: 293.15,
-      T_melt: 1356.15,
-      eps0_dot: 1.0,
-      D1: 0.54,
-      D2: 4.89,
-      D3: -3.03,
-      D4: 0.014,
-      D5: 1.12
+  static validateMaterial(material) {
+    const fields = ['A', 'B', 'n', 'C', 'm', 'T_room', 'T_melt', 'eps0_dot', 'D1', 'D2', 'D3', 'D4', 'D5'];
+    if (!material || typeof material !== 'object' || !fields.every((field) => Number.isFinite(material[field]))) {
+      throw new TypeError('Provide all Johnson-Cook flow and fracture constants explicitly.');
     }
-  };
+    if (material.T_room <= 0 || material.T_melt <= material.T_room || material.eps0_dot <= 0 || material.n < 0 || material.m < 0) {
+      throw new RangeError('Require T_melt > T_room > 0 K, eps0_dot > 0, and non-negative hardening and thermal exponents.');
+    }
+    return material;
+  }
 
-  static PARAMETERS = JohnsonCookFracture.JC_MATERIALS;
-
-  static computeFailureStrain(eta, strainRate = 1.0, tempK = 293.15, materialKey = 'Al7075-T6') {
-    const p = this.JC_MATERIALS[materialKey] || this.JC_MATERIALS['Al7075-T6'];
+  static computeFailureStrain(eta, strainRate, tempK, material) {
+    const p = this.validateMaterial(material);
+    if (![eta, strainRate, tempK].every(Number.isFinite) || strainRate <= 0 || tempK <= 0) {
+      throw new TypeError('Provide finite triaxiality, positive strain rate, and temperature in kelvin.');
+    }
     const epsDotStar = Math.max(1.0, strainRate / p.eps0_dot);
     const tStar = Math.max(0.0, Math.min(1.0, (tempK - p.T_room) / (p.T_melt - p.T_room)));
     const triaxTerm = p.D1 + p.D2 * Math.exp(p.D3 * eta);
@@ -83,8 +29,11 @@ class JohnsonCookFracture {
     return Math.max(0.001, triaxTerm * rateTerm * tempTerm);
   }
 
-  static computeDamageIncrement(dPlasticStrain, eta, strainRate = 1.0, tempK = 293.15, materialKey = 'Al7075-T6') {
-    const epsF = this.computeFailureStrain(eta, strainRate, tempK, materialKey);
+  static computeDamageIncrement(dPlasticStrain, eta, strainRate, tempK, material) {
+    if (!Number.isFinite(dPlasticStrain) || dPlasticStrain < 0) {
+      throw new TypeError('Provide a finite non-negative plastic strain increment.');
+    }
+    const epsF = this.computeFailureStrain(eta, strainRate, tempK, material);
     return dPlasticStrain / Math.max(1e-4, epsF);
   }
 
@@ -96,8 +45,11 @@ class JohnsonCookFracture {
    * Evaluates the dynamic Johnson-Cook flow stress.
    * sigma = [A + B * eps_p^n] * [1 + C * ln(eps_dot*)] * [1 - (T*)^m]
    */
-  static computeFlowStress(materialKey, plasticStrain, strainRate = 1.0, tempK = 293.15) {
-    const p = this.JC_MATERIALS[materialKey] || this.JC_MATERIALS['Aluminum_7075_T6'];
+  static computeFlowStress(material, plasticStrain, strainRate, tempK) {
+    const p = this.validateMaterial(material);
+    if (![plasticStrain, strainRate, tempK].every(Number.isFinite) || plasticStrain < 0 || strainRate <= 0 || tempK <= 0) {
+      throw new TypeError('Provide non-negative plastic strain, positive strain rate, and temperature in kelvin.');
+    }
 
     const epsP = Math.max(0, plasticStrain);
     const epsDotStar = Math.max(1.0, strainRate / p.eps0_dot);
@@ -118,8 +70,14 @@ class JohnsonCookFracture {
    * eps_f = [D1 + D2 * exp(D3 * eta)] * [1 + D4 * ln(eps_dot*)] * [1 + D5 * T*]
    * where eta = sigma_m / sigma_vm is the stress triaxiality ratio.
    */
-  static computeFractureStrain(materialKey, stressTensor, strainRate = 1.0, tempK = 293.15) {
-    const p = this.JC_MATERIALS[materialKey] || this.JC_MATERIALS['Aluminum_7075_T6'];
+  static computeFractureStrain(material, stressTensor, strainRate, tempK) {
+    const p = this.validateMaterial(material);
+    if (
+      !Array.isArray(stressTensor) || stressTensor.length !== 6 || !stressTensor.every(Number.isFinite) ||
+      !Number.isFinite(strainRate) || strainRate <= 0 || !Number.isFinite(tempK) || tempK <= 0
+    ) {
+      throw new TypeError('Provide six stress components in MPa, positive strain rate, and temperature in kelvin.');
+    }
 
     // Mean hydrostatic stress: sigma_m = (sxx + syy + szz) / 3
     const sigmaM = (stressTensor[0] + stressTensor[1] + stressTensor[2]) / 3.0;
@@ -151,6 +109,9 @@ class JohnsonCookFracture {
     const rateTerm = 1.0 + p.D4 * Math.log(epsDotStar);
     const tempTerm = 1.0 + p.D5 * tStar;
 
+    // 0.5% lower-bound safeguard on fracture strain: prevents zero/negative
+    // predicted failure strain (and damage blow-up) under extreme triaxial
+    // compression states. Numerical floor, not a material property.
     const epsF = Math.max(0.005, triaxTerm * rateTerm * tempTerm);
     return {
       fractureStrain: Number(epsF.toFixed(5)),

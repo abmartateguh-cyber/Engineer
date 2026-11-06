@@ -116,19 +116,72 @@ class SimpleNavierStokesSolver {
       }
     }
 
-    // 3. Pressure correction & velocity update
+    // 3. Pressure correction & 3D pressure-gradient reconstruction
+    const pPrime = new Float64Array(cells.length);
+    const gradPPrime = Array.from({ length: cells.length }, () => ({ x: 0.0, y: 0.0, z: 0.0, count: 0 }));
+
     for (let i = 0; i < cells.length; i++) {
       const cell = cells[i];
       const massRes = Math.abs(massImbalance[i]);
       if (massRes > maxMassResidual) maxMassResidual = massRes;
 
       // Pressure correction proportional to mass imbalance
-      const pPrime = (massImbalance[i] / (cell.volume || 1e-3)) * 0.05;
-      cell.p += this.alphaP * pPrime;
+      pPrime[i] = (massImbalance[i] / (cell.volume || 1e-3)) * 0.05;
+      cell.p += this.alphaP * pPrime[i];
+    }
 
-      // Velocity correction
-      const uCorr = -(d_f_constant * pPrime);
-      cell.u += this.alphaU * uCorr;
+    for (const face of faces) {
+      if (face.leftCell >= 0 && face.rightCell >= 0) {
+        const iL = face.leftCell;
+        const iR = face.rightCell;
+        const cL = cells[iL];
+        const cR = cells[iR];
+        const dx = (cR.centroid ? cR.centroid.x : 0) - (cL.centroid ? cL.centroid.x : 0);
+        const dy = (cR.centroid ? cR.centroid.y : 0) - (cL.centroid ? cL.centroid.y : 0);
+        const dz = (cR.centroid ? cR.centroid.z : 0) - (cL.centroid ? cL.centroid.z : 0);
+        const dist = Math.hypot(dx, dy, dz) || 1.0;
+        const dpDn = (pPrime[iR] - pPrime[iL]) / dist;
+
+        const nx = face.normal && Number.isFinite(face.normal.x) ? face.normal.x : dx / dist;
+        const ny = face.normal && Number.isFinite(face.normal.y) ? face.normal.y : dy / dist;
+        const nz = face.normal && Number.isFinite(face.normal.z) ? face.normal.z : dz / dist;
+
+        gradPPrime[iL].x += dpDn * nx;
+        gradPPrime[iL].y += dpDn * ny;
+        gradPPrime[iL].z += dpDn * nz;
+        gradPPrime[iL].count++;
+
+        gradPPrime[iR].x += dpDn * nx;
+        gradPPrime[iR].y += dpDn * ny;
+        gradPPrime[iR].z += dpDn * nz;
+        gradPPrime[iR].count++;
+      }
+    }
+
+    // 4. 3D Velocity correction (u, v, w) from respective pressure gradient components
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const g = gradPPrime[i];
+      const invCount = g.count > 0 ? 1.0 / g.count : 0.0;
+
+      const explicitGrad = cell.gradPPrime || cell.gradP || null;
+      const dpdx = g.count > 0 && g.x !== 0 ? g.x * invCount : (explicitGrad && explicitGrad.x ? explicitGrad.x : pPrime[i]);
+      const dpdy = g.count > 0 && g.y !== 0 ? g.y * invCount : (explicitGrad && explicitGrad.y ? explicitGrad.y : 0.0);
+      const dpdz = g.count > 0 && g.z !== 0 ? g.z * invCount : (explicitGrad && explicitGrad.z ? explicitGrad.z : 0.0);
+
+      const uCorr = -(d_f_constant * dpdx);
+      const vCorr = -(d_f_constant * dpdy);
+      const wCorr = -(d_f_constant * dpdz);
+
+      cell.u = (cell.u || 0) + this.alphaU * uCorr;
+      cell.v = (cell.v || 0) + this.alphaU * vCorr;
+      cell.w = (cell.w || 0) + this.alphaU * wCorr;
+
+      cell.gradP = {
+        x: (cell.gradP ? cell.gradP.x : 0) + this.alphaP * dpdx,
+        y: (cell.gradP ? cell.gradP.y : 0) + this.alphaP * dpdy,
+        z: (cell.gradP ? cell.gradP.z : 0) + this.alphaP * dpdz
+      };
 
       const velNorm = Math.hypot(cell.u, cell.v, cell.w);
       if (velNorm > maxMomentumResidual) maxMomentumResidual = velNorm;

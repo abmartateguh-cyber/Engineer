@@ -4,6 +4,14 @@ const crypto = require('crypto');
 const { OmniError, OmniErrorCode } = require('./OmniError');
 const { ToolApprovalClass } = require('./ToolDefinition');
 
+function freezeJSON(value) {
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) freezeJSON(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 /**
  * Status lifecycle of a ToolProposal.
  */
@@ -28,7 +36,8 @@ class ToolProposal {
    * @param {string[]} [params.expectedMutations=[]] - Descriptions of state mutations
    * @param {string} [params.approvalClass=ToolApprovalClass.MUTATION_PREVIEW] - Approval category
    * @param {string} [params.idempotencyKey] - Unique key preventing duplicate execution
-   * @param {number} [params.originatingProjectRevision=1] - Project revision when proposal was created
+   * @param {number} params.originatingProjectRevision - Project revision when proposal was created
+   * @param {string} [params.originatingProjectId] - Active project identity when available
    * @param {string} [params.reasoning=''] - Stenographer's engineering justification
    * @param {object} [params.costEstimate={}] - Time, memory, or external cost estimates
    */
@@ -39,7 +48,8 @@ class ToolProposal {
     expectedMutations = [],
     approvalClass = ToolApprovalClass.MUTATION_PREVIEW,
     idempotencyKey,
-    originatingProjectRevision = 1,
+    originatingProjectRevision,
+    originatingProjectId = null,
     reasoning = '',
     costEstimate = {}
   }) {
@@ -49,16 +59,23 @@ class ToolProposal {
     if (!Object.values(ToolApprovalClass).includes(approvalClass)) {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, `Invalid ToolApprovalClass: "${approvalClass}"`);
     }
+    if (!Number.isSafeInteger(originatingProjectRevision) || originatingProjectRevision < 1) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'ToolProposal requires an explicit positive project revision');
+    }
+    if (originatingProjectId !== null && (typeof originatingProjectId !== 'string' || !originatingProjectId.trim())) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'ToolProposal project ID must be a non-empty string');
+    }
 
     this._proposalId = proposalId && typeof proposalId === 'string' ? proposalId : crypto.randomUUID();
     this._toolName = toolName;
-    this._args = Object.freeze(JSON.parse(JSON.stringify(args || {})));
+    this._args = freezeJSON(JSON.parse(JSON.stringify(args || {})));
     this._expectedMutations = Object.freeze([...(expectedMutations || [])].map(String));
     this._approvalClass = approvalClass;
     this._idempotencyKey = idempotencyKey || crypto.randomUUID();
-    this._originatingProjectRevision = Number.isInteger(originatingProjectRevision) ? originatingProjectRevision : 1;
+    this._originatingProjectRevision = originatingProjectRevision;
+    this._originatingProjectId = originatingProjectId;
     this._reasoning = String(reasoning || '');
-    this._costEstimate = Object.freeze({ ...costEstimate });
+    this._costEstimate = freezeJSON(JSON.parse(JSON.stringify(costEstimate || {})));
     this._createdAt = new Date().toISOString();
     this._status = ProposalStatus.PROPOSED;
     this._approvalRecord = null;
@@ -66,21 +83,54 @@ class ToolProposal {
     this._error = null;
   }
 
-  get proposalId() { return this._proposalId; }
-  get id() { return this._proposalId; }
-  get toolName() { return this._toolName; }
-  get args() { return this._args; }
-  get parameters() { return this._args; }
-  get expectedMutations() { return this._expectedMutations; }
-  get approvalClass() { return this._approvalClass; }
-  get classification() { return this._approvalClass; }
-  get idempotencyKey() { return this._idempotencyKey; }
-  get originatingProjectRevision() { return this._originatingProjectRevision; }
-  get reasoning() { return this._reasoning; }
-  get costEstimate() { return this._costEstimate; }
-  get createdAt() { return this._createdAt; }
-  get status() { return this._status; }
-  get requiresApproval() { return !this.canAutoRun(); }
+  get proposalId() {
+    return this._proposalId;
+  }
+  get id() {
+    return this._proposalId;
+  }
+  get toolName() {
+    return this._toolName;
+  }
+  get args() {
+    return this._args;
+  }
+  get parameters() {
+    return this._args;
+  }
+  get expectedMutations() {
+    return this._expectedMutations;
+  }
+  get approvalClass() {
+    return this._approvalClass;
+  }
+  get classification() {
+    return this._approvalClass;
+  }
+  get idempotencyKey() {
+    return this._idempotencyKey;
+  }
+  get originatingProjectRevision() {
+    return this._originatingProjectRevision;
+  }
+  get originatingProjectId() {
+    return this._originatingProjectId;
+  }
+  get reasoning() {
+    return this._reasoning;
+  }
+  get costEstimate() {
+    return this._costEstimate;
+  }
+  get createdAt() {
+    return this._createdAt;
+  }
+  get status() {
+    return this._status;
+  }
+  get requiresApproval() {
+    return !this.canAutoRun();
+  }
 
   approve(approvalRecord) {
     this._status = ProposalStatus.APPROVED;
@@ -119,6 +169,7 @@ class ToolProposal {
       approvalClass: this._approvalClass,
       idempotencyKey: this._idempotencyKey,
       originatingProjectRevision: this._originatingProjectRevision,
+      originatingProjectId: this._originatingProjectId,
       reasoning: this._reasoning,
       costEstimate: this._costEstimate,
       createdAt: this._createdAt

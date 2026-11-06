@@ -1,11 +1,12 @@
 /**
  * OmniEng Norton-Bailey Power-Law Creep Solver
- * 
+ *
  * Implements high-temperature secondary & primary creep strain evolution:
  * dot_epsilon_cr = A * sigma^n * t^m
- * 
- * Standards: ASME Section III Subsection NH / API 579-1 / ASME B&PV Section VIII
- * 
+ *
+ * No code-specific material data, standards conformance, or independent creep
+ * validation is included.
+ *
  * Experimental implementation; release maturity and provenance are not established.
  */
 
@@ -15,40 +16,39 @@ class NortonBaileyCreepSolver {
   /**
    * Computes steady-state secondary creep strain rate:
    * dot_epsilon = A * sigma^n
-   * 
+   *
    * @param {Object} params
    * @param {number} params.stressMPa - Equivalent von Mises stress (MPa)
-   * @param {number} [params.A=1.0e-18] - Norton creep coefficient (1/hr / MPa^n)
-   * @param {number} [params.n=5.0] - Stress exponent (typical 4.0 - 7.0 for austenitic steels)
+   * @param {number} params.A - Caller-supplied Norton coefficient (1/hr / MPa^n)
+   * @param {number} params.n - Caller-supplied stress exponent
    * @returns {number} Creep strain rate (strain per hour)
    */
   static evaluateSecondaryCreepRate(params) {
-    const sigma = params.stressMPa;
-    const A = params.A !== undefined ? params.A : 1.0e-18;
-    const n = params.n !== undefined ? params.n : 5.0;
+    const { stressMPa: sigma, A, n } = params || {};
+    this.validateParameters({ stressMPa: sigma, A, n });
 
     return A * Math.pow(Math.max(0.0, sigma), n);
   }
 
   /**
    * Integrates transient primary/secondary creep accumulation over total time.
-   * 
+   *
    * @param {Object} spec
    * @param {number} spec.stressMPa - Applied stress
    * @param {number} spec.totalHours - Duration (hours)
-   * @param {number} [spec.A=1.0e-18] - Norton constant
-   * @param {number} [spec.n=5.0] - Stress exponent
-   * @param {number} [spec.m=0.0] - Time hardening exponent (-1.0 < m <= 0)
+   * @param {number} spec.A - Caller-supplied Norton constant
+   * @param {number} spec.n - Caller-supplied stress exponent
+   * @param {number} spec.m - Caller-supplied time exponent (-1.0 < m <= 0)
    * @returns {{ totalCreepStrain: number, creepRateAtEnd: number, timeHistory: Array<Object> }}
-   */
+  */
   static integrateCreepStrain(spec) {
-    const sigma = spec.stressMPa;
-    const totalHours = spec.totalHours;
-    const A = spec.A !== undefined ? spec.A : 1.0e-18;
-    const n = spec.n !== undefined ? spec.n : 5.0;
-    const m = spec.m !== undefined ? spec.m : 0.0;
+    const { stressMPa: sigma, totalHours } = spec || {};
+    const { A, n, m } = spec || {};
+    if (!Number.isFinite(m)) throw new TypeError('Provide the time exponent m explicitly.');
+    this.validateParameters({ stressMPa: sigma, totalHours, A, n, m });
 
-    const dt = spec.dtHours || Math.max(1.0, totalHours / 100);
+    const dt = spec.dtHours !== undefined ? spec.dtHours : Math.max(1.0, totalHours / 100);
+    if (!Number.isFinite(dt) || dt <= 0) throw new TypeError('dtHours must be positive and finite.');
     let t = 0.0;
     let strain = 0.0;
     const timeHistory = [];
@@ -77,9 +77,23 @@ class NortonBaileyCreepSolver {
    * Evaluates Monkman-Grant Creep Rupture Time:
    * t_r = C_MG / (dot_epsilon_min)^p
    */
-  static evaluateRuptureTime(minCreepRatePerHour, C_MG = 0.10, p = 1.0) {
+  static evaluateRuptureTime(minCreepRatePerHour, C_MG, p) {
+    if (!Number.isFinite(minCreepRatePerHour) || minCreepRatePerHour < 0 || !Number.isFinite(C_MG) || C_MG <= 0 || !Number.isFinite(p) || p <= 0) {
+      throw new TypeError('Provide non-negative creep rate and explicit positive Monkman-Grant constants C_MG and p.');
+    }
     if (minCreepRatePerHour <= 0) return Infinity;
     return C_MG / Math.pow(minCreepRatePerHour, p);
+  }
+
+  static validateParameters({ stressMPa, A, n, totalHours, m }) {
+    if (
+      !Number.isFinite(stressMPa) || stressMPa < 0 || !Number.isFinite(A) || A < 0 ||
+      !Number.isFinite(n) || n < 0 ||
+      (totalHours !== undefined && (!Number.isFinite(totalHours) || totalHours <= 0)) ||
+      (m !== undefined && (!Number.isFinite(m) || m <= -1 || m > 0))
+    ) {
+      throw new TypeError('Provide explicit finite stress, A >= 0, n >= 0, positive duration, and -1 < m <= 0 when integrating creep.');
+    }
   }
 }
 

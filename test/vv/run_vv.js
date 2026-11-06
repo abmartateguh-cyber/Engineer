@@ -14,6 +14,9 @@ const { runNafemsLE10 } = require('./nafems/test_nafems_le10');
 const { runNafemsLE11 } = require('./nafems/test_nafems_le11');
 const { runNafemsFV32 } = require('./nafems/test_nafems_fv32');
 const { runNafemsT1 } = require('./nafems/test_nafems_t1');
+const { runHertzContact3D } = require('./references/hertz_contact_reference');
+const { runNistSparseRobustness } = require('./nist_matrix/test_nist_sparse_robustness');
+const { runHanoverBeamDynamicResponse } = require('./references/hanover_beam_dynamic_reference');
 const { runNasaTmrFlatPlate } = require('./nasa_tmr/test_nasa_tmr_flat_plate');
 const { runManufacturedSparseSPD } = require('../../src/core/vv/manufactured_sparse_spd');
 const { runEulerBeamMooseReference } = require('../../src/core/vv/euler_beam_moose_reference');
@@ -22,6 +25,13 @@ const { runTimoshenkoBeamMooseReference } = require('../../src/core/vv/timoshenk
 const { getUnavailableValidationCase } = require('../../src/core/vv/validation_readiness');
 const { runIso10110OpticsTolerance } = require('./optics/test_iso10110_tolerance');
 const { runHertzAnalyticalReference } = require('../../src/core/vv/hertz_analytical');
+const { runElasticityPatch } = require('./analytic/test_elasticity_patch');
+const { runLameCylinder } = require('./analytic/test_lame_cylinder');
+const { runEulerBeamSSFrequencies } = require('./analytic/test_euler_beam_ss_frequencies');
+const { runThermalStressBlock } = require('./analytic/test_thermal_stress_block');
+const { runMmsElasticityHex20 } = require('./analytic/test_mms_elasticity_hex20');
+const { runOdeSpringMassDamper } = require('./analytic/test_ode_spring_mass_damper');
+const { runShellSSSquarePlateDeflection } = require('./analytic/test_shell_ss_square_plate');
 
 function summarizeValidationResults(results) {
   if (!Array.isArray(results)) throw new TypeError('Validation results must be an array.');
@@ -62,13 +72,21 @@ function runVVVerificationBenchmarks(options = {}) {
     runTimoshenkoBeamMooseReference(),
     runEulerBeamMooseReference(),
     runHertzAnalyticalReference(),
-    getUnavailableValidationCase('HERTZ_CONTACT_3D'),
-    getUnavailableValidationCase('NIST_SPARSE_ROBUSTNESS'),
-    getUnavailableValidationCase('HANOVER_BEAM_DYNAMIC_RESPONSE')
+    runHertzContact3D(),
+    runNistSparseRobustness(),
+    runHanoverBeamDynamicResponse()
   ];
 
   results.push(runNafemsLE11());
   results.push(runIso10110OpticsTolerance());
+
+  results.push(runElasticityPatch());
+  results.push(runLameCylinder());
+  results.push(runEulerBeamSSFrequencies());
+  results.push(runThermalStressBlock());
+  results.push(runMmsElasticityHex20());
+  results.push(runOdeSpringMassDamper());
+  results.push(runShellSSSquarePlateDeflection());
 
   const summary = summarizeValidationResults(results);
   for (const result of results) {

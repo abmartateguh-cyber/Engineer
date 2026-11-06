@@ -134,8 +134,14 @@ class GDTEngine {
    * @returns {Object}
    */
   static evaluatePerpendicularity(measuredNormal, datumNormal, faceLengthMm = 100.0, specifiedTolerance = 0.05) {
+    const mNorm = Array.isArray(measuredNormal)
+      ? { x: measuredNormal[0] || 0, y: measuredNormal[1] || 0, z: measuredNormal[2] || 0 }
+      : measuredNormal;
+    const dNorm = Array.isArray(datumNormal)
+      ? { x: datumNormal[0] || 0, y: datumNormal[1] || 0, z: datumNormal[2] || 0 }
+      : datumNormal;
     // For perpendicular faces, dot product normal_face . normal_datum = 0
-    const dot = measuredNormal.x * datumNormal.x + measuredNormal.y * datumNormal.y + measuredNormal.z * datumNormal.z;
+    const dot = mNorm.x * dNorm.x + mNorm.y * dNorm.y + mNorm.z * dNorm.z;
     const angleRad = Math.acos(Math.max(-1.0, Math.min(1.0, Math.abs(dot))));
     const angularDeviationRad = Math.abs(angleRad - Math.PI / 2.0);
 
@@ -152,6 +158,10 @@ class GDTEngine {
     };
   }
 }
+
+GDTEngine.prototype.evaluateTruePosition = function(...args) { return GDTEngine.evaluateTruePosition(...args); };
+GDTEngine.prototype.evaluateProfileOfSurface = function(...args) { return GDTEngine.evaluateProfileOfSurface(...args); };
+GDTEngine.prototype.evaluatePerpendicularity = function(...args) { return GDTEngine.evaluatePerpendicularity(...args); };
 
 module.exports = {
   DatumReferenceFrame,

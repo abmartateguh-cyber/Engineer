@@ -204,10 +204,13 @@
         screwOptions.hexDrive || 2.2,
         material
       );
-      screw.position.set(pos.x, pos.y, pos.z);
-      if (pos.rotX) screw.rotation.x = pos.rotX;
-      if (pos.rotY) screw.rotation.y = pos.rotY;
-      if (pos.rotZ) screw.rotation.z = pos.rotZ;
+      const px = Array.isArray(pos) ? (pos[0] || 0) : (pos.x || 0);
+      const py = Array.isArray(pos) ? (pos[1] || 0) : (pos.y || 0);
+      const pz = Array.isArray(pos) ? (pos[2] || 0) : (pos.z || 0);
+      screw.position.set(px, py, pz);
+      if (pos && pos.rotX) screw.rotation.x = pos.rotX;
+      if (pos && pos.rotY) screw.rotation.y = pos.rotY;
+      if (pos && pos.rotZ) screw.rotation.z = pos.rotZ;
       group.add(screw);
     });
     return group;

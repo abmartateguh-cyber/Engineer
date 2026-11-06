@@ -27,6 +27,112 @@ class OpticalRay {
 
 class NonSequentialTracer {
   /**
+   * Single-interface vector Snell/Fresnel computation.
+   *
+   * @param {Object} incidentDir - unit direction of the incident ray
+   * @param {Object} normal - surface normal (any orientation; it is flipped so it
+   *   points opposite the incident ray when needed)
+   * @param {number} n1 - refractive index of the incident (initial) medium
+   * @param {number} n2 - refractive index of the transmitting medium
+   * @returns {Object} { incidentDir, normalUsed, cosI, sinTheta2, tir,
+   *   reflectedDir, refractedDir (null when TIR), reflectanceR, transmittanceT }
+   */
+  static traceInterface(incidentDir, normal, n1, n2) {
+    if (!incidentDir || !normal) {
+      throw new TypeError('traceInterface requires incidentDir and normal vectors');
+    }
+    for (const v of [incidentDir, normal]) {
+      for (const k of ['x', 'y', 'z']) {
+        if (typeof v[k] !== 'number' || !Number.isFinite(v[k])) {
+          throw new TypeError('traceInterface vectors must have finite x, y, z components');
+        }
+      }
+    }
+    if (!Number.isFinite(n1) || !Number.isFinite(n2) || n1 <= 0 || n2 <= 0) {
+      throw new RangeError('traceInterface requires positive finite refractive indices');
+    }
+
+    const dirLen = Math.hypot(incidentDir.x, incidentDir.y, incidentDir.z);
+    const normLen = Math.hypot(normal.x, normal.y, normal.z);
+    if (dirLen === 0 || normLen === 0) {
+      throw new RangeError('traceInterface requires non-zero incident and normal vectors');
+    }
+    const d = { x: incidentDir.x / dirLen, y: incidentDir.y / dirLen, z: incidentDir.z / dirLen };
+    let n = { x: normal.x / normLen, y: normal.y / normLen, z: normal.z / normLen };
+
+    let cosI = -(d.x * n.x + d.y * n.y + d.z * n.z);
+    let nInc = n1;
+    let nTrans = n2;
+    if (cosI < 0) {
+      cosI = -cosI;
+      n = { x: -n.x, y: -n.y, z: -n.z };
+      const tmp = nInc;
+      nInc = nTrans;
+      nTrans = tmp;
+    }
+
+    const reflectedDir = {
+      x: d.x + 2.0 * cosI * n.x,
+      y: d.y + 2.0 * cosI * n.y,
+      z: d.z + 2.0 * cosI * n.z
+    };
+
+    if (nInc === nTrans) {
+      return {
+        incidentDir: d,
+        normalUsed: n,
+        cosI,
+        sinTheta2: 0,
+        tir: false,
+        reflectedDir,
+        refractedDir: { ...d },
+        reflectanceR: 0,
+        transmittanceT: 1
+      };
+    }
+
+    const eta = nInc / nTrans;
+    const sinT2 = eta * eta * (1.0 - cosI * cosI);
+    if (sinT2 > 1.0) {
+      return {
+        incidentDir: d,
+        normalUsed: n,
+        cosI,
+        sinTheta2: sinT2,
+        tir: true,
+        reflectedDir,
+        refractedDir: null,
+        reflectanceR: 1,
+        transmittanceT: 0
+      };
+    }
+
+    const cosT = Math.sqrt(1.0 - sinT2);
+    const rs = (nInc * cosI - nTrans * cosT) / (nInc * cosI + nTrans * cosT);
+    const rp = (nTrans * cosI - nInc * cosT) / (nTrans * cosI + nInc * cosT);
+    const R = 0.5 * (rs * rs + rp * rp);
+    const T = 1.0 - R;
+
+    const refractedDir = {
+      x: eta * d.x + (eta * cosI - cosT) * n.x,
+      y: eta * d.y + (eta * cosI - cosT) * n.y,
+      z: eta * d.z + (eta * cosI - cosT) * n.z
+    };
+
+    return {
+      incidentDir: d,
+      normalUsed: n,
+      cosI,
+      sinTheta2: sinT2,
+      tir: false,
+      reflectedDir,
+      refractedDir,
+      reflectanceR: R,
+      transmittanceT: T
+    };
+  }
+
+  /**
    * Traces an optical beam through a non-sequential collection of optical surfaces
    * @param {OpticalRay} initialRay
    * @param {Array<Object>} surfaces Array of optical elements with intersectRay(ray) and getNormal(point)
@@ -42,6 +148,7 @@ class NonSequentialTracer {
     const activeRays = [initialRay];
     const completedPaths = [];
     const detectorHits = [];
+    const tirEvents = [];
     let totalRaysTraced = 0;
 
     while (activeRays.length > 0) {
@@ -117,6 +224,15 @@ class NonSequentialTracer {
           y: ray.dir.y + 2.0 * cosI * normY,
           z: ray.dir.z + 2.0 * cosI * normZ
         };
+        tirEvents.push({
+          point: closestHit.point,
+          direction: reflDir,
+          energy: ray.energy,
+          wavelengthNm: ray.wavelengthNm,
+          nIncident: n1,
+          nRefractive: n2,
+          cosI
+        });
         const tirRay = new OpticalRay(closestHit.point, reflDir, ray.energy, ray.wavelengthNm);
         tirRay.generation = ray.generation + 1;
         activeRays.push(tirRay);
@@ -160,8 +276,10 @@ class NonSequentialTracer {
       totalRaysTraced,
       pathsCount: completedPaths.length,
       detectorHitsCount: detectorHits.length,
+      tirEventsCount: tirEvents.length,
       paths: completedPaths,
-      detectorHits
+      detectorHits,
+      tirEvents
     };
   }
 }

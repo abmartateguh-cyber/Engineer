@@ -1,9 +1,17 @@
 'use strict';
 
 /**
- * Experimental Sellmeier calculation helpers with an empty default catalog.
- * Callers may pass explicitly supplied records; this module contains no vendor data.
+ * Sellmeier calculation helpers with a bundled catalog of real optical glasses.
+ *
+ * The real catalog data ships in ./data/optical_glass_catalog_data.js (official
+ * manufacturer datasheet data: SCHOTT, OHARA, Crystran). The no-argument
+ * constructor stays empty for backwards compatibility with fail-closed callers;
+ * use OpticalGlassCatalog.fromBundledData() (or pass the data array) to load the
+ * real catalog. Callers may pass explicitly supplied records, in which case only
+ * those records are registered.
  */
+const OPTICAL_GLASS_CATALOG_DATA = require('./data/optical_glass_catalog_data');
+
 class OpticalGlassCatalog {
   constructor(records = []) {
     if (!Array.isArray(records)) throw new TypeError('Optical material records must be supplied as an array.');
@@ -191,13 +199,17 @@ class OpticalGlassCatalog {
     return candidates.slice(0, maxResults);
   }
 
+  static fromBundledData() {
+    return new OpticalGlassCatalog(OPTICAL_GLASS_CATALOG_DATA);
+  }
+
   get catalogSize() {
     return this.database.size;
   }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { OpticalGlassCatalog };
+  module.exports = { OpticalGlassCatalog, OPTICAL_GLASS_CATALOG_DATA };
 }
 if (typeof window !== 'undefined') {
   window.OpticalGlassCatalog = OpticalGlassCatalog;

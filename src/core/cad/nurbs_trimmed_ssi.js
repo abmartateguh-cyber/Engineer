@@ -1,14 +1,8 @@
 /**
- * OmniEng Trimmed NURBS Surface-to-Surface Intersection (SSI) Engine
- * 
- * Provides experimental Surface-Surface Intersection (SSI) and p-curve trimming
- * algorithms matching Parasolid / ACIS / CATIA geometric modeling kernels:
- * 1. Hierarchical Oriented Bounding Box (OBB) & AABB subdivision for intersection candidate isolation.
- * 2. Marching Newton-Raphson orthogonal tracing for transversal intersection curve generation.
- * 3. 2D Parameter-space p-curves (u(t), v(t)) structuring outer boundary loops and inner hole loops.
- * 4. Surface trimming and boundary representation evaluation.
- * 
- * Experimental implementation; release maturity and provenance are not established.
+ * Experimental Bézier surface sampling, trim-loop point tests, and a coarse
+ * surface-intersection tracing attempt. This helper uses fixed-domain sampling
+ * and bounded stepping; it is not a general NURBS SSI or boundary-representation
+ * kernel and has no independently established geometric accuracy.
  */
 
 'use strict';
@@ -26,7 +20,7 @@ class ParameterCurve2D {
     if (n === 0) return { u: 0, v: 0 };
     if (n === 1) return { u: this.controlPoints[0].u, v: this.controlPoints[0].v };
 
-    let pts = this.controlPoints.map(p => ({ u: p.u, v: p.v }));
+    let pts = this.controlPoints.map((p) => ({ u: p.u, v: p.v }));
     for (let r = 1; r < n; r++) {
       for (let i = 0; i < n - r; i++) {
         pts[i].u = (1 - t) * pts[i].u + t * pts[i + 1].u;
@@ -62,11 +56,12 @@ class TrimLoop2D {
 
     const n = polygon.length;
     for (let i = 0, j = n - 1; i < n; j = i++) {
-      const xi = polygon[i].u, yi = polygon[i].v;
-      const xj = polygon[j].u, yj = polygon[j].v;
+      const xi = polygon[i].u,
+        yi = polygon[i].v;
+      const xj = polygon[j].u,
+        yj = polygon[j].v;
 
-      const intersect = ((yi > v) !== (yj > v)) &&
-                        (u < (xj - xi) * (v - yi) / (yj - yi + 1e-12) + xi);
+      const intersect = yi > v !== yj > v && u < ((xj - xi) * (v - yi)) / (yj - yi + 1e-12) + xi;
       if (intersect) inside = !inside;
     }
     return inside;
@@ -78,9 +73,21 @@ class TrimmedNurbsSurface {
     this.degreeU = surfaceSpec.degreeU || 3;
     this.degreeV = surfaceSpec.degreeV || 3;
     this.controlGrid = surfaceSpec.controlGrid || [
-      [{ x: 0, y: 0, z: 0 }, { x: 50, y: 0, z: 10 }, { x: 100, y: 0, z: 0 }],
-      [{ x: 0, y: 50, z: 15 }, { x: 50, y: 50, z: 40 }, { x: 100, y: 50, z: 15 }],
-      [{ x: 0, y: 100, z: 0 }, { x: 50, y: 100, z: 10 }, { x: 100, y: 100, z: 0 }]
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 50, y: 0, z: 10 },
+        { x: 100, y: 0, z: 0 }
+      ],
+      [
+        { x: 0, y: 50, z: 15 },
+        { x: 50, y: 50, z: 40 },
+        { x: 100, y: 50, z: 15 }
+      ],
+      [
+        { x: 0, y: 100, z: 0 },
+        { x: 50, y: 100, z: 10 },
+        { x: 100, y: 100, z: 0 }
+      ]
     ];
     this.weights = surfaceSpec.weights || null;
     this.outerLoops = [];
@@ -103,7 +110,7 @@ class TrimmedNurbsSurface {
 
     const vPoints = [];
     for (let i = 0; i < nu; i++) {
-      let row = this.controlGrid[i].map(p => ({ x: p.x, y: p.y, z: p.z }));
+      let row = this.controlGrid[i].map((p) => ({ x: p.x, y: p.y, z: p.z }));
       for (let r = 1; r < nv; r++) {
         for (let j = 0; j < nv - r; j++) {
           row[j].x = (1 - v) * row[j].x + v * row[j + 1].x;
@@ -182,18 +189,15 @@ class TrimmedNurbsSurface {
 
 class SurfaceSurfaceIntersectionEngine {
   /**
-   * Computes exact 3D intersection curve between two NURBS surfaces S1 and S2
+   * Attempts to trace candidate intersection points between two surface evaluators.
+   * The result is sample-based and is not an exact or complete intersection curve.
    * @param {TrimmedNurbsSurface} surf1
    * @param {TrimmedNurbsSurface} surf2
    * @param {Object} options
    * @returns {{intersectionFound: boolean, curve3D: Array<Object>, pCurvesS1: Array<Object>, pCurvesS2: Array<Object>}}
    */
   static intersectSurfaces(surf1, surf2, options = {}) {
-    const {
-      tolerance = 1e-4,
-      stepSize = 0.05,
-      gridSamples = 15
-    } = options;
+    const { tolerance = 1e-4, stepSize = 0.05, gridSamples = 15 } = options;
 
     // 1. Initial grid search for starting seed points S1(u1, v1) ~ S2(u2, v2)
     const seedPairs = [];
@@ -210,7 +214,8 @@ class SurfaceSurfaceIntersectionEngine {
             const p2 = surf2.evaluatePoint(u2, v2);
 
             const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
-            if (dist < 5.0) { // Candidate proximity threshold
+            if (dist < 5.0) {
+              // Candidate proximity threshold
               seedPairs.push({ u1, v1, u2, v2, dist });
             }
           }
@@ -226,7 +231,7 @@ class SurfaceSurfaceIntersectionEngine {
     seedPairs.sort((a, b) => a.dist - b.dist);
     const bestSeed = seedPairs[0];
 
-    // 2. Newton-Raphson refinement for exact intersection point
+    // 2. Iterative refinement of one candidate point
     let state = [bestSeed.u1, bestSeed.v1, bestSeed.u2, bestSeed.v2];
     const refinedSeeds = [];
 
@@ -248,10 +253,10 @@ class SurfaceSurfaceIntersectionEngine {
         const tz = d1.normal.x * d2.normal.y - d1.normal.y * d2.normal.x;
 
         // Orthogonal correction step: minimize distance to both surfaces
-        const s1u2 = (d1.dSdu.x * d1.dSdu.x + d1.dSdu.y * d1.dSdu.y + d1.dSdu.z * d1.dSdu.z) || 1.0;
-        const s1v2 = (d1.dSdv.x * d1.dSdv.x + d1.dSdv.y * d1.dSdv.y + d1.dSdv.z * d1.dSdv.z) || 1.0;
-        const s2u2 = (d2.dSdu.x * d2.dSdu.x + d2.dSdu.y * d2.dSdu.y + d2.dSdu.z * d2.dSdu.z) || 1.0;
-        const s2v2 = (d2.dSdv.x * d2.dSdv.x + d2.dSdv.y * d2.dSdv.y + d2.dSdv.z * d2.dSdv.z) || 1.0;
+        const s1u2 = d1.dSdu.x * d1.dSdu.x + d1.dSdu.y * d1.dSdu.y + d1.dSdu.z * d1.dSdu.z || 1.0;
+        const s1v2 = d1.dSdv.x * d1.dSdv.x + d1.dSdv.y * d1.dSdv.y + d1.dSdv.z * d1.dSdv.z || 1.0;
+        const s2u2 = d2.dSdu.x * d2.dSdu.x + d2.dSdu.y * d2.dSdu.y + d2.dSdu.z * d2.dSdu.z || 1.0;
+        const s2v2 = d2.dSdv.x * d2.dSdv.x + d2.dSdv.y * d2.dSdv.y + d2.dSdv.z * d2.dSdv.z || 1.0;
 
         const du1 = -((rx * d1.dSdu.x + ry * d1.dSdu.y + rz * d1.dSdu.z) / s1u2) * 0.5;
         const dv1 = -((rx * d1.dSdv.x + ry * d1.dSdv.y + rz * d1.dSdv.z) / s1v2) * 0.5;
@@ -286,13 +291,15 @@ class SurfaceSurfaceIntersectionEngine {
       let tz = d1.normal.x * d2.normal.y - d1.normal.y * d2.normal.x;
       const tLen = Math.hypot(tx, ty, tz);
       if (tLen < 1e-6) break; // Tangent surfaces
-      tx /= tLen; ty /= tLen; tz /= tLen;
+      tx /= tLen;
+      ty /= tLen;
+      tz /= tLen;
 
       // Step in parameter spaces using metric projection
-      const s1u2 = (d1.dSdu.x * d1.dSdu.x + d1.dSdu.y * d1.dSdu.y + d1.dSdu.z * d1.dSdu.z) || 1.0;
-      const s1v2 = (d1.dSdv.x * d1.dSdv.x + d1.dSdv.y * d1.dSdv.y + d1.dSdv.z * d1.dSdv.z) || 1.0;
-      const s2u2 = (d2.dSdu.x * d2.dSdu.x + d2.dSdu.y * d2.dSdu.y + d2.dSdu.z * d2.dSdu.z) || 1.0;
-      const s2v2 = (d2.dSdv.x * d2.dSdv.x + d2.dSdv.y * d2.dSdv.y + d2.dSdv.z * d2.dSdv.z) || 1.0;
+      const s1u2 = d1.dSdu.x * d1.dSdu.x + d1.dSdu.y * d1.dSdu.y + d1.dSdu.z * d1.dSdu.z || 1.0;
+      const s1v2 = d1.dSdv.x * d1.dSdv.x + d1.dSdv.y * d1.dSdv.y + d1.dSdv.z * d1.dSdv.z || 1.0;
+      const s2u2 = d2.dSdu.x * d2.dSdu.x + d2.dSdu.y * d2.dSdu.y + d2.dSdu.z * d2.dSdu.z || 1.0;
+      const s2v2 = d2.dSdv.x * d2.dSdv.x + d2.dSdv.y * d2.dSdv.y + d2.dSdv.z * d2.dSdv.z || 1.0;
 
       const nextU1 = curState[0] + stepSize * ((tx * d1.dSdu.x + ty * d1.dSdu.y + tz * d1.dSdu.z) / Math.sqrt(s1u2));
       const nextV1 = curState[1] + stepSize * ((tx * d1.dSdv.x + ty * d1.dSdv.y + tz * d1.dSdv.z) / Math.sqrt(s1v2));
@@ -317,6 +324,12 @@ class SurfaceSurfaceIntersectionEngine {
       pCurvesS1,
       pCurvesS2
     };
+  }
+
+  intersectSurfaces(surf1, surf2, options = {}) {
+    const s1 = surf1 instanceof TrimmedNurbsSurface ? surf1 : new TrimmedNurbsSurface(surf1);
+    const s2 = surf2 instanceof TrimmedNurbsSurface ? surf2 : new TrimmedNurbsSurface(surf2);
+    return SurfaceSurfaceIntersectionEngine.intersectSurfaces(s1, s2, options);
   }
 }
 

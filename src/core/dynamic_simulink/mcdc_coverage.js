@@ -24,10 +24,15 @@ class MCDCCoverageAnalyzer {
     }
 
     // Evaluate outcomes of all test vectors
-    const testResults = executedTestVectors.map(vec => ({
-      vector: vec,
-      decision: Boolean(decisionFunc(...vec))
-    }));
+    const testResults = executedTestVectors.map((vec) => {
+      const isArr = Array.isArray(vec);
+      const arr = isArr ? vec : conditionNames.map((name) => Boolean(vec?.[name]));
+      const decision = isArr ? Boolean(decisionFunc(...arr)) : Boolean(decisionFunc(vec));
+      return {
+        vector: arr,
+        decision
+      };
+    });
 
     // Find independence pairs for each condition
     for (let cIdx = 0; cIdx < n; cIdx++) {
@@ -164,7 +169,7 @@ class MCDCCoverageAnalyzer {
     const conditionCovered = new Array(n).fill(false);
 
     // Iteratively pick the pair that introduces the fewest new vectors while covering uncovered conditions
-    while (conditionCovered.some(c => !c)) {
+    while (conditionCovered.some((c) => !c)) {
       let bestPair = null;
       let bestCondition = -1;
       let minCost = 999;
@@ -204,7 +209,7 @@ class MCDCCoverageAnalyzer {
       }
     }
 
-    const testSuite = Array.from(selectedIndices).map(idx => truthTable[idx].vec);
+    const testSuite = Array.from(selectedIndices).map((idx) => truthTable[idx].vec);
     const coverage = this.evaluateMCDCCoverage(conditionNames, decisionFunc, testSuite);
 
     return {
@@ -217,7 +222,7 @@ class MCDCCoverageAnalyzer {
   /** Deprecated compatibility name; returns an experimental coverage diagnostic. */
   static generateDO178CDossier(decisionId, conditionNames, decisionFunc, testSuite) {
     const coverage = this.evaluateMCDCCoverage(conditionNames, decisionFunc, testSuite);
-    
+
     const dossier = {
       dataStatus: 'experimental',
       status: 'diagnostic-only',
@@ -244,6 +249,22 @@ class MCDCCoverageAnalyzer {
     dossier.sha256Seal = hash;
 
     return dossier;
+  }
+
+  generateMinimalANDSuite(nConditions) {
+    return MCDCCoverageAnalyzer.generateMinimalANDSuite(nConditions);
+  }
+
+  generateDO178CDossier(decisionId, conditionNames, decisionFunc, testSuite) {
+    return MCDCCoverageAnalyzer.generateDO178CDossier(decisionId, conditionNames, decisionFunc, testSuite);
+  }
+
+  evaluateMCDCCoverage(conditionNames, decisionFunc, executedTestVectors) {
+    return MCDCCoverageAnalyzer.evaluateMCDCCoverage(conditionNames, decisionFunc, executedTestVectors);
+  }
+
+  generateMCDCTestSuite(conditionNames, decisionFunc) {
+    return MCDCCoverageAnalyzer.generateMCDCTestSuite(conditionNames, decisionFunc);
   }
 }
 

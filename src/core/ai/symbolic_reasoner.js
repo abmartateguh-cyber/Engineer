@@ -8,118 +8,211 @@
 
 'use strict';
 
+const { Quantity, Dimensions, dimensionsEqual } = require('../contracts/Quantity');
+
 /**
- * Physical Dimension representation: [M, L, T, Theta, I]
- * Mass (M), Length (L), Time (T), Temperature (Theta), Electric Current (I)
+ * Physical Dimension representation aligned to canonical 7-element SI vector:
+ * [M, L, T, I, Theta, N, J]
+ * [0] Mass (M) - kg
+ * [1] Length (L) - m
+ * [2] Time (T) - s
+ * [3] Electric Current (I) - A
+ * [4] Thermodynamic Temperature (Theta) - K
+ * [5] Amount of Substance (N) - mol
+ * [6] Luminous Intensity (J) - cd
  */
 class PhysicalDimension {
-  constructor(m = 0, l = 0, t = 0, theta = 0, i = 0) {
-    this.m = m;
-    this.l = l;
-    this.t = t;
-    this.theta = theta;
-    this.i = i;
+  constructor(m = 0, l = 0, t = 0, i = 0, theta = 0, n = 0, j = 0) {
+    if (Array.isArray(m)) {
+      if (m.length === 7) {
+        [m, l, t, i, theta, n, j] = m;
+      } else if (m.length === 5) {
+        // Legacy 5-element [M, L, T, Theta, I] array compatibility
+        const [lm, ll, lt, ltheta, li] = m;
+        m = lm;
+        l = ll;
+        t = lt;
+        i = li;
+        theta = ltheta;
+        n = 0;
+        j = 0;
+      } else {
+        throw new Error(`PhysicalDimension array must have 7 (or legacy 5) elements, got ${m.length}`);
+      }
+    } else if (m && typeof m === 'object') {
+      const obj = m;
+      m = obj.m || 0;
+      l = obj.l || 0;
+      t = obj.t || 0;
+      i = obj.i || 0;
+      theta = obj.theta || 0;
+      n = obj.n || 0;
+      j = obj.j || 0;
+    }
+
+    this.m = Number(m) || 0;
+    this.l = Number(l) || 0;
+    this.t = Number(t) || 0;
+    this.i = Number(i) || 0;
+    this.theta = Number(theta) || 0;
+    this.n = Number(n) || 0;
+    this.j = Number(j) || 0;
+
+    this.vector = Object.freeze([this.m, this.l, this.t, this.i, this.theta, this.n, this.j]);
+    this.dimension = this.vector;
+    this.length = 7;
+    this[0] = this.m;
+    this[1] = this.l;
+    this[2] = this.t;
+    this[3] = this.i;
+    this[4] = this.theta;
+    this[5] = this.n;
+    this[6] = this.j;
+  }
+
+  [Symbol.iterator]() {
+    return this.vector[Symbol.iterator]();
+  }
+
+  toArray() {
+    return [...this.vector];
+  }
+
+  static fromArray(arr) {
+    return new PhysicalDimension(arr);
+  }
+
+  static fromLegacy5(m = 0, l = 0, t = 0, theta = 0, i = 0) {
+    return new PhysicalDimension(m, l, t, i, theta, 0, 0);
   }
 
   static dimensionless() {
-    return new PhysicalDimension(0, 0, 0, 0, 0);
+    return new PhysicalDimension(Dimensions.DIMENSIONLESS);
   }
 
   static mass() {
-    return new PhysicalDimension(1, 0, 0, 0, 0);
+    return new PhysicalDimension(Dimensions.MASS);
   }
 
   static length() {
-    return new PhysicalDimension(0, 1, 0, 0, 0);
+    return new PhysicalDimension(Dimensions.LENGTH);
   }
 
   static time() {
-    return new PhysicalDimension(0, 0, 1, 0, 0);
-  }
-
-  static temperature() {
-    return new PhysicalDimension(0, 0, 0, 1, 0);
+    return new PhysicalDimension(Dimensions.TIME);
   }
 
   static current() {
-    return new PhysicalDimension(0, 0, 0, 0, 1);
+    return new PhysicalDimension(Dimensions.CURRENT);
+  }
+
+  static temperature() {
+    return new PhysicalDimension(Dimensions.TEMPERATURE);
+  }
+
+  static amount() {
+    return new PhysicalDimension(Dimensions.AMOUNT);
+  }
+
+  static luminousIntensity() {
+    return new PhysicalDimension(Dimensions.LUMINOUS_INTENSITY);
+  }
+
+  static area() {
+    return new PhysicalDimension(Dimensions.AREA);
+  }
+
+  static volume() {
+    return new PhysicalDimension(Dimensions.VOLUME);
   }
 
   static force() { // M L T^-2 (Newton)
-    return new PhysicalDimension(1, 1, -2, 0, 0);
+    return new PhysicalDimension(Dimensions.FORCE);
   }
 
   static pressure() { // M L^-1 T^-2 (Pascal)
-    return new PhysicalDimension(1, -1, -2, 0, 0);
+    return new PhysicalDimension(Dimensions.PRESSURE);
   }
 
   static energy() { // M L^2 T^-2 (Joule)
-    return new PhysicalDimension(1, 2, -2, 0, 0);
+    return new PhysicalDimension(Dimensions.ENERGY);
   }
 
   static power() { // M L^2 T^-3 (Watt)
-    return new PhysicalDimension(1, 2, -3, 0, 0);
+    return new PhysicalDimension(Dimensions.POWER);
   }
 
   static velocity() { // L T^-1 (m/s)
-    return new PhysicalDimension(0, 1, -1, 0, 0);
+    return new PhysicalDimension(Dimensions.VELOCITY);
   }
 
   static acceleration() { // L T^-2 (m/s^2)
-    return new PhysicalDimension(0, 1, -2, 0, 0);
+    return new PhysicalDimension(Dimensions.ACCELERATION);
   }
 
   static voltage() { // M L^2 T^-3 I^-1 (Volt)
-    return new PhysicalDimension(1, 2, -3, 0, -1);
+    return new PhysicalDimension(Dimensions.VOLTAGE);
   }
 
   static resistance() { // M L^2 T^-3 I^-2 (Ohm)
-    return new PhysicalDimension(1, 2, -3, 0, -2);
+    return new PhysicalDimension(Dimensions.RESISTANCE);
   }
 
   static capacitance() { // M^-1 L^-2 T^4 I^2 (Farad)
-    return new PhysicalDimension(-1, -2, 4, 0, 2);
+    return new PhysicalDimension(Dimensions.CAPACITANCE);
+  }
+
+  static inductance() { // M L^2 T^-2 I^-2 (Henry)
+    return new PhysicalDimension(Dimensions.INDUCTANCE);
   }
 
   static dynamicViscosity() { // M L^-1 T^-1 (Pa*s)
-    return new PhysicalDimension(1, -1, -1, 0, 0);
+    return new PhysicalDimension(Dimensions.DYNAMIC_VISCOSITY);
   }
 
   static thermalConductivity() { // M L T^-3 Theta^-1 (W/(m*K))
-    return new PhysicalDimension(1, 1, -3, -1, 0);
+    return new PhysicalDimension(1, 1, -3, 0, -1, 0, 0);
   }
 
   add(other) {
-    if (!this.equals(other)) {
-      throw new Error(`Incompatible dimensions for addition: [${this.format()}] vs [${other.format()}]`);
+    const rhs = other instanceof PhysicalDimension ? other : new PhysicalDimension(other);
+    if (!this.equals(rhs)) {
+      throw new Error(`Incompatible dimensions for addition: [${this.format()}] vs [${rhs.format()}]`);
     }
-    return new PhysicalDimension(this.m, this.l, this.t, this.theta, this.i);
+    return new PhysicalDimension(this.m, this.l, this.t, this.i, this.theta, this.n, this.j);
   }
 
   sub(other) {
-    if (!this.equals(other)) {
-      throw new Error(`Incompatible dimensions for subtraction: [${this.format()}] vs [${other.format()}]`);
+    const rhs = other instanceof PhysicalDimension ? other : new PhysicalDimension(other);
+    if (!this.equals(rhs)) {
+      throw new Error(`Incompatible dimensions for subtraction: [${this.format()}] vs [${rhs.format()}]`);
     }
-    return new PhysicalDimension(this.m, this.l, this.t, this.theta, this.i);
+    return new PhysicalDimension(this.m, this.l, this.t, this.i, this.theta, this.n, this.j);
   }
 
   mul(other) {
+    const rhs = other instanceof PhysicalDimension ? other : new PhysicalDimension(other);
     return new PhysicalDimension(
-      this.m + other.m,
-      this.l + other.l,
-      this.t + other.t,
-      this.theta + other.theta,
-      this.i + other.i
+      this.m + rhs.m,
+      this.l + rhs.l,
+      this.t + rhs.t,
+      this.i + rhs.i,
+      this.theta + rhs.theta,
+      this.n + rhs.n,
+      this.j + rhs.j
     );
   }
 
   div(other) {
+    const rhs = other instanceof PhysicalDimension ? other : new PhysicalDimension(other);
     return new PhysicalDimension(
-      this.m - other.m,
-      this.l - other.l,
-      this.t - other.t,
-      this.theta - other.theta,
-      this.i - other.i
+      this.m - rhs.m,
+      this.l - rhs.l,
+      this.t - rhs.t,
+      this.i - rhs.i,
+      this.theta - rhs.theta,
+      this.n - rhs.n,
+      this.j - rhs.j
     );
   }
 
@@ -128,19 +221,31 @@ class PhysicalDimension {
       this.m * power,
       this.l * power,
       this.t * power,
+      this.i * power,
       this.theta * power,
-      this.i * power
+      this.n * power,
+      this.j * power
     );
   }
 
   equals(other) {
+    if (!other) return false;
+    if (Array.isArray(other)) {
+      if (other.length === 7) {
+        return dimensionsEqual(this.vector, other);
+      }
+      const converted = new PhysicalDimension(other);
+      return this.equals(converted);
+    }
     const eps = 1e-6;
     return (
       Math.abs(this.m - other.m) < eps &&
       Math.abs(this.l - other.l) < eps &&
       Math.abs(this.t - other.t) < eps &&
+      Math.abs(this.i - other.i) < eps &&
       Math.abs(this.theta - other.theta) < eps &&
-      Math.abs(this.i - other.i) < eps
+      Math.abs(this.n - (other.n || 0)) < eps &&
+      Math.abs(this.j - (other.j || 0)) < eps
     );
   }
 
@@ -149,8 +254,10 @@ class PhysicalDimension {
     if (this.m !== 0) parts.push(`M^${this.m}`);
     if (this.l !== 0) parts.push(`L^${this.l}`);
     if (this.t !== 0) parts.push(`T^${this.t}`);
-    if (this.theta !== 0) parts.push(`Theta^${this.theta}`);
     if (this.i !== 0) parts.push(`I^${this.i}`);
+    if (this.theta !== 0) parts.push(`Theta^${this.theta}`);
+    if (this.n !== 0) parts.push(`N^${this.n}`);
+    if (this.j !== 0) parts.push(`J^${this.j}`);
     return parts.length > 0 ? parts.join(' ') : 'Dimensionless';
   }
 }
@@ -169,6 +276,12 @@ const UNIT_REGISTRY = {
   nm: { dimension: PhysicalDimension.length(), factor: 1e-9 },
   um: { dimension: PhysicalDimension.length(), factor: 1e-6 },
 
+  // Area & Volume
+  m2: { dimension: PhysicalDimension.area(), factor: 1.0 },
+  mm2: { dimension: PhysicalDimension.area(), factor: 1e-6 },
+  m3: { dimension: PhysicalDimension.volume(), factor: 1.0 },
+  mm3: { dimension: PhysicalDimension.volume(), factor: 1e-9 },
+
   // Mass (M) -> Base: kilogram (kg)
   kg: { dimension: PhysicalDimension.mass(), factor: 1.0 },
   g: { dimension: PhysicalDimension.mass(), factor: 1e-3 },
@@ -182,6 +295,11 @@ const UNIT_REGISTRY = {
   us: { dimension: PhysicalDimension.time(), factor: 1e-6 },
   min: { dimension: PhysicalDimension.time(), factor: 60.0 },
   hr: { dimension: PhysicalDimension.time(), factor: 3600.0 },
+
+  // Temperature (Theta), Amount (N), Luminous Intensity (J)
+  K: { dimension: PhysicalDimension.temperature(), factor: 1.0 },
+  mol: { dimension: PhysicalDimension.amount(), factor: 1.0 },
+  cd: { dimension: PhysicalDimension.luminousIntensity(), factor: 1.0 },
 
   // Force (M L T^-2) -> Base: Newton (N)
   N: { dimension: PhysicalDimension.force(), factor: 1.0 },
@@ -205,10 +323,12 @@ const UNIT_REGISTRY = {
 
   // Acceleration (L T^-2) -> Base: m/s^2
   'm/s^2': { dimension: PhysicalDimension.acceleration(), factor: 1.0 },
+  'm/s2': { dimension: PhysicalDimension.acceleration(), factor: 1.0 },
   g_accel: { dimension: PhysicalDimension.acceleration(), factor: 9.80665 },
 
-  // Energy (M L^2 T^-2) -> Base: Joule (J)
+  // Energy & Torque (M L^2 T^-2) -> Base: Joule (J) / N*m
   J: { dimension: PhysicalDimension.energy(), factor: 1.0 },
+  'N*m': { dimension: PhysicalDimension.energy(), factor: 1.0 },
   kJ: { dimension: PhysicalDimension.energy(), factor: 1e3 },
   Wh: { dimension: PhysicalDimension.energy(), factor: 3600.0 },
   kWh: { dimension: PhysicalDimension.energy(), factor: 3.6e6 },
@@ -219,7 +339,7 @@ const UNIT_REGISTRY = {
   mW: { dimension: PhysicalDimension.power(), factor: 1e-3 },
   hp: { dimension: PhysicalDimension.power(), factor: 745.699872 },
 
-  // Electrical (V, Ohm, F, A)
+  // Electrical (V, Ohm, F, H, A)
   A: { dimension: PhysicalDimension.current(), factor: 1.0 },
   mA: { dimension: PhysicalDimension.current(), factor: 1e-3 },
   uA: { dimension: PhysicalDimension.current(), factor: 1e-6 },
@@ -227,14 +347,19 @@ const UNIT_REGISTRY = {
   mV: { dimension: PhysicalDimension.voltage(), factor: 1e-3 },
   kV: { dimension: PhysicalDimension.voltage(), factor: 1e3 },
   ohm: { dimension: PhysicalDimension.resistance(), factor: 1.0 },
+  Ohm: { dimension: PhysicalDimension.resistance(), factor: 1.0 },
   kohm: { dimension: PhysicalDimension.resistance(), factor: 1e3 },
   Mohm: { dimension: PhysicalDimension.resistance(), factor: 1e6 },
   F: { dimension: PhysicalDimension.capacitance(), factor: 1.0 },
   uF: { dimension: PhysicalDimension.capacitance(), factor: 1e-6 },
   nF: { dimension: PhysicalDimension.capacitance(), factor: 1e-9 },
   pF: { dimension: PhysicalDimension.capacitance(), factor: 1e-12 },
+  H: { dimension: PhysicalDimension.inductance(), factor: 1.0 },
 
   // Dimensionless
+  '': { dimension: PhysicalDimension.dimensionless(), factor: 1.0 },
+  '1': { dimension: PhysicalDimension.dimensionless(), factor: 1.0 },
+  dimensionless: { dimension: PhysicalDimension.dimensionless(), factor: 1.0 },
   rad: { dimension: PhysicalDimension.dimensionless(), factor: 1.0 },
   deg: { dimension: PhysicalDimension.dimensionless(), factor: Math.PI / 180.0 },
   ratio: { dimension: PhysicalDimension.dimensionless(), factor: 1.0 }
@@ -253,11 +378,16 @@ class DimensionalQuantity {
       throw new Error(`Unknown physical unit: '${unit}'`);
     }
     this.dimension = unitInfo.dimension;
+    this.dimensionVector = this.dimension.vector;
     this.factor = unitInfo.factor;
   }
 
   toBase() {
     return this.magnitude * this.factor;
+  }
+
+  toQuantity() {
+    return new Quantity(this.toBase(), this.unit, this.dimension.toArray());
   }
 
   convertTo(targetUnit) {
@@ -734,6 +864,10 @@ class SymbolicReasoner {
 
   parseIntent(promptText) {
     return this.lexer.parse(promptText);
+  }
+
+  reason(promptText) {
+    return this.parseIntent(promptText);
   }
 
   /**

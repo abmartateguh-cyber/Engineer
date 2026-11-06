@@ -73,7 +73,8 @@ function runCheck() {
     'optics_ipc.js',
     'plant_ipc.js',
     'controls_ipc.js',
-    'system_ipc.js'
+    'system_ipc.js',
+    'hpc_ipc.js'
   ];
 
   const registeredChannels = new Set();

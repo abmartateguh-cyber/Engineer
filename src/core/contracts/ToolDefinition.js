@@ -6,9 +6,9 @@ const { OmniError, OmniErrorCode } = require('./OmniError');
  * Approval classifications for Stenographer tool proposals.
  */
 const ToolApprovalClass = Object.freeze({
-  READ_ONLY: 'READ_ONLY',               // May run automatically without prompt
+  READ_ONLY: 'READ_ONLY', // May run automatically without prompt
   MUTATION_PREVIEW: 'MUTATION_PREVIEW', // Modifies project model or canvas; requires user preview & confirm
-  COMPUTE_JOB: 'COMPUTE_JOB',           // Spawns heavy compute job; requires budget confirmation
+  COMPUTE_JOB: 'COMPUTE_JOB', // Spawns heavy compute job; requires budget confirmation
   EXPORT_OVERWRITE: 'EXPORT_OVERWRITE', // Modifies files or exports; requires file path confirmation
   SECURITY_SENSITIVE: 'SECURITY_SENSITIVE' // Accesses credentials or external networks; strictly requires approval
 });
@@ -55,25 +55,45 @@ class ToolDefinition {
     Object.freeze(this);
   }
 
-  get name() { return this._name; }
-  get description() { return this._description; }
-  get approvalClass() { return this._approvalClass; }
-  get parametersSchema() { return this._parametersSchema; }
-  get modifiesState() { return this._modifiesState; }
-  get estimatedDurationMs() { return this._estimatedDurationMs; }
+  get name() {
+    return this._name;
+  }
+  get description() {
+    return this._description;
+  }
+  get approvalClass() {
+    return this._approvalClass;
+  }
+  get parametersSchema() {
+    return this._parametersSchema;
+  }
+  get modifiesState() {
+    return this._modifiesState;
+  }
+  get estimatedDurationMs() {
+    return this._estimatedDurationMs;
+  }
 
   isReadOnly() {
     return this._approvalClass === ToolApprovalClass.READ_ONLY && !this._modifiesState;
   }
 
-  createProposal(args = {}, reasoning = '', expectedMutations = []) {
+  createProposal(
+    args = {},
+    reasoning = '',
+    expectedMutations = [],
+    originatingProjectRevision,
+    originatingProjectId = null
+  ) {
     const { ToolProposal } = require('./ToolProposal');
     return new ToolProposal({
       toolName: this._name,
       args,
       reasoning,
       expectedMutations,
-      approvalClass: this._approvalClass
+      approvalClass: this._approvalClass,
+      originatingProjectRevision,
+      originatingProjectId
     });
   }
 

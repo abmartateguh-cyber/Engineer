@@ -133,6 +133,7 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
     C: [0.00600069867, 0.0200179144, 103.560653],
     dndTPerK: 0.000003
   };
+  const { dndTPerK: _omittedDndTPerK, ...customGlassWithoutThermoOptic } = customGlassRecord;
   const indexReq = new JobRequest({
     domain: 'optics',
     operation: 'calculate_refractive_index',
@@ -191,7 +192,7 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
     domain: 'optics',
     operation: 'calculate_refractive_index',
     parameters: {
-      customGlassRecord: { ...customGlassRecord, dndTPerK: undefined },
+      customGlassRecord: customGlassWithoutThermoOptic,
       wavelengthUm: 0.58756,
       temperatureC: 60.0
     }
@@ -206,7 +207,7 @@ const { JobStatus } = require('../src/core/contracts/JobResult');
     domain: 'optics',
     operation: 'calculate_refractive_index',
     parameters: {
-      customGlassRecord: { ...customGlassRecord, referenceTemperatureC: 25.0, dndTPerK: undefined },
+      customGlassRecord: { ...customGlassWithoutThermoOptic, referenceTemperatureC: 25.0 },
       wavelengthUm: 0.58756,
       temperatureC: 25.0
     }

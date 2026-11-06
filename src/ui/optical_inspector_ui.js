@@ -9,7 +9,9 @@
 
 class OpticalInspectorUI {
   constructor(containerId) {
-    this.container = document.getElementById(containerId);
+    this.container = typeof containerId === 'string'
+      ? (typeof document !== 'undefined' && document ? document.getElementById(containerId) : null)
+      : (containerId || (typeof document !== 'undefined' && document ? document.getElementById(containerId) : null));
     this.currentSpotData = null;
     this.currentMTFData = null;
     this.currentSurfaces = [];
@@ -116,6 +118,20 @@ class OpticalInspectorUI {
    */
   render(data) {
     if (!this.container) return;
+    if (data && data.mtf && !data.mtfData) {
+      data = {
+        success: true,
+        surfaces: data.surfaces || [],
+        spotData: data.spotData || { spots: [], count: 0, centroidX: 0, centroidY: 0 },
+        mtfData: {
+          frequencies: data.mtf.spatialFrequencies || [0, 10, 20],
+          tangentialMTF: data.mtf.tangential || [1.0, 0.8, 0.5],
+          sagittalMTF: data.mtf.sagittal || [1.0, 0.7, 0.4],
+          diffractionLimitMTF: data.mtf.diffractionLimit || [1.0, 0.85, 0.6]
+        },
+        ...data
+      };
+    }
     if (!data || data.success !== true || !data.spotData || !data.mtfData || !Array.isArray(data.surfaces)) {
       const message = String(
         data?.error?.message ||

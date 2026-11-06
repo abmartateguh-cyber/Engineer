@@ -21,16 +21,21 @@ class ShellMITC4Element {
    * @param {number} properties.thickness - Shell thickness t (m)
    * @param {number} properties.E - Young's modulus (Pa)
    * @param {number} properties.nu - Poisson's ratio
-   * @param {number} [properties.density=7850] - Density kg/m^3
-   */
-  constructor(id, nodeIndices, nodeCoords, properties = {}) {
+ */
+  constructor(id, nodeIndices, nodeCoords, properties) {
+    if (
+      !properties || typeof properties !== 'object' ||
+      ![properties.thickness, properties.E, properties.nu].every(Number.isFinite) ||
+      properties.thickness <= 0 || properties.E <= 0 || properties.nu <= -1 || properties.nu >= 0.5
+    ) {
+      throw new TypeError('Provide explicit thickness in metres, E in pascals, and -1 < nu < 0.5.');
+    }
     this.id = id;
     this.nodes = nodeIndices;
     this.coords = nodeCoords; // 4 nodes in local plane
-    this.t = properties.thickness || 0.005;
-    this.E = properties.E || 2.1e11;
-    this.nu = properties.nu || 0.3;
-    this.rho = properties.density || 7850.0;
+    this.t = properties.thickness;
+    this.E = properties.E;
+    this.nu = properties.nu;
 
     // Constitutive matrices for membrane, bending, and transverse shear
     this.setupConstitutiveMatrices();

@@ -1,0 +1,324 @@
+{
+  "schemaVersion": "1.0.0",
+  "description": "Candidate analytical and published-reference targets for experimental diagnostics; source artifacts and independent review are pending.",
+  "benchmarks": {
+    "NAFEMS_LE1": {
+      "id": "NAFEMS_LE1",
+      "domain": "cae",
+      "title": "NAFEMS LE1 Elliptic Membrane Outward Pressure",
+      "source": "NAFEMS Standard Benchmarks (1990), Test LE1 — Plane Stress Elliptic Membrane",
+      "inputs": {
+        "youngsModulusPa": 210000000000,
+        "poissonRatio": 0.3,
+        "thicknessM": 0.1,
+        "innerSemiAxesM": [2.0, 1.0],
+        "outerSemiAxesM": [3.25, 2.75],
+        "outwardPressurePa": 10000000
+      },
+      "metric": "tangentialStressPointDMpa",
+      "units": "MPa",
+      "targetValue": 92.7,
+      "relativeTolerance": 0.035
+    },
+    "NAFEMS_LE10": {
+      "id": "NAFEMS_LE10",
+      "domain": "cae",
+      "title": "NAFEMS LE10 Thick Plate Pressure (3D HEX20 Continuum)",
+      "source": "NAFEMS Standard Benchmarks (1990), Test LE10 — Thick Elliptic Plate Under Normal Pressure",
+      "inputs": {
+        "youngsModulusPa": 210000000000,
+        "poissonRatio": 0.3,
+        "thicknessM": 0.6,
+        "topPressureMpa": 1.0,
+        "innerSemiAxesM": [2.0, 1.0],
+        "outerSemiAxesM": [3.25, 2.75]
+      },
+      "metric": "sigmaYYPointDMpa",
+      "units": "MPa",
+      "targetValue": -5.38,
+      "relativeTolerance": 0.05
+    },
+    "NAFEMS_LE11": {
+      "id": "NAFEMS_LE11",
+      "domain": "cae",
+      "title": "NAFEMS LE11 Solid Cylinder/Taper/Sphere Temperature Gradient",
+      "source": "NAFEMS Standard Benchmarks (1990), Test LE11 — Thermoelastic Solid Cylinder/Taper/Sphere",
+      "inputs": {
+        "youngsModulusPa": 210000000000,
+        "poissonRatio": 0.3,
+        "thermalExpansionPerK": 0.00023,
+        "neckRadiusM": 1.0,
+        "neckElevationM": 1.0
+      },
+      "metric": "axialStressPointAMpa",
+      "units": "MPa",
+      "targetValue": -105.0,
+      "relativeTolerance": 0.05
+    },
+    "NAFEMS_FV32": {
+      "id": "NAFEMS_FV32",
+      "domain": "cae",
+      "title": "NAFEMS FV32 Cantilevered Tapered Membrane Fundamental Frequency",
+      "source": "NAFEMS Free Vibration Benchmarks (1990), Test FV32 — In-Plane Vibration of Cantilevered Tapered Membrane",
+      "inputs": {
+        "lengthM": 10.0,
+        "rootHeightM": 5.0,
+        "tipHeightM": 1.0,
+        "thicknessM": 0.05,
+        "youngsModulusPa": 200000000000,
+        "poissonRatio": 0.3,
+        "densityKgM3": 8000.0
+      },
+      "metric": "fundamentalFrequencyHz",
+      "units": "Hz",
+      "targetValue": 44.623,
+      "relativeTolerance": 0.03
+    },
+    "NAFEMS_T1": {
+      "id": "NAFEMS_T1",
+      "domain": "cae",
+      "title": "NAFEMS T1 2D Membrane Heat Conduction",
+      "source": "NAFEMS Thermal Benchmarks (1989), Test T1 — 2D Steady/Transient Heat Transfer",
+      "inputs": {
+        "widthM": 0.6,
+        "heightM": 1.0,
+        "conductivityWPerMK": 52.0,
+        "bottomTempC": 100.0,
+        "sideTopTempC": 0.0,
+        "probePointM": [0.6, 0.2]
+      },
+      "metric": "probeTemperatureC",
+      "units": "degC",
+      "targetValue": 36.6,
+      "relativeTolerance": 0.025
+    },
+    "NASA_TMR_FLAT_PLATE": {
+      "id": "NASA_TMR_FLAT_PLATE",
+      "domain": "cfd",
+      "title": "NASA Langley TMR 2D Zero-Pressure-Gradient Turbulent Flat Plate (Re_L = 5e6)",
+      "source": "NASA Langley Turbulence Modeling Resource (CFL3D/FUN3D & Karman-Schoenherr ZPG Flat Plate, M=0.2, Re_L=5e6)",
+      "inputs": {
+        "mach": 0.2,
+        "reynoldsPerMeter": 5000000,
+        "stationXM": 1.0
+      },
+      "metric": "skinFrictionCoefficientCf",
+      "units": "1",
+      "targetValue": 0.002752,
+      "secondaryTarget": {
+        "metric": "momentumThicknessReynoldsReTheta",
+        "targetValue": 8247.0,
+        "relativeTolerance": 0.04
+      },
+      "relativeTolerance": 0.04
+    },
+    "NASA_TMR_CORRELATION_DIAGNOSTIC": {
+      "id": "NASA_TMR_CORRELATION_DIAGNOSTIC",
+      "domain": "cfd",
+      "title": "Analytic NASA TMR correlation integration diagnostic (no flow solver comparison)",
+      "source": "Bundled NASA TMR Karman-Schoenherr table; this diagnostic integrates the momentum correlation and does not run CFD",
+      "inputs": {
+        "mach": 0.2,
+        "reynoldsPerMeter": 5000000,
+        "stationXM": 1.0
+      },
+      "metric": "skinFrictionCoefficientCf",
+      "units": "1",
+      "targetValue": 0.002752,
+      "secondaryTarget": {
+        "metric": "momentumThicknessReynoldsReTheta",
+        "targetValue": 8247.0,
+        "relativeTolerance": 0.04
+      },
+      "relativeTolerance": 0.04
+    },
+    "HERTZ_AXISYMMETRIC_CONTACT_DIAGNOSTIC": {
+      "id": "HERTZ_AXISYMMETRIC_CONTACT_DIAGNOSTIC",
+      "domain": "cae",
+      "title": "Axisymmetric Hertz-contact discretization diagnostic (not a 3D contact FEA case)",
+      "source": "Hertz (1882) closed-form equations are used for comparison; no external contact measurement data is bundled",
+      "inputs": {
+        "radius1M": 0.05,
+        "radius2M": 1e30,
+        "normalLoadN": 1000.0,
+        "youngsModulus1Pa": 210000000000,
+        "poissonRatio1": 0.3,
+        "youngsModulus2Pa": 210000000000,
+        "poissonRatio2": 0.3
+      },
+      "metric": "maxContactPressureMpa",
+      "units": "MPa",
+      "targetValue": 1012.01285469509,
+      "secondaryTarget": {
+        "metric": "contactRadiusMm",
+        "targetValue": 0.686828545531995,
+        "relativeTolerance": 0.02
+      },
+      "relativeTolerance": 0.02
+    },
+    "SPARSE_SPD_GENERATED_SUITE": {
+      "id": "SPARSE_SPD_GENERATED_SUITE",
+      "domain": "math",
+      "title": "Generated sparse SPD and Poisson manufactured diagnostics (not the NIST archive)",
+      "source": "Generated SPD systems and a Poisson manufactured solution; no original NIST sparse matrix archive is used",
+      "inputs": {
+        "poissonInteriorGridN": 31,
+        "spdDimensionN": 256,
+        "spdBandwidth": 6
+      },
+      "metric": "centerPointSolution",
+      "units": "1",
+      "targetValue": 1.0,
+      "maxL2Error": 0.005,
+      "maxRelativeResidual": 1e-11,
+      "relativeTolerance": 0.005
+    },
+    "CANTILEVER_BEAM_ANALYTIC_DIAGNOSTIC": {
+      "id": "CANTILEVER_BEAM_ANALYTIC_DIAGNOSTIC",
+      "domain": "cae",
+      "title": "Synthetic Timoshenko cantilever static/modal/PSD diagnostic (not Hannover data)",
+      "source": "Timoshenko beam formulation and analytic input assumptions; no Hannover measurement file or calibration is used",
+      "inputs": {
+        "lengthM": 1.0,
+        "widthM": 0.1,
+        "heightM": 0.1,
+        "youngsModulusPa": 210000000000,
+        "poissonRatio": 0.3,
+        "densityKgM3": 7850.0,
+        "shearCorrectionFactor": 0.8333333333333334,
+        "tipLoadN": 1000.0,
+        "dampingRatio": 0.05,
+        "psdLevelG2Hz": 0.04
+      },
+      "metric": "timoshenkoTipDeflectionM",
+      "units": "m",
+      "targetValue": 0.00019196190476190476,
+      "secondaryTarget": {
+        "metric": "fundamentalFrequencyHz",
+        "targetValue": 82.06,
+        "relativeTolerance": 0.03
+      },
+      "relativeTolerance": 0.01
+    },
+    "OPTICAL_PSF_PARAXIAL_DIAGNOSTIC": {
+      "id": "OPTICAL_PSF_PARAXIAL_DIAGNOSTIC",
+      "domain": "optics",
+      "title": "Analytic optical PSF/MTF and synthetic paraxial tolerance helper diagnostic (not ISO 10110 qualification)",
+      "source": "Analytic Airy-diffraction and paraxial formulas; no ISO 10110 tolerance catalog or conformance data is used",
+      "inputs": {
+        "wavelengthUm": 0.55,
+        "fNumber": 2.8,
+        "gridSize": 64,
+        "lensRadius1Mm": 51.68,
+        "refractiveIndex": 1.5168
+      },
+      "metric": "airyRadiusUm",
+      "units": "um",
+      "targetValue": 1.8788,
+      "secondaryTarget": {
+        "metric": "midFrequencyMtf",
+        "targetValue": 0.391002,
+        "relativeTolerance": 0.01
+      },
+      "relativeTolerance": 0.005
+    },
+    "HERTZ_CONTACT_3D": {
+      "id": "HERTZ_CONTACT_3D",
+      "domain": "cae",
+      "title": "Named 3D sphere-on-flat contact reference candidate (unavailable)",
+      "source": "Johnson, K. L. (1985), Contact Mechanics, Cambridge University Press, Chapter 4; no external result artifact is bundled",
+      "status": "unavailable",
+      "reason": "The current product route returns a closed-form estimate; the separate axisymmetric discretization diagnostic is not a 3D contact FEA solve.",
+      "inputs": {
+        "radius1M": 0.05,
+        "radius2M": 1e30,
+        "normalLoadN": 1000.0,
+        "youngsModulus1Pa": 210000000000,
+        "poissonRatio1": 0.3,
+        "youngsModulus2Pa": 210000000000,
+        "poissonRatio2": 0.3
+      },
+      "metric": "maxContactPressureMpa",
+      "units": "MPa",
+      "targetValue": 1012.01285469509,
+      "secondaryTarget": {
+        "metric": "contactRadiusMm",
+        "targetValue": 0.686828545531995,
+        "relativeTolerance": 0.02
+      },
+      "relativeTolerance": 0.02
+    },
+    "NIST_SPARSE_ROBUSTNESS": {
+      "id": "NIST_SPARSE_ROBUSTNESS",
+      "domain": "math",
+      "title": "NIST sparse archive reference candidate (unavailable)",
+      "source": "The exact NIST archive/source version has not been identified or bundled; Roache and Davis are numerical-method references, not archive provenance",
+      "status": "unavailable",
+      "reason": "No original NIST matrix data is bundled. SPARSE_SPD_GENERATED_SUITE is a separate generated diagnostic and is not a NIST run.",
+      "inputs": {
+        "poissonInteriorGridN": 31,
+        "spdDimensionN": 256,
+        "spdBandwidth": 6
+      },
+      "metric": "centerPointSolution",
+      "units": "1",
+      "targetValue": 1.0,
+      "maxL2Error": 0.005,
+      "maxRelativeResidual": 1e-11,
+      "relativeTolerance": 0.005
+    },
+    "HANOVER_BEAM_DYNAMIC_RESPONSE": {
+      "id": "HANOVER_BEAM_DYNAMIC_RESPONSE",
+      "domain": "cae",
+      "title": "Hannover laboratory beam response reference candidate (unavailable)",
+      "source": "Dataset DOI 10.25835/lyav246d; external measurements are recorded in validation_readiness.js but are not loaded or used by this candidate spec",
+      "status": "unavailable",
+      "reason": "The cantilever analytic diagnostic is a separate test and does not use Hannover measurement data.",
+      "inputs": {
+        "lengthM": 1.0,
+        "widthM": 0.1,
+        "heightM": 0.1,
+        "youngsModulusPa": 210000000000,
+        "poissonRatio": 0.3,
+        "densityKgM3": 7850.0,
+        "shearCorrectionFactor": 0.8333333333333334,
+        "tipLoadN": 1000.0,
+        "dampingRatio": 0.05,
+        "psdLevelG2Hz": 0.04
+      },
+      "metric": "timoshenkoTipDeflectionM",
+      "units": "m",
+      "targetValue": 0.00019196190476190476,
+      "secondaryTarget": {
+        "metric": "fundamentalFrequencyHz",
+        "targetValue": 82.06,
+        "relativeTolerance": 0.03
+      },
+      "relativeTolerance": 0.01
+    },
+    "ISO_10110_OPTICS_TOLERANCE": {
+      "id": "ISO_10110_OPTICS_TOLERANCE",
+      "domain": "optics",
+      "title": "ISO 10110 tolerance reference candidate (unavailable)",
+      "source": "ISO 10110-5 is referenced as a candidate standard; standard text, tolerance data, catalog rights, and applicability are not reviewed",
+      "status": "unavailable",
+      "reason": "OPTICAL_PSF_PARAXIAL_DIAGNOSTIC and PLATE_THICKNESS_OPD_ANALYTIC are formula diagnostics, not ISO 10110 conformance cases.",
+      "inputs": {
+        "wavelengthUm": 0.55,
+        "fNumber": 2.8,
+        "gridSize": 64,
+        "lensRadius1Mm": 51.68,
+        "refractiveIndex": 1.5168
+      },
+      "metric": "airyRadiusUm",
+      "units": "um",
+      "targetValue": 1.8788,
+      "secondaryTarget": {
+        "metric": "midFrequencyMtf",
+        "targetValue": 0.391002,
+        "relativeTolerance": 0.01
+      },
+      "relativeTolerance": 0.005
+    }
+  }
+}

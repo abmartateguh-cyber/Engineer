@@ -30,6 +30,10 @@ const { FeatureTree, ParametricFeature } = require('../src/core/cad/feature_tree
 // 3. CAE
 const { J2Plasticity } = require('../src/core/cae/nonlinear_plasticity');
 const { JohnsonCookFracture } = require('../src/core/cae/johnson_cook_fracture');
+const {
+  SYNTHETIC_J2_MATERIAL,
+  SYNTHETIC_JOHNSON_COOK_MATERIAL
+} = require('./support/synthetic_cae_materials');
 const { PenaltyContact } = require('../src/core/cae/penalty_contact');
 const { DropTestSimulator } = require('../src/core/cae/drop_test');
 
@@ -75,9 +79,9 @@ console.log('================================================================');
 console.log('   OmniEng Experimental Feature Smoke Suite     ');
 console.log('================================================================\n');
 
-test('Coverage gate enforces its 75% loaded-source function floor', () => {
-  assert.strictEqual(evaluateFunctionCoverageGate(75, 100).passed, true);
-  assert.strictEqual(evaluateFunctionCoverageGate(74, 100).passed, false);
+test('Coverage gate enforces its 85% loaded-source function floor', () => {
+  assert.strictEqual(evaluateFunctionCoverageGate(85, 100).passed, true);
+  assert.strictEqual(evaluateFunctionCoverageGate(84, 100).passed, false);
   assert.strictEqual(evaluateFunctionCoverageGate(0, 0).passed, false);
   assert.throws(() => evaluateFunctionCoverageGate(101, 100), RangeError);
 });
@@ -375,44 +379,46 @@ test('CSGSolid: 3D BSP constructive solid geometry Boolean Union and Difference'
 // ----------------------------------------------------------------
 console.log('\n3. Structural dynamics and contact smoke examples:');
 
-test('J2Plasticity: 3D von Mises radial return mapping algorithm on Al7075-T6 & SS316L', () => {
-  const al7075 = J2Plasticity.MATERIALS['Al7075-T6'];
-  assert(al7075 && al7075.yieldStressMPa === 503.0);
+test('J2Plasticity: 3D von Mises radial return mapping with caller-supplied synthetic properties', () => {
+  const material = SYNTHETIC_J2_MATERIAL;
+  assert(material && material.yieldStressMPa === 250);
+  assert.throws(() => J2Plasticity.radialReturnMapping([1, 0, 0, 0, 0, 0], 0), /explicit material properties/);
 
-  // Elastic state below yield: sigma_x = 300 MPa
-  const elasticStress = [300e6, 0, 0, 0, 0, 0];
-  const elasticRes = J2Plasticity.radialReturnMapping(elasticStress, 0.0, 'Al7075-T6');
+  // Stress vectors are explicitly in MPa for this synthetic example.
+  const elasticStress = [100, 0, 0, 0, 0, 0];
+  const elasticRes = J2Plasticity.radialReturnMapping(elasticStress, 0.0, material);
   assert.strictEqual(elasticRes.isPlastic, false);
   assert.strictEqual(elasticRes.dPlasticStrain, 0.0);
-  assert(Math.abs(elasticRes.vonMisesStressMPa - 300.0) < 0.1);
+  assert(Math.abs(elasticRes.vonMisesStressMPa - 100.0) < 0.1);
 
-  // Plastic state above yield: sigma_x = 700 MPa (yield is 503 MPa)
-  const plasticStress = [700e6, 0, 0, 0, 0, 0];
-  const plasticRes = J2Plasticity.radialReturnMapping(plasticStress, 0.0, 'Al7075-T6');
+  // Plastic state above the synthetic 250 MPa yield input.
+  const plasticStress = [400, 0, 0, 0, 0, 0];
+  const plasticRes = J2Plasticity.radialReturnMapping(plasticStress, 0.0, material);
   assert.strictEqual(plasticRes.isPlastic, true);
   assert(plasticRes.dPlasticStrain > 0.0);
   // Stress must be mapped back to the yield surface with hardening
-  const expectedYieldWithHardening = 503.0 + al7075.hardeningModulusMPa * plasticRes.plasticStrain;
+  const expectedYieldWithHardening = material.yieldStressMPa + material.hardeningModulusMPa * plasticRes.plasticStrain;
   assert(
     Math.abs(plasticRes.vonMisesStressMPa - expectedYieldWithHardening) < 1.0,
     `Mapped stress (${plasticRes.vonMisesStressMPa} MPa) must equal hardened yield (${expectedYieldWithHardening} MPa)`
   );
 });
 
-test('JohnsonCookFracture: Triaxiality-dependent failure strain and cumulative element erosion', () => {
-  const alParam = JohnsonCookFracture.PARAMETERS['Al7075-T6'];
-  assert(alParam.A === 546.0);
+test('JohnsonCookFracture: caller-supplied synthetic constants drive failure strain and damage', () => {
+  const material = SYNTHETIC_JOHNSON_COOK_MATERIAL;
+  assert(material.A === 250);
+  assert.throws(() => JohnsonCookFracture.computeFailureStrain(0.3, 1, 300), /constants explicitly/);
 
   // Low triaxiality (compression/shear) vs High triaxiality (notched tension)
-  const eps_low = JohnsonCookFracture.computeFailureStrain(0.33, 1.0, 293.0, 'Al7075-T6');
-  const eps_high = JohnsonCookFracture.computeFailureStrain(1.5, 1.0, 293.0, 'Al7075-T6');
+  const eps_low = JohnsonCookFracture.computeFailureStrain(0.33, 1.0, 300.0, material);
+  const eps_high = JohnsonCookFracture.computeFailureStrain(1.5, 1.0, 300.0, material);
   assert(eps_high < eps_low, `High triaxiality tension must fail at lower strain: ${eps_high} < ${eps_low}`);
 
   // Damage accumulation loop until failure
   let D = 0.0;
   const dEps = 0.05;
   for (let i = 0; i < 20; i++) {
-    const dD = JohnsonCookFracture.computeDamageIncrement(dEps, 0.33, 10.0, 300.0, 'Al7075-T6');
+    const dD = JohnsonCookFracture.computeDamageIncrement(dEps, 0.33, 10.0, 300.0, material);
     D += dD;
   }
   assert(D > 0.5, `Expected substantial damage accumulation, got D=${D}`);

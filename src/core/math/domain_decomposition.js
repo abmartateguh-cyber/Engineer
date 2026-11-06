@@ -1,12 +1,7 @@
 /**
- * OmniEng Parallel Domain Decomposition & Mesh Graph Partitioning Engine
- * 
- * Implements high-performance graph partitioning and substructuring for distributed HPC:
- * 1. Dual-graph construction from 3D tetrahedral/hexahedral FEA meshes or CFD cell grids.
- * 2. Recursive Coordinate Bisection (RCB) and Kernighan-Lin edge cut optimization (Experimental workflow related to METIS / Scotch).
- * 3. Schur Complement Substructuring:
- *    S_gamma = K_gamma,gamma - sum_p (K_gamma,I^(p) * [K_I,I^(p)]^-1 * K_I,gamma^(p))
- * 4. Enables out-of-core and multi-threaded parallel solves across distributed HPC worker nodes.
+ * Experimental in-memory recursive coordinate bisection (RCB) of element centroids.
+ * It reports shared interface nodes and load counts; it does not optimize graph cuts,
+ * form Schur complements, or run distributed solves.
  * 
  * Experimental implementation; release maturity and provenance are not established.
  */
@@ -15,14 +10,14 @@
 
 class DomainDecompositionEngine {
   /**
-   * Partitions an unstructured 3D mesh into P balanced subdomains with minimal edge cuts.
+   * Partitions element centroids into P groups using recursive median splits.
    * 
    * @param {Array<{x: number, y: number, z: number}>} nodes - Array of 3D node coordinates
    * @param {Array<number[]>} elements - Array of element connectivity arrays (node indices)
    * @param {number} [numPartitions=2] - Number of target subdomains P (power of 2 or arbitrary integer)
    * @returns {{
    *   subdomains: Array<{ id: number, elementIndices: number[], nodeIndices: number[], interfaceNodeIndices: number[] }>,
-   *   cutEdgesCount: number,
+   *   sharedNodePartitionIncidences: number,
    *   interfaceNodes: number[],
    *   loadImbalanceRatio: number
    * }}
@@ -37,7 +32,7 @@ class DomainDecompositionEngine {
           nodeIndices: allNodes,
           interfaceNodeIndices: []
         }],
-        cutEdgesCount: 0,
+        sharedNodePartitionIncidences: 0,
         interfaceNodes: [],
         loadImbalanceRatio: 1.0
       };
@@ -134,12 +129,12 @@ class DomainDecompositionEngine {
 
     // 4. Identify interface cut nodes (nodes shared by > 1 subdomain)
     const globalInterfaceNodes = new Set();
-    let cutEdgesCount = 0;
+    let sharedNodePartitionIncidences = 0;
 
     for (const [nIdx, subSet] of nodeSubdomainMap.entries()) {
       if (subSet.size > 1) {
         globalInterfaceNodes.add(nIdx);
-        cutEdgesCount += (subSet.size - 1);
+        sharedNodePartitionIncidences += (subSet.size - 1);
         for (const pIdx of subSet) {
           subdomains[pIdx].interfaceNodeIndices.push(nIdx);
         }
@@ -154,15 +149,14 @@ class DomainDecompositionEngine {
 
     return {
       subdomains,
-      cutEdgesCount,
+      sharedNodePartitionIncidences,
       interfaceNodes: Array.from(globalInterfaceNodes).sort((a, b) => a - b),
       loadImbalanceRatio: Number(loadImbalanceRatio.toFixed(3))
     };
   }
 
   /**
-   * Constructs Schur Complement sub-matrices for interface reduction.
-   * S_gamma = K_gamma,gamma - sum_p (K_gamma,I * K_I,I^-1 * K_I,gamma)
+   * Counts internal and interface degrees of freedom; no Schur matrix is assembled.
    * 
    * @param {Object} partition
    * @param {number} totalNodes
@@ -181,8 +175,7 @@ class DomainDecompositionEngine {
     return {
       internalDofsCount: totalInternalDofs,
       interfaceDofsCount: interfaceDofs,
-      schurDimension: interfaceDofs,
-      parallelEfficiencyFactor: partition.loadImbalanceRatio <= 1.2 ? 0.95 : 0.85
+      schurDimension: interfaceDofs
     };
   }
 }

@@ -17,13 +17,15 @@
     <script src="vendor/three.min.js"></script>
     <!-- Native Precision Vector Iconography System -->
     <script src="ui/icons.js"></script>
+    <!-- Web Workstation Universal IPC Bridge Polyfill -->
+    <script src="ui/browser_ipc_bridge.js"></script>
   </head>
   <body class="app-shell">
     <!-- 1. Top Bar Region -->
     <header class="topbar app-header" role="banner">
       <div class="topbar-brand brand-section">
         <div class="topbar-logo logo-badge"><span class="logo-mark">O</span> OMNIENG</div>
-        <span class="sr-only">Universal Engineering Engine</span>
+        <span class="sr-only">Experimental Engineering Workbench</span>
       </div>
 
       <!-- Segmented Studio Switcher -->
@@ -310,7 +312,7 @@
           class="btn icon-btn ribbon-btn"
           id="ribbon-btn-undo"
           data-studio-cat="common"
-          title="Undo last change (Ctrl+Z)"
+          title="Undo unavailable: project command history is not connected"
           aria-label="Undo last change"
           disabled
         >
@@ -320,7 +322,7 @@
           class="btn icon-btn ribbon-btn"
           id="ribbon-btn-redo"
           data-studio-cat="common"
-          title="Redo change (Ctrl+Y)"
+          title="Redo unavailable: project command history is not connected"
           aria-label="Redo change"
           disabled
         >
@@ -506,6 +508,14 @@
             <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-pfd" data-studio-cat="oilgas">
               <span class="icon-slot" data-omni-icon="flowsheet"></span> Experimental Plant Flowsheet
             </button>
+            <button
+              class="tools-menu-item ribbon-btn action-btn"
+              id="ribbon-btn-pid"
+              data-studio-cat="oilgas"
+              title="Generate P&ID"
+            >
+              <span class="icon-slot" data-omni-icon="piping"></span> P&ID
+            </button>
             <button class="tools-menu-item ribbon-btn action-btn" id="ribbon-btn-asme" data-studio-cat="oilgas">
               <span class="icon-slot" data-omni-icon="asme"></span> Experimental Stress Screen
             </button>
@@ -618,11 +628,11 @@
         <div class="viewport-mode-tabs" role="tablist" aria-label="Active Canvas Mode">
           <button class="v-mode-btn active" id="btn-view-3d">3D CAD / CAE</button>
           <button class="v-mode-btn" id="btn-view-diagram">Block Diagram</button>
-          <button class="v-mode-btn" id="btn-view-eda">Illustrative IC</button>
+          <button class="v-mode-btn" id="btn-view-eda">IC / EDA</button>
           <button class="v-mode-btn" id="btn-view-pcb">PCB</button>
-          <button class="v-mode-btn" id="btn-view-pid">Illustrative P&ID</button>
-          <button class="v-mode-btn" id="btn-view-vle">VLE — Unavailable</button>
-          <button class="v-mode-btn" id="btn-view-tray">Column Profile — Unavailable</button>
+          <button class="v-mode-btn" id="btn-view-pid" title="Process & Instrumentation Diagram (P&ID)">P&ID</button>
+          <button class="v-mode-btn" id="btn-view-vle">VLE</button>
+          <button class="v-mode-btn" id="btn-view-tray">Column Profile</button>
         </div>
 
         <!-- Global Solver Asynchronous Progress Bar -->
@@ -749,8 +759,119 @@
               Experimental estimate only; no solver frames loaded.
             </div>
           </div>
+
+          <!-- Floating Viewport HUD Capsule (Stage 2) -->
+          <div
+            class="viewport-hud-capsule"
+            id="viewport-hud-capsule"
+            role="toolbar"
+            aria-label="Viewport Display Tools"
+          >
+            <button
+              type="button"
+              class="hud-capsule-btn active"
+              data-hud-action="shaded"
+              title="Shaded solid geometry"
+              aria-label="Shaded solid geometry"
+            >
+              <span class="icon-slot" data-omni-icon="solid" aria-hidden="true"></span>
+              <span class="hud-capsule-label">Shaded</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="wireframe"
+              title="Wireframe mesh overlay"
+              aria-label="Wireframe mesh overlay"
+            >
+              <span class="icon-slot" data-omni-icon="wireframe" aria-hidden="true"></span>
+              <span class="hud-capsule-label">Wireframe</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="xray"
+              title="Transparent internal X-Ray"
+              aria-label="Transparent internal X-Ray"
+            >
+              <span class="icon-slot" data-omni-icon="xray" aria-hidden="true"></span>
+              <span class="hud-capsule-label">X-Ray</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="fea-stress-map"
+              title="FEA stress map overlay"
+              aria-label="FEA stress map overlay"
+            >
+              <span class="icon-slot" data-omni-icon="fea" aria-hidden="true"></span>
+              <span class="hud-capsule-label">FEA Stress Map</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="section-cut"
+              title="Section cut plane"
+              aria-label="Section cut plane"
+            >
+              <span class="icon-slot" data-omni-icon="clip" aria-hidden="true"></span>
+              <span class="hud-capsule-label">Section Cut</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="caliper-measure"
+              title="3D caliper measurement"
+              aria-label="3D caliper measurement"
+            >
+              <span class="icon-slot" data-omni-icon="caliper" aria-hidden="true"></span>
+              <span class="hud-capsule-label">Caliper Measure</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="isometric"
+              title="Isometric view"
+              aria-label="Isometric view"
+            >
+              <span class="icon-slot" data-omni-icon="camIso" aria-hidden="true"></span>
+              <span class="hud-capsule-label">Isometric</span>
+            </button>
+            <button
+              type="button"
+              class="hud-capsule-btn"
+              data-hud-action="fit-to-view"
+              title="Fit model to view"
+              aria-label="Fit model to view"
+            >
+              <span class="icon-slot" data-omni-icon="camReset" aria-hidden="true"></span>
+              <span class="hud-capsule-label">Fit to View</span>
+            </button>
+          </div>
+
+          <!-- Translucent ViewCube Wrapper (Stage 2) -->
+          <div class="viewcube-wrapper" id="viewcube-wrapper" role="group" aria-label="3D ViewCube Orientation">
+            <div class="viewcube-cube" id="viewcube-cube" title="ViewCube Orientation">
+              <span class="viewcube-face viewcube-face-x" data-viewaxis="x">X</span>
+              <span class="viewcube-face viewcube-face-y" data-viewaxis="y">Y</span>
+              <span class="viewcube-face viewcube-face-z" data-viewaxis="z">Z</span>
+            </div>
+            <div class="viewcube-triad" aria-hidden="true">
+              <span class="viewcube-axis viewcube-axis-r">R</span>
+              <span class="viewcube-axis viewcube-axis-g">G</span>
+              <span class="viewcube-axis viewcube-axis-b">B</span>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Row 3.5: Experimental Capability Panels -->
+      <section class="experimental-capability-panels" id="experimental-capability-panels">
+        <div class="experimental-panel" id="panel-materials-catalog"></div>
+        <div class="experimental-panel" id="panel-optics-glass-lookup"></div>
+        <div class="experimental-panel" id="panel-ai-surrogate-trainer"></div>
+        <div class="experimental-panel" id="panel-hpc-local-dispatch"></div>
+      </section>
 
       <!-- Row 4: Bottom OmniAI Co-Pilot Panel -->
       <footer class="ai-copilot-panel" id="ai-copilot-dock">
@@ -814,6 +935,61 @@
           <button class="ai-send-btn" id="ai-send-btn">Execute Action</button>
         </div>
       </footer>
+
+      <!-- Row 5: Collapsible Multi-Tab Diagnostics Console (Stage 2) -->
+      <section class="diagnostics-console" id="diagnostics-console" aria-label="Engineering Diagnostics Console">
+        <div class="diagnostics-header" id="diagnostics-header">
+          <button type="button" class="diagnostics-toggle-btn" aria-expanded="false" title="Toggle Diagnostics Console">
+            <span class="icon-slot" data-omni-icon="chevronUp" aria-hidden="true"></span>
+            <span>Diagnostics</span>
+          </button>
+          <div class="diagnostics-tabs" role="tablist" aria-label="Diagnostics Console Tabs">
+            <button
+              type="button"
+              class="diagnostics-tab active"
+              role="tab"
+              aria-selected="true"
+              data-console-tab="system-log"
+            >
+              System Log
+            </button>
+            <button
+              type="button"
+              class="diagnostics-tab"
+              role="tab"
+              aria-selected="false"
+              data-console-tab="solver-telemetry"
+            >
+              Solver Telemetry
+            </button>
+            <button
+              type="button"
+              class="diagnostics-tab"
+              role="tab"
+              aria-selected="false"
+              data-console-tab="vv-evidence"
+            >
+              V&amp;V Evidence
+            </button>
+            <button
+              type="button"
+              class="diagnostics-tab"
+              role="tab"
+              aria-selected="false"
+              data-console-tab="omni-ai-assistant"
+            >
+              OmniAI Assistant
+            </button>
+          </div>
+          <span class="diagnostics-status-chip" id="diagnostics-status-chip">idle</span>
+        </div>
+        <div class="diagnostics-body" id="diagnostics-body" hidden>
+          <div class="diagnostics-pane" id="pane-system-log" data-console-pane="system-log"></div>
+          <div class="diagnostics-pane" id="pane-solver-telemetry" data-console-pane="solver-telemetry" hidden></div>
+          <div class="diagnostics-pane" id="pane-vv-evidence" data-console-pane="vv-evidence" hidden></div>
+          <div class="diagnostics-pane" id="pane-omni-ai-assistant" data-console-pane="omni-ai-assistant" hidden></div>
+        </div>
+      </section>
     </main>
 
     <!-- 6. Right Inspector -->
@@ -871,6 +1047,15 @@
         >
           <span id="status-maturity-label" style="color: var(--warn)">Maturity: experimental</span>
         </span>
+        <span
+          class="status-badge"
+          id="stenographer-status-badge"
+          role="status"
+          title="Checking local audit status"
+          style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--fg-3)"
+        >
+          <span id="stenographer-ledger-state">Audit: checking</span>
+        </span>
         <span style="font-size: 10px; color: var(--fg-3)">Render FPS: unavailable</span>
         <span style="font-size: 10px; color: var(--fg-3)"
           >Precision: <span style="color: var(--accent); font-family: var(--font-mono)">IEEE 754 Float64</span></span
@@ -880,6 +1065,46 @@
         <span style="font-size: 10px; color: var(--fg-3)"
           >Coord: <strong style="color: var(--fg-1)">Z-Up (ISO 10303)</strong></span
         >
+        <div
+          class="job-monitor"
+          id="job-monitor"
+          style="display: none; align-items: center; gap: 6px; font-size: 10px; margin-left: 8px"
+        >
+          <span class="job-spinner" id="job-spinner" style="color: var(--accent)">●</span>
+          <span id="job-name-label" style="color: var(--fg-1); font-weight: 500">Idle</span>
+          <div
+            class="job-progress-bar-track"
+            style="
+              width: 70px;
+              height: 4px;
+              background: var(--surface-3);
+              border-radius: 2px;
+              overflow: hidden;
+              display: inline-block;
+            "
+          >
+            <div
+              id="job-progress-bar-fill"
+              style="width: 0%; height: 100%; background: var(--accent); transition: width 0.2s ease"
+            ></div>
+          </div>
+          <span id="job-percent-label" style="color: var(--fg-2); font-family: var(--font-mono)">0%</span>
+          <button
+            id="btn-cancel-active-job"
+            title="Cancel current compute job"
+            style="
+              padding: 1px 6px;
+              font-size: 9px;
+              border-radius: 3px;
+              background: var(--surface-3);
+              border: 1px solid var(--line);
+              color: var(--warn);
+              cursor: pointer;
+            "
+          >
+            Cancel
+          </button>
+        </div>
       </div>
       <div class="status-bar-right">
         <label
@@ -1084,6 +1309,21 @@
         </div>
         <div class="modal-body" id="flowsheet-pfd-body">
           <!-- Rendered by FlowsheetPfdUI -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Experimental P&ID studio -->
+    <div class="modal-overlay" id="modal-pid-studio">
+      <div class="modal-card" style="width: 1040px; max-height: 92vh">
+        <div class="modal-header">
+          <div class="modal-title">
+            <span class="icon-slot" data-omni-icon="piping"></span> P&ID Studio — Oil &amp; Gas
+          </div>
+          <button class="modal-close-btn" id="btn-close-pid-studio">&times;</button>
+        </div>
+        <div class="modal-body" id="pid-studio-body">
+          <!-- Rendered by PIDStudioUI -->
         </div>
       </div>
     </div>
@@ -2061,6 +2301,15 @@
             </div>
           </div>
 
+          <!-- Spacecraft specification availability filter -->
+          <div class="palette-filter-bar" id="nasa-ship-filter-bar">
+            <button class="palette-filter-chip active" data-ship-tab="overview">Overview</button>
+            <button class="palette-filter-chip" data-ship-tab="propulsion">Propulsion</button>
+            <button class="palette-filter-chip" data-ship-tab="avionics">Avionics</button>
+            <button class="palette-filter-chip" data-ship-tab="thermal">Thermal</button>
+            <button class="palette-filter-chip" data-ship-tab="eclss">ECLSS</button>
+          </div>
+
           <!-- Availability details are repeated here after the modal is opened. -->
           <div id="nasa-ship-tab-content" style="display: flex; flex-direction: column; gap: 12px">
             <!-- Dynamically populated by app.js renderNasaShipSpecTab() -->
@@ -2117,7 +2366,7 @@
           <button class="palette-filter-chip" data-category="optics">Optics</button>
           <button class="palette-filter-chip" data-category="eda">EDA / Silicon</button>
           <button class="palette-filter-chip" data-category="plant">Plant / Process</button>
-          <button class="palette-filter-chip" data-category="compliance">Compliance</button>
+          <button class="palette-filter-chip" data-category="compliance">Evidence &amp; Project Tools</button>
         </div>
         <div class="command-palette-results" id="command-palette-results">
           <!-- Dynamically populated by app.js -->
@@ -2203,12 +2452,17 @@
     <script src="ui/optical_inspector_ui.js"></script>
     <script src="ui/spice_oscilloscope_ui.js"></script>
     <script src="ui/flowsheet_pfd_ui.js"></script>
+    <script src="ui/pid_studio_ui.js"></script>
     <script src="ui/keymap_manager.js"></script>
     <script src="ui/docking_manager.js"></script>
     <script src="ui/safe_dom.js"></script>
     <script src="ui/bode_chart_model.js"></script>
     <script src="ui/eda_result_view.js"></script>
     <script src="ui/engineering_result_view.js"></script>
+    <script src="ui/materials_catalog_view.js"></script>
+    <script src="ui/optics_glass_lookup_view.js"></script>
+    <script src="ui/ai_surrogate_trainer_view.js"></script>
+    <script src="ui/hpc_local_dispatch_view.js"></script>
     <script src="ui/workspace_tab_view.js"></script>
     <script src="ui/command_palette_view.js"></script>
     <script src="ui/property_grid_view.js"></script>

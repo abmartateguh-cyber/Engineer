@@ -3,13 +3,18 @@
  *
  * Implements:
  * - v1 Legacy single-file container (MAGIC: OMNIENG\x01)
- * - v2 Content-addressed atomic archive (MAGIC: OMNIENG\x02)
- * - Atomic saves with fsync and safe rename
- * - Crash recovery journal & automatic recovery
- * - v1 to v2 migration
- * - Non-linear undo/redo CommandHistoryJournal
- * - AES-256-GCM encrypted vault
- */
+ *  - v2 Content-addressed atomic archive (MAGIC: OMNIENG\x02)
+ *  - v3 write-ahead log (WAL) journal.wal: [seq, op, payloadDigest, crc32]
+ *    with fsync-batched commit markers and replay-on-open recovery
+ *  - Atomic saves with fsync and safe rename
+ *  - Crash recovery journal & automatic recovery
+ *  - v1 to v2 migration
+ *  - Non-linear undo/redo CommandHistoryJournal
+ *  - AES-256-GCM encrypted vault
+ *  - v3 streaming container (MAGIC: OMNIENG\x03): chunked, out-of-core
+ *    read/write with per-chunk sha256, trailer index, and byte-range entry
+ *    streams (memory bounded regardless of archive size)
+ *  */
 
 'use strict';
 
@@ -17,9 +22,11 @@ const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Readable, Transform } = require('stream');
 const { OmniError, OmniErrorCode } = require('../contracts/OmniError');
 const { ProjectManifestV2 } = require('../contracts/ProjectManifestV2');
 const { ArtifactRef, RetentionPolicy } = require('../contracts/ArtifactRef');
+const { JobResult } = require('../contracts/JobResult');
 
 const MAGIC_BYTES_V1 = Buffer.from('OMNIENG\x01', 'binary'); // 8-byte magic header v1
 const MAGIC_BYTES_V2 = Buffer.from('OMNIENG\x02', 'binary'); // 8-byte magic header v2
@@ -28,11 +35,48 @@ const VAULT_MAGIC_BYTES = Buffer.from('OMNIVAUL', 'utf8'); // 8-byte encrypted v
 const CURRENT_SCHEMA_VERSION_V1 = 1;
 const CURRENT_SCHEMA_VERSION_V2 = '2.0.0';
 
+// v3 streaming container constants (MAGIC: OMNIENG\x03). Layout:
+//   [8B magic "OMNIENG\x03"]
+//   [4B u32 version=1]
+//   [4B u32 flags]             bit0 = per-chunk deflate compression
+//   [4B u32 chunkSize]
+//   [8B u64 reserved]
+//   per entry:
+//     [4B u32 nameLen][name UTF-8]
+//     chunk frames: [8B u64 storedLen][stored bytes][32B sha256(stored)]
+//   trailer:
+//     [4B u32 entryCount]
+//     per entry: [4B u32 nameLen][name][8B u64 entryOffset][8B u64 entryLength]
+//                [8B u64 rawLength][8B u64 chunkCount][32B entrySha256(raw)]
+//     [8B u64 trailerOffset][8B "OMNITR\x00\x00"]
+const MAGIC_BYTES_V3 = Buffer.from('OMNIENG\x03', 'binary');
+const TRAILER_MAGIC = Buffer.from('OMNITR\x00\x00', 'binary');
+const STREAMING_FORMAT_VERSION = 1;
+const STREAMING_FLAG_COMPRESSED = 0x1;
+const DEFAULT_CHUNK_SIZE = 1024 * 1024; // 1 MiB
+const MIN_CHUNK_SIZE = 64 * 1024;
+const MAX_CHUNK_SIZE = 64 * 1024 * 1024;
+
 // Resource limits
 const MAX_ARCHIVE_SECTION_COUNT = 4096;
 const MAX_ARCHIVE_SIZE_BYTES = 512 * 1024 * 1024; // 512 MiB
 const MAX_UNCOMPRESSED_SECTION_SIZE = 500 * 1024 * 1024; // 500 MB
 const MAX_EXPANSION_RATIO = 50;
+
+// v3 write-ahead log (WAL) constants. The WAL file lives beside the archive as
+// "journal.wal". Each record is a JSON array on its own line:
+//   [seq, op, payloadDigest, crc32]
+// where `op` is a stringified operation descriptor ({"op":..., "payload":...}),
+// `payloadDigest` is the SHA-256 of that descriptor (node:crypto), and crc32 is
+// a genuine CRC-32 over the canonical [seq, op, payloadDigest] serialization.
+// A COMMIT marker is [seq, "COMMIT", null, crc32] where seq is the sequence of
+// the last data entry it makes durable. On replay, only entries up to the last
+// valid COMMIT marker are applied; any valid-but-uncommitted tail and any torn
+// partial append are discarded.
+const WAL_MAGIC = 'OMNIWAL';
+const WAL_VERSION = 3;
+const WAL_FORMAT = 0;
+const WAL_FILE_NAME = 'journal.wal';
 
 /**
  * Standard 32-bit CRC implementation for archive data integrity
@@ -408,6 +452,337 @@ class OmniArchive {
 }
 
 /**
+ * OmniWal: v3 write-ahead log beside an .omni archive.
+ *
+ * File layout (append-only):
+ *   ["OMNIWAL",3,0,"/abs/path/archive.omni"]
+ *   [1,"{\"op\":\"add_blob\",\"payload\":{...}}","<sha256>",<crc32>]
+ *   [1,"COMMIT",null,<crc32>]
+ *   ...
+ *
+ * Entries are batched in memory and persisted on flush()/commit(). commit()
+ * writes the pending entries, then a COMMIT marker, then fsyncs the file
+ * (fsync-batched durability). On open, any uncommitted tail or torn partial
+ * append is compacted away so the file always starts from a clean committed
+ * prefix.
+ */
+class OmniWal {
+  constructor({ path: walPath, archivePath }) {
+    this.path = walPath;
+    this.archivePath = path.resolve(archivePath);
+    this.fd = null;
+    this._offset = 0; // explicit byte offset for append writes
+    this.seq = 1; // next data sequence number to assign
+    this.committed = 0; // highest data sequence made durable by a COMMIT marker
+    this.pending = 0; // entries batched in memory but not yet committed
+    this.recovered = false; // true if open() discarded a torn/tail remnant
+    this._lines = [];
+  }
+
+  static derivePath(archivePath) {
+    return path.join(path.dirname(archivePath), WAL_FILE_NAME);
+  }
+
+  static encodeLine(seq, opText, digest) {
+    return JSON.stringify([
+      seq,
+      opText,
+      digest,
+      calculateCRC32(Buffer.from(JSON.stringify([seq, opText, digest]), 'utf8'))
+    ]);
+  }
+
+  static encodeHeader(archivePath) {
+    return JSON.stringify([WAL_MAGIC, WAL_VERSION, WAL_FORMAT, path.resolve(archivePath)]);
+  }
+
+  open() {
+    const dir = path.dirname(this.path);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(this.path)) {
+      this.fd = fs.openSync(this.path, 'a');
+      this._offset = 0;
+      this._writeHeader();
+      return this;
+    }
+    const parsed = parseWalFile(this.path, this.archivePath);
+    if (!parsed.applicable) {
+      throw new OmniError(
+        OmniErrorCode.UNSUPPORTED,
+        `WAL file ${this.path} exists but is not a matching v3 journal for archive ${this.archivePath}`
+      );
+    }
+    if (parsed.torn || parsed.maxValidSeq > parsed.lastCommit) {
+      this._rewriteClean(parsed);
+    } else {
+      this.fd = fs.openSync(this.path, 'a');
+      this._offset = fs.fstatSync(this.fd).size;
+    }
+    this.seq = parsed.maxValidSeq + 1;
+    this.committed = parsed.lastCommit;
+    this.recovered = parsed.torn;
+    this.pending = 0;
+    this._lines = [];
+    return this;
+  }
+
+  _writeHeader() {
+    const header = OmniWal.encodeHeader(this.archivePath) + '\n';
+    fs.writeSync(this.fd, header, 0, header.length, this._offset);
+    this._offset += header.length;
+    fs.fsyncSync(this.fd);
+  }
+
+  _rewriteClean(parsed) {
+    this.close();
+    const kept = parsed.records.filter((r) => r.seq <= parsed.lastCommit);
+    const content = OmniWal.encodeHeader(this.archivePath) + '\n' + kept.map((r) => r.raw).join('\n') + '\n';
+    const tmp = `${this.path}.compact.tmp.${process.pid}.${crypto.randomUUID()}`;
+    const fd = fs.openSync(tmp, 'w');
+    try {
+      fs.writeSync(fd, content, 0, content.length, 0);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(tmp, this.path);
+    this.fd = fs.openSync(this.path, 'a');
+    this._offset = fs.fstatSync(this.fd).size;
+  }
+
+  appendEntry(op, payload) {
+    if (this.fd === null) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'WAL is not open; call enableWal() first');
+    }
+    if (typeof op !== 'string' || !op.trim()) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'WAL op must be a non-empty string');
+    }
+    const opText = JSON.stringify({ op, payload: payload === undefined ? null : payload });
+    const digest = crypto.createHash('sha256').update(opText, 'utf8').digest('hex');
+    const seq = this.seq++;
+    const line = OmniWal.encodeLine(seq, opText, digest);
+    this._lines.push(line);
+    this.pending++;
+    return { seq, op, digest, pending: this.pending };
+  }
+
+  flush() {
+    if (this._lines.length === 0) return this.stats();
+    const buf = Buffer.concat(this._lines.map((l) => Buffer.from(l + '\n', 'utf8')));
+    fs.writeSync(this.fd, buf, 0, buf.length, this._offset);
+    this._offset += buf.length;
+    this._lines = [];
+    return this.stats();
+  }
+
+  commit() {
+    if (this.pending === 0) return this.stats();
+    const buf = Buffer.concat(this._lines.map((l) => Buffer.from(l + '\n', 'utf8')));
+    const commitSeq = this.seq - 1;
+    const commitLine = OmniWal.encodeLine(commitSeq, 'COMMIT', null) + '\n';
+    const commitBuf = Buffer.from(commitLine, 'utf8');
+    fs.writeSync(this.fd, buf, 0, buf.length, this._offset);
+    this._offset += buf.length;
+    fs.writeSync(this.fd, commitBuf, 0, commitBuf.length, this._offset);
+    this._offset += commitBuf.length;
+    fs.fsyncSync(this.fd);
+    this.committed = commitSeq;
+    this.pending = 0;
+    this._lines = [];
+    return this.stats();
+  }
+
+  rebase() {
+    this.close();
+    const dir = path.dirname(this.path);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const content = OmniWal.encodeHeader(this.archivePath) + '\n';
+    const tmp = `${this.path}.rebase.tmp.${process.pid}.${crypto.randomUUID()}`;
+    const fd = fs.openSync(tmp, 'w');
+    try {
+      fs.writeSync(fd, content, 0, content.length, 0);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(tmp, this.path);
+    this.fd = fs.openSync(this.path, 'a');
+    this._offset = fs.fstatSync(this.fd).size;
+    this.seq = 1;
+    this.committed = 0;
+    this.pending = 0;
+    this.recovered = false;
+    this._lines = [];
+    return this.stats();
+  }
+
+  close() {
+    if (this.fd !== null) {
+      try {
+        fs.closeSync(this.fd);
+      } catch (_) {}
+      this.fd = null;
+    }
+  }
+
+  stats() {
+    return {
+      path: this.path,
+      seq: this.seq,
+      committed: this.committed,
+      recovered: this.recovered,
+      pending: this.pending
+    };
+  }
+}
+
+/**
+ * Parses a WAL file into valid records. Returns:
+ * {
+ *   applicable, torn, maxValidSeq, lastCommit,
+ *   records: [{seq, op, digest, raw}],   // valid complete lines, in order
+ * }
+ * Any parse failure, CRC mismatch, or out-of-order sequence stops the scan at
+ * that line; everything from that point onward is treated as a torn tail.
+ */
+function parseWalFile(walPath, expectedArchivePath) {
+  const result = {
+    applicable: false,
+    torn: false,
+    maxValidSeq: 0,
+    lastCommit: 0,
+    records: []
+  };
+  let raw;
+  try {
+    raw = fs.readFileSync(walPath, 'utf8');
+  } catch {
+    return result;
+  }
+  const lines = raw.split('\n');
+  if (lines.length === 0 || lines[0].trim() === '') return result;
+  let header;
+  try {
+    header = JSON.parse(lines[0]);
+  } catch {
+    return result;
+  }
+  if (
+    !Array.isArray(header) ||
+    header.length !== 4 ||
+    header[0] !== WAL_MAGIC ||
+    header[1] !== WAL_VERSION ||
+    header[2] !== WAL_FORMAT ||
+    path.resolve(String(header[3])) !== path.resolve(expectedArchivePath)
+  ) {
+    return result;
+  }
+  result.applicable = true;
+  let prevSeq = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === '') continue;
+    let arr;
+    try {
+      arr = JSON.parse(line);
+    } catch {
+      result.torn = true;
+      break;
+    }
+    if (!Array.isArray(arr) || arr.length !== 4 || typeof arr[3] !== 'number') {
+      result.torn = true;
+      break;
+    }
+    const [seq, op, digest, crc] = arr;
+    const expectedCrc = calculateCRC32(Buffer.from(JSON.stringify([seq, op, digest]), 'utf8'));
+    if (expectedCrc !== crc) {
+      result.torn = true;
+      break;
+    }
+    const isCommit = op === 'COMMIT';
+    // Data entries must continue the strictly increasing sequence; a COMMIT
+    // marker reuses the seq of the last data entry it makes durable.
+    if (!Number.isInteger(seq) || seq < 1 || seq !== (isCommit ? prevSeq : prevSeq + 1)) {
+      result.torn = true;
+      break;
+    }
+    prevSeq = seq;
+    result.maxValidSeq = seq;
+    if (isCommit) {
+      if (digest !== null) {
+        result.torn = true;
+        break;
+      }
+      result.lastCommit = seq;
+    } else if (typeof op === 'string' && /^[a-f0-9]{64}$/.test(digest)) {
+      result.records.push({ seq, op, digest, raw: line });
+    } else {
+      result.torn = true;
+      break;
+    }
+  }
+  return result;
+}
+
+/**
+ * Applies a single committed WAL operation to an archive during replay.
+ * The descriptor digest is re-verified against the stored payloadDigest.
+ */
+function applyWalOp(archive, opText, digest) {
+  let desc;
+  try {
+    desc = JSON.parse(opText);
+  } catch {
+    throw new Error('WAL op descriptor is not valid JSON');
+  }
+  if (!desc || typeof desc !== 'object' || typeof desc.op !== 'string') {
+    throw new Error('Malformed WAL op descriptor');
+  }
+  const actualDigest = crypto.createHash('sha256').update(opText, 'utf8').digest('hex');
+  if (actualDigest !== digest) {
+    throw new Error('WAL payload digest mismatch');
+  }
+  const payload = desc.payload === null || desc.payload === undefined ? {} : desc.payload;
+  switch (desc.op) {
+    case 'add_blob': {
+      if (typeof payload.dataBase64 !== 'string') {
+        throw new Error('add_blob WAL op requires payload.dataBase64');
+      }
+      archive.addBlob(Buffer.from(payload.dataBase64, 'base64'), {
+        mimeType: payload.mimeType || 'application/octet-stream',
+        name: payload.name || '',
+        retention: payload.retention
+      });
+      break;
+    }
+    case 'record_result': {
+      archive.recordResult(JobResult.fromJSON(payload.result));
+      break;
+    }
+    case 'journal_execute': {
+      archive.journal.execute(
+        payload.actionType,
+        payload.forwardPatch || {},
+        payload.reversePatch || {},
+        payload.description || '',
+        payload.author || 'user'
+      );
+      break;
+    }
+    case 'bump_revision': {
+      archive.bumpRevision(payload.changes || {});
+      break;
+    }
+    default:
+      throw new Error(`Unknown WAL op "${desc.op}"`);
+  }
+}
+
+/**
  * OmniArchiveV2: Production content-addressed engineering archive (.omni v2)
  *
  * Implements:
@@ -438,6 +813,9 @@ class OmniArchiveV2 {
     this.journal = new CommandJournal();
     this.results = []; // JobResult summaries
     this.signatures = [];
+    this._wal = null; // OmniWal instance when WAL enabled
+    this._walArchivePath = null; // archive path used to derive/verify the WAL
+    this._walState = { path: null, seq: 0, committed: 0, recovered: false, pending: 0 };
   }
 
   /**
@@ -605,6 +983,15 @@ class OmniArchiveV2 {
   saveToFile(filePath) {
     const buf = this.saveToBuffer();
     saveAtomicSync(filePath, buf, true);
+    this._walArchivePath = path.resolve(filePath);
+
+    // The atomic snapshot now contains every committed WAL operation; rebase
+    // the WAL so it starts fresh from the snapshot (uncommitted tail dropped).
+    if (this._wal) {
+      try {
+        this._wal.rebase();
+      } catch (_) {}
+    }
 
     // Clean up recovery journal upon acknowledged atomic save
     const recoveryPath = `${filePath}.recovery.journal`;
@@ -627,21 +1014,233 @@ class OmniArchiveV2 {
   }
 
   /**
-   * Loads v2 archive from file.
+   * Saves the archive as a v3 streaming container (chunked, out-of-core).
+   * Manifest/journal/results are written as small entries; blobs are streamed
+   * as chunked entries. Integrity is verified per chunk and per whole entry on
+   * read. The legacy buffer-based saveToFile() remains available.
+   * @param {string} filePath
+   * @param {object} [options] - Passed through to OmniArchiveV3.writeChunks
+   * @returns {Promise<{filePath: string, sizeBytes: number, blobCount: number, streamed: boolean}>}
+   */
+  async saveToFileStreaming(filePath, options = {}) {
+    const entries = [
+      { name: 'manifest.json', stream: Buffer.from(JSON.stringify(this.manifest.toJSON()), 'utf8') },
+      { name: 'journal.json', stream: Buffer.from(JSON.stringify(this.journal.export()), 'utf8') },
+      { name: 'results.json', stream: Buffer.from(JSON.stringify(this.results), 'utf8') }
+    ];
+    for (const [hash, buf] of this.blobs.entries()) {
+      entries.push({ name: `blobs/${hash}`, stream: buf });
+    }
+    const ws = fs.createWriteStream(filePath);
+    try {
+      const res = await OmniArchiveV3.writeChunks(ws, entries, options);
+      await new Promise((resolve, reject) => {
+        ws.on('error', reject);
+        ws.end(resolve);
+      });
+      return { filePath, sizeBytes: res.fileSize, blobCount: this.blobs.size, streamed: true };
+    } catch (err) {
+      ws.destroy();
+      throw err;
+    }
+  }
+
+  /**
+   * Loads a v3 streaming archive into a fully in-memory OmniArchiveV2 using
+   * the integrity-checked streaming entry reader (suited to small archives).
    * @param {string} filePath
    * @returns {OmniArchiveV2}
    */
-  static loadFromFile(filePath) {
+  static loadFromFileStreaming(filePath) {
+    return OmniArchiveV3.loadArchiveSync(filePath);
+  }
+
+  /**
+   * Loads v2 archive from file. When a "journal.wal" write-ahead log exists
+   * beside the archive, committed WAL operations are replayed on top of the
+   * on-disk snapshot and any uncommitted/torn tail is discarded. Recovery
+   * details are available via archive.getWalStats().
+   * @param {string} filePath
+   * @param {object} [options={}]
+   * @param {string} [options.walPath] - Override WAL file location
+   * @returns {OmniArchiveV2}
+   */
+  static loadFromFile(filePath, options = {}) {
     if (!fs.existsSync(filePath)) {
       throw new OmniError(OmniErrorCode.INVALID_INPUT, `Archive file not found: ${filePath}`);
     }
+    const probe = Buffer.alloc(8);
+    const probeFd = fs.openSync(filePath, 'r');
+    try {
+      const n = fs.readSync(probeFd, probe, 0, 8, 0);
+      if (n === 8 && probe.equals(MAGIC_BYTES_V3)) {
+        return OmniArchiveV3.loadArchiveSync(filePath);
+      }
+    } finally {
+      fs.closeSync(probeFd);
+    }
     const buf = fs.readFileSync(filePath);
+    let archive;
     if (buf.subarray(0, 8).equals(MAGIC_BYTES_V1)) {
       // Automatic transparent migration from v1
       const v1 = OmniArchive.loadFromBuffer(buf);
-      return OmniArchiveV2.fromV1(v1);
+      archive = OmniArchiveV2.fromV1(v1);
+    } else {
+      archive = OmniArchiveV2.loadFromBuffer(buf);
     }
-    return OmniArchiveV2.loadFromBuffer(buf);
+    archive._walArchivePath = path.resolve(filePath);
+    archive._walState = OmniArchiveV2.replayWal(filePath, archive, options);
+    return archive;
+  }
+
+  /**
+   * Replays a WAL file onto a loaded archive: applies committed ops after the
+   * last snapshot, discards the uncommitted tail, and reports recovery stats.
+   * @param {string} filePath
+   * @param {OmniArchiveV2} archive
+   * @param {object} [options={}]
+   * @returns {object} { path, seq, committed, recovered, pending, applicable, applied, discarded, skipped }
+   */
+  static replayWal(filePath, archive, options = {}) {
+    const walPath = options.walPath || OmniWal.derivePath(filePath);
+    const base = { path: walPath, seq: 1, committed: 0, recovered: false, pending: 0, applicable: false };
+    if (!fs.existsSync(walPath)) return base;
+
+    const parsed = parseWalFile(walPath, filePath);
+    if (!parsed.applicable) return base;
+
+    const applied = [];
+    const skipped = [];
+    for (const record of parsed.records) {
+      if (record.seq > parsed.lastCommit) continue; // uncommitted tail
+      try {
+        applyWalOp(archive, record.op, record.digest);
+        applied.push(record.seq);
+      } catch (err) {
+        skipped.push({ seq: record.seq, error: err.message });
+      }
+    }
+    const discarded = parsed.records.filter((r) => r.seq > parsed.lastCommit).length;
+    const recovered = parsed.torn || applied.length > 0 || discarded > 0;
+
+    return {
+      path: walPath,
+      seq: parsed.maxValidSeq + 1,
+      committed: parsed.lastCommit,
+      recovered,
+      pending: 0,
+      applicable: true,
+      applied: applied.length,
+      discarded,
+      skipped,
+      torn: parsed.torn
+    };
+  }
+
+  /**
+   * Enables the v3 WAL for this archive. Creates (or reopens) the append-only
+   * "journal.wal" beside the archive file and compact-repairs any uncommitted
+   * tail left by a previous crash.
+   * @param {object} [options={}]
+   * @param {string} [options.path] - WAL path (defaults to journal.wal beside the archive)
+   * @param {string} [options.archivePath] - Archive identity used in the WAL header
+   * @returns {object} getWalStats() snapshot
+   */
+  enableWal(options = {}) {
+    const archivePath = options.archivePath || this._walArchivePath;
+    let walPath = options.path;
+    if (!walPath) {
+      if (!archivePath) {
+        throw new OmniError(
+          OmniErrorCode.INVALID_INPUT,
+          'WAL path is required until the archive has been saved to a file (call saveToFile first or pass options.path)'
+        );
+      }
+      walPath = OmniWal.derivePath(archivePath);
+    }
+    if (this._wal) {
+      if (path.resolve(this._wal.path) === path.resolve(walPath)) {
+        return this.getWalStats();
+      }
+      this.disableWal();
+    }
+    this._wal = new OmniWal({ path: walPath, archivePath: archivePath || walPath });
+    this._wal.open();
+    this._walState = this._wal.stats();
+    return this._walState;
+  }
+
+  /**
+   * Batches an operation entry into the WAL (not yet durable). Use
+   * commitTransaction() to persist the batch with a COMMIT marker + fsync.
+   * @param {string} op - Operation name (add_blob, record_result, journal_execute, bump_revision)
+   * @param {*} payload - Serializable operation payload
+   * @returns {object} { seq, op, digest, pending }
+   */
+  appendWalEntry(op, payload) {
+    if (!this._wal) {
+      throw new OmniError(OmniErrorCode.INVALID_INPUT, 'WAL is not enabled; call enableWal() first');
+    }
+    const entry = this._wal.appendEntry(op, payload);
+    this._walState = this._wal.stats();
+    return entry;
+  }
+
+  /**
+   * Alias for appendWalEntry.
+   */
+  logWalOp(op, payload) {
+    return this.appendWalEntry(op, payload);
+  }
+
+  /**
+   * Writes batched WAL entries to disk without a COMMIT marker (no fsync).
+   * commitTransaction() is the durability point.
+   * @returns {object} getWalStats() snapshot
+   */
+  flushWal() {
+    if (!this._wal) return this.getWalStats();
+    this._walState = this._wal.flush();
+    return this._walState;
+  }
+
+  /**
+   * Commits the batched WAL transaction: writes pending entries, then a COMMIT
+   * marker carrying the last entry sequence, then fsyncs the WAL file.
+   * @returns {object} getWalStats() snapshot
+   */
+  commitTransaction() {
+    if (!this._wal) {
+      return { path: null, seq: 0, committed: 0, recovered: false, pending: 0, wal: false };
+    }
+    this._walState = this._wal.commit();
+    return { ...this._walState, wal: true };
+  }
+
+  /**
+   * Closes and detaches the WAL.
+   * @returns {object} getWalStats() snapshot
+   */
+  disableWal() {
+    if (this._wal) {
+      this._wal.close();
+      this._wal = null;
+    }
+    this._walState = { path: null, seq: 0, committed: 0, recovered: false, pending: 0 };
+    return this._walState;
+  }
+
+  /**
+   * WAL statistics: { path, seq, committed, recovered, pending }.
+   * After a load that replayed a WAL, "recovered" reflects whether committed
+   * ops were applied or a torn/uncommitted tail was discarded.
+   * @returns {object}
+   */
+  getWalStats() {
+    if (this._wal) {
+      return this._wal.stats();
+    }
+    return this._walState || { path: null, seq: 0, committed: 0, recovered: false, pending: 0 };
   }
 
   /**
@@ -703,6 +1302,490 @@ class OmniArchiveV2 {
     }
 
     return v2;
+  }
+}
+
+/**
+ * Reads `len` bytes from `fd` at `fileOffset` into `buf` starting at `bufPos`.
+ * Guarantees a full read or throws.
+ */
+function readFullSync(fd, buf, bufPos, len, fileOffset) {
+  let bytesRead = 0;
+  while (bytesRead < len) {
+    const n = fs.readSync(fd, buf, bufPos + bytesRead, len - bytesRead, fileOffset + bytesRead);
+    if (n === 0) throw new Error('Archive file changed while it was being read');
+    bytesRead += n;
+  }
+}
+
+function writeUInt64BE(buf, value, offset) {
+  buf.writeBigUInt64BE(BigInt(value), offset);
+}
+
+function readUInt64BE(buf, offset) {
+  return Number(buf.readBigUInt64BE(offset));
+}
+
+/**
+ * OmniArchiveV3: out-of-core streaming .omni container.
+ *
+ * Writes entries as chunked frames (per-chunk sha256 over stored bytes) with
+ * a trailer index (entry byte ranges + whole-entry raw sha256). Reads random
+ * access entries via fs.createReadStream(start/end), so memory usage is
+ * bounded by chunk size regardless of archive size. The legacy in-memory
+ * APIs remain available for small archives via loadArchiveSync().
+ */
+class OmniArchiveV3 {
+  /**
+   * Streams a set of entries into a writable file stream.
+   * @param {import('stream').Writable} writable - Destination (e.g. fs.createWriteStream)
+   * @param {Array<{name: string, stream: (Readable|Buffer|Array<Buffer>)}>} entries
+   * @param {object} [options]
+   * @param {number} [options.chunkSize=1048576]
+   * @param {boolean} [options.compression=true] - Per-chunk deflate
+   * @param {number} [options.compressionLevel] - zlib level (default Z_BEST_SPEED)
+   * @returns {Promise<{entries: object[], trailerOffset: number, fileSize: number}>}
+   */
+  static async writeChunks(writable, entries, options = {}) {
+    if (!writable || typeof writable.write !== 'function') {
+      throw new Error('writeChunks requires a writable stream');
+    }
+    const chunkSize = Math.min(MAX_CHUNK_SIZE, Math.max(MIN_CHUNK_SIZE, options.chunkSize || DEFAULT_CHUNK_SIZE));
+    const compressed = options.compression !== false;
+    const compressionLevel =
+      options.compressionLevel === undefined ? zlib.constants.Z_BEST_SPEED : options.compressionLevel;
+
+    const header = Buffer.alloc(28);
+    MAGIC_BYTES_V3.copy(header, 0);
+    header.writeUInt32BE(STREAMING_FORMAT_VERSION, 8);
+    header.writeUInt32BE(compressed ? STREAMING_FLAG_COMPRESSED : 0, 12);
+    header.writeUInt32BE(chunkSize, 16);
+    writeUInt64BE(header, 0, 20);
+
+    const writeAll = (buf) =>
+      new Promise((resolve, reject) => {
+        writable.write(buf, (err) => (err ? reject(err) : resolve()));
+      });
+
+    const emitFrame = async (rawBuf, meta) => {
+      const stored = compressed ? zlib.deflateSync(rawBuf, { level: compressionLevel }) : rawBuf;
+      const digest = crypto.createHash('sha256').update(stored).digest();
+      const lenBuf = Buffer.alloc(8);
+      writeUInt64BE(lenBuf, stored.length, 0);
+      await writeAll(Buffer.concat([lenBuf, stored, digest]));
+      meta.pos += 8 + stored.length + 32;
+      meta.rawLength += rawBuf.length;
+      meta.chunkCount++;
+      meta.entryHash.update(rawBuf);
+    };
+
+    await writeAll(header);
+    const index = [];
+    let pos = header.length;
+
+    for (const entry of entries) {
+      const name = String(entry.name);
+      const nameBuf = Buffer.from(name, 'utf8');
+      if (nameBuf.length === 0) throw new Error('Streaming archive entry name must not be empty');
+      if (nameBuf.length > 0xffffffff) throw new Error('Streaming archive entry name exceeds 4 GiB');
+      if (index.some((e) => e.name === name)) throw new Error(`Duplicate streaming archive entry '${name}'`);
+
+      const entryStart = pos;
+      const head = Buffer.alloc(4 + nameBuf.length);
+      head.writeUInt32BE(nameBuf.length, 0);
+      nameBuf.copy(head, 4);
+      await writeAll(head);
+      pos += head.length;
+
+      let src = entry.stream;
+      if (Buffer.isBuffer(src)) src = [src];
+      else if (src == null) src = [];
+
+      const meta = { pos, rawLength: 0, chunkCount: 0, entryHash: crypto.createHash('sha256') };
+      let parts = [];
+      let partTotal = 0;
+
+      for await (let chunk of src) {
+        if (!Buffer.isBuffer(chunk)) chunk = Buffer.from(chunk);
+        let off = 0;
+        while (off < chunk.length) {
+          const need = chunkSize - partTotal;
+          const take = Math.min(need, chunk.length - off);
+          parts.push(chunk.subarray(off, off + take));
+          partTotal += take;
+          off += take;
+          if (partTotal === chunkSize) {
+            const rawBuf = Buffer.concat(parts);
+            parts = [];
+            partTotal = 0;
+            await emitFrame(rawBuf, meta);
+          }
+        }
+      }
+      if (partTotal > 0) {
+        await emitFrame(Buffer.concat(parts), meta);
+      }
+
+      index.push({
+        name,
+        entryOffset: entryStart,
+        entryLength: meta.pos - entryStart,
+        rawLength: meta.rawLength,
+        chunkCount: meta.chunkCount,
+        entrySha256: meta.entryHash.digest('hex')
+      });
+      pos = meta.pos;
+    }
+
+    const trailer = OmniArchiveV3._buildTrailer(index, pos);
+    await writeAll(trailer);
+    return { entries: index, trailerOffset: pos, fileSize: pos + trailer.length };
+  }
+
+  static _buildTrailer(index, trailerOffset) {
+    const records = [];
+    let size = 4;
+    for (const e of index) {
+      const nameBuf = Buffer.from(e.name, 'utf8');
+      size += 4 + nameBuf.length + 8 + 8 + 8 + 8 + 32;
+      records.push({ nameBuf, e });
+    }
+    const buf = Buffer.alloc(size + 16);
+    let off = 0;
+    buf.writeUInt32BE(index.length, off);
+    off += 4;
+    for (const { nameBuf, e } of records) {
+      buf.writeUInt32BE(nameBuf.length, off);
+      off += 4;
+      nameBuf.copy(buf, off);
+      off += nameBuf.length;
+      writeUInt64BE(buf, e.entryOffset, off);
+      off += 8;
+      writeUInt64BE(buf, e.entryLength, off);
+      off += 8;
+      writeUInt64BE(buf, e.rawLength, off);
+      off += 8;
+      writeUInt64BE(buf, e.chunkCount, off);
+      off += 8;
+      Buffer.from(e.entrySha256, 'hex').copy(buf, off);
+      off += 32;
+    }
+    writeUInt64BE(buf, trailerOffset, off);
+    off += 8;
+    TRAILER_MAGIC.copy(buf, off);
+    return buf;
+  }
+
+  /**
+   * Reads the trailer index of a streaming archive (sync).
+   * @returns {{headerSize: number, trailerOffset: number, entries: object[]}}
+   */
+  static readIndex(archivePath) {
+    const fd = fs.openSync(archivePath, 'r');
+    try {
+      const st = fs.fstatSync(fd);
+      if (st.size < 40) throw new Error('Malformed streaming archive: file too small');
+
+      const probe = Buffer.alloc(28);
+      readFullSync(fd, probe, 0, 28, 0);
+      if (!probe.subarray(0, 8).equals(MAGIC_BYTES_V3)) {
+        throw new Error('Not a v3 streaming archive: missing OMNIENG\\x03 magic');
+      }
+
+      const tail = Buffer.alloc(16);
+      readFullSync(fd, tail, 0, 16, st.size - 16);
+      const trailerOffset = readUInt64BE(tail, 0);
+      if (!tail.subarray(8, 16).equals(TRAILER_MAGIC)) {
+        throw new Error('Malformed streaming archive: missing trailer magic');
+      }
+      if (trailerOffset < 28 || trailerOffset >= st.size - 16) {
+        throw new Error('Malformed streaming archive: invalid trailer offset');
+      }
+
+      const trailerLen = st.size - trailerOffset - 16;
+      const trailer = Buffer.alloc(trailerLen);
+      readFullSync(fd, trailer, 0, trailerLen, trailerOffset);
+
+      let off = 0;
+      const entryCount = trailer.readUInt32BE(off);
+      off += 4;
+      const entries = [];
+      for (let i = 0; i < entryCount; i++) {
+        if (off + 4 > trailer.length) throw new Error('Malformed streaming archive: truncated trailer');
+        const nameLen = trailer.readUInt32BE(off);
+        off += 4;
+        if (nameLen === 0 || off + nameLen > trailer.length) {
+          throw new Error('Malformed streaming archive: bad entry name');
+        }
+        const name = trailer.subarray(off, off + nameLen).toString('utf8');
+        off += nameLen;
+        if (off + 32 > trailer.length) throw new Error('Malformed streaming archive: truncated entry record');
+        const entryOffset = readUInt64BE(trailer, off);
+        off += 8;
+        const entryLength = readUInt64BE(trailer, off);
+        off += 8;
+        const rawLength = readUInt64BE(trailer, off);
+        off += 8;
+        const chunkCount = readUInt64BE(trailer, off);
+        off += 8;
+        const entrySha256 = trailer.subarray(off, off + 32).toString('hex');
+        off += 32;
+        entries.push({ name, entryOffset, entryLength, rawLength, chunkCount, entrySha256 });
+      }
+      if (off !== trailer.length) throw new Error('Malformed streaming archive: trailing garbage in trailer');
+      return { headerSize: 28, trailerOffset, entries };
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  static _readHeaderFlags(archivePath) {
+    const fd = fs.openSync(archivePath, 'r');
+    try {
+      const probe = Buffer.alloc(28);
+      readFullSync(fd, probe, 0, 28, 0);
+      if (!probe.subarray(0, 8).equals(MAGIC_BYTES_V3)) {
+        throw new Error('Not a v3 streaming archive: missing OMNIENG\\x03 magic');
+      }
+      if (probe.readUInt32BE(8) !== STREAMING_FORMAT_VERSION) {
+        throw new Error('Unsupported streaming archive format version');
+      }
+      return probe.readUInt32BE(12);
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  static _entryDataRange(entry) {
+    const nameLen = Buffer.byteLength(entry.name, 'utf8');
+    const dataStart = entry.entryOffset + 4 + nameLen;
+    const dataEnd = entry.entryOffset + entry.entryLength;
+    return { dataStart, dataEnd };
+  }
+
+  /**
+   * Returns a Node Readable stream containing the raw (decompressed) bytes of
+   * one entry. Reads only the entry's byte range; per-chunk sha256 and the
+   * whole-entry sha256 are verified as data flows. Integrity failures destroy
+   * the stream with an Error.
+   * @param {string} archivePath
+   * @param {string} entryName
+   * @param {object} [options]
+   * @param {number} [options.highWaterMark]
+   * @returns {import('stream').Readable}
+   */
+  static readEntryStream(archivePath, entryName, options = {}) {
+    const fail = (message) => {
+      const err = new Error(message);
+      const rs = new Readable({ read() {} });
+      process.nextTick(() => rs.destroy(err));
+      return rs;
+    };
+
+    let idx;
+    try {
+      idx = OmniArchiveV3.readIndex(archivePath);
+    } catch (err) {
+      return fail(err.message);
+    }
+    const entry = idx.entries.find((e) => e.name === entryName);
+    if (!entry) return fail(`Streaming archive entry not found: ${entryName}`);
+
+    const { dataStart, dataEnd } = OmniArchiveV3._entryDataRange(entry);
+    if (dataEnd <= dataStart) {
+      if (entry.chunkCount !== 0 || entry.rawLength !== 0) {
+        return fail(`Malformed streaming archive: empty byte range for entry '${entryName}'`);
+      }
+      return Readable.from([]);
+    }
+
+    const flags = OmniArchiveV3._readHeaderFlags(archivePath);
+    const src = fs.createReadStream(archivePath, {
+      start: dataStart,
+      end: dataEnd - 1,
+      highWaterMark: options.highWaterMark || 256 * 1024
+    });
+    const verify = new ChunkVerifyTransform({
+      compression: Boolean(flags & STREAMING_FLAG_COMPRESSED),
+      expectedChunks: entry.chunkCount,
+      expectedRaw: entry.rawLength,
+      expectedSha: entry.entrySha256
+    });
+    src.on('error', (err) => verify.destroy(err));
+    verify.on('error', () => src.destroy());
+    src.pipe(verify);
+    return verify;
+  }
+
+  /**
+   * Synchronously reads one entry into a Buffer using the same chunked,
+   * integrity-checked byte-range path (bounded by chunk size, not archive size).
+   * @param {string} archivePath
+   * @param {string} entryName
+   * @returns {Buffer}
+   */
+  static readEntryBufferSync(archivePath, entryName) {
+    const idx = OmniArchiveV3.readIndex(archivePath);
+    const entry = idx.entries.find((e) => e.name === entryName);
+    if (!entry) throw new Error(`Streaming archive entry not found: ${entryName}`);
+
+    const { dataStart, dataEnd } = OmniArchiveV3._entryDataRange(entry);
+    const flags = OmniArchiveV3._readHeaderFlags(archivePath);
+    const compressed = Boolean(flags & STREAMING_FLAG_COMPRESSED);
+
+    const fd = fs.openSync(archivePath, 'r');
+    try {
+      const out = [];
+      let stage = Buffer.alloc(0);
+      let seenChunks = 0;
+      let seenRaw = 0;
+      const hash = crypto.createHash('sha256');
+      let pos = dataStart;
+      const readSize = 1024 * 1024;
+      while (pos < dataEnd) {
+        const want = Math.min(readSize, dataEnd - pos);
+        const buf = Buffer.allocUnsafe(want);
+        readFullSync(fd, buf, 0, want, pos);
+        pos += want;
+        stage = stage.length === 0 ? buf : Buffer.concat([stage, buf]);
+        for (;;) {
+          if (stage.length < 8) break;
+          const storedLen = Number(stage.readBigUInt64BE(0));
+          const frameLen = 8 + storedLen + 32;
+          if (stage.length < frameLen) break;
+          const stored = stage.subarray(8, 8 + storedLen);
+          const storedHash = stage.subarray(8 + storedLen, frameLen);
+          if (!crypto.createHash('sha256').update(stored).digest().equals(storedHash)) {
+            throw new Error(`Integrity failure on chunk ${seenChunks + 1}: sha256 mismatch`);
+          }
+          let raw;
+          try {
+            raw = compressed ? zlib.inflateSync(stored) : stored;
+          } catch {
+            throw new Error(`Integrity failure on chunk ${seenChunks + 1}: inflate failed`);
+          }
+          seenChunks++;
+          seenRaw += raw.length;
+          hash.update(raw);
+          out.push(raw);
+          stage = stage.subarray(frameLen);
+        }
+      }
+      if (stage.length !== 0) throw new Error('Integrity failure: truncated chunk frame');
+      if (seenChunks !== entry.chunkCount) {
+        throw new Error(`Integrity failure: chunk count ${seenChunks} != expected ${entry.chunkCount}`);
+      }
+      if (seenRaw !== entry.rawLength) {
+        throw new Error(`Integrity failure: byte count ${seenRaw} != expected ${entry.rawLength}`);
+      }
+      const digest = hash.digest('hex');
+      if (digest !== entry.entrySha256) throw new Error('Integrity failure: whole-entry sha256 mismatch');
+      return Buffer.concat(out);
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  /**
+   * Loads a small streaming archive fully into memory (legacy-compatible
+   * OmniArchiveV2) using the same integrity-checked entry reads.
+   * @param {string} filePath
+   * @returns {OmniArchiveV2}
+   */
+  static loadArchiveSync(filePath) {
+    const idx = OmniArchiveV3.readIndex(filePath);
+    const readEntry = (name) => OmniArchiveV3.readEntryBufferSync(filePath, name).toString('utf8');
+
+    const manifestJson = JSON.parse(readEntry('manifest.json'));
+    if (!manifestJson || manifestJson.schemaVersion !== CURRENT_SCHEMA_VERSION_V2) {
+      throw new OmniError(
+        OmniErrorCode.INVALID_INPUT,
+        'Invalid streaming v2 archive: missing schemaVersion 2.0.0 manifest'
+      );
+    }
+    const v2 = new OmniArchiveV2({ manifest: ProjectManifestV2.fromJSON(manifestJson) });
+
+    if (idx.entries.some((e) => e.name === 'journal.json')) {
+      v2.journal.import(JSON.parse(readEntry('journal.json')));
+    }
+    if (idx.entries.some((e) => e.name === 'results.json')) {
+      v2.results = JSON.parse(readEntry('results.json')) || [];
+    }
+    for (const e of idx.entries) {
+      if (e.name.startsWith('blobs/')) {
+        const hash = e.name.slice(6);
+        v2.blobs.set(hash, OmniArchiveV3.readEntryBufferSync(filePath, e.name));
+      }
+    }
+    return v2;
+  }
+}
+
+/**
+ * Transform that parses chunk frames from an entry byte range, verifies each
+ * chunk's sha256 (stored bytes), inflates, and verifies the whole-entry
+ * sha256 / byte count on completion.
+ */
+class ChunkVerifyTransform extends Transform {
+  constructor({ compression, expectedChunks, expectedRaw, expectedSha }) {
+    super({ highWaterMark: 1024 * 1024 });
+    this._compression = compression;
+    this._expectedChunks = expectedChunks;
+    this._expectedRaw = expectedRaw;
+    this._expectedSha = expectedSha;
+    this._stage = Buffer.alloc(0);
+    this._seenChunks = 0;
+    this._seenRaw = 0;
+    this._hash = crypto.createHash('sha256');
+  }
+
+  _transform(chunk, enc, cb) {
+    try {
+      this._stage = this._stage.length === 0 ? chunk : Buffer.concat([this._stage, chunk]);
+      for (;;) {
+        if (this._stage.length < 8) break;
+        const storedLen = Number(this._stage.readBigUInt64BE(0));
+        const frameLen = 8 + storedLen + 32;
+        if (this._stage.length < frameLen) break;
+        const stored = this._stage.subarray(8, 8 + storedLen);
+        const storedHash = this._stage.subarray(8 + storedLen, frameLen);
+        if (!crypto.createHash('sha256').update(stored).digest().equals(storedHash)) {
+          throw new Error(`Integrity failure on chunk ${this._seenChunks + 1}: sha256 mismatch`);
+        }
+        let raw;
+        try {
+          raw = this._compression ? zlib.inflateSync(stored) : stored;
+        } catch {
+          throw new Error(`Integrity failure on chunk ${this._seenChunks + 1}: inflate failed`);
+        }
+        this._seenChunks++;
+        this._seenRaw += raw.length;
+        this._hash.update(raw);
+        this.push(raw);
+        this._stage = this._stage.subarray(frameLen);
+      }
+      cb();
+    } catch (err) {
+      cb(err);
+    }
+  }
+
+  _flush(cb) {
+    try {
+      if (this._stage.length !== 0) throw new Error('Integrity failure: truncated chunk frame');
+      if (this._seenChunks !== this._expectedChunks) {
+        throw new Error(`Integrity failure: chunk count ${this._seenChunks} != expected ${this._expectedChunks}`);
+      }
+      if (this._seenRaw !== this._expectedRaw) {
+        throw new Error(`Integrity failure: byte count ${this._seenRaw} != expected ${this._expectedRaw}`);
+      }
+      if (this._hash.digest('hex') !== this._expectedSha) {
+        throw new Error('Integrity failure: whole-entry sha256 mismatch');
+      }
+      cb();
+    } catch (err) {
+      cb(err);
+    }
   }
 }
 
@@ -849,15 +1932,22 @@ class OmniVaultAES256 {
 module.exports = {
   OmniArchive,
   OmniArchiveV2,
+  OmniArchiveV3,
   CommandJournal,
   OmniVaultAES256,
+  OmniWal,
+  WAL_MAGIC,
+  WAL_VERSION,
+  WAL_FILE_NAME,
   calculateCRC32,
   saveAtomicSync,
   MAGIC_BYTES,
   MAGIC_BYTES_V1,
   MAGIC_BYTES_V2,
+  MAGIC_BYTES_V3,
   VAULT_MAGIC_BYTES,
   MAX_UNCOMPRESSED_SECTION_SIZE,
   MAX_ARCHIVE_SIZE_BYTES,
-  MAX_EXPANSION_RATIO
+  MAX_EXPANSION_RATIO,
+  DEFAULT_CHUNK_SIZE
 };

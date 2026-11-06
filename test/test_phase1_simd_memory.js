@@ -1,6 +1,6 @@
 /**
  * OmniEng Phase 1 Verification Suite:
- * High-Performance WASM SIMD128 Vector Acceleration & Zero-Copy Memory Scaling
+ * Experimental WebAssembly vector kernels and worker task dispatch
  */
 
 'use strict';
@@ -11,7 +11,7 @@ const { getGlobalWorkerPool } = require('../src/core/math/worker_pool');
 const { SparseMatrixCSR, SparseCholeskySolver } = require('../src/core/math/sparse_cholesky');
 
 console.log('================================================================');
-console.log('   RUNNING PHASE 1: WASM SIMD128 & ZERO-COPY MEMORY SUITE       ');
+console.log('   RUNNING PHASE 1: WASM VECTOR KERNELS & WORKER TASK SUITE     ');
 console.log('================================================================\n');
 
 // 1. WASM SIMD128 Dot Product
@@ -82,16 +82,20 @@ const sharedBuf = workerPool.allocateSharedBuffer(1024);
 assert(sharedBuf.byteLength === 1024, 'Shared buffer allocation failed');
 
 (async () => {
-  const poolTask = await workerPool.dispatch('WASM_SIMD_BLAS', {
-    operation: 'dotProduct',
-    a: new Float64Array([1, 2, 3, 4, 5]),
-    b: new Float64Array([5, 4, 3, 2, 1])
-  }, { priority: 'HIGH' });
+  const poolTask = await workerPool.dispatch(
+    'WASM_SIMD_BLAS',
+    {
+      operation: 'dotProduct',
+      a: new Float64Array([1, 2, 3, 4, 5]),
+      b: new Float64Array([5, 4, 3, 2, 1])
+    },
+    { priority: 'HIGH' }
+  );
 
   assert.strictEqual(poolTask.result.dotProduct, 35, 'Worker pool dot product failed');
-  console.log(`  ✓ [P1-5] WorkerPool Zero-Copy Dispatch: 1*5 + 2*4 + 3*3 + 4*2 + 5*1 = ${poolTask.result.dotProduct}`);
+  console.log(`  ✓ [P1-5] WorkerPool Structured-Clone Task: dot product = ${poolTask.result.dotProduct}`);
 
-  // 6. Block-Tiled Out-of-Core Sparse Solver
+  // 6. In-memory block-ordered sparse iterative helper
   const numRows = 100;
   const A = new SparseMatrixCSR(numRows, numRows);
   const rhs = new Float64Array(numRows);
@@ -109,9 +113,11 @@ assert(sharedBuf.byteLength === 1024, 'Shared buffer allocation failed');
     tolerance: 1e-6
   });
 
-  assert(oocResult.converged, `Out-of-core solver did not converge (res = ${oocResult.residualNorm})`);
-  assert(oocResult.residualNorm < 1e-4, 'Out-of-core residual too high');
-  console.log(`  ✓ [P1-6] Out-of-Core Block-Tiled Sparse Solver: converged in ${oocResult.iterations} iterations (res = ${oocResult.residualNorm.toExponential(2)})`);
+  assert(oocResult.converged, `Block iterative helper did not converge (res = ${oocResult.residualNorm})`);
+  assert(oocResult.residualNorm < 1e-4, 'Block iterative residual too high');
+  console.log(
+    `  ✓ [P1-6] In-Memory Block-Ordered Iteration: converged in ${oocResult.iterations} iterations (res = ${oocResult.residualNorm.toExponential(2)})`
+  );
 
   console.log('\n================================================================');
   console.log('   ALL 6 PHASE 1 TESTS PASSED SUCCESSFULLY!                    ');

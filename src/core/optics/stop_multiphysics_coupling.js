@@ -168,6 +168,10 @@ class StopMultiphysicsCoupling {
       degradedStrehl: Number(degradedStrehl.toFixed(4)),
       thermalSoakMtf: {
         method: 'illustrative RMS wavefront approximation',
+        // The lp10..lp40 multipliers are arbitrary illustrative placeholder
+        // attenuation ratios. No measured spatial-frequency (LP) response
+        // exists, so they are not claims about lens performance; only the
+        // RMS/WFE-derived MTF degradation factor is computed.
         lp10: 0.92 * mtfDegradationFactor,
         lp20: 0.84 * mtfDegradationFactor,
         lp30: 0.74 * mtfDegradationFactor,

@@ -1,0 +1,63 @@
+{
+  "suite": "omnieng-matrixmarket-suite",
+  "version": "1.0.0",
+  "generated": "2026-10-31T00:00:00.000Z",
+  "note": "Geniune entries were downloaded from the public-domain Matrix Market / NIST mirror and pinned by SHA-256. The wathen100 slot is a documented deterministic synthetic substitute (the NIST mirror does not host a wathen100.mtx under any probed path).",
+  "matrices": [
+    {
+      "id": "bcsstk01",
+      "name": "bcsstk01 (BCS structural engineering, stiffness matrix after 1 step, 48 dof)",
+      "source": "https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/bcsstruc1/bcsstk01.mtx.gz",
+      "license": "Public domain / Matrix Market redistribution allowed (NIST)",
+      "syntheticSubstitute": false,
+      "downloadedAt": "2026-10-31T00:00:00.000Z",
+      "fileName": "bcsstk01.mtx",
+      "bytes": 6025,
+      "sha256": "90681443b885c9b8781354fa6bfeab8ecb8c53f0f7a4a8961cc4469eb6e2a187",
+      "format": "coordinate",
+      "field": "real",
+      "symmetry": "symmetric",
+      "nRows": 48,
+      "nCols": 48,
+      "nnzStored": 224,
+      "nnzFullSymmetric": 400
+    },
+    {
+      "id": "nos4",
+      "name": "nos4 (Harwell-Boeing, 100x100 SPD, Poisson-like 10x10 grid)",
+      "source": "https://math.nist.gov/MatrixMarket/data/Harwell-Boeing/lanpro/nos4.mtx.gz",
+      "license": "Public domain / Matrix Market redistribution allowed (NIST)",
+      "syntheticSubstitute": false,
+      "downloadedAt": "2026-10-31T00:00:00.000Z",
+      "fileName": "nos4.mtx",
+      "bytes": 9385,
+      "sha256": "adc4b8cf5c09234f44baa37439e29b313913ea34686904af677955ecdf4edc8a",
+      "format": "coordinate",
+      "field": "real",
+      "symmetry": "symmetric",
+      "nRows": 100,
+      "nCols": 100,
+      "nnzStored": 347,
+      "nnzFullSymmetric": 594
+    },
+    {
+      "id": "wathen100_synthetic",
+      "name": "wathen100 synthetic substitute (deterministic SPD mass-matrix analogue)",
+      "source": "synthetic (documented genesis; no NIST host found for wathen100.mtx)",
+      "license": "n/a (generated)",
+      "syntheticSubstitute": true,
+      "downloadedAt": null,
+      "fileName": "wathen100_synthetic.mtx",
+      "bytes": 126066,
+      "sha256": "7704f6ebe10b976fc9021b5413018146466bb11ed90ada17f0e3832d15641456",
+      "format": "coordinate",
+      "field": "real",
+      "symmetry": "symmetric",
+      "nRows": 100,
+      "nCols": 100,
+      "nnzStored": 5050,
+      "nnzFullSymmetric": 10000,
+      "genesis": "seeded B (n=100, rank 12, density 10%, +/-1); A = B*B' + diag(0.5+U[0,1]); scaled so max|A|=1; seed 0xC0FFEE; documented in file header comments."
+    }
+  ]
+}

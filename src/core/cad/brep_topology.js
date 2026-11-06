@@ -8,7 +8,13 @@ const { Vector3 } = require('../math/linear_algebra');
 class Vertex {
   constructor(x, y, z) {
     this.id = 'v_' + Math.random().toString(36).substr(2, 9);
-    this.point = new Vector3(x, y, z);
+    if (Array.isArray(x)) {
+      this.point = new Vector3(x[0], x[1], x[2]);
+    } else if (x && typeof x === 'object' && 'x' in x) {
+      this.point = new Vector3(x.x, x.y, x.z);
+    } else {
+      this.point = new Vector3(x, y, z);
+    }
   }
 }
 
@@ -57,6 +63,58 @@ class Face {
   }
 }
 
+const GDT_GEOMETRIC_CHARACTERISTICS = new Set([
+  'FLATNESS',
+  'STRAIGHTNESS',
+  'CIRCULARITY',
+  'PERPENDICULARITY',
+  'PARALLELISM',
+  'POSITION',
+  'TOTAL_RUNOUT'
+]);
+
+function normalizeGdtType(type) {
+  if (typeof type !== 'string') return null;
+  const norm = type
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, '_');
+  return GDT_GEOMETRIC_CHARACTERISTICS.has(norm) ? norm : null;
+}
+
+/**
+ * PMI (Product and Manufacturing Information) datum definition (AP242-style).
+ * A datum labels a face/entity that serves as a reference for GD&T tolerances.
+ */
+class PmiDatum {
+  constructor(label, entityId, opts = {}) {
+    this.id = 'datum_' + Math.random().toString(36).substr(2, 9);
+    this.label = String(label || '').toUpperCase();
+    this.entityId = entityId; // id of the associated topological entity (face/edge/vertex/body)
+    this.name = opts.name || `Datum ${this.label}`;
+    this.description = opts.description || '';
+  }
+}
+
+/**
+ * PMI geometric tolerance definition (AP242-style subset).
+ * Supported characteristics: flatness, straightness, circularity,
+ * perpendicularity, parallelism, position, total-runout.
+ */
+class PmiGeometricTolerance {
+  constructor(spec = {}) {
+    this.id = 'gdt_' + Math.random().toString(36).substr(2, 9);
+    this.type = spec.type; // normalized characteristic code
+    this.value = spec.value; // tolerance zone value (length units)
+    this.datumRefs = Array.isArray(spec.datumRefs) ? [...spec.datumRefs] : [];
+    this.entityId = spec.entityId; // id of the tolerated topological entity
+    this.name = spec.name || this.type;
+    this.description = spec.description || '';
+    // Optional companion size record (TOLERANCED_SIZE) when a nominal size is supplied
+    this.nominalSize = Number.isFinite(spec.nominalSize) ? spec.nominalSize : null;
+  }
+}
+
 class SolidBody {
   constructor(name = 'Solid') {
     this.id = 'body_' + Math.random().toString(36).substr(2, 9);
@@ -65,6 +123,119 @@ class SolidBody {
     this.edges = [];
     this.faces = [];
     this.color = '#38bdf8';
+    this.datums = [];
+    this.geometricTolerances = [];
+  }
+
+  /**
+   * Resolves a topological entity id (face/edge/vertex/body id or name).
+   * @param {string|Object} entityId
+   * @returns {Object|null} the entity, or null when unknown
+   */
+  findEntity(entityId) {
+    if (entityId === null || entityId === undefined) return null;
+    if (typeof entityId === 'object') return entityId;
+    const id = String(entityId);
+    for (const face of this.faces) {
+      if (face.id === id || face.name === id) return face;
+    }
+    for (const edge of this.edges) {
+      if (edge.id === id) return edge;
+    }
+    for (const v of this.vertices) {
+      if (v.id === id) return v;
+    }
+    if (this.id === id || this.name === id) return this;
+    return null;
+  }
+
+  /**
+   * Registers a datum label on an existing topological entity (face/edge/vertex/body).
+   * @param {string} label Datum label (e.g. 'A')
+   * @param {string|Object} entityId
+   * @param {Object} [opts] { name, description }
+   * @returns {PmiDatum}
+   */
+  addDatum(label, entityId, opts = {}) {
+    if (!label || typeof label !== 'string') {
+      throw new Error(`Datum label must be a non-empty string, got ${JSON.stringify(label)}`);
+    }
+    if (!this.findEntity(entityId)) {
+      throw new Error(`Datum '${label}' references unknown entity ${JSON.stringify(entityId)}`);
+    }
+    for (const d of this.datums) {
+      if (d.label === String(label).toUpperCase()) {
+        throw new Error(`Datum '${String(label).toUpperCase()}' already exists on this solid`);
+      }
+    }
+    const datum = new PmiDatum(label, entityId instanceof Object && entityId.id ? entityId.id : entityId, opts);
+    this.datums.push(datum);
+    return datum;
+  }
+
+  /**
+   * Resolves a datum reference (label or datum id) to a registered PmiDatum.
+   * @param {string|Object} ref
+   * @returns {PmiDatum|null}
+   */
+  findDatum(ref) {
+    if (ref === null || ref === undefined) return null;
+    if (typeof ref === 'object') {
+      const key = ref.label !== undefined ? String(ref.label).toUpperCase() : ref.id;
+      return this.findDatum(key);
+    }
+    const key = String(ref);
+    return this.datums.find((d) => d.label === key || d.id === key) || null;
+  }
+
+  /**
+   * Attaches a GD&T geometric tolerance to an existing entity.
+   * @param {string|Object} entityId Face/edge/vertex/body id (or entity object)
+   * @param {Object} gdtSpec
+   *   - type: 'flatness' | 'straightness' | 'circularity' | 'perpendicularity'
+   *     | 'parallelism' | 'position' | 'total-runout'
+   *   - value: finite non-negative number (tolerance zone)
+   *   - datumRefs: array of datum labels / datum ids, each must exist
+   *   - nominalSize (optional): number -> also emits TOLERANCED_SIZE record
+   * @returns {PmiGeometricTolerance}
+   */
+  attachGdtToEntity(entityId, gdtSpec) {
+    if (!gdtSpec || typeof gdtSpec !== 'object') {
+      throw new Error('attachGdtToEntity requires a gdtSpec object');
+    }
+    const type = normalizeGdtType(gdtSpec.type);
+    if (!type) {
+      throw new Error(
+        `Unsupported GD&T characteristic ${JSON.stringify(gdtSpec.type)}; supported: ${[...GDT_GEOMETRIC_CHARACTERISTICS].join(', ')}`
+      );
+    }
+    const value = gdtSpec.value;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`GD&T value must be a finite non-negative number, got ${value}`);
+    }
+    const entity = this.findEntity(entityId);
+    if (!entity) {
+      throw new Error(`GD&T ${type} references unknown entity ${JSON.stringify(entityId)}`);
+    }
+    const datumRefs = [];
+    for (const ref of gdtSpec.datumRefs || []) {
+      const datum = this.findDatum(ref);
+      if (!datum) {
+        throw new Error(`GD&T ${type} references unknown datum ${JSON.stringify(ref)}; register it first via addDatum`);
+      }
+      datumRefs.push(datum);
+    }
+    const tolerance = new PmiGeometricTolerance({
+      type,
+      value,
+      datumRefs: datumRefs.map((d) => d.label),
+      entityId: entity.id || entityId,
+      name: gdtSpec.name,
+      description: gdtSpec.description,
+      nominalSize: gdtSpec.nominalSize
+    });
+    this.geometricTolerances.push(tolerance);
+    return tolerance;
   }
 
   computeVolume() {
@@ -130,7 +301,7 @@ class SolidBody {
 
     for (const f of this.faces) {
       if (f.vertices.length >= 3) {
-        out += 'f ' + f.vertices.map(v => vMap.get(v)).join(' ') + '\n';
+        out += 'f ' + f.vertices.map((v) => vMap.get(v)).join(' ') + '\n';
       }
     }
     return out;
@@ -167,9 +338,12 @@ class BRepPrimitives {
    */
   static createBox(dx = 10, dy = 10, dz = 10, name = 'Box') {
     const body = new SolidBody(name);
-    const x0 = -dx / 2, x1 = dx / 2;
-    const y0 = -dy / 2, y1 = dy / 2;
-    const z0 = -dz / 2, z1 = dz / 2;
+    const x0 = -dx / 2,
+      x1 = dx / 2;
+    const y0 = -dy / 2,
+      y1 = dy / 2;
+    const z0 = -dz / 2,
+      z1 = dz / 2;
 
     const v = [
       new Vertex(x0, y0, z0), // 0
@@ -179,18 +353,18 @@ class BRepPrimitives {
       new Vertex(x0, y0, z1), // 4
       new Vertex(x1, y0, z1), // 5
       new Vertex(x1, y1, z1), // 6
-      new Vertex(x0, y1, z1)  // 7
+      new Vertex(x0, y1, z1) // 7
     ];
     body.vertices = v;
 
     // 6 faces (CCW outward normal)
     body.faces = [
       new Face([v[0], v[3], v[2], v[1]], new Vector3(0, 0, -1)), // Bottom -Z
-      new Face([v[4], v[5], v[6], v[7]], new Vector3(0, 0, 1)),  // Top +Z
+      new Face([v[4], v[5], v[6], v[7]], new Vector3(0, 0, 1)), // Top +Z
       new Face([v[0], v[1], v[5], v[4]], new Vector3(0, -1, 0)), // Front -Y
-      new Face([v[2], v[3], v[7], v[6]], new Vector3(0, 1, 0)),  // Back +Y
+      new Face([v[2], v[3], v[7], v[6]], new Vector3(0, 1, 0)), // Back +Y
       new Face([v[0], v[4], v[7], v[3]], new Vector3(-1, 0, 0)), // Left -X
-      new Face([v[1], v[2], v[6], v[5]], new Vector3(1, 0, 0))   // Right +X
+      new Face([v[1], v[2], v[6], v[5]], new Vector3(1, 0, 0)) // Right +X
     ];
 
     body.buildEdges();
@@ -230,11 +404,7 @@ class BRepPrimitives {
       const v1 = bottomVerts[next];
       const v2 = topVerts[next];
       const v3 = topVerts[i];
-      const normal = new Vector3(
-        (v0.point.x + v1.point.x) / 2,
-        (v0.point.y + v1.point.y) / 2,
-        0
-      ).normalize();
+      const normal = new Vector3((v0.point.x + v1.point.x) / 2, (v0.point.y + v1.point.y) / 2, 0).normalize();
       body.faces.push(new Face([v0, v1, v2, v3], normal));
     }
 
@@ -289,6 +459,18 @@ class BRepPrimitives {
   }
 }
 
+SolidBody.createBox = BRepPrimitives.createBox;
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { Vertex, Edge, Face, SolidBody, BRepPrimitives };
+  module.exports = {
+    Vertex,
+    Edge,
+    Face,
+    SolidBody,
+    BRepPrimitives,
+    PmiDatum,
+    PmiGeometricTolerance,
+    normalizeGdtType,
+    GDT_GEOMETRIC_CHARACTERISTICS
+  };
 }

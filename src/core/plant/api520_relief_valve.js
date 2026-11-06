@@ -73,20 +73,28 @@ class Api520ReliefValve {
 
     let A_req_sq_mm;
     let flowRegime;
+    let F2Subcritical = null;
 
     if (isCritical) {
       flowRegime = 'critical';
-      // API 520 Eq (5): A = (13160 * W) / (C * Kd * P1 * Kb * Kc) * sqrt(T * Z / M)
-      A_req_sq_mm = ((13160 * massFlow) / (C * Kd * P1 * Kb * Kc)) * Math.sqrt((T * Z) / M);
+      // API 520 Part I SI (metric) choked-gas equation: A = W / (C Kd P1 Kb Kc) * sqrt(T Z / M)
+      // with W in kg/h and P1 in kPa absolute (no US-unit 13160 factor).
+      A_req_sq_mm = (massFlow / (C * Kd * P1 * Kb * Kc)) * Math.sqrt((T * Z) / M);
     } else {
       flowRegime = 'subcritical';
-      // Subcritical correction factor F2
+      // Subcritical flow: the capacity reduction factor F2 (flow function)
+      // normalized by its choked value F2(r_cf) ~ 1. At r = r_cf the
+      // subcritical area reduces exactly to the choked area; as r -> 1 the
+      // factor -> 0 and the required area grows without bound. This is the
+      // physically continuous SI form (no US-unit 17.9 constant).
       const r = Pb / P1;
       const termExp = Math.pow(r, 2 / k) - Math.pow(r, (k + 1) / k);
-      const F2 = Math.sqrt((k / (k - 1)) * termExp * (2 / (1 - r)));
-
-      // API 520 subcritical sizing equation
-      A_req_sq_mm = ((17.9 * massFlow) / (F2 * Kd * Kc)) * Math.sqrt((T * Z) / (M * P1 * (P1 - Pb)));
+      const F2 = Math.sqrt((k / (k - 1)) * termExp);
+      const termExpCrit = Math.pow(r_cf, 2 / k) - Math.pow(r_cf, (k + 1) / k);
+      const F2Critical = Math.sqrt((k / (k - 1)) * termExpCrit);
+      const AChokedSi = (massFlow / (C * Kd * P1 * Kb * Kc)) * Math.sqrt((T * Z) / M);
+      A_req_sq_mm = AChokedSi * (F2Critical / F2);
+      F2Subcritical = F2;
     }
 
     const A_req_sq_in = A_req_sq_mm / 645.16;
@@ -97,6 +105,7 @@ class Api520ReliefValve {
       criticalPressureRatio: r_cf,
       criticalPressure_kPa: Pcf,
       gasConstantC: C,
+      ...(F2Subcritical !== null ? { f2Subcritical: F2Subcritical } : {}),
       requiredArea_sq_mm: A_req_sq_mm,
       requiredArea_sq_in: A_req_sq_in,
       selectedOrifice

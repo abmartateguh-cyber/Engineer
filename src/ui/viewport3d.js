@@ -75,6 +75,26 @@ class Viewport3D {
     this.cameraAngle = { theta: 0.65, phi: 0.85 }; // Spherical coordinates
     this.target = new THREE.Vector3(0, 0, 0);
 
+    // OrbitControls-compatible adapter so legacy camera-framing blocks that check
+    // `this.camera && this.controls` (e.g. NASA rocket modes) become live.
+    this.controls = {
+      target: this.target,
+      update: () => this.updateCameraPosition()
+    };
+    this._rafPending = false;
+
+    // Interaction state (professional CAD conventions):
+    // - LMB (button 0): entity selection / rubber-band drag-box pick
+    // - MMB (button 1): camera orbit (Shift+MMB pans)
+    // - RMB (button 2): camera pan
+    // - wheel: smooth zoom anchored at the cursor
+    this.isOrbiting = false;
+    this.selectionStart = null;
+    this._isDragSelecting = false;
+    this._dragBoxEl = null;
+    this._cursorClient = { x: 0, y: 0 };
+    this._cameraTween = null;
+
     if (TactileSpringPhysics) {
       this.cameraFollower = new TactileSpringPhysics.TactileSpringFollower3D({ stiffness: 140.0, damping: 22.0 });
       this.cameraFollower.setValue(this.cameraAngle.theta, this.cameraAngle.phi, this.cameraDistance);
@@ -205,6 +225,7 @@ class Viewport3D {
 
     // 7. Window resize observer and container ResizeObserver
     window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('visibilitychange', () => this.ensureAnimationLoop());
     if (typeof ResizeObserver !== 'undefined') {
       const host = this.canvas.closest('.canvas-host') || this.canvas.parentElement;
       if (host) {
@@ -627,6 +648,7 @@ class Viewport3D {
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       this.previousMouseDownPos = { x: e.clientX, y: e.clientY };
+      this._cursorClient = { x: e.clientX, y: e.clientY };
 
       // Check if clicking on an active gizmo handle
       if (e.button === 0 && this.gizmoGroup && this.gizmoGroup.visible && this.camera) {
@@ -650,8 +672,17 @@ class Viewport3D {
         }
       }
 
+      // Professional CAD button map:
+      // - LMB (0): entity selection / drag-box pick
+      // - MMB (1): orbit (Shift+MMB pans)
+      // - RMB (2): pan
       this.isDragging = e.button === 0;
-      this.isPanning = e.button === 2;
+      this.isOrbiting = e.button === 1 && !e.shiftKey;
+      this.isPanning = e.button === 2 || (e.button === 1 && !!e.shiftKey);
+      if (this.isDragging) {
+        this.selectionStart = { x: e.clientX, y: e.clientY };
+        this._isDragSelecting = false;
+      }
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
     });
 
@@ -659,6 +690,7 @@ class Viewport3D {
       const rect = this.canvas.getBoundingClientRect();
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this._cursorClient = { x: e.clientX, y: e.clientY };
 
       // Gizmo dragging interaction
       if (this.isGizmoDragging && this.selectedPart && this.camera) {
@@ -681,15 +713,29 @@ class Viewport3D {
         return;
       }
 
-      if (!this.isDragging && !this.isPanning) {
+      if (!this.isDragging && !this.isPanning && !this.isOrbiting) {
         this.checkRaycastHover();
+        return;
+      }
+
+      if (this.isDragging) {
+        // LMB drag -> rubber-band selection box (camera stays put)
+        if (this.selectionStart) {
+          const dx = e.clientX - this.selectionStart.x;
+          const dy = e.clientY - this.selectionStart.y;
+          if (Math.abs(dx) >= 6 || Math.abs(dy) >= 6) {
+            this._isDragSelecting = true;
+            this._updateDragBox(this.selectionStart.x, this.selectionStart.y, e.clientX, e.clientY);
+          }
+        }
+        this.previousMousePosition = { x: e.clientX, y: e.clientY };
         return;
       }
 
       const deltaX = e.clientX - this.previousMousePosition.x;
       const deltaY = e.clientY - this.previousMousePosition.y;
 
-      if (this.isDragging) {
+      if (this.isOrbiting) {
         // Orbit rotation
         this.cameraAngle.theta -= deltaX * 0.008;
         this.cameraAngle.phi = Math.max(0.08, Math.min(Math.PI - 0.08, this.cameraAngle.phi - deltaY * 0.008));
@@ -716,16 +762,22 @@ class Viewport3D {
           this.onPartTransformEnd(this.getPartProperties(this.selectedPart));
         }
       }
+      if (this.isDragging && this._isDragSelecting) {
+        this._selectFromDragBox();
+      }
       this.isDragging = false;
+      this.isOrbiting = false;
       this.isPanning = false;
+      this._isDragSelecting = false;
+      this.selectionStart = null;
+      this._hideDragBox();
     });
 
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.cameraDistance = Math.max(25, Math.min(1000, this.cameraDistance + e.deltaY * 0.22));
-      this.updateCameraPosition();
+      this._zoomAtCursor(e.deltaY);
     });
 
     this.canvas.addEventListener('click', (e) => {
@@ -755,6 +807,170 @@ class Viewport3D {
         }
       }
     });
+  }
+
+  _ensureDragBoxEl() {
+    if (this._dragBoxEl) return this._dragBoxEl;
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
+    const el = document.createElement('div');
+    el.style.cssText =
+      'position:absolute;pointer-events:none;display:none;z-index:9999;' +
+      'border:1px solid #38bdf8;background:rgba(56,189,248,0.14);box-sizing:border-box;';
+    const host = this.canvas && (this.canvas.parentElement || document.body);
+    if (host && typeof host.appendChild === 'function') {
+      host.appendChild(el);
+    }
+    this._dragBoxEl = el;
+    return el;
+  }
+
+  _updateDragBox(x0, y0, x1, y1) {
+    const el = this._ensureDragBoxEl();
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.left = `${Math.min(x0, x1)}px`;
+    el.style.top = `${Math.min(y0, y1)}px`;
+    el.style.width = `${Math.abs(x1 - x0)}px`;
+    el.style.height = `${Math.abs(y1 - y0)}px`;
+  }
+
+  _hideDragBox() {
+    if (this._dragBoxEl) {
+      this._dragBoxEl.style.display = 'none';
+    }
+  }
+
+  _selectFromDragBox() {
+    if (!this.selectionStart || !this.currentMesh || !this.camera) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const selNdc = {
+      minX: ((Math.min(this.selectionStart.x, this._cursorClient.x) - rect.left) / rect.width) * 2 - 1,
+      maxX: ((Math.max(this.selectionStart.x, this._cursorClient.x) - rect.left) / rect.width) * 2 - 1,
+      minY: -((Math.max(this.selectionStart.y, this._cursorClient.y) - rect.top) / rect.height) * 2 + 1,
+      maxY: -((Math.min(this.selectionStart.y, this._cursorClient.y) - rect.top) / rect.height) * 2 + 1
+    };
+
+    let best = null;
+    let bestArea = 0;
+    const box = new THREE.Box3();
+    const proj = new THREE.Vector3();
+    const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
+
+    this.currentMesh.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const ud = obj.userData || {};
+      if (ud.isGizmoHandle || ud.isHelper) return;
+      box.setFromObject(obj);
+      if (box.isEmpty()) return;
+      const min = box.min;
+      const max = box.max;
+      corners[0].set(min.x, min.y, min.z);
+      corners[1].set(max.x, min.y, min.z);
+      corners[2].set(min.x, max.y, min.z);
+      corners[3].set(max.x, max.y, min.z);
+      corners[4].set(min.x, min.y, max.z);
+      corners[5].set(max.x, min.y, max.z);
+      corners[6].set(min.x, max.y, max.z);
+      corners[7].set(max.x, max.y, max.z);
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        proj.copy(corners[i]).project(this.camera);
+        if (proj.x < minX) minX = proj.x;
+        if (proj.x > maxX) maxX = proj.x;
+        if (proj.y < minY) minY = proj.y;
+        if (proj.y > maxY) maxY = proj.y;
+      }
+      if (maxX < selNdc.minX || minX > selNdc.maxX) return;
+      if (maxY < selNdc.minY || minY > selNdc.maxY) return;
+      const overlapW = Math.min(maxX, selNdc.maxX) - Math.max(minX, selNdc.minX);
+      const overlapH = Math.min(maxY, selNdc.maxY) - Math.max(minY, selNdc.minY);
+      const area = Math.max(0, overlapW) * Math.max(0, overlapH);
+      if (area > bestArea) {
+        bestArea = area;
+        best = obj;
+      }
+    });
+
+    if (best) {
+      this.selectPart(best);
+    } else {
+      this.deselectPart();
+    }
+  }
+
+  _zoomAtCursor(deltaY) {
+    const rect = this.canvas.getBoundingClientRect();
+    const ndcX = ((this._cursorClient.x - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((this._cursorClient.y - rect.top) / rect.height) * 2 + 1;
+    const oldDist = this.cameraDistance;
+    const newDist = Math.max(25, Math.min(1000, oldDist * Math.exp(deltaY * 0.0015)));
+    if (oldDist === newDist) return;
+    this.cameraDistance = newDist;
+
+    // Anchor the world point under the cursor by shifting the target along the
+    // view ray so the point stays fixed on screen as the camera dollys.
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    const anchor = ray.ray.origin.clone().addScaledVector(ray.ray.direction, oldDist);
+    this.updateCameraPosition();
+    const rayAfter = new THREE.Raycaster();
+    rayAfter.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    const shift = anchor.clone().sub(this.camera.position).addScaledVector(rayAfter.ray.direction, -oldDist);
+    this.target.add(shift);
+    this.updateCameraPosition();
+  }
+
+  _easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  /**
+   * Smoothly tween the camera to a new orientation along a great-circle arc.
+   * `direction` is a unit (or arbitrary length) Vector3/array pointing from the
+   * target toward the desired viewpoint (e.g. ViewCube face normals).
+   * Easing is a deterministic cubic in/out; no randomness is involved.
+   */
+  tweenCameraToDirection(direction, options = {}) {
+    if (!this.camera) return false;
+    const d = Array.isArray(direction)
+      ? new THREE.Vector3(direction[0], direction[1], direction[2])
+      : direction instanceof THREE.Vector3
+        ? direction.clone()
+        : new THREE.Vector3(direction.x || 0, direction.y || 0, direction.z || 0);
+    const len = d.length();
+    if (len < 1e-6) return false;
+    d.divideScalar(len);
+
+    const startDir = new THREE.Vector3().subVectors(this.camera.position, this.target).normalize();
+    const axis = new THREE.Vector3().crossVectors(startDir, d);
+    const dot = THREE.MathUtils.clamp(startDir.dot(d), -1, 1);
+    const angle = Math.acos(dot);
+    let rotAxis = axis;
+    if (axis.lengthSq() < 1e-10) {
+      // Parallel or anti-parallel paths: pick a deterministic perpendicular axis.
+      const ref = Math.abs(startDir.y) < 0.999 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+      rotAxis = new THREE.Vector3().crossVectors(startDir, ref);
+      if (rotAxis.lengthSq() < 1e-10) {
+        rotAxis = new THREE.Vector3(0, 0, 1);
+      } else {
+        rotAxis.normalize();
+      }
+    } else {
+      rotAxis.normalize();
+    }
+
+    this._cameraTween = {
+      startDir: startDir.clone(),
+      endDir: d.clone(),
+      axis: rotAxis,
+      angle,
+      t: 0,
+      duration: Math.max(0.05, Number(options.duration) || 0.8)
+    };
+    return true;
   }
 
   checkRaycastHover() {
@@ -846,15 +1062,65 @@ class Viewport3D {
     return this.isQuadView;
   }
 
+  _isViewportHidden() {
+    if (!this.canvas) return true;
+    if (this.canvas.offsetParent === null) return true;
+    if (this.canvas.style && this.canvas.style.display === 'none') return true;
+    if (typeof document !== 'undefined' && document.hidden) return true;
+    return false;
+  }
+
+  ensureAnimationLoop() {
+    if (this._rafPending) return;
+    if (typeof window !== 'undefined' && !window.__OMNI_TEST_MODE__) {
+      if (this._isViewportHidden()) return;
+    }
+    this.animate();
+  }
+
+  startAnimation() {
+    this.ensureAnimationLoop();
+  }
+
   animate() {
     if (typeof window !== 'undefined' && !window.__OMNI_TEST_MODE__) {
-      requestAnimationFrame(() => this.animate());
+      // Do not keep scheduling frames while the canvas is hidden; exit the loop
+      // cleanly and restart on demand via ensureAnimationLoop()/startAnimation().
+      if (this._isViewportHidden()) {
+        this._rafPending = false;
+        return;
+      }
+      this._rafPending = true;
+      const self = this;
+      requestAnimationFrame(() => {
+        self._rafPending = false;
+        self.animate();
+      });
     }
 
     const dt = 0.016; // Fixed animation step; this is not measured render cadence.
 
+    // Spherical great-circle tween toward a ViewCube face direction
+    if (this._cameraTween) {
+      const tw = this._cameraTween;
+      tw.t = Math.min(1, tw.t + dt / tw.duration);
+      const eased = this._easeInOutCubic(tw.t);
+      const q = new THREE.Quaternion().setFromAxisAngle(tw.axis, tw.angle * eased);
+      const dir = tw.startDir.clone().applyQuaternion(q).normalize();
+      this.cameraAngle.phi = Math.acos(THREE.MathUtils.clamp(dir.y, -1, 1));
+      this.cameraAngle.theta = Math.atan2(dir.x, dir.z);
+      this.updateCameraPosition();
+      if (tw.t >= 1) {
+        this._cameraTween = null;
+        if (this.cameraFollower) {
+          this.cameraFollower.setValue(this.cameraAngle.theta, this.cameraAngle.phi, this.cameraDistance);
+          this.cameraFollower.setTarget(this.cameraAngle.theta, this.cameraAngle.phi, this.cameraDistance);
+        }
+      }
+    }
+
     // Tactile Spring Follower for Camera
-    if (this.cameraFollower && !this.isDragging && !this.isPanning) {
+    if (this.cameraFollower && !this.isDragging && !this.isPanning && !this.isOrbiting && !this._cameraTween) {
       if (!this.cameraFollower.isSettled()) {
         this.cameraFollower.update(dt);
         const vals = this.cameraFollower.getValues();
@@ -976,6 +1242,101 @@ class Viewport3D {
       this.setExplodeFactor(0.8);
     } else {
       this.setExplodeFactor(0.0);
+    }
+  }
+
+  toggleWireframe() {
+    this.wireframeMode = this.wireframeMode === 'wireframe' ? 'shaded' : 'wireframe';
+    const wireframe = this.wireframeMode === 'wireframe';
+
+    const applyMode = (obj) => {
+      obj.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        if (child.userData && child.userData.isGizmoHandle) return; // keep 3D gizmo intact
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => {
+          if (!m || !m.isMaterial) return;
+          m.wireframe = wireframe;
+          if (wireframe) {
+            m.transparent = false;
+            m.opacity = 1.0;
+          }
+        });
+      });
+    };
+
+    if (this.scene) applyMode(this.scene);
+    this.viewMode = wireframe ? 'wireframe' : 'shaded';
+    this.setViewportStats(wireframe ? 'Wireframe display mode enabled' : 'Shaded display mode restored');
+    return this.wireframeMode;
+  }
+
+  resetCamera() {
+    const fallbackDistance = 220;
+    const target = new THREE.Vector3(0, 0, 0);
+    let radius = 120;
+
+    try {
+      const box = new THREE.Box3();
+      let found = false;
+      const addToBox = (obj) => {
+        try {
+          box.expandByObject(obj);
+          found = true;
+        } catch (_) {}
+      };
+
+      if (this.currentMesh) {
+        addToBox(this.currentMesh);
+      }
+      if (!found && this.scene) {
+        this.scene.traverse((obj) => {
+          if (obj === this.gridHelper || obj === this.axesHelper) return;
+          if (obj.name === '__viewport_transform_gizmo__') return;
+          if (obj.userData && obj.userData.isGizmoHandle) return;
+          if (obj.isMesh || obj.isLineSegments || obj.isLine || obj.isPoints) addToBox(obj);
+        });
+      }
+
+      if (found && !box.isEmpty()) {
+        box.getCenter(target);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        radius = Math.max(size.x, size.y, size.z) / 2;
+      }
+    } catch (_) {
+      radius = 120;
+    }
+
+    this.target.copy(target);
+    this.cameraAngle = { theta: 0.65, phi: 0.85 };
+    this.cameraDistance = Math.max(25, Math.min(1500, radius * 2.6 || fallbackDistance));
+
+    if (this.cameraFollower) {
+      this.cameraFollower.setValue(this.cameraAngle.theta, this.cameraAngle.phi, this.cameraDistance);
+      this.cameraFollower.setTarget(this.cameraAngle.theta, this.cameraAngle.phi, this.cameraDistance);
+    }
+    this.updateCameraPosition();
+    this.setViewportStats('Camera framing reset to scene bounds');
+    return { success: true, target: target.toArray(), distance: this.cameraDistance };
+  }
+
+  updateTransform(data) {
+    if (!data || typeof data !== 'object') return;
+    const target = this.selectedPart || (this.currentMesh && this.currentMesh.isMesh ? this.currentMesh : null);
+    if (!target) return;
+    if (Array.isArray(data.position) && data.position.length >= 3) {
+      target.position.set(Number(data.position[0]), Number(data.position[1]), Number(data.position[2]));
+    }
+    if (Array.isArray(data.rotation) && data.rotation.length >= 3) {
+      target.rotation.set(Number(data.rotation[0]), Number(data.rotation[1]), Number(data.rotation[2]));
+    }
+    if (Array.isArray(data.scale) && data.scale.length >= 3) {
+      target.scale.set(
+        Math.max(0.001, Number(data.scale[0])),
+        Math.max(0.001, Number(data.scale[1])),
+        Math.max(0.001, Number(data.scale[2]))
+      );
     }
   }
 
@@ -1329,7 +1690,7 @@ class Viewport3D {
     // Synthetic heat spreader geometry
     const vcGeom = new THREE.BoxGeometry(w * 0.82, 0.45, d * 0.72);
     const vcMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // Rich copper luster
+      color: 0xd97706, // Illustrative warm metallic appearance
       metalness: 0.95,
       roughness: 0.2
     });
@@ -1500,7 +1861,7 @@ class Viewport3D {
   // =========================================================================
   // 1B. Illustrative optomechanical camera lens assembly
   // Shows full internal cross-section: 8 glass elements in 6 groups, 9-blade iris,
-  // copper voice coil motor (VCM), internal light baffles, and ray tracing cone.
+  // metallic-looking accents, internal baffles, and an illustrative ray cone.
   // =========================================================================
 
   renderCameraLens3D(cutaway = true, cutawayAngle = Math.PI / 2, explodeFactor = 0, fStop = 1.4, showRays = true) {
@@ -1516,7 +1877,7 @@ class Viewport3D {
 
     // Common Materials
     const barrelMat = new THREE.MeshStandardMaterial({
-      color: 0x111827, // Matte Hard-Anodized Aircraft Unspecified structural material
+      color: 0x111827, // Illustrative matte dark appearance
       metalness: 0.88,
       roughness: 0.28,
       side: THREE.DoubleSide
@@ -1530,42 +1891,42 @@ class Viewport3D {
     });
 
     const baffleMat = new THREE.MeshStandardMaterial({
-      color: 0x050811, // Anti-Reflective Matte Flocked Black
+      color: 0x050811, // Illustrative dark baffle appearance
       roughness: 0.98,
       metalness: 0.1,
       side: THREE.DoubleSide
     });
 
     const brassCamMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // Precision Brass Helical Cam Collar
+      color: 0xd97706, // Illustrative warm metallic appearance
       metalness: 0.92,
       roughness: 0.35,
       side: THREE.DoubleSide
     });
 
     const copperVcmMat = new THREE.MeshStandardMaterial({
-      color: 0xb45309, // Pure Copper Electromagnetic Voice Coil Windings
+      color: 0xb45309, // Illustrative warm metallic appearance
       metalness: 0.96,
       roughness: 0.22,
       side: THREE.DoubleSide
     });
 
     const magnetMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8, // NdFeB Neodymium Stator Magnet
+      color: 0x94a3b8, // Illustrative gray-blue appearance
       metalness: 0.95,
       roughness: 0.18,
       side: THREE.DoubleSide
     });
 
     const bayonetMat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0, // Precision CNC Stainless Steel 316L Bayonet Flange
+      color: 0xe2e8f0, // Illustrative light-metal appearance
       metalness: 0.98,
       roughness: 0.15,
       side: THREE.DoubleSide
     });
 
     const goldPinMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b, // Hard Gold-Plated CPU Telemetry Contact Pins
+      color: 0xf59e0b, // Illustrative warm metallic contact-pin color
       metalness: 0.98,
       roughness: 0.1
     });
@@ -1615,7 +1976,7 @@ class Viewport3D {
     group.add(internalRearLight);
 
     // -----------------------------------------------------------------------
-    // 1. Outer Aluminum Lens Barrel with Cross-Section Cutaway Window
+    // 1. Outer illustrative lens barrel with a cross-section cutaway window
     // -----------------------------------------------------------------------
     const barrelGeom = new THREE.CylinderGeometry(
       barrelRadius,
@@ -1708,7 +2069,7 @@ class Viewport3D {
     explodedParts.push(apertureRing);
 
     // -----------------------------------------------------------------------
-    // 2. Internal Anti-Reflective Stepped Baffles & Lens Group Spacers
+    // 2. Internal dark stepped baffles and illustrative lens-group spacers
     // -----------------------------------------------------------------------
     [-22, -10, 8, 28, 42].forEach((zPos, idx) => {
       const baffleGeom = new THREE.RingGeometry(
@@ -1749,9 +2110,9 @@ class Viewport3D {
     group.add(helicoidMesh);
 
     // -----------------------------------------------------------------------
-    // 3. Voice Coil Motor (VCM) Electromagnetic Autofocus Linear Actuator
+    // 3. Illustrative actuator-ring geometry
     // -----------------------------------------------------------------------
-    // Outer Neodymium Magnetic Stator Ring
+    // Outer illustrative actuator ring
     const magnetGeom = new THREE.CylinderGeometry(
       barrelRadius * 0.9,
       barrelRadius * 0.9,
@@ -1771,7 +2132,7 @@ class Viewport3D {
     };
     group.add(magnetMesh);
 
-    // Inner Copper Electromagnetic Voice Coil
+    // Inner illustrative coil shape
     const vcmCoilGeom = new THREE.CylinderGeometry(
       barrelRadius * 0.86,
       barrelRadius * 0.86,
@@ -1825,7 +2186,7 @@ class Viewport3D {
       capMesh.position.z = -thickness * 0.25;
       lensGroup.add(capMesh);
 
-      // Aluminum mounting retaining cell ring
+      // Illustrative mounting and retaining ring
       const cellGeom = new THREE.CylinderGeometry(lensR + 1.2, lensR + 1.2, thickness * 0.6, 36, 1, true);
       const cellMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 });
       const cellMesh = new THREE.Mesh(cellGeom, cellMat);
@@ -1996,7 +2357,7 @@ class Viewport3D {
     );
 
     // -----------------------------------------------------------------------
-    // 6. Stainless Steel Bayonet Mount & Gold Contact Pins
+    // 6. Illustrative mount and contact-pin geometry
     // -----------------------------------------------------------------------
     const bayonetFlangeGeom = new THREE.CylinderGeometry(
       barrelRadius * 0.95,
@@ -2195,7 +2556,7 @@ class Viewport3D {
 
     // Materials
     const cfrpBarrelMat = new THREE.MeshStandardMaterial({
-      color: 0x18181b, // Carbon Fiber Reinforced Polymer (Toray T800 Matte)
+      color: 0x18181b, // Illustrative dark composite-like appearance
       metalness: 0.35,
       roughness: 0.65,
       side: THREE.DoubleSide
@@ -2209,28 +2570,28 @@ class Viewport3D {
     });
 
     const brassMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // C36000 Optical Retaining Rings
+      color: 0xd97706, // Illustrative warm metallic appearance
       metalness: 0.9,
       roughness: 0.3,
       side: THREE.DoubleSide
     });
 
     const vcmCopperMat = new THREE.MeshStandardMaterial({
-      color: 0xb45309, // Pure OFC Dual-VCM Copper Coils
+      color: 0xb45309, // Illustrative warm metallic appearance
       metalness: 0.95,
       roughness: 0.2,
       side: THREE.DoubleSide
     });
 
     const magnetMat = new THREE.MeshStandardMaterial({
-      color: 0x334155, // NdFeB N52SH Neodymium Magnets
+      color: 0x334155, // Illustrative dark gray-blue appearance
       metalness: 0.92,
       roughness: 0.15,
       side: THREE.DoubleSide
     });
 
     const ceramicGuideMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc, // Silicon Nitride Si3N4 Ceramic Guide Rods
+      color: 0xf8fafc, // Illustrative light guide appearance
       metalness: 0.1,
       roughness: 0.05
     });
@@ -2307,7 +2668,7 @@ class Viewport3D {
     l2.position.set(-100, 100, -80);
     group.add(l2);
 
-    // 1. CFRP Outer Barrel with Cutaway Section
+    // 1. Illustrative dark outer barrel with cutaway section
     const barrelGeom = new THREE.CylinderGeometry(
       barrelRadius,
       barrelRadius * 0.97,
@@ -2332,7 +2693,7 @@ class Viewport3D {
     group.add(barrelMesh);
     explodedParts.push(barrelMesh);
 
-    // 2. Titanium Grade 5 Coaxial Internal Sleeves
+    // 2. Illustrative coaxial internal sleeve geometry
     const tiSleeveGeom = new THREE.CylinderGeometry(
       barrelRadius - 2.5,
       barrelRadius - 2.5,
@@ -2396,7 +2757,7 @@ class Viewport3D {
       capMesh.position.z = -thickness * 0.25;
       elGroup.add(capMesh);
 
-      // Titanium retaining ring
+      // Illustrative gray-metal retaining ring appearance
       const ringGeom = new THREE.CylinderGeometry(r + 1.2, r + 1.2, thickness * 0.5, 36, 1, true);
       const ringMesh = new THREE.Mesh(ringGeom, titaniumMat);
       ringMesh.rotation.x = Math.PI / 2;
@@ -2532,7 +2893,7 @@ class Viewport3D {
     group.add(vcmCarriage);
     explodedParts.push(vcmCarriage);
 
-    // 6. 11-Blade Electromagnetic Rounded Iris Diaphragm (f/1.0 to f/16)
+    // 6. Illustrative 11-blade iris geometry scaled by the supplied f-stop value
     const irisGroup = new THREE.Group();
     const pupilR = Math.max(3.5, Math.min(25.0, 25.0 / Math.max(1.0, fStop)));
     const irisOuterR = 30.0;
@@ -2663,7 +3024,7 @@ class Viewport3D {
       'Illustrative element placement'
     );
 
-    // 11. Stainless Steel 316L Mount Bayonet & 12 Gold Pins
+    // 11. Illustrative mount and contact-pin geometry
     const bayonetMat = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
       metalness: 0.98,
@@ -2756,7 +3117,7 @@ class Viewport3D {
   }
 
   // =========================================================================
-  // 2. Drone & Aerospace: Carbon Fiber FPV / VTOL Quadcopter (CATIA / Fusion)
+  // 2. Synthetic UAV assembly geometry
   // =========================================================================
 
   renderDrone3D(armLength = 85, rpm = 8000) {
@@ -3444,7 +3805,42 @@ class Viewport3D {
   // 4. Illustrative stress color map (no solver output)
   // =========================================================================
 
-  renderFEAStressHeatmap(stressLevel = 'normal', maxStressVal = 145) {
+  renderFEAStressHeatmap(stressLevel = 'normal', maxStressVal = 145, stressValues = null, targetMesh = null) {
+    let mesh = targetMesh;
+    if (!mesh && this.currentMesh && typeof this.currentMesh.traverse === 'function') {
+      mesh = this.currentMesh;
+    }
+    if (mesh && typeof mesh.traverse === 'function' && !mesh.isMesh) {
+      let found = null;
+      mesh.traverse((m) => {
+        if (!found && m.isMesh && m.geometry && m.geometry.attributes && m.geometry.attributes.position) found = m;
+      });
+      mesh = found;
+    }
+    const data =
+      Array.isArray(stressValues) && stressValues.length > 0
+        ? stressValues
+        : stressValues &&
+            typeof stressValues === 'object' &&
+            !Array.isArray(stressValues) &&
+            Array.isArray(stressValues.values)
+          ? stressValues.values
+          : null;
+
+    if (mesh && data && data.length > 0) {
+      const res = this.applyStressColormap(mesh, data, {
+        min: undefined,
+        max: Number.isFinite(Number(maxStressVal)) ? Number(maxStressVal) : undefined,
+        colormap: 'turbo'
+      });
+      if (res.success) {
+        this.setViewportStats(
+          `Von Mises stress colormap applied to active mesh (${res.min.toFixed(1)}–${res.max.toFixed(1)} on '${stressLevel}' scale); solver result loaded`
+        );
+        return res;
+      }
+    }
+
     this.clearMesh();
     const group = new THREE.Group();
 
@@ -3496,12 +3892,12 @@ class Viewport3D {
       metalness: 0.4
     });
 
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.userData = {
+    const stressMesh = new THREE.Mesh(geom, mat);
+    stressMesh.userData = {
       partName: 'Illustrative stress color map geometry',
       materialName: 'Illustrative material (unsourced)'
     };
-    group.add(mesh);
+    group.add(stressMesh);
 
     // Subtle element edge wireframe overlay
     const wireGeom = new THREE.WireframeGeometry(geom);
@@ -3511,6 +3907,162 @@ class Viewport3D {
     this.currentMesh = group;
     this.scene.add(group);
     this.setViewportStats('Illustrative stress color map; no solver result is loaded');
+  }
+
+  /**
+   * Apply a real scalar-field colormap (e.g. von Mises stress) to a mesh's
+   * vertices. Accepts per-vertex or per-element (triangle) scalar values and
+   * expands element values onto vertices. Never destroys or replaces the mesh.
+   */
+  applyStressColormap(mesh, stressValues, options = {}) {
+    if (!mesh) return { success: false, error: 'no-mesh' };
+    if (!Array.isArray(stressValues) || stressValues.length === 0) {
+      return { success: false, error: 'no-stress-data' };
+    }
+    const colormap = options.colormap || 'turbo';
+    const geom = mesh.geometry;
+    if (!geom || !geom.attributes || !geom.attributes.position) {
+      return { success: false, error: 'invalid-geometry' };
+    }
+    const vertexCount = geom.attributes.position.count;
+    if (vertexCount <= 0) return { success: false, error: 'empty-geometry' };
+
+    let vertexValues = stressValues;
+    if (stressValues.length !== vertexCount) {
+      vertexValues = this._expandStressPerElement(stressValues, vertexCount, geom.index ? geom.index.array : null);
+    }
+    if (!vertexValues || vertexValues.length !== vertexCount) {
+      return { success: false, error: 'stress-count-mismatch' };
+    }
+
+    let min = typeof options.min === 'number' && Number.isFinite(options.min) ? options.min : Infinity;
+    let max = typeof options.max === 'number' && Number.isFinite(options.max) ? options.max : -Infinity;
+    for (let i = 0; i < vertexCount; i++) {
+      const v = Number(vertexValues[i]);
+      if (Number.isFinite(v)) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return { success: false, error: 'non-numeric-stress' };
+    if (!(max > min)) max = min + 1e-6;
+
+    const colorArray = new Float32Array(vertexCount * 3);
+    for (let i = 0; i < vertexCount; i++) {
+      const raw = Number(vertexValues[i]);
+      const v = Number.isFinite(raw) ? raw : min;
+      const t = Math.max(0, Math.min(1, (v - min) / (max - min)));
+      const rgb = this._colormapColor(colormap, t);
+      colorArray[i * 3] = rgb[0];
+      colorArray[i * 3 + 1] = rgb[1];
+      colorArray[i * 3 + 2] = rgb[2];
+    }
+
+    geom.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+
+    const firstMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    if (firstMat && firstMat.isMaterial) {
+      if (!firstMat.vertexColors) {
+        const clone = firstMat.clone();
+        clone.vertexColors = true;
+        clone.needsUpdate = true;
+        clone.userData.__omniStressClone = true;
+        if (Array.isArray(mesh.material)) mesh.material = [clone];
+        else mesh.material = clone;
+      } else {
+        firstMat.needsUpdate = true;
+      }
+    }
+
+    return { success: true, min, max, applied: true, colormap, vertexCount };
+  }
+
+  _expandStressPerElement(elements, vertexCount, indexArray) {
+    const out = new Float32Array(vertexCount);
+    let fillUnassigned = () => {
+      for (let i = 0; i < vertexCount; i++) {
+        if (!Number.isFinite(out[i])) out[i] = 0;
+      }
+      return out;
+    };
+
+    if (indexArray && indexArray.length >= 3) {
+      for (let ti = 0; ti + 2 < indexArray.length; ti += 3) {
+        const e = Math.min(Math.floor(ti / 3), elements.length - 1);
+        const ev = Number(elements[e]);
+        for (let k = 0; k < 3; k++) out[indexArray[ti + k]] = ev;
+      }
+      return fillUnassigned();
+    }
+
+    const triCount = Math.floor(vertexCount / 3);
+    for (let t = 0; t < triCount; t++) {
+      const e = Math.min(t, elements.length - 1);
+      const ev = Number(elements[e]);
+      out[t * 3] = ev;
+      out[t * 3 + 1] = ev;
+      out[t * 3 + 2] = ev;
+    }
+    return fillUnassigned();
+  }
+
+  _colormapColor(name, t) {
+    if (name === 'rainbow') {
+      if (t < 0.25) return [0, t * 4, 1];
+      if (t < 0.5) return [0, 1, 1 - (t - 0.25) * 4];
+      if (t < 0.75) return [(t - 0.5) * 4, 1, 0];
+      return [1, 1 - (t - 0.75) * 4, 0];
+    }
+    if (name === 'viridis') return this._viridisColor(t);
+    return this._turboColor(t);
+  }
+
+  _turboColor(t) {
+    const r =
+      0.13572138 +
+      4.6153926 * t -
+      42.66032258 * t * t +
+      132.13108234 * t * t * t -
+      152.94239396 * t * t * t * t +
+      59.28637943 * t * t * t * t * t;
+    const g =
+      0.09140261 +
+      2.19418839 * t +
+      4.84296658 * t * t -
+      14.18503333 * t * t * t +
+      4.27729857 * t * t * t * t +
+      2.82956604 * t * t * t * t * t;
+    const b =
+      0.1066733 +
+      12.64194608 * t -
+      60.58204836 * t * t +
+      110.36276771 * t * t * t -
+      89.90310912 * t * t * t * t +
+      27.34824973 * t * t * t * t * t;
+    return [Math.max(0, Math.min(1, r)), Math.max(0, Math.min(1, g)), Math.max(0, Math.min(1, b))];
+  }
+
+  _viridisColor(t) {
+    const stops = [
+      [0.0, 0.267, 0.005, 0.329],
+      [0.1, 0.283, 0.141, 0.458],
+      [0.2, 0.254, 0.265, 0.53],
+      [0.3, 0.207, 0.372, 0.553],
+      [0.4, 0.164, 0.471, 0.558],
+      [0.5, 0.128, 0.567, 0.551],
+      [0.6, 0.135, 0.659, 0.518],
+      [0.7, 0.267, 0.749, 0.441],
+      [0.8, 0.478, 0.821, 0.318],
+      [0.9, 0.741, 0.873, 0.15],
+      [1.0, 0.993, 0.906, 0.144]
+    ];
+    let i = 0;
+    while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+    const a = stops[i];
+    const b = stops[i + 1];
+    const span = b[0] - a[0] || 1;
+    const f = (t - a[0]) / span;
+    return [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f];
   }
 
   /**
@@ -3561,8 +4113,20 @@ class Viewport3D {
   /**
    * Render 3D CNC Toolpath Trajectory Lines.
    */
+  runToolpath3D(layers) {
+    if (!Array.isArray(layers)) {
+      if (layers && typeof layers === 'object' && Array.isArray(layers.layers)) {
+        layers = layers.layers;
+      } else {
+        return { success: false, error: 'invalid-toolpath-layers' };
+      }
+    }
+    this.renderToolpath3D(layers);
+    return { success: true, applied: true };
+  }
+
   renderToolpath3D(layers = []) {
-    if (!layers || layers.length === 0) return;
+    if (!layers || typeof layers !== 'object' || layers.length === 0) return;
 
     const toolpathGroup = new THREE.Group();
     toolpathGroup.name = 'CNC_Toolpath_Overlay';
@@ -3571,14 +4135,28 @@ class Viewport3D {
     const existing = this.scene.getObjectByName('CNC_Toolpath_Overlay');
     if (existing) this.scene.remove(existing);
 
+    const toVec = (p, fallback) => {
+      if (p && typeof p === 'object') {
+        if (Array.isArray(p.coords) && p.coords.length >= 3) {
+          return { x: Number(p.coords[0]) || 0, y: Number(p.coords[1]) || 0, z: Number(p.coords[2]) || 0 };
+        }
+        if (Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)) {
+          return { x: p.x, y: p.y, z: p.z };
+        }
+      }
+      return fallback;
+    };
+
     for (const layer of layers) {
+      if (!layer || typeof layer !== 'object' || !Array.isArray(layer) || layer.length < 2) continue;
       const cutPositions = [];
       const rapidPositions = [];
 
       for (let i = 0; i < layer.length - 1; i++) {
-        const p1 = layer[i];
-        const p2 = layer[i + 1];
-        if (p2.type === 'cut') {
+        const p1 = toVec(layer[i], null);
+        if (!p1) continue;
+        const p2 = toVec(layer[i + 1], p1);
+        if (layer[i + 1] && typeof layer[i + 1] === 'object' && layer[i + 1].type === 'cut') {
           cutPositions.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
         } else {
           rapidPositions.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
