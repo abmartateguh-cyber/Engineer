@@ -51,7 +51,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "electron": "43.8.6",
-    "electron-builder": "^26.5.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^9.39.5",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
